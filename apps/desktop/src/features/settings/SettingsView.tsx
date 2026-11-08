@@ -10,12 +10,20 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
 
-/** 设置项之间只用一条发丝线分隔：分组是信息层级，不需要再画一层框。 */
+/**
+ * 设置分组卡片。
+ *
+ * B 站的设置页是一叠带标题的白色卡片，不是一长条用发丝线切开的文字流。
+ * 卡片之间留 12px，卡片自己带 8px 圆角和 B 站那条 0 2px 8px 的阴影。
+ */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-b border-hairline py-6">
-      <h2 className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">{title}</h2>
-      <div className="mt-4">{children}</div>
+    <section className="rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <h2 className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-1)]">
+        <span className="h-3 w-[3px] rounded-full bg-[var(--accent)]" />
+        {title}
+      </h2>
+      <div className="mt-3">{children}</div>
     </section>
   )
 }
@@ -73,7 +81,7 @@ export function SettingsView() {
       
 
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-2">
-        <div className="max-w-[880px]">
+        <div className="mx-auto flex max-w-[720px] flex-col gap-3 py-4">
           <Section title="快捷键">
             <ShortcutTable />
           </Section>
