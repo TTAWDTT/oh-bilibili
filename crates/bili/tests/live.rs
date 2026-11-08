@@ -31,6 +31,9 @@ async fn 搜索到取流的完整链路可用() {
         println!("封面样本：{c}");
     }
     assert!(with_cover > 0, "搜索结果应该带封面，否则列表只能显示字母占位");
+    let with_avatar = tracks.iter().filter(|t| t.up_avatar.is_some()).count();
+    println!("带 UP 头像的结果：{with_avatar}/{}", tracks.len());
+    assert!(with_avatar > 0, "搜索结果应该带 UP 主头像");
 
     let first = &tracks[0];
     assert!(

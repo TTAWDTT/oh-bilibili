@@ -346,7 +346,7 @@ mod wire {
                 typeid: as_u32(&item["typeid"]),
                 views: item["play"].as_u64().unwrap_or(0),
                 danmaku: item["video_review"].as_u64().unwrap_or(0),
-                up_avatar: None,
+                up_avatar: norm_cover(item["upic"].as_str().unwrap_or("")),
                 score: 0.0,
             });
         }
