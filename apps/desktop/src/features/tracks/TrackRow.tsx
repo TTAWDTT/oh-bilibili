@@ -37,7 +37,8 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         onClick={onPlay}
         aria-label={`播放 ${track.title}`}
         title={`播放 ${track.title}`}
-        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[4px] border border-white/32"
+        data-row="cover"
+          className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[4px] border border-white/32"
       >
         <Cover
           cover={track.cover}
