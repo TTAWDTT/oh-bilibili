@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { REAL_COVERS } from '../../shared/lib/realCovers'
 import { Bili2233 } from '../../shared/ui/Bili2233'
 
 type Slide = {
+  image: string | undefined
   title: string
   desc: string
   from: string
@@ -16,18 +18,21 @@ type Slide = {
  */
 const SLIDES: Slide[] = [
   {
+    image: REAL_COVERS['孤勇者'],
     title: '干杯，把 B 站的声音装进口袋',
     desc: '搜索、播放、弹幕、歌词、投币三连，全在本机完成。',
     from: '#ff5c8a',
     to: '#7b6bff',
   },
   {
+    image: REAL_COVERS['海底'],
     title: '22 娘和 33 娘守在这里',
     desc: '每一条音轨都来自你自己的 B 站账号，不经任何中转。',
     from: '#00aeec',
     to: '#ff6699',
   },
   {
+    image: REAL_COVERS['大鱼'],
     title: '一键三连，也是一种收藏方式',
     desc: '点赞、投币、收进「哔哩哔哩 music」，和你账号里同步。',
     from: '#ff9f2e',
@@ -50,11 +55,25 @@ export function SearchBanner() {
           key={slide.title}
           aria-hidden={i !== active}
           className="bili-banner-slide absolute inset-0 transition-opacity duration-700"
-          style={{
-            opacity: i === active ? 1 : 0,
-            background: `linear-gradient(105deg, ${slide.from} 0%, ${slide.to} 100%)`,
-          }}
+          style={{ opacity: i === active ? 1 : 0 }}
         >
+          {slide.image ? (
+            <img
+              src={slide.image}
+              alt=""
+              aria-hidden
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 h-full w-full scale-110 object-cover"
+            />
+          ) : null}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: slide.image
+                ? `linear-gradient(100deg, rgb(0 0 0 / 0.82) 0%, rgb(0 0 0 / 0.55) 38%, rgb(0 0 0 / 0.12) 70%, transparent 100%)`
+                : `linear-gradient(105deg, ${slide.from} 0%, ${slide.to} 100%)`,
+            }}
+          />
           {/* 右上角柔光 */}
           <div
             className="pointer-events-none absolute -right-12 -top-20 h-72 w-72 rounded-full"
