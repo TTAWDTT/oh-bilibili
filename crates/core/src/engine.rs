@@ -396,25 +396,60 @@ impl Engine {
         }
     }
 
-    /// 启动时恢复上次的队列。曲目详情从已知缓存里取，取不到的丢弃。
-    fn restore_queue(&self) {
+    /// 启动时恢复上次的队列，缺的曲目在后台慢慢补齐。
+    ///
+    /// 先恢复能立刻拿到的，剩下的交给 [`Engine::backfill_queue`]，
+    /// 启动不会被几十次网络请求拖住。
+    fn restore_queue(self: &Arc<Self>) {
         let Ok(Some(raw)) = self.library.load_queue() else {
             return;
         };
         let Ok(keys): Result<Vec<String>, _> = serde_json::from_str(&raw) else {
             return;
         };
-        let known = lock(&self.known);
-        let tracks: Vec<Track> = keys
-            .iter()
-            .filter_map(|k| known.get(k).cloned())
-            .collect();
-        drop(known);
-        if tracks.is_empty() {
+        if keys.is_empty() {
             return;
         }
-        let mut q = lock(&self.queue);
-        *q = Queue::from_tracks(&tracks, 0);
+        let tracks = self.tracks_for(&keys);
+        if !tracks.is_empty() {
+            let mut q = lock(&self.queue);
+            *q = Queue::from_tracks(&tracks, 0);
+        }
+
+        // 有缺的就后台补，补完再整体替换队列。
+        if tracks.len() < keys.len() {
+            let engine = self.clone();
+            std::thread::spawn(move || {
+                let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+                    Ok(rt) => rt,
+                    Err(_) => return,
+                };
+                rt.block_on(async {
+                    for key in &keys {
+                        if lock(&engine.known).contains_key(key) {
+                            continue;
+                        }
+                        let track_key = TrackKey::from_provider(key.clone());
+                        if let Ok(detail) = engine.source.detail(&track_key).await {
+                            engine.remember(&detail.track);
+                        }
+                        // 限速队列本身会排队，这里只需要给彼此留点间隔。
+                        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                    }
+                    let filled = engine.tracks_for(&keys);
+                    if !filled.is_empty() {
+                        let mut q = lock(&engine.queue);
+                        *q = Queue::from_tracks(&filled, 0);
+                    }
+                });
+            });
+        }
+    }
+
+    /// 按 key 列表取已知曲目，顺序保持。
+    fn tracks_for(&self, keys: &[String]) -> Vec<Track> {
+        let known = lock(&self.known);
+        keys.iter().filter_map(|k| known.get(k).cloned()).collect()
     }
 
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
