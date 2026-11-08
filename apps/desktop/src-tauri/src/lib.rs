@@ -3,6 +3,8 @@
 //! 这里只做四件事：创建窗口、注册命令、把引擎事件转成前端事件、跑进度心跳。
 //! 业务逻辑全在 `bilimusic-core` 里。
 
+mod mv;
+
 use std::sync::Arc;
 
 use bilimusic_core::engine::Engine;
@@ -49,6 +51,23 @@ struct DownloadView {
     state: String,
     progress: f32,
     path: Option<String>,
+}
+
+/// MV 代理监听的端口，界面用它拼视频地址。
+struct MvPort(u16);
+
+#[tauri::command]
+fn mv_port(port: tauri::State<'_, MvPort>) -> u16 {
+    port.0
+}
+
+/// 取一条可播放的 mp4 直链；界面会把它交给本地代理转发。
+#[tauri::command(rename_all = "snake_case")]
+async fn mv_source(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<String, WireError> {
+    engine.mv_url(&TrackKey::from_provider(key)).await
 }
 
 #[tauri::command]
@@ -280,6 +299,9 @@ pub fn run() {
             let db_path = dir.join("library.sqlite");
 
             let engine = Engine::new(&db_path)?;
+            let mv_port = mv::spawn(engine.cookie_header())
+                .map_err(|e| format!("MV 代理起不来：{e}"))?;
+            app.manage(MvPort(mv_port));
             app.manage(engine.clone());
 
             // 引擎事件 -> 前端事件。全应用只有这一处 emit。
@@ -302,6 +324,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             health,
+            mv_port,
+            mv_source,
             search_q,
             player_state,
             player_play,

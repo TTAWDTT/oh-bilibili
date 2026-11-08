@@ -183,6 +183,37 @@ impl Source {
         Ok(wire::subtitle_lines(&body))
     }
 
+    /// 取一条音视频合一的 MP4 地址，给界面里的 `<video>` 用。
+    ///
+    /// 用 fnval=1 拿 durl，而不是 DASH：MASH 的音轨与视频轨是分开的，
+    /// 要自己同步；durl 是单个 mp4，浏览器原生播放器能直接处理。
+    pub async fn mv_url(&self, key: &TrackKey) -> Result<String, BiliError> {
+        let bvid = key.as_opaque().to_string();
+        let detail = self.detail(key).await?;
+        let value = self
+            .client
+            .signed_get(
+                &format!("{}/x/player/wbi/playurl", client::API),
+                vec![
+                    ("bvid", bvid),
+                    ("cid", detail.cid.to_string()),
+                    ("fnval", "1".to_string()),
+                    ("platform", "pc".to_string()),
+                ],
+                PLAY_INTERVAL,
+            )
+            .await?;
+        value["data"]["durl"][0]["url"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| BiliError::Parse("这条视频没有可播放的 mp4".into()))
+    }
+
+    /// 当前 cookie 串，代理转发视频时要带上。
+    pub fn cookie_header(&self) -> String {
+        self.client.cookie_header()
+    }
+
     /// 给音频层用的请求头。`audio` 不认识 B 站，只认识这些键值。
     pub fn stream_headers(&self) -> Vec<(String, String)> {
         let cookie = self.client.cookie_header();

@@ -418,6 +418,14 @@ impl Engine {
         }
     }
 
+    pub fn cookie_header(&self) -> String {
+        self.source.cookie_header()
+    }
+
+    pub async fn mv_url(&self, key: &TrackKey) -> Result<String, WireError> {
+        Ok(self.source.mv_url(key).await?)
+    }
+
     pub async fn auth_qrcode(&self) -> Result<bilimusic_bili::auth::QrChallenge, WireError> {
         Ok(self.source.login_qr().await?)
     }
