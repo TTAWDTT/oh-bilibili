@@ -47,7 +47,8 @@ npm run dev          # 起 Tauri 开发窗口
 npm run web
 ```
 
-下载功能需要一个 yt-dlp 可执行文件。放到 `resources/yt-dlp` 即可：
+下载功能需要一个 yt-dlp 可执行文件。源码树里放 `resources/yt-dlp`；**打包后的 `.app` 不认这个路径**，
+要么把它放进 `BiliMusic.app/Contents/MacOS/resources/`，要么装到 PATH 里（brew 或 pip 都行）。
 
 ```sh
 curl -L -o resources/yt-dlp \
