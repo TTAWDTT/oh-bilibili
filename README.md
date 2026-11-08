@@ -86,6 +86,8 @@ cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
 - **登录系功能没有真机验证。** 二维码登录、点赞、收藏三条路径写完了，离线测试只覆盖「未登录时被正确挡住」与「二维码能生成」。真账号下的成功路径需要你自己点一遍。
 - **内存超预算。** 预算写的 120MB，实测 release 主进程 112MB，加上 WKWebView 的子进程会更高。webview 的基线压不下去，要么调预算，要么换成原生绘制。
 - **播放队列不跨重启恢复。** v1 明确的非目标。
+- **歌词只有两级。** 本地 `.lrc`（放 `~/Music/BiliMusic/<歌名>.lrc`）与 lrclib。
+  计划里的第三级「B 站字幕」没接，`lyrics` 表建了但没写入。
 - **`cargo public-api` 闸门未接入。** 现在只有依赖方向断言。
 
 ## 架构

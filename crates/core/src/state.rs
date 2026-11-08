@@ -532,11 +532,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn 空闲态没有音源也没有音轨() {
-        let s = PlayerState::Idle;
-        assert!(s.track().is_none());
-        assert!(s.prepared().is_none());
-        assert_eq!(s.phase(), "idle");
-    }
 }

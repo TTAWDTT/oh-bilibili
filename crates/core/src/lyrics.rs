@@ -150,6 +150,23 @@ pub fn lyric_queries(raw: &str) -> Vec<String> {
 }
 
 /// 从 lrclib 找歌词。这个接口免鉴权，实测返回逐字时间轴。
+/// 本地 lrc：和下载目录同名放一份 `.lrc` 就能用。
+pub fn from_local(track: &Track) -> Option<LyricDoc> {
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from)?;
+    let dir = home.join("Music").join("BiliMusic");
+    let base = clean_title(&track.title);
+    if base.is_empty() {
+        return None;
+    }
+    let path = dir.join(format!("{base}.lrc"));
+    let raw = std::fs::read_to_string(path).ok()?;
+    let doc = parse_lrc(&raw);
+    if doc.lines.is_empty() {
+        return None;
+    }
+    Some(doc)
+}
+
 pub async fn from_lrclib(
     http: &reqwest::Client,
     track: &Track,

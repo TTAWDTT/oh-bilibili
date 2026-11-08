@@ -382,9 +382,14 @@ impl Engine {
             return Ok(doc);
         }
         let track = self.track_of(key)?;
-        let doc = lyrics::from_lrclib(&self.http, &track)
-            .await
-            .unwrap_or_else(LyricDoc::empty);
+        // 两级回退：本地 lrc 优先（用户自己放的更准），再打 lrclib。
+        // B 站字幕那一级还没接，README 已写明。
+        let doc = match lyrics::from_local(&track) {
+            Some(doc) => doc,
+            None => lyrics::from_lrclib(&self.http, &track)
+                .await
+                .unwrap_or_else(LyricDoc::empty),
+        };
         lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
         Ok(doc)
     }
