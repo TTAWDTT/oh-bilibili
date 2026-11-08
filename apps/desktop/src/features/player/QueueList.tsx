@@ -70,7 +70,7 @@ export function QueueList() {
     return (
       <EmptyState
         icon="biliTv"
-        title="队列是空的"
+        title="前方高能，队列还是空的"
         detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
         action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
         compact

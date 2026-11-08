@@ -37,7 +37,7 @@ export function LikedView() {
           <div className="flex min-h-[320px] flex-1 items-center justify-center">
             <EmptyState
               icon="heart"
-              title="还没有喜欢的歌"
+              title="一个红心都没点，下次一定？"
               detail="在任意歌曲上点一下红心，它会出现在这里。"
               action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
             />

@@ -14,7 +14,7 @@ import { SettingsView } from '../features/settings/SettingsView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
-import { IconRail } from './IconRail'
+import { ChannelBar } from './ChannelBar'
 import { Sidebar } from './Sidebar'
 import { StageGlow } from './StageGlow'
 import { StatusBar } from './StatusBar'
@@ -63,9 +63,9 @@ export default function App() {
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--bg,var(--color-ink))] text-[var(--text-1)]">
       <StageGlow />
       <TitleBar />
+      <ChannelBar />
 
       <div className="relative z-10 flex min-h-0 flex-1">
-        <IconRail />
         <Sidebar />
         <main className="block min-w-0 flex-1 overflow-hidden">
           <CurrentView view={view} />

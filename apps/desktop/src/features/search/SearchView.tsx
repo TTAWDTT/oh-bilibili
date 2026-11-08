@@ -88,12 +88,13 @@ export function SearchView() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
         <form
+          className="flex items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault()
             setNonce((current) => current + 1)
           }}
         >
-          <div className="flex items-center gap-2 rounded-[4px] border border-hairline bg-[var(--panel-raised)] px-4 py-3 focus-within:border-[var(--line)]">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[4px] border border-hairline bg-[var(--panel-raised)] px-4 py-3 focus-within:border-[var(--line)]">
             <Icon name="search" size={18} className="text-[var(--text-2)]" />
             <input
               ref={inputRef}
@@ -125,7 +126,7 @@ export function SearchView() {
           <button
             type="submit"
             aria-label="搜索"
-            className="search-btn-pink ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
+            className="search-btn-pink flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
           >
             <Icon name="search" size={15} />
           </button>
