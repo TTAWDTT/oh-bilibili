@@ -18,20 +18,20 @@ const SLIDES: Slide[] = [
   {
     title: '干杯，把 B 站的声音装进口袋',
     desc: '搜索、播放、弹幕、歌词、投币三连，全在本机完成。',
-    from: 'color-mix(in oklab, var(--bili-pink) 30%, white)',
-    to: 'color-mix(in oklab, var(--bili-blue) 18%, white)',
+    from: '#ff5c8a',
+    to: '#7b6bff',
   },
   {
     title: '22 娘和 33 娘守在这里',
     desc: '每一条音轨都来自你自己的 B 站账号，不经任何中转。',
-    from: 'color-mix(in oklab, var(--bili-blue) 26%, white)',
-    to: 'color-mix(in oklab, var(--bili-pink) 16%, white)',
+    from: '#00aeec',
+    to: '#ff6699',
   },
   {
     title: '一键三连，也是一种收藏方式',
     desc: '点赞、投币、收进「哔哩哔哩 music」，和你账号里同步。',
-    from: 'color-mix(in oklab, #ffb027 30%, white)',
-    to: 'color-mix(in oklab, var(--bili-pink) 22%, white)',
+    from: '#ff9f2e',
+    to: '#ff5c8a',
   },
 ]
 
@@ -62,8 +62,8 @@ export function SearchBanner() {
           />
           <div className="relative flex h-full items-center justify-between gap-6 px-8">
             <div className="min-w-0">
-              <div className="text-[24px] font-semibold leading-tight text-[#4c3340]">{slide.title}</div>
-              <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-[#7d5a67]">{slide.desc}</p>
+              <div className="text-[24px] font-semibold leading-tight text-white">{slide.title}</div>
+              <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-white/85">{slide.desc}</p>
               <div className="mt-4 flex items-center gap-1.5">
                 {SLIDES.map((_, dot) => (
                   <button
