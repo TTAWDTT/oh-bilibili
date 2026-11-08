@@ -26,7 +26,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           void toggleLike(track)
         }}
         className={[
-          't press rounded-[4px] p-1',
+          't press flex h-6 w-6 items-center justify-center rounded-[4px]',
           liked ? 'text-[var(--accent)]' : 'text-white/48 hover:text-white',
         ].join(' ')}
       >
@@ -42,7 +42,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           void toggleFav(track)
         }}
         className={[
-          't press rounded-[4px] p-1',
+          't press flex h-6 w-6 items-center justify-center rounded-[4px]',
           faved ? 'text-[#ffc46b]' : 'text-white/48 hover:text-white',
         ].join(' ')}
       >

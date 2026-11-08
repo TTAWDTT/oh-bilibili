@@ -16,7 +16,7 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       onClick={onClick}
       aria-pressed={active}
       className={[
-        't flex h-full items-center border-b-2 text-[12px]',
+        't flex h-8 items-center border-b-2 text-[12px]',
         active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/62 hover:text-white',
       ].join(' ')}
     >
