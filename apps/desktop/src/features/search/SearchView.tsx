@@ -4,7 +4,6 @@ import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
@@ -30,14 +29,23 @@ export function SearchView() {
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
-  const [focused, setFocused] = useState(false)
   const [partition, setPartition] = useState('全部')
   const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
   const history = useSearchHistory((s) => s.items)
   const pushHistory = useSearchHistory((s) => s.push)
-  const clearHistory = useSearchHistory((s) => s.clear)
+  const heroQuery = useAppStore((state) => state.heroQuery)
+  const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const authorQuery = useAppStore((state) => state.authorQuery)
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+
+  // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
+  useEffect(() => {
+    if (!heroQuery) return
+    setQuery(heroQuery)
+    setPage(1)
+    setNonce((n) => n + 1)
+    setHeroQuery(null)
+  }, [heroQuery, setHeroQuery])
 
   // 从别处点 UP 主进来时，把名字填进搜索框并立刻搜一次。
   useEffect(() => {
@@ -118,55 +126,9 @@ export function SearchView() {
         }}
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6"
       >
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            setNonce((current) => current + 1)
-          }}
-        >
-          <div className="bili-focus-scale flex min-w-0 flex-1 items-center gap-2 rounded-[6px] border border-hairline bg-[var(--panel-raised)] px-4 py-3 focus-within:border-[var(--accent)]">
-            <Icon name="search" size={18} className="text-[var(--text-2)]" />
-            <input
-              ref={inputRef}
-              onFocus={() => setFocused(true)}
-              onBlur={() => window.setTimeout(() => setFocused(false), 150)}
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setPage(1)
-              }}
-              aria-label="搜索歌曲"
-              placeholder="歌名、UP 主，或者一句歌词"
-              className="min-w-0 flex-1 bg-transparent text-[16px] text-[var(--text-1)] placeholder:text-[var(--text-2)]"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="清空输入"
-                title="清空输入"
-                className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-[var(--text-1)]"
-              >
-                <Icon name="close" size={14} />
-              </button>
-            ) : (
-              <kbd className="kbd hidden shrink-0 sm:inline-flex" aria-hidden>
-                ⌘K
-              </kbd>
-            )}
-          </div>
-          <button
-            type="submit"
-            aria-label="搜索"
-            className="search-btn-pink flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
-          >
-            <Icon name="search" size={15} />
-          </button>
+        {/* 搜索框在顶栏，这里只呈现结果。 */}
 
-        </form>
-
-        {focused && trimmed.length === 0 ? (
+        {trimmed.length === 0 && history.length > 0 ? (
           <div className="bili-suggest relative z-20 -mt-1 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
             <div className="flex items-center gap-2">
               <span className="bili-tag-blue rounded-[3px] px-1.5 text-[12px] leading-[17px]">热门</span>
@@ -207,32 +169,6 @@ export function SearchView() {
 
         {trimmed.length === 0 ? (
           <div className="mt-6">
-            {history.length > 0 ? (
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">搜索历史</span>
-                  <button
-                    type="button"
-                    onClick={clearHistory}
-                    className="text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-                  >
-                    清空
-                  </button>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {history.map((word) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => pick(word)}
-                      className="t rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
 
             <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
               <SearchBanner />

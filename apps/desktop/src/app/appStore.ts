@@ -20,6 +20,8 @@ type AppStore = {
   rail: RailTab | null
   /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
   searchFocus: number
+  /** 顶栏搜索框提交的关键词，搜索页消费一次后清空。 */
+  heroQuery: string | null
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
@@ -31,6 +33,7 @@ type AppStore = {
   toggleRail: (tab: RailTab) => void
   closeRail: () => void
   focusSearch: () => void
+  setHeroQuery: (q: string | null) => void
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
@@ -44,6 +47,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,
+  heroQuery: null,
   authOpen: false,
   mv: null,
   stage: false,
@@ -54,6 +58,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
+  setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),
