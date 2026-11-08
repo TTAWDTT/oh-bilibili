@@ -25,6 +25,22 @@ impl Client {
         Ok(())
     }
 
+    /// 投币。`count` 是 1 或 2（B 站上限两枚）；`also_like` 为真时同时点赞，一键三连就是这么来的。
+    pub async fn add_coin(&self, aid: u64, count: u8, also_like: bool) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        let body = vec![
+            ("aid", aid.to_string()),
+            ("multiply", count.clamp(1, 2).to_string()),
+            ("select_like", if also_like { "1" } else { "0" }.to_string()),
+            ("csrf", csrf),
+        ];
+        self.post_form(&format!("{API}/x/web-interface/coin/add"), body)
+            .await?;
+        Ok(())
+    }
+
     /// 找收藏夹，没有就建一个。返回 media_id。
     pub async fn ensure_fav_folder(&self, name: &str) -> Result<i64, BiliError> {
         let mid = self

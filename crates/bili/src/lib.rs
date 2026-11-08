@@ -136,6 +136,12 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// 投币。三连里的「币」，和点赞是同一次操作的两个动作。
+    pub async fn add_coin(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        self.client.add_coin(detail.aid, count, also_like).await
+    }
+
     /// 收藏：落到固定名字的收藏夹，没有就建。
     pub async fn set_favorite(&self, key: &TrackKey, on: bool) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

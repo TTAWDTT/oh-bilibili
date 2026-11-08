@@ -371,6 +371,12 @@ impl Engine {
         Ok(())
     }
 
+    /// 投币。真实写进 B 站账号，失败会返回可读的错误。
+    pub async fn coin_set(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), WireError> {
+        self.source.add_coin(key, count, also_like).await?;
+        Ok(())
+    }
+
     pub async fn fav_set(&self, key: &TrackKey, faved: bool) -> Result<(), WireError> {
         self.source.set_favorite(key, faved).await?;
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {

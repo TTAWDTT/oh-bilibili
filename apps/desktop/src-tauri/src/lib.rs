@@ -213,6 +213,18 @@ async fn like_set(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn coin_set(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    count: u8,
+    also_like: bool,
+) -> Result<(), WireError> {
+    engine
+        .coin_set(&TrackKey::from_provider(key), count, also_like)
+        .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn fav_set(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -353,6 +365,7 @@ pub fn run() {
             library_add,
             library_tracks,
             like_set,
+            coin_set,
             fav_set,
             lyrics_get,
             auth_status,

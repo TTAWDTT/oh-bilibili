@@ -1,3 +1,6 @@
+import * as ipc from '../../shared/lib/ipc'
+import { toWireError } from '../../shared/lib/errors'
+import { toastDone, toastFailure } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { formatDuration } from '../../shared/lib/format'
@@ -49,6 +52,18 @@ type TrackGridProps = {
 export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const setMv = useAppStore((state) => state.setMv)
+
+  /** 三连动作统一入口：失败走同一套提示，不静默。 */
+  const act = async (kind: 'like' | 'coin' | 'fav', track: Track): Promise<void> => {
+    try {
+      if (kind === 'like') await ipc.likeSet(track.key, true)
+      else if (kind === 'fav') await ipc.favSet(track.key, true)
+      else await ipc.coinAdd(track.key, 1, true)
+      toastDone(kind === 'like' ? '已点赞' : kind === 'fav' ? '已收藏' : '已投币并点赞')
+    } catch (e) {
+      toastFailure('三连', toWireError(e))
+    }
+  }
 
   return (
     <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))]">
@@ -129,6 +144,17 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               ))}
             </div>
 
+            <button
+              type="button"
+              aria-label={`看 ${track.title} 的 MV`}
+              title="看 MV"
+              onClick={() => setMv({ key: track.key, title: track.title })}
+              className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              <Icon name="biliTv" size={11} />
+              看 MV
+            </button>
+
             <div className="mt-1 flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-3)]">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
@@ -136,20 +162,36 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   {track.artist}
                 </span>
               </span>
-              {/* 三连：赞 / 币 / 藏，B 站最辨识的一组操作 */}
+              {/* 三连：赞 / 币 / 藏，都是真接口，不是装饰 */}
               <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <Icon name="heart" size={12} className="hover:text-[var(--accent)]" />
-                <span className="h-2.5 w-px bg-[var(--line)]" />
-                <Icon name="coin" size={12} className="hover:text-[var(--accent)]" />
+                <button
+                  type="button"
+                  aria-label="点赞"
+                  title="点赞"
+                  onClick={() => void act('like', track)}
+                  className="hover:text-[var(--accent)]"
+                >
+                  <Icon name="heart" size={12} />
+                </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
                   type="button"
-                  aria-label="看 MV"
-                  title="看 MV"
-                  onClick={() => setMv({ key: track.key, title: track.title })}
+                  aria-label="投币"
+                  title="投币"
+                  onClick={() => void act('coin', track)}
                   className="hover:text-[var(--accent)]"
                 >
-                  <Icon name="biliTv" size={12} />
+                  <Icon name="coin" size={12} />
+                </button>
+                <span className="h-2.5 w-px bg-[var(--line)]" />
+                <button
+                  type="button"
+                  aria-label="收藏"
+                  title="收藏"
+                  onClick={() => void act('fav', track)}
+                  className="hover:text-[var(--accent)]"
+                >
+                  <Icon name="bookmark" size={12} />
                 </button>
               </span>
             </div>

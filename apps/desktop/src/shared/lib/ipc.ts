@@ -111,6 +111,11 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+/** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
+export function coinAdd(key: string, count: number, alsoLike: boolean): Promise<null> {
+  return call<null>('coin_set', { key, count, also_like: alsoLike })
+}
+
 /** 这条视频的真实弹幕。 */
 export function danmaku(key: string): Promise<string[]> {
   return call<string[]>('danmaku', { key })
