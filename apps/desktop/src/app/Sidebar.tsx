@@ -72,6 +72,7 @@ export function Sidebar() {
       <button
         type="button"
         onClick={() => setAuthOpen(true)}
+        data-row="account"
         className="t flex shrink-0 items-center gap-2 border-t border-hairline px-3 py-2 text-left hover:bg-[var(--hover)]"
       >
         <span className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline text-[var(--text-3)]">

@@ -113,6 +113,7 @@
   const ALLOWED_H = [24, 32, 40]
   const strayH = new Map()
   for (const n of clickable) {
+    if (n.hasAttribute('data-row')) continue
     const h = Math.round(n.getBoundingClientRect().height)
     if (h < 18 || h > 56) continue
     if (!ALLOWED_H.some((a) => Math.abs(a - h) <= 1)) {

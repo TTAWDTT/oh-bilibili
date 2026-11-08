@@ -43,7 +43,7 @@ export function IconRail() {
             title={item.label}
             aria-current={active ? 'page' : undefined}
             className={[
-              't relative flex h-9 w-9 items-center justify-center rounded-[4px]',
+              't relative flex h-8 w-8 items-center justify-center rounded-[4px]',
               active
                 ? 'bg-[var(--hover)] text-[var(--text-1)]'
                 : 'text-[var(--text-2)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]',
