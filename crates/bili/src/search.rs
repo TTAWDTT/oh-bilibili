@@ -163,6 +163,7 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
         danmaku: Some(c.danmaku).filter(|v| *v > 0),
         up_avatar: c.up_avatar.clone(),
         tname: partition_name(c.typeid).map(|n| n.to_string()),
+        typeid: Some(c.typeid),
     }
 }
 

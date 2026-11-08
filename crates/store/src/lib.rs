@@ -492,6 +492,7 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         danmaku: None,
         up_avatar: None,
         tname: None,
+        typeid: None,
     })
 }
 
@@ -590,6 +591,7 @@ mod tests {
             danmaku: None,
             up_avatar: None,
             tname: None,
+            typeid: None,
         }
     }
 

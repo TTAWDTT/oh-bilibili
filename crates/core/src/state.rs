@@ -453,6 +453,7 @@ mod tests {
             danmaku: None,
             up_avatar: None,
             tname: None,
+            typeid: None,
         }
     }
 

@@ -8,6 +8,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
+import { PARTITIONS, PartitionFilter, matchesPartition } from './PartitionFilter'
 
 const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -35,6 +36,7 @@ export function SearchView() {
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
+  const [partition, setPartition] = useState('全部')
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -167,6 +169,10 @@ export function SearchView() {
               ) : null}
             </div>
 
+            {tracks.length > 0 ? (
+              <PartitionFilter active={partition} onChange={setPartition} />
+            ) : null}
+
             {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}
 
             {status === 'error' && error ? (
@@ -193,7 +199,9 @@ export function SearchView() {
 
             {tracks.length > 0 ? (
               <TrackGrid
-                tracks={tracks}
+                tracks={tracks.filter((t) =>
+                  matchesPartition(t.typeid ?? undefined, PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!),
+                )}
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}
               />

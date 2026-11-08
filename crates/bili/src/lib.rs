@@ -424,6 +424,7 @@ mod wire {
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1)),
             tname: data["tname"].as_str().map(|s| s.to_string()),
+            typeid: data["tid"].as_u64().map(|v| v as u32),
         };
         Ok(TrackDetail { track, cid, aid })
     }

@@ -10,6 +10,7 @@ export type Track = {
   danmaku?: number | null
   up_avatar?: string | null
   tname?: string | null
+  typeid?: number | null
 }
 
 export type PlayerPhase = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'faulted'
