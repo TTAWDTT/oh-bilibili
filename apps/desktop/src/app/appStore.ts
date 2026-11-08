@@ -6,6 +6,7 @@ export type View =
   | { kind: 'playlist'; id: number; name: string }
   | { kind: 'liked' }
   | { kind: 'downloads' | 'history' }
+  | { kind: 'author'; name: string }
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'

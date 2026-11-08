@@ -81,7 +81,6 @@ type TrackGridProps = {
 export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const setMv = useAppStore((state) => state.setMv)
-  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
   const navigate = useAppStore((state) => state.navigate)
 
   /** 三连动作统一入口：失败走同一套提示，不静默。 */
@@ -223,8 +222,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   title={`看 ${track.artist} 的更多视频`}
                   onClick={(event) => {
                     event.stopPropagation()
-                    setAuthorQuery(track.artist)
-                    navigate({ kind: 'search' })
+                    navigate({ kind: 'author', name: track.artist })
                   }}
                   className="truncate hover:text-[var(--accent)] hover:underline"
                 >

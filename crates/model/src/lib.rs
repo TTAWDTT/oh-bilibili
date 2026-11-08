@@ -183,6 +183,18 @@ impl SearchQuery {
     }
 }
 
+/// 一个 UP 主的公开信息。字段全部来自搜索结果，不做额外请求。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Author {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
+    /// 这个 UP 主在当前搜索结果里出现的投稿数，不是他的总投稿数。
+    pub videos_here: u32,
+    /// 累计播放量（当前结果集内）。
+    pub views_here: u64,
+}
+
 /// 搜索排序。B 站搜索页右上角那排。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
