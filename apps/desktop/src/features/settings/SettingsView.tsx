@@ -112,7 +112,7 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => setAuthOpen(true)}
-                  className="t press mt-4 rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/85"
+                  className="t press mt-4 rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85"
                 >
                   扫码登录
                 </button>

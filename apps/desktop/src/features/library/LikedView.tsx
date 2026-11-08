@@ -23,7 +23,7 @@ export function LikedView() {
             <button
               type="button"
               onClick={() => void playContext(keys, 0)}
-              className="t press flex items-center gap-2 rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/85"
+              className="t press flex items-center gap-2 rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85"
             >
               <Icon name="play" size={13} />
               播放全部

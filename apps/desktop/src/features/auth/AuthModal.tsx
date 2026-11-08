@@ -115,7 +115,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="t press rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/85"
+            className="t press rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85"
           >
             完成
           </button>
