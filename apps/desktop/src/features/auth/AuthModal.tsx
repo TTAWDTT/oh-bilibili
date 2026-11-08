@@ -136,7 +136,7 @@ export function AuthModal() {
         </div>
       ) : (
         <>
-          <QrPanel state={panelState} url={challenge.url} />
+          <QrPanel state={panelState} url={challenge.url} svg={challenge.svg} />
 
           <div className="mt-4 flex items-center justify-between border-t border-hairline pt-4">
             <button

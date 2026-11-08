@@ -10,6 +10,28 @@ use crate::error::BiliError;
 pub struct QrChallenge {
     pub key: String,
     pub url: String,
+    /// 直接可用的 SVG 字符串。二维码里是登录令牌，只能在本地生成，不能走第三方服务。
+    pub svg: String,
+}
+
+/// 把文本渲染成二维码 SVG。用一个 path 合并所有深色模块，避免上万个 rect。
+pub fn qr_svg(text: &str) -> Result<String, BiliError> {
+    use qrcode::QrCode;
+    let code = QrCode::new(text.as_bytes())
+        .map_err(|e| BiliError::Parse(format!("二维码生成失败：{e}")))?;
+    let width = code.width();
+    let colors = code.to_colors();
+    let mut path = String::new();
+    for (i, c) in colors.iter().enumerate() {
+        if *c == qrcode::Color::Dark {
+            let x = i % width;
+            let y = i / width;
+            path.push_str(&format!("M{x} {y}h1v1h-1z"));
+        }
+    }
+    Ok(format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 {width} {width}" shape-rendering="crispEdges"><rect width="{width}" height="{width}" fill="#ffffff"/><path d="{path}" fill="#000000"/></svg>"##
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,7 +58,8 @@ impl Client {
             .as_str()
             .ok_or_else(|| BiliError::Parse("没有二维码内容".into()))?
             .to_string();
-        Ok(QrChallenge { key, url })
+        let svg = qr_svg(&url)?;
+        Ok(QrChallenge { key, url, svg })
     }
 
     /// 轮询。`Confirmed` 时 cookie 已经落进罐里，调用方接着刷 nav。
@@ -62,5 +85,28 @@ impl Client {
 
     pub fn csrf(&self) -> Option<String> {
         self.cookie_value("bili_jct")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 二维码是合法_svg_且带深色模块() {
+        let svg = qr_svg("https://passport.bilibili.com/h5-app/passport/login/scan?qrcode_key=abc123")
+            .expect("应该能生成");
+        assert!(svg.starts_with("<svg"), "必须是 svg");
+        assert!(svg.contains("viewBox"), "必须有 viewBox 才能缩放");
+        let modules = svg.matches("M").count();
+        assert!(modules > 100, "深色模块太少，二维码会是空的：{modules}");
+        assert!(svg.ends_with("</svg>"));
+    }
+
+    #[test]
+    fn 不同内容生成不同图形() {
+        let a = qr_svg("https://example.com/a").unwrap();
+        let b = qr_svg("https://example.com/b").unwrap();
+        assert_ne!(a, b);
     }
 }

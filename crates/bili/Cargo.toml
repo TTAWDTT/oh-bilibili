@@ -13,6 +13,7 @@ tokio = { workspace = true, features = ["rt", "time", "sync"] }
 bilimusic-model = { path = "../model" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "charset", "blocking"] }
 md-5 = "0.10"
+qrcode = "0.14.1"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

@@ -34,9 +34,10 @@ const STATUS: Record<QrStatus['state'], { title: string; detail: string; tone: s
 type QrPanelProps = {
   state: QrStatus['state']
   url: string
+  svg: string
 }
 
-export function QrPanel({ state, url }: QrPanelProps) {
+export function QrPanel({ state, url, svg }: QrPanelProps) {
   const status = STATUS[state]
 
   const copy = async (): Promise<void> => {
@@ -75,9 +76,26 @@ export function QrPanel({ state, url }: QrPanelProps) {
           </button>
         </div>
       </div>
-      <div className="selectable mt-4 break-all rounded-[4px] border border-white/32 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/48">
-        {url}
-      </div>
+      {svg ? (
+        <div className="relative mt-4 flex justify-center">
+          <img
+            src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+            alt="B 站登录二维码"
+            width={168}
+            height={168}
+            className="rounded-[4px] bg-white p-2"
+          />
+          {state === 'expired' ? (
+            <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/70 text-[12px] text-white">
+              二维码已过期，点刷新重来
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="selectable mt-4 break-all rounded-[4px] border border-white/32 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/48">
+          {url}
+        </div>
+      )}
     </div>
   )
 }

@@ -32,6 +32,7 @@ struct PlaylistView {
 struct QrView {
     key: String,
     url: String,
+    svg: String,
     expires_in_ms: u64,
 }
 
@@ -211,6 +212,7 @@ async fn auth_qrcode(engine: tauri::State<'_, Arc<Engine>>) -> Result<QrView, Wi
     Ok(QrView {
         key: qr.key,
         url: qr.url,
+        svg: qr.svg,
         expires_in_ms: 180_000,
     })
 }

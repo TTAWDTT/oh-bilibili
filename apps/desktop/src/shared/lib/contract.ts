@@ -41,7 +41,7 @@ export type AuthUser = { mid: number; uname: string; avatar: string | null }
 
 export type AuthSnapshot = { logged_in: boolean; user: AuthUser | null }
 
-export type QrChallenge = { key: string; url: string; expires_in_ms: number }
+export type QrChallenge = { key: string; url: string; svg: string; expires_in_ms: number }
 
 export type QrStatus = {
   state: 'waiting' | 'scanned' | 'confirmed' | 'expired'
