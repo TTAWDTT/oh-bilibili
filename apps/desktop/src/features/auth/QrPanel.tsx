@@ -8,7 +8,7 @@ const STATUS: Record<QrStatus['state'], { title: string; detail: string; tone: s
   waiting: {
     title: '等待扫码',
     detail: '用手机 B 站扫一扫，或把下面的链接复制到手机打开。',
-    tone: 'text-white/72',
+    tone: 'text-white/70',
     icon: 'user',
   },
   scanned: {
@@ -48,12 +48,12 @@ export function QrPanel({ state, url }: QrPanelProps) {
   return (
     <div>
       <div className="flex gap-4">
-        <div className="relative flex h-[124px] w-[124px] shrink-0 items-center justify-center overflow-hidden border border-white/12">
+        <div className="relative flex h-[124px] w-[124px] shrink-0 items-center justify-center overflow-hidden border border-white/32">
           <span
-            className="absolute inset-2 rounded-full border border-dashed border-white/12"
+            className="absolute inset-2 rounded-full border border-dashed border-white/32"
             style={{ animation: state === 'waiting' ? 'spin-slow 22s linear infinite' : undefined }}
           />
-          <span className="absolute inset-7 rounded-full border border-white/8" />
+          <span className="absolute inset-7 rounded-full border border-white/32" />
           <span
             className="absolute inset-0 opacity-50"
             style={{ background: 'radial-gradient(circle at 50% 50%, var(--accent-soft), transparent 70%)' }}
@@ -63,19 +63,19 @@ export function QrPanel({ state, url }: QrPanelProps) {
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[12.5px] font-medium ${status.tone}`}>{status.title}</div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-white/36">{status.detail}</p>
+          <div className={`text-[13px] font-medium ${status.tone}`}>{status.title}</div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-white/32">{status.detail}</p>
           <button
             type="button"
             onClick={() => void copy()}
-            className="t press mt-3 flex items-center gap-1.5 rounded-[4px] border border-white/12 px-3 py-1.5 text-[11px] text-white/72 hover:border-white/28 hover:text-white"
+            className="t press mt-3 flex items-center gap-1 rounded-[4px] border border-white/32 px-3 py-1 text-[11px] text-white/70 hover:border-white/32 hover:text-white"
           >
             <Icon name="copy" size={12} />
             复制登录链接
           </button>
         </div>
       </div>
-      <div className="selectable mt-4 break-all rounded-[4px] border border-white/8 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/34">
+      <div className="selectable mt-4 break-all rounded-[4px] border border-white/32 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/32">
         {url}
       </div>
     </div>

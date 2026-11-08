@@ -27,12 +27,12 @@ export function DownloadButton({ trackKey, size = 16 }: DownloadButtonProps) {
       title={label}
       onClick={onClick}
       className={[
-        't press rounded-[4px] p-1.5',
+        't press rounded-[4px] p-1',
         done
           ? 'text-[#7bf0a0]'
           : busy
             ? 'text-[var(--accent)]'
-            : 'text-white/34 hover:text-white',
+            : 'text-white/32 hover:text-white',
       ].join(' ')}
     >
       <Icon name={done ? 'check' : busy ? 'clock' : 'download'} size={size} />

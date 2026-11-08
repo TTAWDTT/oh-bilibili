@@ -13,7 +13,7 @@ export function ShortcutTable() {
       <tbody>
         {SHORTCUTS.map((shortcut) => (
           <tr key={shortcut.label} className="border-t border-hairline first:border-t-0">
-            <td className="w-[88px] py-1.5 pr-4 align-middle">
+            <td className="w-[88px] py-1 pr-4 align-middle">
               <span className="flex flex-wrap items-center gap-1">
                 {shortcut.keys.map((key) => (
                   <kbd key={key} className="kbd">
@@ -22,8 +22,8 @@ export function ShortcutTable() {
                 ))}
               </span>
             </td>
-            <td className="w-[168px] py-1.5 pr-4 align-middle text-[12px] text-white/84">{shortcut.label}</td>
-            <td className="py-1.5 align-middle text-[11px] text-white/36">{shortcut.detail}</td>
+            <td className="w-[168px] py-1 pr-4 align-middle text-[12px] text-white/85">{shortcut.label}</td>
+            <td className="py-1 align-middle text-[11px] text-white/32">{shortcut.detail}</td>
           </tr>
         ))}
       </tbody>

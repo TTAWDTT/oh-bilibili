@@ -9,7 +9,7 @@ import { Skeleton } from '../../shared/ui/Skeleton'
 import { useDownloadsStore } from './downloadsStore'
 
 const STATE: Record<DownloadState, { label: string; tone: string }> = {
-  queued: { label: '排队中', tone: 'text-white/46' },
+  queued: { label: '排队中', tone: 'text-white/45' },
   running: { label: '下载中', tone: 'text-[var(--accent)]' },
   done: { label: '已完成', tone: 'text-[#7bf0a0]' },
   failed: { label: '失败', tone: 'text-[#ff6b8a]' },
@@ -64,18 +64,18 @@ export function DownloadsView() {
                   <Cover
                     cover={null}
                     title={item.title}
-                    className="h-10 w-10 shrink-0 rounded-[4px] border border-white/10"
-                    glyphClassName="text-[16px] font-medium text-white/55"
+                    className="h-10 w-10 shrink-0 rounded-[4px] border border-white/32"
+                    glyphClassName="text-[16px] font-medium text-white/70"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[12.5px] text-white/70 group-hover:text-white" title={item.title}>
+                      <span className="truncate text-[13px] text-white/70 group-hover:text-white" title={item.title}>
                         {item.title}
                       </span>
                       <span className={`shrink-0 text-[10px] ${state.tone}`}>{state.label}</span>
                     </div>
                     {item.state === 'running' ? (
-                      <div className="mt-2 h-[2px] w-full overflow-hidden bg-white/12">
+                      <div className="mt-2 h-[2px] w-full overflow-hidden bg-white/32">
                         {/* 进度用 scaleX 而不是 width，跑进度时不触发布局 */}
                         <div
                           className="t h-full origin-left"
@@ -90,13 +90,13 @@ export function DownloadsView() {
                         type="button"
                         onClick={() => void copyPath(item.path ?? '')}
                         title="复制文件路径"
-                        className="t mt-1.5 flex max-w-full items-center gap-1.5 text-left text-[10.5px] text-white/34 hover:text-white/68"
+                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[11px] text-white/32 hover:text-white/70"
                       >
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
                       </button>
                     ) : (
-                      <div className="mt-1.5 text-[10.5px] text-white/26">等待开始</div>
+                      <div className="mt-1.5 text-[11px] text-white/32">等待开始</div>
                     )}
                   </div>
                   <span className="flex w-16 shrink-0 justify-end">

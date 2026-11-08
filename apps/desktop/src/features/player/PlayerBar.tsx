@@ -35,12 +35,12 @@ function RailToggle({
         enabled
           ? active
             ? 'text-[var(--accent)]'
-            : 'text-white/42 hover:text-white'
-          : 'cursor-default text-white/18',
+            : 'text-white/45 hover:text-white'
+          : 'cursor-default text-white/32',
       ].join(' ')}
     >
       <Icon name={tab === 'lyrics' ? 'lyrics' : 'queue'} size={16} />
-      {tab === 'queue' && count > 0 ? <span className="num text-[10.5px]">{count}</span> : null}
+      {tab === 'queue' && count > 0 ? <span className="num text-[11px]">{count}</span> : null}
     </button>
   )
 }
@@ -55,12 +55,12 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         onClick={() => navigate({ kind: 'search' })}
         className="t group flex items-center gap-2 px-1 py-1 text-left"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-white/25">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-white/32">
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[12.5px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
-          <span className="mt-1 block text-[11.5px] text-white/38 group-hover:text-white/60">去搜索里挑一首 →</span>
+          <span className="block text-[13px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
+          <span className="mt-1 block text-[12px] text-white/32 group-hover:text-white/70">去搜索里挑一首 →</span>
         </span>
       </button>
     )
@@ -71,18 +71,18 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
       <Cover
         cover={track.cover}
         title={track.title}
-        className="h-10 w-10 shrink-0 rounded-[4px] border border-white/12"
-        glyphClassName="text-[20px] font-semibold text-white/60"
+        className="h-10 w-10 shrink-0 rounded-[4px] border border-white/32"
+        glyphClassName="text-[20px] font-semibold text-white/70"
       />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13.5px] font-medium leading-tight text-white" title={track.title}>
           {track.title}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <span className="truncate text-[11.5px] text-white/44" title={track.artist}>
+          <span className="truncate text-[12px] text-white/45" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-[3px] border border-white/12 px-1.5 py-[1px] font-mono text-[9px] text-white/40">
+          <span className="num shrink-0 rounded-[3px] border border-white/32 px-2 py-[1px] font-mono text-[9px] text-white/45">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>
@@ -110,7 +110,7 @@ export function PlayerBar() {
       <div className="flex min-w-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
         <VolumeControl />
-        <span className="h-5 w-px bg-white/10" />
+        <span className="h-5 w-px bg-white/32" />
         <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
         <RailToggle tab="queue" active={rail === 'queue'} count={queued} enabled={queued > 0} />
       </div>

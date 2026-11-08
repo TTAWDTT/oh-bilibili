@@ -25,7 +25,7 @@ export function PlaybackProgress() {
   }
 
   return (
-    <div className="flex w-full items-center gap-1.5">
+    <div className="flex w-full items-center gap-1">
       <div className="min-w-0 flex-1">
         <Slider
           value={ratio}
@@ -36,7 +36,7 @@ export function PlaybackProgress() {
           disabled={duration <= 0}
         />
       </div>
-      <span className="num w-10 shrink-0 font-mono text-[10.5px] text-white/44">{formatTime(duration)}</span>
+      <span className="num w-10 shrink-0 font-mono text-[11px] text-white/45">{formatTime(duration)}</span>
     </div>
   )
 }

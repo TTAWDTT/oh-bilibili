@@ -60,7 +60,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => void playContext(keys, 0)}
-                className="t press flex items-center gap-2 rounded-[4px] bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/88"
+                className="t press flex items-center gap-2 rounded-[4px] bg-white px-4 py-1 text-[12px] font-medium text-black hover:bg-white/85"
               >
                 <Icon name="play" size={13} />
                 播放全部
@@ -68,7 +68,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'search' })}
-                className="t press rounded-[4px] border border-white/12 px-4 py-1.5 text-[12px] text-white/72 hover:border-white/28 hover:text-white"
+                className="t press rounded-[4px] border border-white/32 px-4 py-1 text-[12px] text-white/70 hover:border-white/32 hover:text-white"
               >
                 去添加
               </button>
@@ -81,7 +81,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
         <button
           type="button"
           onClick={() => navigate({ kind: 'library' })}
-          className="t press mb-3 flex w-fit items-center gap-1 pr-2 text-[11.5px] text-white/40 hover:text-white"
+          className="t press mb-3 flex w-fit items-center gap-1 pr-2 text-[12px] text-white/45 hover:text-white"
         >
           <Icon name="chevronLeft" size={13} />
           曲库

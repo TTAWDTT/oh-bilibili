@@ -47,7 +47,7 @@ export function Sidebar() {
             <Skeleton className="h-2.5 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="px-3 py-1 text-[11.5px] leading-relaxed text-[var(--text-3)]">
+          <p className="px-3 py-1 text-[12px] leading-relaxed text-[var(--text-3)]">
             还没有歌单，点上面的加号建一个。
           </p>
         ) : (
@@ -81,7 +81,7 @@ export function Sidebar() {
           <span className="block truncate text-[12px] text-[var(--text-1)]">
             {user?.uname ?? '未登录'}
           </span>
-          <span className="block truncate text-[10.5px] text-[var(--text-3)]">
+          <span className="block truncate text-[11px] text-[var(--text-3)]">
             {user ? '已连接 B 站' : '登录后同步'}
           </span>
         </span>

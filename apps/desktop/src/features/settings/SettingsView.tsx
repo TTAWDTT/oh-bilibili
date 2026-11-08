@@ -22,9 +22,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Chip({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-center gap-2 rounded-[4px] border border-white/10 px-2.5 py-1.5">
-      <span className="text-[9.5px] uppercase tracking-[0.14em] text-white/32">{label}</span>
-      <span className="num font-mono text-[10.5px] text-white/72">{value}</span>
+    <span className="flex items-center gap-2 rounded-[4px] border border-white/32 px-2.5 py-1">
+      <span className="text-[10px] uppercase tracking-[0.14em] text-white/32">{label}</span>
+      <span className="num font-mono text-[11px] text-white/70">{value}</span>
     </span>
   )
 }
@@ -82,22 +82,22 @@ export function SettingsView() {
             {user ? (
               <div className="flex items-center gap-4">
                 {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-white/12 object-cover" />
+                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-white/32 object-cover" />
                 ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/10 text-[17px] font-medium text-white/90">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[17px] font-medium text-white/85">
                     {user.uname.slice(0, 1)}
                   </span>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] text-white/90" title={user.uname}>
+                  <div className="truncate text-[14px] text-white/85" title={user.uname}>
                     {user.uname}
                   </div>
-                  <div className="num mt-1 font-mono text-[10.5px] text-white/34">UID {user.mid}</div>
+                  <div className="num mt-1 font-mono text-[11px] text-white/32">UID {user.mid}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => void logout()}
-                  className="t press flex shrink-0 items-center gap-1.5 rounded-[4px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
+                  className="t press flex shrink-0 items-center gap-1 rounded-[4px] border border-white/32 px-4 py-1 text-[12px] text-white/70 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
                 >
                   <Icon name="logout" size={13} />
                   退出
@@ -105,14 +105,14 @@ export function SettingsView() {
               </div>
             ) : (
               <div>
-                <div className="text-[12.5px] text-white/84">未登录</div>
-                <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+                <div className="text-[13px] text-white/85">未登录</div>
+                <p className="mt-2 text-[12px] leading-relaxed text-white/32">
                   登录后才能把喜欢与收藏写进 B 站账号。凭据只存本机，不上传。
                 </p>
                 <button
                   type="button"
                   onClick={() => setAuthOpen(true)}
-                  className="t press mt-4 rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+                  className="t press mt-4 rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/85"
                 >
                   扫码登录
                 </button>
@@ -121,15 +121,15 @@ export function SettingsView() {
           </Section>
 
           <Section title="同步">
-            <div className="text-[12.5px] text-white/84">喜欢与收藏</div>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+            <div className="text-[13px] text-white/85">喜欢与收藏</div>
+            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
               离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
             </p>
             <button
               type="button"
               onClick={() => void sync()}
               disabled={syncing}
-              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white disabled:cursor-default disabled:opacity-40"
+              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-white/32 px-4 py-2 text-[12px] text-white/85 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-40"
             >
               <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
               {syncing ? '同步中…' : '立即同步'}
@@ -137,8 +137,8 @@ export function SettingsView() {
           </Section>
 
           <Section title="音质">
-            <div className="text-[12.5px] text-white/84">如实显示，不承诺无损</div>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+            <div className="text-[13px] text-white/85">如实显示，不承诺无损</div>
+            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
               B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -148,8 +148,8 @@ export function SettingsView() {
           </Section>
 
           <Section title="关于">
-            <div className="text-[12.5px] text-white/84">BiliMusic alpha</div>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+            <div className="text-[13px] text-white/85">BiliMusic alpha</div>
+            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
               音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">

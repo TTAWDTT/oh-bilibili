@@ -39,7 +39,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[4px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white"
+            className="t press flex items-center gap-2 rounded-[4px] border border-white/32 px-4 py-2 text-[12px] text-white/85 hover:border-white/32 hover:text-white"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -76,15 +76,15 @@ export function LibraryView() {
                   <button
                     type="button"
                     onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                    className="flex min-w-0 flex-1 items-center gap-2 py-3.5 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2 py-3 text-left"
                   >
-                    <span className="text-white/26 group-hover:text-white/60">
+                    <span className="text-white/32 group-hover:text-white/70">
                       <Icon name="library" size={15} />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-white/70 group-hover:text-white" title={playlist.name}>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
                       {playlist.name}
                     </span>
-                    <span className="num w-16 shrink-0 text-right font-mono text-[10.5px] text-white/32">{count}</span>
+                    <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-white/32">{count}</span>
                   </button>
                   <div className="flex w-[68px] shrink-0 items-center justify-end gap-0.5">
                     <button
@@ -99,7 +99,7 @@ export function LibraryView() {
                           0,
                         )
                       }}
-                      className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white disabled:cursor-default disabled:opacity-20"
+                      className="t press rounded-[4px] p-1 text-white/32 hover:text-white disabled:cursor-default disabled:opacity-20"
                     >
                       <Icon name="play" size={14} />
                     </button>
@@ -108,7 +108,7 @@ export function LibraryView() {
                       aria-label={`打开 ${playlist.name}`}
                       title="打开歌单"
                       onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                      className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white"
+                      className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
                     >
                       <Icon name="chevronRight" size={14} />
                     </button>

@@ -34,7 +34,7 @@ export function Cover({ cover, title, className, glyphClassName }: CoverProps) {
       style={{ background: `linear-gradient(145deg, hsl(${hue} 64% 26%), hsl(${(hue + 48) % 360} 76% 42%))` }}
       aria-hidden
     >
-      <span className={glyphClassName ?? 'text-[40%] font-semibold text-white/60'}>{initials(title)}</span>
+      <span className={glyphClassName ?? 'text-[40%] font-semibold text-white/70'}>{initials(title)}</span>
     </div>
   )
 }

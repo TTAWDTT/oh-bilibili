@@ -105,10 +105,10 @@ export function Slider({
         disabled ? 'cursor-default opacity-45' : 'cursor-pointer',
       ].join(' ')}
     >
-      <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-white/14">
+      <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-white/32">
         {buffered === null ? null : (
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-white/14"
+            className="absolute inset-y-0 left-0 rounded-full bg-white/32"
             style={{ width: `${clamp(buffered, 0, 1) * 100}%` }}
           />
         )}

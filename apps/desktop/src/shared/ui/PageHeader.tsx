@@ -11,7 +11,7 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
   if (!title && !actions) return null
   return (
     <div className="flex h-9 shrink-0 items-center justify-between gap-4 border-b border-hairline px-8">
-      <div className="min-w-0 truncate text-[12.5px] text-white/70" title={title}>
+      <div className="min-w-0 truncate text-[13px] text-white/70" title={title}>
         {title ?? ''}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

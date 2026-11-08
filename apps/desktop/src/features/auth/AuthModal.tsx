@@ -102,20 +102,20 @@ export function AuthModal() {
       {loggedIn && auth?.user ? (
         <div className="flex items-center gap-4 border-b border-hairline pb-5">
           {auth.user.avatar ? (
-            <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-white/12 object-cover" />
+            <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-white/32 object-cover" />
           ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/10 text-[16px] font-medium text-white/90">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[16px] font-medium text-white/85">
               {auth.user.uname.slice(0, 1)}
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13.5px] text-white/90">{auth.user.uname}</div>
-            <div className="mt-0.5 font-mono text-[10.5px] text-white/32">UID {auth.user.mid}</div>
+            <div className="truncate text-[13.5px] text-white/85">{auth.user.uname}</div>
+            <div className="mt-0.5 font-mono text-[11px] text-white/32">UID {auth.user.mid}</div>
           </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="t press rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+            className="t press rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/85"
           >
             完成
           </button>
@@ -142,15 +142,15 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="t press flex items-center gap-1.5 rounded-[4px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-white/28 hover:text-white"
+              className="t press flex items-center gap-1 rounded-[4px] border border-white/32 px-4 py-1 text-[12px] text-white/70 hover:border-white/32 hover:text-white"
             >
               <Icon name="refresh" size={12} />
               重新生成
             </button>
-            <span className="font-mono text-[10.5px] text-white/28">有效期 {formatTime(remaining)}</span>
+            <span className="font-mono text-[11px] text-white/32">有效期 {formatTime(remaining)}</span>
           </div>
 
-          <ol className="mt-4 space-y-1.5 text-[11.5px] leading-relaxed text-white/34">
+          <ol className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-white/32">
             <li>1. 打开手机 B 站，进入「扫一扫」。</li>
             <li>2. 扫码，或打开复制的链接，在手机上确认登录。</li>
             <li>3. 确认后这个弹窗会自动关闭。</li>

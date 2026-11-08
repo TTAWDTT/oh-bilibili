@@ -28,7 +28,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
       style={{ height: TRACK_ROW_HEIGHT }}
       className="group flex items-center gap-2 border-b border-hairline px-4"
     >
-      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/28">
+      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/32">
         {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
       </span>
 
@@ -37,32 +37,32 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         onClick={onPlay}
         aria-label={`播放 ${track.title}`}
         title={`播放 ${track.title}`}
-        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[4px] border border-white/10"
+        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[4px] border border-white/32"
       >
         <Cover
           cover={track.cover}
           title={track.title}
           className="h-full w-full"
-          glyphClassName="text-[16px] font-medium text-white/55"
+          glyphClassName="text-[16px] font-medium text-white/70"
         />
       </button>
 
       <button type="button" onClick={onPlay} className="min-w-0 flex-1 text-left">
         <span
           className={[
-            't block truncate text-[12.5px]',
+            't block truncate text-[13px]',
             active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white',
           ].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[10.5px] text-white/36 group-hover:text-white/55" title={track.artist}>
+        <span className="mt-1 block truncate text-[11px] text-white/32 group-hover:text-white/70" title={track.artist}>
           {track.artist}
         </span>
       </button>
 
-      <span className="num hidden w-10 shrink-0 text-right font-mono text-[10px] text-white/30 sm:block">
+      <span className="num hidden w-10 shrink-0 text-right font-mono text-[10px] text-white/32 sm:block">
         {formatDuration(track.duration_ms)}
       </span>
 
@@ -73,7 +73,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
           aria-label="加入歌单"
           title="加入歌单"
           onClick={() => setAdding(true)}
-          className="t press rounded-[4px] p-1.5 text-white/30 hover:text-white"
+          className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
         >
           <Icon name="plus" size={14} />
         </button>

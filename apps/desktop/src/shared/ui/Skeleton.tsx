@@ -6,7 +6,7 @@ export function TrackListSkeleton({ rows }: { rows: number }) {
   return (
     <div aria-hidden>
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex items-center gap-2 border-b border-hairline px-4 py-1.5">
+        <div key={index} className="flex items-center gap-2 border-b border-hairline px-4 py-1">
           <Skeleton className="h-3 w-3 shrink-0" />
           <Skeleton className="h-9 w-9 shrink-0 rounded-[4px]" />
           <div className="flex-1 space-y-2">

@@ -28,14 +28,14 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
         <Icon name={tone.icon} size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[12.5px] font-medium text-white/92">{toast.title}</div>
-        {toast.detail ? <div className="mt-0.5 break-words text-[11.5px] leading-relaxed text-white/45">{toast.detail}</div> : null}
+        <div className="text-[13px] font-medium text-white/85">{toast.title}</div>
+        {toast.detail ? <div className="mt-0.5 break-words text-[12px] leading-relaxed text-white/45">{toast.detail}</div> : null}
       </div>
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
         aria-label="关闭提示"
-        className="t press rounded-[4px] p-1 text-white/35 hover:text-white"
+        className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
       >
         <Icon name="close" size={13} />
       </button>

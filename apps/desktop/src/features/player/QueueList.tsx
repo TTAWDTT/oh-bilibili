@@ -30,20 +30,20 @@ function QueueRow({
       className="t group flex w-full items-center gap-2 border-b border-hairline px-4 text-left"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
-        {active ? <Equalizer size="sm" /> : <span className="num font-mono text-[10px] text-white/28">{index + 1}</span>}
+        {active ? <Equalizer size="sm" /> : <span className="num font-mono text-[10px] text-white/32">{index + 1}</span>}
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={['block truncate text-[12.5px]', active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white'].join(' ')}
+          className={['block truncate text-[13px]', active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white'].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[10.5px] text-white/36 group-hover:text-white/55" title={track.artist}>
+        <span className="mt-1 block truncate text-[11px] text-white/32 group-hover:text-white/70" title={track.artist}>
           {track.artist}
         </span>
       </span>
-      <span className="num shrink-0 font-mono text-[10px] text-white/28">{formatDuration(track.duration_ms)}</span>
+      <span className="num shrink-0 font-mono text-[10px] text-white/32">{formatDuration(track.duration_ms)}</span>
     </button>
   )
 }
@@ -90,7 +90,7 @@ export function QueueList() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/28">
+      <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/32">
         接下来 · {queue.items.length} 首
       </div>
       {queue.items.length > VIRTUAL_THRESHOLD ? (

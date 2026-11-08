@@ -50,7 +50,7 @@ export function IconRail() {
             ].join(' ')}
           >
             {active ? (
-              <span className="absolute -left-1 top-1.5 h-6 w-[2px] rounded-full bg-[var(--accent)]" />
+              <span className="absolute -left-1 top-1 h-6 w-[2px] rounded-full bg-[var(--accent)]" />
             ) : null}
             <Icon name={item.icon} size={17} />
             {badge > 0 ? (

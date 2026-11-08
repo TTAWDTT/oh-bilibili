@@ -6,7 +6,7 @@
  *
  * 三条硬规则，所有组件都从这里取值，不要在组件里散写字号与颜色：
  * 1. 纯中性灰阶，没有渐变、没有发光、没有毛玻璃。层次靠 1px 边框与两级背景差。
- * 2. 密集：正文 12.5px，行高 30px，圆角 4px。宁可小，不要松。
+ * 2. 密集：正文 13px，行高 24px，圆角 4px。宁可小，不要松。
  * 3. 强调色只出现在焦点环、进度条、激活图标这类微小面积上，永远不填大面积。
  */
 
@@ -59,7 +59,7 @@ body {
   background: var(--color-ink);
   color: var(--text-1);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;

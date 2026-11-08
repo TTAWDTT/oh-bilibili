@@ -22,7 +22,7 @@ function PagerButton({ label, disabled, onClick }: { label: string; disabled: bo
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="t press rounded-[4px] border border-hairline px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white disabled:cursor-default disabled:opacity-30"
+      className="t press rounded-[4px] border border-hairline px-4 py-1 text-[12px] text-white/70 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-30"
     >
       {label}
     </button>
@@ -98,7 +98,7 @@ export function SearchView() {
             setNonce((current) => current + 1)
           }}
         >
-          <div className="flex items-center gap-2 rounded-[4px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
+          <div className="flex items-center gap-2 rounded-[4px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/32">
             <Icon name="search" size={18} className="text-white/32" />
             <input
               ref={inputRef}
@@ -109,7 +109,7 @@ export function SearchView() {
               }}
               aria-label="搜索歌曲"
               placeholder="歌名、UP 主，或者一句歌词"
-              className="min-w-0 flex-1 bg-transparent text-[14px] text-white/90 placeholder:text-white/26"
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-white/85 placeholder:text-white/32"
             />
             {query ? (
               <button
@@ -117,7 +117,7 @@ export function SearchView() {
                 onClick={() => setQuery('')}
                 aria-label="清空输入"
                 title="清空输入"
-                className="t press rounded-[4px] p-1 text-white/34 hover:text-white"
+                className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
               >
                 <Icon name="close" size={14} />
               </button>
@@ -131,24 +131,24 @@ export function SearchView() {
 
         {trimmed.length === 0 ? (
           <div className="mt-6">
-            <div className="text-[10.5px] uppercase tracking-[0.22em] text-white/32">试试这些</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-white/32">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => pick(suggestion)}
-                  className="t press text-[12.5px] text-white/45 underline-offset-4 hover:text-white hover:underline"
+                  className="t press text-[13px] text-white/45 underline-offset-4 hover:text-white hover:underline"
                 >
                   {suggestion}
                 </button>
               ))}
             </div>
-            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[11.5px] leading-relaxed text-white/34">{HINT}</p>
+            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[12px] leading-relaxed text-white/32">{HINT}</p>
           </div>
         ) : (
           <section className="mt-6">
-            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[10.5px] tracking-[0.16em] text-white/32">
+            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[11px] tracking-[0.16em] text-white/32">
               <span>
                 {status === 'error'
                   ? '搜索失败'
@@ -159,7 +159,7 @@ export function SearchView() {
                       : ''}
               </span>
               {status === 'loading' && tracks.length > 0 ? (
-                <span className="h-3 w-3 animate-spin rounded-full border border-white/20 border-t-white/70" />
+                <span className="h-3 w-3 animate-spin rounded-full border border-white/32 border-t-white/70" />
               ) : null}
             </div>
 
