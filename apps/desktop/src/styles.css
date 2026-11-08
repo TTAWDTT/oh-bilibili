@@ -12,9 +12,9 @@
 
 :root {
   color-scheme: dark;
-  --accent: #ff3d81;
-  --accent-soft: rgb(255 61 129 / 0.38);
-  --accent-deep: rgb(124 77 255 / 0.34);
+  --accent: #b9c6d4;
+  --accent-soft: rgb(185 198 212 / 0.09);
+  --accent-deep: rgb(150 165 182 / 0.07);
   /* 全站唯一的时长与缓动：新增过渡只准引用这两个变量 */
   --dur: 240ms;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);

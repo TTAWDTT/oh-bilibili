@@ -22,7 +22,7 @@ export function Aurora({ accent }: { accent: Accent }) {
             top: '4%',
             width: '54%',
             height: '70%',
-            background: `radial-gradient(circle at 50% 50%, hsl(${(accent.hue + 22) % 360} 90% 58% / 0.24), transparent 66%)`,
+            background: `radial-gradient(circle at 50% 50%, accent.soft, transparent 66%)`,
             animationDelay: '-7s',
           }}
         />
@@ -33,14 +33,14 @@ export function Aurora({ accent }: { accent: Accent }) {
             bottom: '-32%',
             width: '62%',
             height: '70%',
-            background: `radial-gradient(circle at 50% 50%, hsl(${(accent.hue + 334) % 360} 84% 58% / 0.18), transparent 68%)`,
+            background: `radial-gradient(circle at 50% 50%, accent.deep, transparent 68%)`,
             animationDelay: '-13s',
           }}
         />
       </div>
       <div
         className="absolute inset-0"
-        style={{ background: 'radial-gradient(75% 60% at 50% 0%, rgba(255,255,255,0.05), transparent 70%)' }}
+        style={{ background: 'radial-gradient(80% 65% at 50% 0%, rgba(255,255,255,0.035), transparent 70%)' }}
       />
     </div>
   )

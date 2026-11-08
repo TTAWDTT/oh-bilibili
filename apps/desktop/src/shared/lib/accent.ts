@@ -9,14 +9,23 @@ export type Accent = {
   deep: string
 }
 
-const DEFAULT_HUE = 322
+const DEFAULT_HUE = 214
 
+/**
+ * 封面色相只用来「染色」，不用来「发光」。
+ *
+ * 之前的饱和度是 90% 上下，等于把三团霓虹铺满整屏；现在：
+ * - accent 是给进度条、激活态这类小面积元素用的，中等饱和
+ * - soft / deep 是氛围层，饱和度压到 18% 以下、透明度 0.10 以下，
+ *   最终读起来接近中性灰，只在长时间看时才感觉得到色调
+ * - 只保留一个色相，去掉 hue+22 / hue+334 那种彩虹组合
+ */
 function accentFor(hue: number): Accent {
   return {
     hue,
-    accent: `hsl(${hue} 92% 66%)`,
-    soft: `hsl(${hue} 92% 58% / 0.38)`,
-    deep: `hsl(${(hue + 44) % 360} 88% 48% / 0.34)`,
+    accent: `hsl(${hue} 46% 70%)`,
+    soft: `hsl(${hue} 16% 62% / 0.09)`,
+    deep: `hsl(${hue} 14% 46% / 0.07)`,
   }
 }
 
