@@ -34,8 +34,12 @@ export function health(): Promise<Health> {
 }
 
 /** 契约里同时存在 SearchPage 包裹形状；命令表按 Track[] 实现，两种都吃下来更稳。 */
-export async function searchQ(query: string, page: number): Promise<Track[]> {
-  const result = await call<Track[] | SearchPage>('search_q', { query, page })
+export async function searchQ(
+  query: string,
+  page: number,
+  order?: string,
+): Promise<Track[]> {
+  const result = await call<Track[] | SearchPage>('search_q', { query, page, order })
   return Array.isArray(result) ? result : result.tracks
 }
 

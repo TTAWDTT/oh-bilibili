@@ -37,6 +37,7 @@ export function SearchView() {
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState('全部')
+  const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -76,7 +77,7 @@ export function SearchView() {
         })
     }, 320)
     return () => window.clearTimeout(handle)
-  }, [trimmed, page, nonce])
+  }, [trimmed, page, nonce, order])
 
   const pick = (value: string): void => {
     setQuery(value)
@@ -170,7 +171,32 @@ export function SearchView() {
             </div>
 
             {tracks.length > 0 ? (
-              <PartitionFilter active={partition} onChange={setPartition} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <PartitionFilter active={partition} onChange={setPartition} />
+                <div className="mb-3 flex items-center gap-1">
+                  {([
+                    ['totalrank', '综合'],
+                    ['click', '最多播放'],
+                    ['pubdate', '最新发布'],
+                    ['danmaku', '最多弹幕'],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setOrder(value)}
+                      aria-pressed={order === value}
+                      className={[
+                        't rounded-[4px] px-2 py-1 text-[11.5px]',
+                        order === value
+                          ? 'text-[var(--accent)]'
+                          : 'text-[var(--text-3)] hover:text-[var(--text-1)]',
+                      ].join(' ')}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
 
             {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}

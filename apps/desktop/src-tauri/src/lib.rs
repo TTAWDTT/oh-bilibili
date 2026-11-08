@@ -115,8 +115,16 @@ async fn search_q(
     engine: tauri::State<'_, Arc<Engine>>,
     query: String,
     page: u32,
+    order: Option<String>,
 ) -> Result<Vec<Track>, WireError> {
-    engine.search(&query, page).await
+    use bilimusic_model::SearchOrder;
+    let order = match order.as_deref() {
+        Some("click") => SearchOrder::Click,
+        Some("pubdate") => SearchOrder::PubDate,
+        Some("danmaku") => SearchOrder::Danmaku,
+        _ => SearchOrder::TotalRank,
+    };
+    engine.search_ordered(&query, page, order).await
 }
 
 #[tauri::command]

@@ -183,6 +183,32 @@ impl SearchQuery {
     }
 }
 
+/// 搜索排序。B 站搜索页右上角那排。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchOrder {
+    /// 综合排序，B 站的默认。
+    #[default]
+    TotalRank,
+    /// 最多播放。
+    Click,
+    /// 最新发布。
+    PubDate,
+    /// 最多弹幕。
+    Danmaku,
+}
+
+impl SearchOrder {
+    pub fn as_param(self) -> Option<&'static str> {
+        match self {
+            SearchOrder::TotalRank => None,
+            SearchOrder::Click => Some("click"),
+            SearchOrder::PubDate => Some("pubdate"),
+            SearchOrder::Danmaku => Some("dm"),
+        }
+    }
+}
+
 /// 分页游标。不透明，UI 只回传不构造。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

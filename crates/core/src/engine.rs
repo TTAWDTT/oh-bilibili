@@ -121,9 +121,19 @@ impl Engine {
     }
 
     pub async fn search(&self, query: &str, page: u32) -> Result<Vec<Track>, WireError> {
+        self.search_ordered(query, page, bilimusic_model::SearchOrder::TotalRank)
+            .await
+    }
+
+    pub async fn search_ordered(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+    ) -> Result<Vec<Track>, WireError> {
         let q = SearchQuery::parse(query, page)
             .map_err(|e| WireError::input("query", e.to_string()))?;
-        let tracks = self.source.search(&q).await?;
+        let tracks = self.source.search_ordered(&q, order).await?;
         for t in &tracks {
             self.remember(t);
         }

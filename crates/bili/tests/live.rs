@@ -110,3 +110,34 @@ async fn 弹幕能算成密度曲线() {
     assert_eq!(heat.len(), 40);
     assert!(peak > 0, "应该算出非零密度");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 按播放量排序确实改变结果顺序() {
+    use bilimusic_model::SearchOrder;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+
+    let default = source.search(&q).await.expect("默认排序");
+    tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+    let by_click = source
+        .search_ordered(&q, SearchOrder::Click)
+        .await
+        .expect("按播放量");
+
+    println!("默认首条：{:?}", default.first().map(|t| &t.title));
+    println!("播放量首条：{:?}", by_click.first().map(|t| &t.title));
+    println!("默认首条播放量：{:?}", default.first().and_then(|t| t.views));
+    println!("播放量首条播放量：{:?}", by_click.first().and_then(|t| t.views));
+
+    assert!(!by_click.is_empty(), "按播放量排序应该有结果");
+    let dv = default.first().and_then(|t| t.views).unwrap_or(0);
+    let cv = by_click.first().and_then(|t| t.views).unwrap_or(0);
+    let dv_list: Vec<u64> = default.iter().filter_map(|t| t.views).collect();
+    let cv_list: Vec<u64> = by_click.iter().filter_map(|t| t.views).collect();
+    let same_order = dv_list == cv_list;
+    println!("两份列表播放量序列相同：{same_order}");
+    println!("默认前五：{:?}", dv_list.iter().take(5).collect::<Vec<_>>());
+    println!("播放前五：{:?}", cv_list.iter().take(5).collect::<Vec<_>>());
+    assert!(!same_order, "order=click 应该改变排序，否则这个参数已经失效");
+}

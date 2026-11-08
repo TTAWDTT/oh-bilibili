@@ -62,16 +62,30 @@ impl Source {
 
     /// 搜索并排序。返回的 Track 里已经不含任何 B 站标识。
     pub async fn search(&self, query: &SearchQuery) -> Result<Vec<Track>, BiliError> {
+        self.search_ordered(query, bilimusic_model::SearchOrder::TotalRank)
+            .await
+    }
+
+    /// 带排序的搜索。B 站的 order 参数：click 最多播放、pubdate 最新发布、dm 最多弹幕。
+    pub async fn search_ordered(
+        &self,
+        query: &SearchQuery,
+        order: bilimusic_model::SearchOrder,
+    ) -> Result<Vec<Track>, BiliError> {
+        let mut params = vec![
+            ("search_type", "video".to_string()),
+            ("keyword", query.keyword().to_string()),
+            ("page", query.page().to_string()),
+            ("page_size", "30".to_string()),
+        ];
+        if let Some(order_param) = order.as_param() {
+            params.push(("order", order_param.to_string()));
+        }
         let value = self
             .client
             .signed_get(
                 &format!("{}/x/web-interface/wbi/search/type", client::API),
-                vec![
-                    ("search_type", "video".to_string()),
-                    ("keyword", query.keyword().to_string()),
-                    ("page", query.page().to_string()),
-                    ("page_size", "30".to_string()),
-                ],
+                params,
                 SEARCH_INTERVAL,
             )
             .await?;
