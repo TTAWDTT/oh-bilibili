@@ -1,5 +1,5 @@
 export function Skeleton({ className }: { className: string }) {
-  return <div className={`skeleton rounded-[3px] ${className}`} />
+  return <div className={`bili-skeleton rounded-[3px] ${className}`} />
 }
 
 export function TrackListSkeleton({ rows }: { rows: number }) {

@@ -253,7 +253,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   onClick={() => void act('like', track)}
                   className="hover:text-[var(--accent)]"
                 >
-                  <Icon name="heart" size={12} />
+                  <Icon name="thumb" size={12} />
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
@@ -273,7 +273,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   onClick={() => void act('fav', track)}
                   className="hover:text-[var(--accent)]"
                 >
-                  <Icon name="bookmark" size={12} />
+                  <Icon name="bookmarkStar" size={12} />
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
@@ -283,7 +283,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   onClick={() => void later(track)}
                   className="hover:text-[var(--accent)]"
                 >
-                  <Icon name="clock" size={12} />
+                  <Icon name="watchLater" size={12} />
                 </button>
               </span>
             </div>

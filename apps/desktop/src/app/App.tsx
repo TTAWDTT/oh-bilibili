@@ -78,7 +78,9 @@ export default function App() {
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
         <main className="block min-w-0 flex-1 overflow-hidden">
-          <CurrentView view={view} />
+          <div key={view.kind} className="bili-page h-full">
+            <CurrentView view={view} />
+          </div>
         </main>
         <div className="rail-slot" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
