@@ -66,7 +66,7 @@ export function Transport() {
           't press mx-1 flex h-10 w-10 items-center justify-center rounded-full',
           hasTrack
             ? 'bg-white text-black active:scale-[0.96]'
-            : 'cursor-default border border-white/32 bg-white/[0.04] text-white/32',
+            : 'cursor-default border border-white/32 bg-white/[0.04] text-white/48',
         ].join(' ')}
       >
         {loading ? (

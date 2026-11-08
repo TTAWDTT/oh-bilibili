@@ -56,7 +56,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
             <Skeleton className="h-9 w-full" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="border-b border-hairline py-4 text-center text-[12px] text-white/32">还没有歌单，在下面直接建一个。</p>
+          <p className="border-b border-hairline py-4 text-center text-[12px] text-white/48">还没有歌单，在下面直接建一个。</p>
         ) : (
           playlists.map((playlist) => (
             <button
@@ -66,9 +66,9 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
               onClick={() => void choose(playlist.id)}
               className="t group flex items-center gap-2 border-b border-hairline px-1 py-1 text-left text-[13px] text-white/70 hover:text-white disabled:opacity-40"
             >
-              <Icon name="library" size={15} className="text-white/32 group-hover:text-white/70" />
+              <Icon name="library" size={15} className="text-white/48 group-hover:text-white/70" />
               <span className="min-w-0 flex-1 truncate">{playlist.name}</span>
-              <Icon name="plus" size={13} className="text-white/32 group-hover:text-white/70" />
+              <Icon name="plus" size={13} className="text-white/48 group-hover:text-white/70" />
             </button>
           ))
         )}
@@ -87,7 +87,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
           onChange={(event) => setName(event.target.value)}
           placeholder="新建歌单并加入"
           aria-label="新歌单名"
-          className="t min-w-0 flex-1 rounded-[4px] border border-white/32 bg-white/[0.03] px-3 py-1 text-[13px] text-white/85 placeholder:text-white/32 focus:border-white/32"
+          className="t min-w-0 flex-1 rounded-[4px] border border-white/32 bg-white/[0.03] px-3 py-1 text-[13px] text-white/85 placeholder:text-white/48 focus:border-white/32"
         />
         <button
           type="submit"

@@ -23,7 +23,7 @@ export function ShortcutTable() {
               </span>
             </td>
             <td className="w-[168px] py-1 pr-4 align-middle text-[12px] text-white/85">{shortcut.label}</td>
-            <td className="py-1 align-middle text-[11px] text-white/32">{shortcut.detail}</td>
+            <td className="py-1 align-middle text-[11px] text-white/48">{shortcut.detail}</td>
           </tr>
         ))}
       </tbody>

@@ -28,7 +28,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
       style={{ height: TRACK_ROW_HEIGHT }}
       className="group flex items-center gap-2 border-b border-hairline px-4"
     >
-      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/32">
+      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/48">
         {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
       </span>
 
@@ -57,23 +57,23 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[11px] text-white/32 group-hover:text-white/70" title={track.artist}>
+        <span className="mt-1 block truncate text-[11px] text-white/48 group-hover:text-white/70" title={track.artist}>
           {track.artist}
         </span>
       </button>
 
-      <span className="num hidden w-10 shrink-0 text-right font-mono text-[10px] text-white/32 sm:block">
+      <span className="num hidden w-10 shrink-0 text-right font-mono text-[10px] text-white/48 sm:block">
         {formatDuration(track.duration_ms)}
       </span>
 
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-1">
         <ReactionButtons track={track} size={14} />
         <button
           type="button"
           aria-label="加入歌单"
           title="加入歌单"
           onClick={() => setAdding(true)}
-          className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
+          className="t press rounded-[4px] p-1 text-white/48 hover:text-white"
         >
           <Icon name="plus" size={14} />
         </button>

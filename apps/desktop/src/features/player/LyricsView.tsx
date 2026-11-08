@@ -27,7 +27,7 @@ function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
 
   return (
     <span className="relative block">
-      <span className="text-white/32">{line.text}</span>
+      <span className="text-white/48">{line.text}</span>
       <span
         ref={fillRef}
         aria-hidden
@@ -141,10 +141,10 @@ export function LyricsView({ track }: { track: Track | null }) {
   if (!doc.synced) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/32">纯文本 · {doc.source}</div>
+        <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/48">纯文本 · {doc.source}</div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-8">
           {doc.lines.map((line, index) => (
-            <p key={index} className="py-2 text-[13.5px] leading-relaxed text-white/45">
+            <p key={index} className="py-2 text-[13.5px] leading-relaxed text-white/62">
               {line.text}
             </p>
           ))}
@@ -155,7 +155,7 @@ export function LyricsView({ track }: { track: Track | null }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between px-5 pb-1 pt-4 text-[10px] tracking-[0.14em] text-white/32">
+      <div className="flex items-center justify-between px-5 pb-1 pt-4 text-[10px] tracking-[0.14em] text-white/48">
         <span>歌词</span>
         <span>{doc.source}</span>
       </div>
@@ -182,7 +182,7 @@ export function LyricsView({ track }: { track: Track | null }) {
                       <ActiveLine line={line} nextAt={nextAt} />
                     </span>
                   ) : (
-                    <span className="t block text-[14px] leading-[1.6] text-white/32 hover:text-white/70">
+                    <span className="t block text-[14px] leading-[1.6] text-white/48 hover:text-white/70">
                       {line.text}
                     </span>
                   )}

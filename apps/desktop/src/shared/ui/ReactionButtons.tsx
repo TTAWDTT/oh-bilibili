@@ -15,7 +15,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
   const toggleFav = useReactionStore((state) => state.toggleFav)
 
   return (
-    <div className={`flex items-center gap-0.5 ${className ?? ''}`}>
+    <div className={`flex items-center gap-1 ${className ?? ''}`}>
       <button
         type="button"
         aria-pressed={liked}
@@ -27,7 +27,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
         }}
         className={[
           't press rounded-[4px] p-1',
-          liked ? 'text-[var(--accent)]' : 'text-white/32 hover:text-white',
+          liked ? 'text-[var(--accent)]' : 'text-white/48 hover:text-white',
         ].join(' ')}
       >
         <Icon name={liked ? 'heartFilled' : 'heart'} size={size} />
@@ -43,7 +43,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
         }}
         className={[
           't press rounded-[4px] p-1',
-          faved ? 'text-[#ffc46b]' : 'text-white/32 hover:text-white',
+          faved ? 'text-[#ffc46b]' : 'text-white/48 hover:text-white',
         ].join(' ')}
       >
         <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={size} />

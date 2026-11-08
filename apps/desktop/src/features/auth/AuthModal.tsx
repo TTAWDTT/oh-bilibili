@@ -110,7 +110,7 @@ export function AuthModal() {
           )}
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13.5px] text-white/85">{auth.user.uname}</div>
-            <div className="mt-0.5 font-mono text-[11px] text-white/32">UID {auth.user.mid}</div>
+            <div className="mt-0.5 font-mono text-[11px] text-white/48">UID {auth.user.mid}</div>
           </div>
           <button
             type="button"
@@ -147,10 +147,10 @@ export function AuthModal() {
               <Icon name="refresh" size={12} />
               重新生成
             </button>
-            <span className="font-mono text-[11px] text-white/32">有效期 {formatTime(remaining)}</span>
+            <span className="font-mono text-[11px] text-white/48">有效期 {formatTime(remaining)}</span>
           </div>
 
-          <ol className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-white/32">
+          <ol className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-white/48">
             <li>1. 打开手机 B 站，进入「扫一扫」。</li>
             <li>2. 扫码，或打开复制的链接，在手机上确认登录。</li>
             <li>3. 确认后这个弹窗会自动关闭。</li>

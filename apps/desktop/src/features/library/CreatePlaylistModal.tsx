@@ -52,13 +52,13 @@ export function CreatePlaylistModal({ open, onClose }: CreatePlaylistModalProps)
           onChange={(event) => setName(event.target.value)}
           placeholder="给歌单起个名字"
           aria-label="歌单名"
-          className="t w-full rounded-[4px] border border-white/32 bg-white/[0.03] px-4 py-3 text-[13px] text-white/85 placeholder:text-white/32 focus:border-white/32"
+          className="t w-full rounded-[4px] border border-white/32 bg-white/[0.03] px-4 py-3 text-[13px] text-white/85 placeholder:text-white/48 focus:border-white/32"
         />
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="t press rounded-[4px] px-4 py-1 text-[12px] text-white/45 hover:text-white"
+            className="t press rounded-[4px] px-4 py-1 text-[12px] text-white/62 hover:text-white"
           >
             取消
           </button>

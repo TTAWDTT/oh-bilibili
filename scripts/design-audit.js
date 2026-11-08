@@ -64,7 +64,17 @@
   const heights = new Set(rows.map((n) => Math.round(n.getBoundingClientRect().height)))
   if (heights.size > 1) add('列表行高不统一', `${heights.size} 种：${[...heights].join(' ')}`)
 
-  // 7. 正文对比度（取出现次数最多的前景/背景组合）
+  // 7. 正文对比度
+  // 半透明前景必须先合成到背景上再算，否则 oklab(.../0.32) 会被当成 RGB 读出假数字。
+  const blend = (fg, bg) => {
+    const fa = Number((fg.match(/\/\s*([\d.]+)\s*\)$/) || [])[1] ?? '1')
+    if (fa >= 1) return fg
+    const white = /oklab|rgba?\(255, 255, 255/.test(fg)
+    if (!white) return fg
+    const b = bg.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number)
+    const mix = b.map((v) => Math.round(255 * fa + v * (1 - fa)))
+    return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`
+  }
   const lum = (c) => {
     const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number)
     const f = (v) => {
@@ -88,7 +98,7 @@
       cur = cur.parentElement
     }
     if (!bg) continue
-    const f = lum(getComputedStyle(n).color)
+    const f = lum(blend(getComputedStyle(n).color, bg))
     const b = lum(bg)
     const ratio = (Math.max(f, b) + 0.05) / (Math.min(f, b) + 0.05)
     if (ratio < 4.5) lowContrast += 1

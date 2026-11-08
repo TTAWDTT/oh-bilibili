@@ -9,7 +9,7 @@ import { Skeleton } from '../../shared/ui/Skeleton'
 import { useDownloadsStore } from './downloadsStore'
 
 const STATE: Record<DownloadState, { label: string; tone: string }> = {
-  queued: { label: '排队中', tone: 'text-white/45' },
+  queued: { label: '排队中', tone: 'text-white/62' },
   running: { label: '下载中', tone: 'text-[var(--accent)]' },
   done: { label: '已完成', tone: 'text-[#7bf0a0]' },
   failed: { label: '失败', tone: 'text-[#ff6b8a]' },
@@ -53,7 +53,7 @@ export function DownloadsView() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
+            <div className="flex items-center gap-2 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/48">
               <span className="flex-1">曲目</span>
               <span className="w-16 text-right">进度</span>
             </div>
@@ -90,13 +90,13 @@ export function DownloadsView() {
                         type="button"
                         onClick={() => void copyPath(item.path ?? '')}
                         title="复制文件路径"
-                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[11px] text-white/32 hover:text-white/70"
+                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[11px] text-white/48 hover:text-white/70"
                       >
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
                       </button>
                     ) : (
-                      <div className="mt-1.5 text-[11px] text-white/32">等待开始</div>
+                      <div className="mt-1.5 text-[11px] text-white/48">等待开始</div>
                     )}
                   </div>
                   <span className="flex w-16 shrink-0 justify-end">
@@ -109,7 +109,7 @@ export function DownloadsView() {
                         <Icon name="alert" size={16} />
                       </span>
                     ) : (
-                      <span className="num font-mono text-[10px] text-white/32">{Math.round(item.progress * 100)}%</span>
+                      <span className="num font-mono text-[10px] text-white/48">{Math.round(item.progress * 100)}%</span>
                     )}
                   </span>
                 </div>

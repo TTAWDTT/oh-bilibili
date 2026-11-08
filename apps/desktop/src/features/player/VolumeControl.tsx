@@ -10,7 +10,7 @@ export function VolumeControl() {
   const shown = draft ?? volume
 
   return (
-    <div className="flex items-center gap-2 text-white/45">
+    <div className="flex items-center gap-2 text-white/62">
       <button
         type="button"
         aria-label={shown > 0 ? '静音' : '取消静音'}
@@ -33,7 +33,7 @@ export function VolumeControl() {
           }}
         />
       </div>
-      <span className="num w-7 shrink-0 text-right font-mono text-[10px] text-white/32">
+      <span className="num w-7 shrink-0 text-right font-mono text-[10px] text-white/48">
         {Math.round(shown * 100)}
       </span>
     </div>

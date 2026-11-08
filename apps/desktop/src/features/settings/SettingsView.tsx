@@ -14,7 +14,7 @@ import { ShortcutTable } from './ShortcutTable'
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-hairline py-6">
-      <h2 className="text-[10px] uppercase tracking-[0.22em] text-white/32">{title}</h2>
+      <h2 className="text-[10px] uppercase tracking-[0.22em] text-white/48">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
   )
@@ -22,8 +22,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Chip({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-center gap-2 rounded-[4px] border border-white/32 px-2.5 py-1">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-white/32">{label}</span>
+    <span className="flex items-center gap-2 rounded-[4px] border border-white/32 px-2 py-1">
+      <span className="text-[10px] uppercase tracking-[0.14em] text-white/48">{label}</span>
       <span className="num font-mono text-[11px] text-white/70">{value}</span>
     </span>
   )
@@ -92,7 +92,7 @@ export function SettingsView() {
                   <div className="truncate text-[14px] text-white/85" title={user.uname}>
                     {user.uname}
                   </div>
-                  <div className="num mt-1 font-mono text-[11px] text-white/32">UID {user.mid}</div>
+                  <div className="num mt-1 font-mono text-[11px] text-white/48">UID {user.mid}</div>
                 </div>
                 <button
                   type="button"
@@ -106,7 +106,7 @@ export function SettingsView() {
             ) : (
               <div>
                 <div className="text-[13px] text-white/85">未登录</div>
-                <p className="mt-2 text-[12px] leading-relaxed text-white/32">
+                <p className="mt-2 text-[12px] leading-relaxed text-white/48">
                   登录后才能把喜欢与收藏写进 B 站账号。凭据只存本机，不上传。
                 </p>
                 <button
@@ -122,7 +122,7 @@ export function SettingsView() {
 
           <Section title="同步">
             <div className="text-[13px] text-white/85">喜欢与收藏</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
+            <p className="mt-2 text-[12px] leading-relaxed text-white/48">
               离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
             </p>
             <button
@@ -138,7 +138,7 @@ export function SettingsView() {
 
           <Section title="音质">
             <div className="text-[13px] text-white/85">如实显示，不承诺无损</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
+            <p className="mt-2 text-[12px] leading-relaxed text-white/48">
               B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -149,7 +149,7 @@ export function SettingsView() {
 
           <Section title="关于">
             <div className="text-[13px] text-white/85">BiliMusic alpha</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-white/32">
+            <p className="mt-2 text-[12px] leading-relaxed text-white/48">
               音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">

@@ -64,7 +64,7 @@ export function QrPanel({ state, url }: QrPanelProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className={`text-[13px] font-medium ${status.tone}`}>{status.title}</div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-white/32">{status.detail}</p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-white/48">{status.detail}</p>
           <button
             type="button"
             onClick={() => void copy()}
@@ -75,7 +75,7 @@ export function QrPanel({ state, url }: QrPanelProps) {
           </button>
         </div>
       </div>
-      <div className="selectable mt-4 break-all rounded-[4px] border border-white/32 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/32">
+      <div className="selectable mt-4 break-all rounded-[4px] border border-white/32 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/48">
         {url}
       </div>
     </div>

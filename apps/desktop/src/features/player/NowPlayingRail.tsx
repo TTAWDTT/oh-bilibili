@@ -17,7 +17,7 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       aria-pressed={active}
       className={[
         't flex h-full items-center border-b-2 text-[12px]',
-        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/45 hover:text-white',
+        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/62 hover:text-white',
       ].join(' ')}
     >
       {label}
@@ -35,7 +35,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         glyphClassName="text-[30px] font-semibold text-white/70"
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/32">
+        <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/48">
           正在播放
           {loading ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] pulse-soft" /> : null}
         </div>
@@ -45,12 +45,12 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         >
           {track.title}
         </div>
-        <div className="mt-1 truncate text-[12px] text-white/45" title={track.artist}>
+        <div className="mt-1 truncate text-[12px] text-white/62" title={track.artist}>
           {track.artist}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ReactionButtons track={track} size={15} />
-          <span className="num rounded-[3px] border border-white/32 px-2 py-[1px] font-mono text-[9px] text-white/45">
+          <span className="num rounded-[3px] border border-white/32 px-2 py-[1px] font-mono text-[9px] text-white/62">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>
@@ -84,7 +84,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
           aria-label="收起右栏"
           title="收起右栏（Esc）"
           onClick={closeRail}
-          className="t press rounded-[4px] p-1 text-white/32 hover:text-white"
+          className="t press rounded-[4px] p-1 text-white/48 hover:text-white"
         >
           <Icon name="close" size={14} />
         </button>

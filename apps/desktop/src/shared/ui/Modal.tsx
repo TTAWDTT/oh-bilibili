@@ -50,14 +50,14 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-3 py-5">
           <div>
             <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em] text-white/85">{title}</h2>
-            {description ? <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/45">{description}</p> : null}
+            {description ? <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-white/62">{description}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="关闭"
             title="关闭（Esc）"
-            className="t press rounded-[4px] p-2 text-white/45 hover:text-white"
+            className="t press rounded-[4px] p-2 text-white/62 hover:text-white"
           >
             <Icon name="close" size={16} />
           </button>

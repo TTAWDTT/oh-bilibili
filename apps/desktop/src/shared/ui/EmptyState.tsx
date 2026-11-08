@@ -13,11 +13,11 @@ type EmptyStateProps = {
 export function EmptyState({ icon, title, detail, action, compact = false }: EmptyStateProps) {
   return (
     <div className={compact ? 'flex flex-col items-center px-4 py-10 text-center' : 'flex flex-col items-center px-3 py-16 text-center'}>
-      <Icon name={icon} size={22} className="text-white/32" />
+      <Icon name={icon} size={22} className="text-white/48" />
       <h3 className="mt-3 text-[14px] font-medium text-white/85" title={title}>
         {title}
       </h3>
-      <p className="mt-2 max-w-xs text-[12px] leading-relaxed text-white/45">{detail}</p>
+      <p className="mt-2 max-w-xs text-[12px] leading-relaxed text-white/62">{detail}</p>
       {action ? (
         <button
           type="button"

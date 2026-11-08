@@ -32,7 +32,7 @@ export function DownloadButton({ trackKey, size = 16 }: DownloadButtonProps) {
           ? 'text-[#7bf0a0]'
           : busy
             ? 'text-[var(--accent)]'
-            : 'text-white/32 hover:text-white',
+            : 'text-white/48 hover:text-white',
       ].join(' ')}
     >
       <Icon name={done ? 'check' : busy ? 'clock' : 'download'} size={size} />
