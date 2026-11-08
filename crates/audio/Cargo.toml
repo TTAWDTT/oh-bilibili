@@ -7,4 +7,5 @@ description = "audio"
 
 [dependencies]
 serde.workspace = true
+symphonia = { version = "0.5.4", features = ["aac", "isomp4"] }
 thiserror.workspace = true
