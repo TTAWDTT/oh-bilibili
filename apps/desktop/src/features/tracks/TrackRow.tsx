@@ -9,7 +9,7 @@ import { DownloadButton } from '../downloads/DownloadButton'
 import { AddToPlaylistModal } from '../library/AddToPlaylist'
 
 /** 行高固定，既给窗口化一个准确的分页单位，也让 hover 不可能改变行高。 */
-export const TRACK_ROW_HEIGHT = 56
+export const TRACK_ROW_HEIGHT = 40
 
 type TrackRowProps = {
   track: Track
@@ -59,7 +59,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[11px] text-white/48 group-hover:text-white/70" title={track.artist}>
+        <span className="mt-0 block truncate text-[11px] text-white/48 group-hover:text-white/70" title={track.artist}>
           {track.artist}
         </span>
       </button>
