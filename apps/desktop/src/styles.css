@@ -44,7 +44,7 @@
   --radius-sm: 4px;
   --radius-md: 6px;
 
-  --dur: 120ms;
+  --dur: 200ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --rail-w: 320px;
   --focus-ring: var(--accent);
@@ -62,6 +62,10 @@ body {
   color: var(--text-1);
   font-family: var(--font-sans);
   font-size: 14px;
+  /* B 站正文行高是 20px（14px 的 1.43 倍），字重 500 比 400 用得多得多。
+     这两点决定了「读起来厚不厚」，比配色更影响观感。 */
+  line-height: 20px;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
