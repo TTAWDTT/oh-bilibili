@@ -105,20 +105,24 @@ export function Slider({
         disabled ? 'cursor-default opacity-45' : 'cursor-pointer',
       ].join(' ')}
     >
-      <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-white/32">
+      <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-[var(--line)]">
         {buffered === null ? null : (
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-white/32"
+            className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--bili-pink)_22%,var(--line))]"
             style={{ width: `${clamp(buffered, 0, 1) * 100}%` }}
           />
         )}
         <div
           className="absolute inset-y-0 left-0 rounded-full"
-          style={{ width: `${clamp(value, 0, 1) * 100}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-deep))' }}
+          style={{
+            width: `${clamp(value, 0, 1) * 100}%`,
+            // B 站的进度是粉色打头、往蓝色过渡，和它首页的双色一致
+            background: 'linear-gradient(90deg, var(--bili-pink), color-mix(in oklab, var(--bili-blue) 70%, var(--bili-pink)))',
+          }}
         />
       </div>
       <div
-        className="t pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full bg-white opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
+        className="t pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full border-2 border-[var(--bili-pink)] bg-white shadow-[0_0_8px_rgba(251,114,153,0.6)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
         style={{ left: `${clamp(value, 0, 1) * 100}%` }}
       />
     </div>

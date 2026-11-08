@@ -10,7 +10,7 @@ import { Skeleton } from '../shared/ui/Skeleton'
 
 /** 侧栏行：24px 高，hover 是深灰填充而不是只改文字色——这是编辑器式列表的通用手感。 */
 const ROW =
-  't mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[12px]'
+  'bili-nav-item t mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[12px]'
 const ROW_IDLE = 'text-[var(--text-2)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]'
 const ROW_ACTIVE = 'bg-[var(--hover)] text-[var(--text-1)]'
 const SECTION = 'px-3 pb-1 pt-3 text-[11px] font-medium tracking-[0.08em] text-[var(--text-3)]'
