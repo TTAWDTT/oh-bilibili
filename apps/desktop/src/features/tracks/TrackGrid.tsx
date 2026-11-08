@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
@@ -82,14 +83,26 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const setMv = useAppStore((state) => state.setMv)
 
   /** 三连动作统一入口：失败走同一套提示，不静默。 */
-  const act = async (kind: 'like' | 'coin' | 'fav', track: Track): Promise<void> => {
+  const act = async (kind: 'like' | 'fav', track: Track): Promise<void> => {
     try {
       if (kind === 'like') await ipc.likeSet(track.key, true)
-      else if (kind === 'fav') await ipc.favSet(track.key, true)
-      else await ipc.coinAdd(track.key, 1, true)
-      toastDone(kind === 'like' ? '已点赞' : kind === 'fav' ? '已收藏' : '已投币并点赞')
+      else await ipc.favSet(track.key, true)
+      toastDone(kind === 'like' ? '已点赞' : '已收藏')
     } catch (e) {
       toastFailure('三连', toWireError(e))
+    }
+  }
+
+  /** 投币不可撤销，B 站硬币还是稀缺资源，所以必须二次确认。 */
+  const [confirming, setConfirming] = useState<string | null>(null)
+
+  const doCoin = async (track: Track): Promise<void> => {
+    setConfirming(null)
+    try {
+      await ipc.coinAdd(track.key, 1, true)
+      toastDone('已投 1 枚币并点赞')
+    } catch (e) {
+      toastFailure('投币', toWireError(e))
     }
   }
 
@@ -223,7 +236,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   type="button"
                   aria-label="投币"
                   title="投币"
-                  onClick={() => void act('coin', track)}
+                  onClick={() => setConfirming(track.key)}
                   className="hover:text-[var(--accent)]"
                 >
                   <Icon name="coin" size={12} />
@@ -240,6 +253,26 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 </button>
               </span>
             </div>
+
+            {confirming === track.key ? (
+              <div className="mt-1 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[11px]">
+                <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
+                <button
+                  type="button"
+                  onClick={() => void doCoin(track)}
+                  className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
+                >
+                  投
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(null)}
+                  className="text-[var(--text-3)] hover:text-[var(--text-1)]"
+                >
+                  取消
+                </button>
+              </div>
+            ) : null}
           </article>
         )
       })}
