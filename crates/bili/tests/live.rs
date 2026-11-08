@@ -176,3 +176,14 @@ async fn 按_up_主名能搜到他的投稿() {
     println!("首条作者：{:?}", tracks.first().map(|t| &t.artist));
     assert!(!tracks.is_empty(), "按 UP 名应该能搜到东西");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 搜索结果的_up_主带_mid() {
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let with_mid = tracks.iter().filter(|t| t.up_mid.is_some()).count();
+    println!("带 UP mid 的：{with_mid}/{}", tracks.len());
+    assert!(with_mid > 0, "关注按钮需要 UP 的 mid");
+}

@@ -1,3 +1,5 @@
+import { toastDone, toastFailure } from '../../app/notice'
+import { toWireError } from '../../shared/lib/errors'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
@@ -24,6 +26,25 @@ export function AuthorView({ name }: { name: string }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const navigate = useAppStore((state) => state.navigate)
+  const [followed, setFollowed] = useState(false)
+
+  /** 关注是真接口：写进你的 B 站关注列表，取关同理。 */
+  const follow = async (): Promise<void> => {
+    const mid = tracks?.find((t) => t.up_mid)?.up_mid
+    if (!mid) {
+      toastFailure('关注', { class: 'input', message: '这条结果没带 UP 主的 uid' })
+      return
+    }
+    const next = !followed
+    setFollowed(next)
+    try {
+      await ipc.followSet(mid, next)
+      toastDone(next ? '已关注' : '已取消关注')
+    } catch (e) {
+      setFollowed(!next)
+      toastFailure('关注', toWireError(e))
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -64,7 +85,20 @@ export function AuthorView({ name }: { name: string }) {
           <h1 className="truncate text-[20px] font-semibold text-[var(--text-1)]" title={name}>
             {name}
           </h1>
-          <div className="num mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[var(--text-3)]">
+          <button
+            type="button"
+            onClick={() => void follow()}
+            className={[
+              'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[12px]',
+              followed
+                ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                : 'bg-[var(--accent)] text-white',
+            ].join(' ')}
+          >
+            {followed ? '已关注' : '+ 关注'}
+          </button>
+
+          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[var(--text-3)]">
             <span>{tracks.length} 个投稿</span>
             <span>{formatCount(views)} 累计播放</span>
             <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">

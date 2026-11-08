@@ -9,6 +9,7 @@ export type Track = {
   views?: number | null
   danmaku?: number | null
   up_avatar?: string | null
+  up_mid?: number | null
   tname?: string | null
   typeid?: number | null
 }

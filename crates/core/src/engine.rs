@@ -539,6 +539,11 @@ impl Engine {
         Ok(())
     }
 
+    pub async fn follow_set(&self, mid: u64, on: bool) -> Result<(), WireError> {
+        self.source.set_follow(mid, on).await?;
+        Ok(())
+    }
+
     pub async fn fav_set(&self, key: &TrackKey, faved: bool) -> Result<(), WireError> {
         self.source.set_favorite(key, faved).await?;
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {

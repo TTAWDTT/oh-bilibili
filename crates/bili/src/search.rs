@@ -18,6 +18,7 @@ pub struct Candidate {
     pub views: u64,
     pub danmaku: u64,
     pub up_avatar: Option<String>,
+    pub up_mid: Option<u64>,
     pub score: f64,
 }
 
@@ -162,6 +163,7 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
         views: Some(c.views).filter(|v| *v > 0),
         danmaku: Some(c.danmaku).filter(|v| *v > 0),
         up_avatar: c.up_avatar.clone(),
+        up_mid: c.up_mid,
         tname: partition_name(c.typeid).map(|n| n.to_string()),
         typeid: Some(c.typeid),
     }
@@ -203,6 +205,7 @@ mod tests {
             views: 1000,
             danmaku: 10,
             up_avatar: None,
+            up_mid: None,
             score: 0.0,
         }
     }

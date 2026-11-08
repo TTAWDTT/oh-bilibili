@@ -25,6 +25,22 @@ impl Client {
         Ok(())
     }
 
+    /// 关注或取关一个 UP 主。`act` 1 关注、2 取关。
+    pub async fn follow(&self, mid: u64, on: bool) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        let body = vec![
+            ("fid", mid.to_string()),
+            ("act", if on { "1" } else { "2" }.to_string()),
+            ("re_src", "11".to_string()),
+            ("csrf", csrf),
+        ];
+        self.post_form(&format!("{API}/x/relation/modify"), body)
+            .await?;
+        Ok(())
+    }
+
     /// 投币。`count` 是 1 或 2（B 站上限两枚）；`also_like` 为真时同时点赞，一键三连就是这么来的。
     pub async fn add_coin(&self, aid: u64, count: u8, also_like: bool) -> Result<(), BiliError> {
         let csrf = self

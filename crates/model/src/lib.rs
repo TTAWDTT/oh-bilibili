@@ -116,6 +116,9 @@ pub struct Track {
     /// UP 主头像。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub up_avatar: Option<String>,
+    /// UP 主 uid，关注要用。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub up_mid: Option<u64>,
     /// 分区名，如「音乐」「鬼畜」。由 typeid 查 B 站固定分区表得到。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tname: Option<String>,

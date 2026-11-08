@@ -460,6 +460,7 @@ mod tests {
             views: None,
             danmaku: None,
             up_avatar: None,
+            up_mid: None,
             tname: None,
             typeid: None,
         }

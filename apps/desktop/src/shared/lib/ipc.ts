@@ -135,6 +135,11 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+/** 关注或取关 UP 主。 */
+export function followSet(mid: number, on: boolean): Promise<null> {
+  return call<null>('follow_set', { mid, on })
+}
+
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
 export function coinAdd(key: string, count: number, alsoLike: boolean): Promise<null> {
   return call<null>('coin_set', { key, count, also_like: alsoLike })

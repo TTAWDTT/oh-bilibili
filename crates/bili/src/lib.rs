@@ -166,6 +166,11 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// 关注 UP 主。
+    pub async fn set_follow(&self, mid: u64, on: bool) -> Result<(), BiliError> {
+        self.client.follow(mid, on).await
+    }
+
     /// 投币。三连里的「币」，和点赞是同一次操作的两个动作。
     pub async fn add_coin(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;
@@ -368,6 +373,7 @@ impl Source {
                 up_avatar: item["owner"]["face"]
                     .as_str()
                     .map(|f| f.replacen("http://", "https://", 1)),
+                up_mid: item["owner"]["mid"].as_u64(),
                 tname: search::partition_name(typeid).map(|n| n.to_string()),
                 typeid: Some(typeid),
             });
@@ -468,6 +474,7 @@ mod wire {
                 views: item["play"].as_u64().unwrap_or(0),
                 danmaku: item["video_review"].as_u64().unwrap_or(0),
                 up_avatar: norm_cover(item["upic"].as_str().unwrap_or("")),
+                up_mid: item["mid"].as_u64(),
                 score: 0.0,
             });
         }
@@ -507,6 +514,7 @@ mod wire {
             up_avatar: data["owner"]["face"]
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1)),
+            up_mid: data["owner"]["mid"].as_u64(),
             tname: data["tname"].as_str().map(|s| s.to_string()),
             typeid: data["tid"].as_u64().map(|v| v as u32),
         };
