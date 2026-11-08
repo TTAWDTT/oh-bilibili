@@ -233,7 +233,10 @@ mod wire {
         }
         if pic.starts_with("//") {
             Some(format!("https:{pic}"))
-        } else if pic.starts_with("http") {
+        } else if let Some(rest) = pic.strip_prefix("http://") {
+            // 接口有时给 http 图床，webview 里会被判混合内容，统一升到 https。
+            Some(format!("https://{rest}"))
+        } else if pic.starts_with("https://") {
             Some(pic.to_string())
         } else {
             None
