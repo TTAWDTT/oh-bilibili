@@ -218,3 +218,42 @@
 .stage-line {
   animation: stage-line-breathe 4.5s ease-in-out infinite;
 }
+
+/* 常驻环境层：两团极淡的暖光缓慢漂移，30 秒一个来回。
+   静止界面需要「在呼吸」的证据，否则看起来像截图。 */
+.ambient-drift-a,
+.ambient-drift-b {
+  background: radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 68%);
+  filter: blur(80px);
+  opacity: 0.07;
+  will-change: transform;
+}
+
+.ambient-drift-a {
+  animation: ambient-a 34s ease-in-out infinite alternate;
+}
+
+.ambient-drift-b {
+  animation: ambient-b 41s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(6%, 4%, 0) scale(1.12); }
+}
+
+@keyframes ambient-b {
+  from { transform: translate3d(0, 0, 0) scale(1.06); }
+  to { transform: translate3d(-7%, -5%, 0) scale(1); }
+}
+
+/* 顶栏的小电视：每 7 秒眨一次，和图标的眼睛节奏对齐 */
+.bili-tv-mark {
+  display: inline-flex;
+  animation: bili-tv-mark-blink 7s ease-in-out infinite;
+}
+
+@keyframes bili-tv-mark-blink {
+  0%, 90%, 100% { opacity: 1; }
+  94% { opacity: 0.45; }
+}

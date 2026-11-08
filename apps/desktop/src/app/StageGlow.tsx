@@ -35,6 +35,9 @@ export function StageGlow() {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+      {/* 常驻层：极慢漂移的两团色斑。不播放时界面也在呼吸，这是「活着」的底子。 */}
+      <div className="ambient-drift-a absolute -left-[10%] top-[-20%] h-[70%] w-[55%] rounded-full" />
+      <div className="ambient-drift-b absolute -right-[8%] bottom-[-25%] h-[65%] w-[50%] rounded-full" />
       <div
         ref={ref}
         className="absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity duration-300"
