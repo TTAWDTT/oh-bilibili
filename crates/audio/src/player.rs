@@ -139,6 +139,18 @@ fn open_decoder(media: Media) -> Result<Session, AudioError> {
     let decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| AudioError::Decode(e.to_string()))?;
+
+    // fMP4 把 moov 放在文件末尾，探针读完头已经在 EOF 附近，
+    // 不回卷的话第一次 next_packet 直接 EOF，听起来像「点了播放没反应」。
+    let mut format = format;
+    let _ = format.seek(
+        SeekMode::Accurate,
+        SeekTo::Time {
+            time: Time::from(0.0),
+            track_id: Some(track_id),
+        },
+    );
+
     Ok(Session {
         format,
         decoder,

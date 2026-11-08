@@ -246,7 +246,8 @@ impl Engine {
             let player = lock(&self.player);
             player.load(Media::new(media)).map_err(|e| WireError::internal(e.to_string()))?;
             player.set_volume(*lock(&self.volume));
-            player.seek(0);
+            // 不要在 load 之后 seek(0)：load 已经重置了时钟，再 seek 一次会在
+            // 音频线程刚开始推进时把帧计数打回 0，位置看起来像卡住。
         }
         let _ = token;
         let quality: Quality = best.quality;

@@ -26,10 +26,12 @@ async fn 引擎能搜到歌并真的开始播放() {
     assert_eq!(snapshot.phase, "playing", "应该进入播放态");
     assert!(snapshot.quality_kbps.unwrap_or(0) >= 64, "应该拿到音轨档位");
 
-    tokio::time::sleep(Duration::from_millis(1200)).await;
+    // 网络取首字节要 1–2 秒，1.2 秒的窗口在快网下才够，会假红。
+    // 等 3 秒再测，断言的是「有没有在推进」而不是「推进得多快」。
+    tokio::time::sleep(Duration::from_millis(3000)).await;
     let after = engine.snapshot();
-    println!("1.2 秒后位置：{}ms", after.position_ms);
-    assert!(after.position_ms > 200, "声卡应该真的在推进位置");
+    println!("3 秒后位置：{}ms", after.position_ms);
+    assert!(after.position_ms > 800, "声卡应该真的在推进位置");
 
     engine.seek(90_000);
     tokio::time::sleep(Duration::from_millis(400)).await;
