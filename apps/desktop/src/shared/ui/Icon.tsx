@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react'
 
 const ICONS = {
+  /** B 站小电视。用在「音源来自 B 站」这类需要点明来源的位置。 */
+  biliTv: (
+    <>
+      <path d="M8.4 2.6 12 6.2l3.6-3.6" />
+      <rect x="3.2" y="6.4" width="17.6" height="13.4" rx="3" />
+      <path d="M8 15.4c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" />
+      <circle cx="8.6" cy="10.4" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="15.4" cy="10.4" r=".9" fill="currentColor" stroke="none" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.4" />

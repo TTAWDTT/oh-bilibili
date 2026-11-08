@@ -112,3 +112,49 @@
 [data-row='track']:focus-within > div:last-child {
   opacity: 1;
 }
+
+/* 舞台态：播放时封面外圈一道流光缓慢旋转，静止时不转。
+   没有真实的频谱数据之前，这一层负责「活着」的感觉，不假装是频谱。 */
+@keyframes stage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes stage-breath {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+
+.stage-cover {
+  position: relative;
+  isolation: isolate;
+}
+
+.stage-cover::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 8px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--accent) 40deg,
+    transparent 90deg,
+    transparent 360deg
+  );
+  filter: blur(6px);
+  z-index: -1;
+  opacity: 0.32;
+}
+
+.stage-cover[data-playing='true']::before {
+  animation:
+    stage-spin 9s linear infinite,
+    stage-breath 4s ease-in-out infinite;
+}

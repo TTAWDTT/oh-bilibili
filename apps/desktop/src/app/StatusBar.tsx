@@ -1,5 +1,6 @@
 import { usePlayerStore } from '../features/player/playerStore'
 import { formatTime } from '../shared/lib/format'
+import { Icon } from '../shared/ui/Icon'
 
 /**
  * 状态条。编辑器式外壳的最后一段：22px，11px 字，只放事实，不放操作。
@@ -16,8 +17,8 @@ export function StatusBar() {
     <footer className="flex h-[22px] shrink-0 items-center justify-between border-t border-hairline bg-[var(--panel-alt)] px-2 text-[11px] text-[var(--text-3)]">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-          本机直连
+          <Icon name="biliTv" size={12} />
+          本机直连 B 站
         </span>
         <span className="num">
           {formatTime(snapshot?.position_ms ?? 0)} / {formatTime(snapshot?.duration_ms ?? 0)}
