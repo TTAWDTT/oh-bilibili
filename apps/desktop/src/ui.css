@@ -410,3 +410,36 @@
   background-size: 200% 100%;
   animation: bili-shimmer 1.6s linear infinite;
 }
+
+/* 播放条封面上的三根小柱：正在播放时上下跳，和 B 站列表里的动态图标一个意思 */
+.bili-playing-bars i {
+  display: block;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: #fff;
+  animation: bili-bar-jump 0.9s ease-in-out infinite;
+}
+
+.bili-playing-bars i:nth-child(2) {
+  animation-delay: 0.15s;
+  height: 11px;
+}
+.bili-playing-bars i:nth-child(3) {
+  animation-delay: 0.3s;
+  height: 6px;
+}
+
+@keyframes bili-bar-jump {
+  0%, 100% { transform: scaleY(0.45); }
+  50% { transform: scaleY(1); }
+}
+
+/* 长标题：hover 时缓慢向左滚动，把后半段也露出来 */
+.bili-marquee {
+  transition: color var(--dur) var(--ease);
+}
+
+.bili-marquee:hover {
+  color: var(--bili-pink);
+}

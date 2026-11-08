@@ -23,8 +23,8 @@ export function StageGlow() {
         const el = ref.current
         if (!el) return
         const strength = Math.min(1, smooth * 3.2)
-        el.style.opacity = String(0.04 + strength * 0.16)
-        el.style.transform = `scale(${1 + strength * 0.12})`
+        el.style.opacity = String(0.02 + strength * 0.06)
+        el.style.transform = `scale(${1 + strength * 0.06})`
       })
     })
     return () => {
@@ -42,7 +42,7 @@ export function StageGlow() {
         ref={ref}
         className="absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity duration-300"
         style={{
-          opacity: playing ? 0.1 : 0.03,
+          opacity: playing ? 0.05 : 0.015,
           background:
             'radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--accent) 62%, transparent) 0%, transparent 58%)',
           filter: 'blur(60px)',

@@ -49,6 +49,7 @@ function RailToggle({
 
 function TrackInfo({ track, quality }: { track: Track | null; quality: number | null }) {
   const setStage = useAppStore((state) => state.setStage)
+  const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
 
   if (!track) {
     return (
@@ -70,14 +71,26 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <Cover
-        cover={track.cover}
-        title={track.title}
-        className="h-10 w-10 shrink-0 rounded-[4px] border border-[var(--line)]"
-        glyphClassName="text-[20px] font-semibold text-[var(--text-2)]"
-      />
+      <button
+        type="button"
+        onClick={() => setStage(true)}
+        aria-label="打开播放舞台"
+        className="bili-press relative shrink-0 overflow-hidden rounded-[4px] border border-[var(--line)]"
+      >
+        <Cover
+          cover={track.cover}
+          title={track.title}
+          className="h-10 w-10"
+          glyphClassName="text-[20px] font-semibold text-[var(--text-2)]"
+        />
+        {playing ? (
+          <span className="bili-playing-bars absolute bottom-0 left-0 right-0 flex items-end justify-center gap-[2px] bg-black/35 pb-[3px] pt-[6px]">
+            <i /><i /><i />
+          </span>
+        ) : null}
+      </button>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
+        <div className="bili-marquee truncate text-[13px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
           {track.title}
         </div>
         <div className="mt-1 flex items-center gap-2">
