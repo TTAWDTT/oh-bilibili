@@ -135,6 +135,18 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+export type FavFolder = { id: number; title: string; count: number }
+
+/** 当前账号的收藏夹。 */
+export function favFolders(): Promise<FavFolder[]> {
+  return call<FavFolder[]>('fav_folders', {})
+}
+
+/** 某个收藏夹里的曲目。 */
+export function favTracks(folderId: number): Promise<Track[]> {
+  return call<Track[]>('fav_tracks', { folder_id: folderId })
+}
+
 /** 加入或移出稍后再看。 */
 export function watchLaterSet(key: string, on: boolean): Promise<null> {
   return call<null>('watch_later_set', { key, on })

@@ -25,6 +25,51 @@ impl Client {
         Ok(())
     }
 
+    /// 当前账号的收藏夹列表。返回 (media_id, 名字, 条目数)。
+    pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
+        let mid = self
+            .logged_in_mid()
+            .ok_or_else(|| BiliError::NeedsLogin("还没有登录".into()))?;
+        let v = self
+            .get_json(
+                &format!("{API}/x/v3/fav/folder/created/list-all?up_mid={mid}&rid=0"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["list"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|item| {
+                Some((
+                    item["id"].as_i64()?,
+                    item["title"].as_str()?.to_string(),
+                    item["media_count"].as_u64().unwrap_or(0) as u32,
+                ))
+            })
+            .collect())
+    }
+
+    /// 某个收藏夹里的视频 bvid 列表。
+    pub async fn fav_items(&self, folder_id: i64) -> Result<Vec<String>, BiliError> {
+        let v = self
+            .get_json(
+                &format!(
+                    "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps=40&pn=1&platform=web"
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["medias"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|m| m["bvid"].as_str().map(|s| s.to_string()))
+            .collect())
+    }
+
     /// 稍后再看的列表。未登录会返回 NeedsLogin。
     pub async fn watch_later(&self) -> Result<Vec<u64>, BiliError> {
         let v = self

@@ -304,6 +304,33 @@ async fn coin_set(
         .await
 }
 
+#[derive(Serialize)]
+struct FavFolderView {
+    id: i64,
+    title: String,
+    count: u32,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn fav_folders(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<FavFolderView>, WireError> {
+    Ok(engine
+        .fav_folders()
+        .await?
+        .into_iter()
+        .map(|(id, title, count)| FavFolderView { id, title, count })
+        .collect())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn fav_tracks(
+    engine: tauri::State<'_, Arc<Engine>>,
+    folder_id: i64,
+) -> Result<Vec<Track>, WireError> {
+    engine.fav_tracks(folder_id).await
+}
+
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_later_set(
     engine: tauri::State<'_, Arc<Engine>>,
@@ -474,6 +501,8 @@ pub fn run() {
             coin_set,
             follow_set,
             watch_later_set,
+            fav_folders,
+            fav_tracks,
             fav_set,
             lyrics_get,
             auth_status,

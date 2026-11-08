@@ -5,7 +5,7 @@ export type View =
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }
   | { kind: 'liked' }
-  | { kind: 'downloads' | 'history' }
+  | { kind: 'downloads' | 'history' | 'favs' }
   | { kind: 'author'; name: string }
   | { kind: 'settings' }
 

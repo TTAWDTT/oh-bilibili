@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
 import { AuthorView } from '../features/library/AuthorView'
+import { FavFoldersView } from '../features/library/FavFoldersView'
 import { HistoryView } from '../features/library/HistoryView'
 import { LibraryView } from '../features/library/LibraryView'
 import { LikedView } from '../features/library/LikedView'
@@ -39,6 +40,8 @@ function CurrentView({ view }: { view: View }) {
       return <DownloadsView />
     case 'history':
       return <HistoryView />
+    case 'favs':
+      return <FavFoldersView />
     case 'author':
       return <AuthorView name={view.name} />
     case 'settings':

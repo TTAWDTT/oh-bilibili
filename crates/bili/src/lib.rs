@@ -166,6 +166,24 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// 收藏夹列表。
+    pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
+        self.client.fav_folders().await
+    }
+
+    /// 收藏夹内容，转成 Track。
+    pub async fn fav_tracks(&self, folder_id: i64) -> Result<Vec<Track>, BiliError> {
+        let keys = self.client.fav_items(folder_id).await?;
+        let mut out = Vec::new();
+        for bvid in keys {
+            let key = TrackKey::from_provider(bvid);
+            if let Ok(detail) = self.detail(&key).await {
+                out.push(detail.track);
+            }
+        }
+        Ok(out)
+    }
+
     /// 这条视频是否已在稍后再看里。
     pub async fn in_watch_later(&self, key: &TrackKey) -> Result<bool, BiliError> {
         let detail = self.detail(key).await?;
