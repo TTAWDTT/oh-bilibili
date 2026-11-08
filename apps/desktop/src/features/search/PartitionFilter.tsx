@@ -8,7 +8,8 @@ export type Partition = { label: string; ids: number[] }
 
 export const PARTITIONS: Partition[] = [
   { label: '全部', ids: [] },
-  { label: '音乐', ids: [3] },
+  // B 站音乐区用子分区 id，主类目 3 反而很少出现
+  { label: '音乐', ids: [3, 28, 29, 30, 31, 59, 130, 193, 171] },
   { label: '舞蹈', ids: [129] },
   { label: '游戏', ids: [4, 17, 65, 136, 171] },
   { label: '鬼畜', ids: [119] },

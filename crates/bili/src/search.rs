@@ -30,7 +30,7 @@ const NEGATIVE: [&str; 10] = [
 pub fn partition_name(typeid: u32) -> Option<&'static str> {
     let name = match typeid {
         1 | 24 | 25 | 47 | 210 => "动画",
-        3 => "音乐",
+        3 | 28 | 29 | 30 | 31 | 59 | 130 | 193 | 171 => "音乐",
         4 | 17 | 65 | 136 | 171 => "游戏",
         5 | 71 => "娱乐",
         23 | 27 => "电影",

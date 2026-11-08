@@ -152,7 +152,8 @@ async fn 分区过滤能按类型筛结果() {
         .search_ordered(&q, SearchOrder::TotalRank)
         .await
         .expect("搜索");
-    let music: Vec<_> = all.iter().filter(|t| t.typeid == Some(3)).collect();
+    let music: Vec<_> = all.iter().filter(|t| matches!(t.typeid, Some(3 | 28 | 29 | 30 | 31 | 59 | 130 | 193 | 171))).collect();
     println!("全部 {} 条，其中音乐区 {} 条", all.len(), music.len());
     assert!(all.iter().all(|t| t.typeid.is_some()), "每条都应该带 typeid");
+    assert!(!music.is_empty(), "晴天应该有音乐区结果");
 }
