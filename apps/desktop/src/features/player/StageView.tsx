@@ -89,10 +89,12 @@ export function StageView() {
           alt=""
           aria-hidden
           referrerPolicy="no-referrer"
-          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-40 blur-[90px] saturate-150"
+          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-[100px] saturate-125"
         />
       ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-black/45" />
+      {/* 浅色底：白色半透明压住封面，让文字在任何封面上都读得清 */}
+      <div className="pointer-events-none absolute inset-0 bg-white/88" />
+      <div className="bili-canvas pointer-events-none absolute inset-0 opacity-45" />
       <DanmakuLayer trackKey={track.key} playing={snapshot?.phase === 'playing'} />
 
       <button
@@ -111,7 +113,7 @@ export function StageView() {
           <Cover
             cover={track.cover}
             title={track.title}
-            className="h-[240px] w-[240px] rounded-full border border-white/20"
+            className="h-[240px] w-[240px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)]"
             glyphClassName="text-[64px] font-semibold text-[var(--text-1)]"
           />
         </div>
@@ -136,7 +138,7 @@ export function StageView() {
             type="button"
             aria-label={snapshot?.phase === 'playing' ? '暂停' : '播放'}
             onClick={() => void toggle()}
-            className="t press flex h-14 w-14 items-center justify-center rounded-full bg-white text-black"
+            className="bili-press flex h-14 w-14 items-center justify-center rounded-full bg-[var(--bili-pink)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
           >
             <Icon name={snapshot?.phase === 'playing' ? 'pause' : 'play'} size={22} />
           </button>
@@ -153,8 +155,8 @@ export function StageView() {
       </div>
 
       {related.length > 0 ? (
-        <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-black/35 px-6 py-3 backdrop-blur">
-          <div className="mb-2 text-[11px] text-white/45">相关推荐</div>
+        <div className="absolute inset-x-0 bottom-0 border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur">
+          <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {related.map((item) => (
               <button
@@ -172,7 +174,7 @@ export function StageView() {
                     glyphClassName="text-[20px] font-semibold text-white/80"
                   />
                 </span>
-                <span className="mt-1 line-clamp-1 block text-[11px] text-white/75 group-hover:text-[var(--accent)]">
+                <span className="mt-1 line-clamp-1 block text-[11px] text-[var(--text-2)] group-hover:text-[var(--bili-pink)]">
                   {item.title}
                 </span>
               </button>
