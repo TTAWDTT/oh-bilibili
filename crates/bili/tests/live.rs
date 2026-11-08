@@ -25,6 +25,13 @@ async fn 搜索到取流的完整链路可用() {
         );
     }
 
+    let with_cover = tracks.iter().filter(|t| t.cover.is_some()).count();
+    println!("\n带封面的结果：{with_cover}/{}", tracks.len());
+    if let Some(c) = tracks.iter().find_map(|t| t.cover.as_deref()) {
+        println!("封面样本：{c}");
+    }
+    assert!(with_cover > 0, "搜索结果应该带封面，否则列表只能显示字母占位");
+
     let first = &tracks[0];
     assert!(
         first.title.contains("晴天"),

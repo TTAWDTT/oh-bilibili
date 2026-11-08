@@ -21,6 +21,10 @@ export function Cover({ cover, title, className, glyphClassName }: CoverProps) {
         src={cover}
         alt=""
         draggable={false}
+        /* B 站图床对非 bilibili 的 Referer 一律 403，webview 默认会带页面来源，
+           所以必须显式不发 Referer。缺这一条，封面在真机上全部裂图。 */
+        referrerPolicy="no-referrer"
+        loading="lazy"
         className={`${className} object-cover`}
         onError={() => setBroken(true)}
       />
