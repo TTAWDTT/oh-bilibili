@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { REAL_COVERS } from '../../shared/lib/realCovers'
 import { Bili2233 } from '../../shared/ui/Bili2233'
 
 type Slide = {
@@ -18,21 +17,21 @@ type Slide = {
  */
 const SLIDES: Slide[] = [
   {
-    image: REAL_COVERS['孤勇者'],
+    image: '/assets/banner-1.png',
     title: '干杯，把 B 站的声音装进口袋',
     desc: '搜索、播放、弹幕、歌词、投币三连，全在本机完成。',
     from: '#ff5c8a',
     to: '#7b6bff',
   },
   {
-    image: REAL_COVERS['海底'],
+    image: '/assets/banner-2.jpg',
     title: '22 娘和 33 娘守在这里',
     desc: '每一条音轨都来自你自己的 B 站账号，不经任何中转。',
     from: '#00aeec',
     to: '#ff6699',
   },
   {
-    image: REAL_COVERS['大鱼'],
+    image: '/assets/banner-3.jpg',
     title: '一键三连，也是一种收藏方式',
     desc: '点赞、投币、收进「哔哩哔哩 music」，和你账号里同步。',
     from: '#ff9f2e',
