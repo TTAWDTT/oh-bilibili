@@ -8,7 +8,6 @@ import type { Health } from '../../shared/lib/ipc'
 import { isTauri } from '../../shared/lib/runtime'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageHeader } from '../../shared/ui/PageHeader'
 import { ShortcutTable } from './ShortcutTable'
 
 /** 设置项之间只用一条发丝线分隔：分组是信息层级，不需要再画一层框。 */
@@ -70,114 +69,114 @@ export function SettingsView() {
   }, [syncing])
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-12 pt-8">
-      <PageHeader
-        actions={null}
-      />
+    <div className="flex h-full flex-col">
+      
 
-      <div className="mt-6 max-w-[880px]">
-        <Section title="快捷键">
-          <ShortcutTable />
-        </Section>
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-2">
+        <div className="max-w-[880px]">
+          <Section title="快捷键">
+            <ShortcutTable />
+          </Section>
 
-        <Section title="账号">
-          {user ? (
-            <div className="flex items-center gap-4">
-              {user.avatar ? (
-                <img src={user.avatar} alt="" className="h-12 w-12 rounded-[6px] border border-white/12 object-cover" />
-              ) : (
-                <span className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-white/10 text-[17px] font-medium text-white/90">
-                  {user.uname.slice(0, 1)}
-                </span>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] text-white/90" title={user.uname}>
-                  {user.uname}
+          <Section title="账号">
+            {user ? (
+              <div className="flex items-center gap-4">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" className="h-12 w-12 rounded-[6px] border border-white/12 object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-white/10 text-[17px] font-medium text-white/90">
+                    {user.uname.slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] text-white/90" title={user.uname}>
+                    {user.uname}
+                  </div>
+                  <div className="num mt-1 font-mono text-[10.5px] text-white/34">UID {user.mid}</div>
                 </div>
-                <div className="num mt-1 font-mono text-[10.5px] text-white/34">UID {user.mid}</div>
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
+                >
+                  <Icon name="logout" size={13} />
+                  退出
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => void logout()}
-                className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
-              >
-                <Icon name="logout" size={13} />
-                退出
-              </button>
+            ) : (
+              <div>
+                <div className="text-[13px] text-white/84">未登录</div>
+                <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+                  登录后才能把喜欢与收藏写进 B 站账号。凭据只存本机，不上传。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAuthOpen(true)}
+                  className="t press mt-4 rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+                >
+                  扫码登录
+                </button>
+              </div>
+            )}
+          </Section>
+
+          <Section title="同步">
+            <div className="text-[13px] text-white/84">喜欢与收藏</div>
+            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+              离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
+            </p>
+            <button
+              type="button"
+              onClick={() => void sync()}
+              disabled={syncing}
+              className="t press mt-4 flex items-center gap-2 rounded-[6px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white disabled:cursor-default disabled:opacity-40"
+            >
+              <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? '同步中…' : '立即同步'}
+            </button>
+          </Section>
+
+          <Section title="音质">
+            <div className="text-[13px] text-white/84">如实显示，不承诺无损</div>
+            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+              B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Chip label="档位" value="64 / 132 / 192K" />
+              <Chip label="引擎" value={health?.engine ?? (healthFailed ? '不可用' : '…')} />
             </div>
-          ) : (
-            <div>
-              <div className="text-[13px] text-white/84">未登录</div>
-              <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
-                登录后才能把喜欢与收藏写进 B 站账号。凭据只存本机，不上传。
-              </p>
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
-                className="t press mt-4 rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
-              >
-                扫码登录
-              </button>
+          </Section>
+
+          <Section title="关于">
+            <div className="text-[13px] text-white/84">BiliMusic alpha</div>
+            <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
+              音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Chip label="版本" value={health?.version ?? '…'} />
+              <Chip label="平台" value={health?.platform ?? '…'} />
+              <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
             </div>
-          )}
-        </Section>
+            {isTauri ? null : (
+              <div className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-[#9fe6ff]/70">
+                <Icon name="info" size={13} className="mt-[2px] shrink-0" />
+                当前跑在浏览器预览：音源是 30 秒假音频，登录会在约 5 秒后自动成功。
+              </div>
+            )}
+          </Section>
 
-        <Section title="同步">
-          <div className="text-[13px] text-white/84">喜欢与收藏</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
-            离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
-          </p>
-          <button
-            type="button"
-            onClick={() => void sync()}
-            disabled={syncing}
-            className="t press mt-4 flex items-center gap-2 rounded-[6px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white disabled:cursor-default disabled:opacity-40"
-          >
-            <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
-            {syncing ? '同步中…' : '立即同步'}
-          </button>
-        </Section>
-
-        <Section title="音质">
-          <div className="text-[13px] text-white/84">如实显示，不承诺无损</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
-            B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Chip label="档位" value="64 / 132 / 192K" />
-            <Chip label="引擎" value={health?.engine ?? (healthFailed ? '不可用' : '…')} />
-          </div>
-        </Section>
-
-        <Section title="关于">
-          <div className="text-[13px] text-white/84">BiliMusic alpha</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
-            音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Chip label="版本" value={health?.version ?? '…'} />
-            <Chip label="平台" value={health?.platform ?? '…'} />
-            <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
-          </div>
-          {isTauri ? null : (
-            <div className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-[#9fe6ff]/70">
-              <Icon name="info" size={13} className="mt-[2px] shrink-0" />
-              当前跑在浏览器预览：音源是 30 秒假音频，登录会在约 5 秒后自动成功。
+          {healthFailed ? (
+            <div className="py-4">
+              <EmptyState
+                icon="alert"
+                title="外壳信息读不到"
+                detail="IPC 通道可能没起来，界面其余部分仍可独立工作。"
+                action={{ label: '重试', onClick: () => setHealthNonce((current) => current + 1) }}
+                compact
+              />
             </div>
-          )}
-        </Section>
-
-        {healthFailed ? (
-          <div className="py-4">
-            <EmptyState
-              icon="alert"
-              title="外壳信息读不到"
-              detail="IPC 通道可能没起来，界面其余部分仍可独立工作。"
-              action={{ label: '重试', onClick: () => setHealthNonce((current) => current + 1) }}
-              compact
-            />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   )

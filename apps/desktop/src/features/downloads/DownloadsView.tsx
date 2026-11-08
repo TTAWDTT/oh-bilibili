@@ -5,7 +5,6 @@ import { toastDone, toastFailure } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageHeader } from '../../shared/ui/PageHeader'
 import { Skeleton } from '../../shared/ui/Skeleton'
 import { useDownloadsStore } from './downloadsStore'
 
@@ -27,12 +26,10 @@ export function DownloadsView() {
   const navigate = useAppStore((state) => state.navigate)
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
-      <PageHeader
-        actions={null}
-      />
+    <div className="flex h-full flex-col">
+      
 
-      <div className="mt-7 max-w-[920px]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (

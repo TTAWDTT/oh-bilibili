@@ -51,16 +51,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
   const playing = snapshot?.phase === 'playing'
 
   return (
-    <div className="flex h-full max-w-[1040px] flex-col px-8 pb-8 pt-8">
-      <button
-        type="button"
-        onClick={() => navigate({ kind: 'library' })}
-        className="t press mb-4 flex w-fit items-center gap-1 pr-2 text-[11.5px] text-white/40 hover:text-white"
-      >
-        <Icon name="chevronLeft" size={13} />
-        曲库
-      </button>
-
+    <div className="flex h-full flex-col">
       <PageHeader
         title={tracks ? `${name} · ${tracks.length} 首 · ${formatSpan(total)}` : name}
         actions={
@@ -69,7 +60,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => void playContext(keys, 0)}
-                className="t press flex items-center gap-2 rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+                className="t press flex items-center gap-2 rounded-[6px] bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/88"
               >
                 <Icon name="play" size={13} />
                 播放全部
@@ -77,7 +68,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'search' })}
-                className="t press rounded-[6px] border border-white/12 px-4 py-2 text-[12px] text-white/72 hover:border-white/28 hover:text-white"
+                className="t press rounded-[6px] border border-white/12 px-4 py-1.5 text-[12px] text-white/72 hover:border-white/28 hover:text-white"
               >
                 去添加
               </button>
@@ -86,39 +77,50 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
         }
       />
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {tracks === null ? <TrackListSkeleton rows={6} /> : null}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8 pt-4">
+        <button
+          type="button"
+          onClick={() => navigate({ kind: 'library' })}
+          className="t press mb-3 flex w-fit items-center gap-1 pr-2 text-[11.5px] text-white/40 hover:text-white"
+        >
+          <Icon name="chevronLeft" size={13} />
+          曲库
+        </button>
 
-        {error ? (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon="alert"
-              title={error}
-              detail="歌单读取失败了，稍后再试一次。"
-              action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
+        <div className="flex min-h-0 flex-col">
+          {tracks === null ? <TrackListSkeleton rows={6} /> : null}
+
+          {error ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <EmptyState
+                icon="alert"
+                title={error}
+                detail="歌单读取失败了，稍后再试一次。"
+                action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
+              />
+            </div>
+          ) : null}
+
+          {tracks !== null && !error && tracks.length === 0 ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <EmptyState
+                icon="music"
+                title="这张歌单还是空的"
+                detail="去搜索里找到喜欢的歌，点加号就能收进来。"
+                action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+              />
+            </div>
+          ) : null}
+
+          {tracks !== null && tracks.length > 0 ? (
+            <TrackList
+              tracks={tracks}
+              activeKey={activeKey}
+              playing={playing}
+              onPlay={(index) => void playContext(keys, index)}
             />
-          </div>
-        ) : null}
-
-        {tracks !== null && !error && tracks.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon="music"
-              title="这张歌单还是空的"
-              detail="去搜索里找到喜欢的歌，点加号就能收进来。"
-              action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
-            />
-          </div>
-        ) : null}
-
-        {tracks !== null && tracks.length > 0 ? (
-          <TrackList
-            tracks={tracks}
-            activeKey={activeKey}
-            playing={playing}
-            onPlay={(index) => void playContext(keys, index)}
-          />
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   )

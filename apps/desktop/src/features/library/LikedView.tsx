@@ -16,7 +16,7 @@ export function LikedView() {
   const playing = snapshot?.phase === 'playing'
 
   return (
-    <div className="flex h-full max-w-[1040px] flex-col px-8 pb-8 pt-8">
+    <div className="flex h-full flex-col">
       <PageHeader
         actions={
           tracks.length > 0 ? (
@@ -32,9 +32,9 @@ export function LikedView() {
         }
       />
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-8 pt-2">
         {tracks.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex min-h-[320px] flex-1 items-center justify-center">
             <EmptyState
               icon="heart"
               title="还没有喜欢的歌"

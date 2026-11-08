@@ -88,126 +88,128 @@ export function SearchView() {
   const playing = snapshot?.phase === 'playing'
 
   return (
-    <div className="h-full max-w-[1040px] overflow-y-auto px-8 pb-10 pt-8">
+    <div className="flex h-full flex-col">
 
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          setNonce((current) => current + 1)
-        }}
-        className="mt-6"
-      >
-        <div className="flex items-center gap-3 rounded-[6px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
-          <Icon name="search" size={18} className="text-white/32" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setPage(1)
-            }}
-            aria-label="搜索歌曲"
-            placeholder="歌名、UP 主，或者一句歌词"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-white/90 placeholder:text-white/26"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              aria-label="清空输入"
-              title="清空输入"
-              className="t press rounded-[4px] p-1 text-white/34 hover:text-white"
-            >
-              <Icon name="close" size={14} />
-            </button>
-          ) : (
-            <kbd className="kbd hidden shrink-0 sm:inline-flex" aria-hidden>
-              ⌘K
-            </kbd>
-          )}
-        </div>
-      </form>
-
-      {trimmed.length === 0 ? (
-        <div className="mt-10">
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-            {SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => pick(suggestion)}
-                className="t press text-[12.5px] text-white/45 underline-offset-4 hover:text-white hover:underline"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-          <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[11.5px] leading-relaxed text-white/34">{HINT}</p>
-        </div>
-      ) : (
-        <section className="mt-8">
-          <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[10.5px] tracking-[0.16em] text-white/32">
-            <span>
-              {status === 'error'
-                ? '搜索失败'
-                : status === 'loading'
-                  ? '正在搜索…'
-                  : status === 'ready'
-                    ? `第 ${page} 页 · ${tracks.length} 首`
-                    : ''}
-            </span>
-            {status === 'loading' && tracks.length > 0 ? (
-              <span className="h-3 w-3 animate-spin rounded-full border border-white/20 border-t-white/70" />
-            ) : null}
-          </div>
-
-          {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}
-
-          {status === 'error' && error ? (
-            <div className="flex min-h-[320px] items-center justify-center">
-              <EmptyState
-                icon="alert"
-                title={error.message}
-                detail="检查网络或登录状态后再试一次。"
-                action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
-              />
-            </div>
-          ) : null}
-
-          {status === 'ready' && tracks.length === 0 ? (
-            <div className="flex min-h-[320px] items-center justify-center">
-              <EmptyState
-                icon="search"
-                title={`没有找到「${trimmed}」`}
-                detail="换个关键词，或者换个说法试试。"
-                action={{ label: '清空条件', onClick: () => setQuery('') }}
-              />
-            </div>
-          ) : null}
-
-          {tracks.length > 0 ? (
-            <TrackList
-              tracks={tracks}
-              activeKey={activeKey}
-              playing={playing}
-              onPlay={(index) => void playContext(keys, index)}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            setNonce((current) => current + 1)
+          }}
+        >
+          <div className="flex items-center gap-3 rounded-[6px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
+            <Icon name="search" size={18} className="text-white/32" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setPage(1)
+              }}
+              aria-label="搜索歌曲"
+              placeholder="歌名、UP 主，或者一句歌词"
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-white/90 placeholder:text-white/26"
             />
-          ) : null}
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                aria-label="清空输入"
+                title="清空输入"
+                className="t press rounded-[4px] p-1 text-white/34 hover:text-white"
+              >
+                <Icon name="close" size={14} />
+              </button>
+            ) : (
+              <kbd className="kbd hidden shrink-0 sm:inline-flex" aria-hidden>
+                ⌘K
+              </kbd>
+            )}
+          </div>
+        </form>
 
-          {status === 'ready' && tracks.length > 0 ? (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <PagerButton label="上一页" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} />
-              <span className="num px-2 font-mono text-[11px] text-white/32">{page}</span>
-              <PagerButton
-                label="下一页"
-                disabled={tracks.length < PAGE_SIZE}
-                onClick={() => setPage((current) => current + 1)}
-              />
+        {trimmed.length === 0 ? (
+          <div className="mt-6">
+            <div className="text-[10.5px] uppercase tracking-[0.22em] text-white/32">试试这些</div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => pick(suggestion)}
+                  className="t press text-[12.5px] text-white/45 underline-offset-4 hover:text-white hover:underline"
+                >
+                  {suggestion}
+                </button>
+              ))}
             </div>
-          ) : null}
-        </section>
-      )}
+            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[11.5px] leading-relaxed text-white/34">{HINT}</p>
+          </div>
+        ) : (
+          <section className="mt-6">
+            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[10.5px] tracking-[0.16em] text-white/32">
+              <span>
+                {status === 'error'
+                  ? '搜索失败'
+                  : status === 'loading'
+                    ? '正在搜索…'
+                    : status === 'ready'
+                      ? `第 ${page} 页 · ${tracks.length} 首`
+                      : ''}
+              </span>
+              {status === 'loading' && tracks.length > 0 ? (
+                <span className="h-3 w-3 animate-spin rounded-full border border-white/20 border-t-white/70" />
+              ) : null}
+            </div>
+
+            {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}
+
+            {status === 'error' && error ? (
+              <div className="flex min-h-[320px] items-center justify-center">
+                <EmptyState
+                  icon="alert"
+                  title={error.message}
+                  detail="检查网络或登录状态后再试一次。"
+                  action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
+                />
+              </div>
+            ) : null}
+
+            {status === 'ready' && tracks.length === 0 ? (
+              <div className="flex min-h-[320px] items-center justify-center">
+                <EmptyState
+                  icon="search"
+                  title={`没有找到「${trimmed}」`}
+                  detail="换个关键词，或者换个说法试试。"
+                  action={{ label: '清空条件', onClick: () => setQuery('') }}
+                />
+              </div>
+            ) : null}
+
+            {tracks.length > 0 ? (
+              <TrackList
+                tracks={tracks}
+                activeKey={activeKey}
+                playing={playing}
+                onPlay={(index) => void playContext(keys, index)}
+              />
+            ) : null}
+
+            {status === 'ready' && tracks.length > 0 ? (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <PagerButton label="上一页" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} />
+                <span className="num px-2 font-mono text-[11px] text-white/32">{page}</span>
+                <PagerButton
+                  label="下一页"
+                  disabled={tracks.length < PAGE_SIZE}
+                  onClick={() => setPage((current) => current + 1)}
+                />
+              </div>
+            ) : null}
+          </section>
+        )}
+      </div>
     </div>
   )
 }

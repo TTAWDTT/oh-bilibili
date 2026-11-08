@@ -55,7 +55,7 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         onClick={() => navigate({ kind: 'search' })}
         className="t group flex items-center gap-3 px-1 py-1 text-left"
       >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center border border-hairline text-white/25">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[6px] border border-hairline text-white/25">
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">

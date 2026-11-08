@@ -33,7 +33,7 @@ export function LibraryView() {
   }, [playlists, revision])
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
+    <div className="flex h-full flex-col">
       <PageHeader
         actions={
           <button
@@ -47,78 +47,80 @@ export function LibraryView() {
         }
       />
 
-      {playlists === null ? (
-        <div className="mt-8">
-          <PlaylistRowsSkeleton rows={4} />
-        </div>
-      ) : playlists.length === 0 ? (
-        <div className="flex min-h-[320px] items-center justify-center">
-          <EmptyState
-            icon="library"
-            title="还没有歌单"
-            detail="建一个歌单，把歌按自己的顺序收起来。"
-            action={{ label: '新建歌单', onClick: () => setCreating(true) }}
-          />
-        </div>
-      ) : (
-        <section className="mt-8 max-w-[900px]">
-          <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
-            <span className="flex-1">歌单</span>
-            <span className="num w-16 text-right">曲目</span>
-            <span className="w-[68px]" />
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+        {playlists === null ? (
+          <div className="mt-8">
+            <PlaylistRowsSkeleton rows={4} />
           </div>
-          {playlists.map((playlist) => {
-            const tracks = tracksByList[playlist.id]
-            const count = tracks ? `${tracks.length} 首` : '——'
-            return (
-              <div key={playlist.id} className="group flex items-center gap-4 border-b border-hairline px-4">
-                <button
-                  type="button"
-                  onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                  className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
-                >
-                  <span className="text-white/26 group-hover:text-white/60">
-                    <Icon name="library" size={15} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
-                    {playlist.name}
-                  </span>
-                  <span className="num w-16 shrink-0 text-right font-mono text-[10.5px] text-white/32">{count}</span>
-                </button>
-                <div className="flex w-[68px] shrink-0 items-center justify-end gap-0.5">
+        ) : playlists.length === 0 ? (
+          <div className="flex min-h-[320px] items-center justify-center">
+            <EmptyState
+              icon="library"
+              title="还没有歌单"
+              detail="建一个歌单，把歌按自己的顺序收起来。"
+              action={{ label: '新建歌单', onClick: () => setCreating(true) }}
+            />
+          </div>
+        ) : (
+          <section className="mt-8">
+            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
+              <span className="flex-1">歌单</span>
+              <span className="num w-16 text-right">曲目</span>
+              <span className="w-[68px]" />
+            </div>
+            {playlists.map((playlist) => {
+              const tracks = tracksByList[playlist.id]
+              const count = tracks ? `${tracks.length} 首` : '——'
+              return (
+                <div key={playlist.id} className="group flex items-center gap-4 border-b border-hairline px-4">
                   <button
                     type="button"
-                    aria-label={`播放 ${playlist.name}`}
-                    title="播放歌单"
-                    disabled={!tracks || tracks.length === 0}
-                    onClick={() => {
-                      if (!tracks || tracks.length === 0) return
-                      void playContext(
-                        tracks.map((track) => track.key),
-                        0,
-                      )
-                    }}
-                    className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white disabled:cursor-default disabled:opacity-20"
-                  >
-                    <Icon name="play" size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`打开 ${playlist.name}`}
-                    title="打开歌单"
                     onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                    className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white"
+                    className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
                   >
-                    <Icon name="chevronRight" size={14} />
+                    <span className="text-white/26 group-hover:text-white/60">
+                      <Icon name="library" size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
+                      {playlist.name}
+                    </span>
+                    <span className="num w-16 shrink-0 text-right font-mono text-[10.5px] text-white/32">{count}</span>
                   </button>
+                  <div className="flex w-[68px] shrink-0 items-center justify-end gap-0.5">
+                    <button
+                      type="button"
+                      aria-label={`播放 ${playlist.name}`}
+                      title="播放歌单"
+                      disabled={!tracks || tracks.length === 0}
+                      onClick={() => {
+                        if (!tracks || tracks.length === 0) return
+                        void playContext(
+                          tracks.map((track) => track.key),
+                          0,
+                        )
+                      }}
+                      className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white disabled:cursor-default disabled:opacity-20"
+                    >
+                      <Icon name="play" size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`打开 ${playlist.name}`}
+                      title="打开歌单"
+                      onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
+                      className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white"
+                    >
+                      <Icon name="chevronRight" size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </section>
-      )}
+              )
+            })}
+          </section>
+        )}
 
-      <CreatePlaylistModal open={creating} onClose={() => setCreating(false)} />
+        <CreatePlaylistModal open={creating} onClose={() => setCreating(false)} />
+      </div>
     </div>
   )
 }
