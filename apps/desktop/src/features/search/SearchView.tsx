@@ -30,6 +30,7 @@ export function SearchView() {
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
+  const [focused, setFocused] = useState(false)
   const [partition, setPartition] = useState('全部')
   const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
   const history = useSearchHistory((s) => s.items)
@@ -128,6 +129,8 @@ export function SearchView() {
             <Icon name="search" size={18} className="text-[var(--text-2)]" />
             <input
               ref={inputRef}
+              onFocus={() => setFocused(true)}
+              onBlur={() => window.setTimeout(() => setFocused(false), 150)}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value)
@@ -162,6 +165,45 @@ export function SearchView() {
           </button>
 
         </form>
+
+        {focused && trimmed.length === 0 ? (
+          <div className="bili-suggest relative z-20 -mt-1 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center gap-2">
+              <span className="bili-tag-blue rounded-[3px] px-1.5 text-[10.5px] leading-[17px]">热门</span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                {SUGGESTIONS.map((word) => (
+                  <button
+                    key={word}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pick(word)}
+                    className="t text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                  >
+                    {word}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {history.length > 0 ? (
+              <div className="mt-2.5 flex items-center gap-2 border-t border-[var(--line)] pt-2.5">
+                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[10.5px] leading-[17px] text-[var(--text-3)]">历史</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  {history.slice(0, 6).map((word) => (
+                    <button
+                      key={word}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pick(word)}
+                      className="t text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                    >
+                      {word}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {trimmed.length === 0 ? (
           <div className="mt-6">
