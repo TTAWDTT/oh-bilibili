@@ -1,19 +1,19 @@
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
-import { Icon } from '../shared/ui/Icon'
-import type { IconName } from '../shared/ui/Icon'
+import { PartitionIcon } from '../shared/ui/PartitionIcon'
 
-type Channel = { view: View; label: string; icon: IconName }
+type ChannelKind = 'search' | 'music' | 'anime' | 'film' | 'history' | 'favs' | 'settings'
+type Channel = { view: View; label: string; kind: ChannelKind }
 
 /** B 站网页端那条白色频道栏。当前频道用粉色下划线标记，和侧栏的选中行是两套语义。 */
 const CHANNELS: readonly Channel[] = [
-  { view: { kind: 'search' }, label: '搜索', icon: 'search' },
-  { view: { kind: 'library' }, label: '曲库', icon: 'library' },
-  { view: { kind: 'liked' }, label: '喜欢', icon: 'heart' },
-  { view: { kind: 'downloads' }, label: '下载', icon: 'download' },
-  { view: { kind: 'history' }, label: '历史', icon: 'clock' },
-  { view: { kind: 'favs' }, label: '收藏夹', icon: 'bookmark' },
-  { view: { kind: 'settings' }, label: '设置', icon: 'settings' },
+  { view: { kind: 'search' }, label: '搜索', kind: 'search' },
+  { view: { kind: 'library' }, label: '曲库', kind: 'music' },
+  { view: { kind: 'liked' }, label: '喜欢', kind: 'anime' },
+  { view: { kind: 'downloads' }, label: '下载', kind: 'film' },
+  { view: { kind: 'history' }, label: '历史', kind: 'history' },
+  { view: { kind: 'favs' }, label: '收藏夹', kind: 'favs' },
+  { view: { kind: 'settings' }, label: '设置', kind: 'settings' },
 ]
 
 export function ChannelBar() {
@@ -40,7 +40,7 @@ export function ChannelBar() {
                 : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
             ].join(' ')}
           >
-            <Icon name={channel.icon} size={14} />
+            <PartitionIcon kind={channel.kind} size={18} />
             {channel.label}
             {active ? (
               <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[var(--accent)]" />

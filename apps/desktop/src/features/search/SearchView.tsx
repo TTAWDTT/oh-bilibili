@@ -1,4 +1,3 @@
-import { Bili2233 } from '../../shared/ui/Bili2233'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track, WireError } from '../../shared/lib/contract'
@@ -10,6 +9,8 @@ import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
+import { ChannelGrid } from './ChannelGrid'
+import { SearchBanner } from './SearchBanner'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -189,14 +190,9 @@ export function SearchView() {
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-col items-center">
-              <Bili2233 width={260} />
-              <p className="mt-1 text-[12px] text-[var(--text-3)]">
-                22 娘和 33 娘在等你说一首歌的名字
-              </p>
-            </div>
+            <SearchBanner />
 
-            <div className="mt-7 text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
+            <div className="mt-8 text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
@@ -209,6 +205,8 @@ export function SearchView() {
                 </button>
               ))}
             </div>
+            <ChannelGrid onPick={(kw) => pick(kw)} />
+
             <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[12px] leading-relaxed text-[var(--text-2)]">{HINT}</p>
           </div>
         ) : (
