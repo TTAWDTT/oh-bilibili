@@ -9,7 +9,6 @@ import { PlayerBar } from '../features/player/PlayerBar'
 import { usePlayerStore } from '../features/player/playerStore'
 import { SearchView } from '../features/search/SearchView'
 import { SettingsView } from '../features/settings/SettingsView'
-import { useAccentVars, useTrackAccent } from '../shared/lib/accent'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
@@ -45,8 +44,6 @@ export default function App() {
   const setRail = useAppStore((state) => state.setRail)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
-  const accent = useTrackAccent(track)
-  useAccentVars(accent)
 
   // 没歌也没队列时右栏没有任何内容可看，收起它让中间真正铺满。
   const hasContent = track !== null || queued > 0
