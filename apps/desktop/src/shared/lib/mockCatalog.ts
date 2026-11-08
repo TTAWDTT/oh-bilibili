@@ -1,5 +1,6 @@
 import type { LyricDoc, Track } from './contract'
 import { hueFor } from './format'
+import { REAL_COVERS } from './realCovers'
 
 type Seed = { title: string; artist: string }
 
@@ -103,7 +104,8 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     artist: seed.artist,
     // 浏览器 mock 的假音源统一在 30 秒上下，进度、切歌、歌词一屏内就能走完。
     duration_ms: 26_000 + ((index * 1700) % 7000),
-    cover: coverArt(seed.title, hueFor(key), index),
+    // 有真封面就用真封面，没有才退回生成图。
+    cover: REAL_COVERS[seed.title] ?? coverArt(seed.title, hueFor(key), index),
     // 播放量按名次递减，排行榜才有真实感；不是随机数。
     views: 9_800_000 - index * 420_000,
     danmaku: 42_000 - index * 1_800,
