@@ -488,6 +488,9 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         duration: duration_ms.map(|d| Millis(d as u64)),
         cover: row.get(3)?,
         accent: None,
+        views: None,
+        danmaku: None,
+        up_avatar: None,
     })
 }
 
@@ -582,6 +585,9 @@ mod tests {
             duration: Some(Millis(200_000)),
             cover: None,
             accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
         }
     }
 

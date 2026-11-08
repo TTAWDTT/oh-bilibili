@@ -15,6 +15,9 @@ pub struct Candidate {
     pub duration: Option<Millis>,
     pub play: u64,
     pub typeid: u32,
+    pub views: u64,
+    pub danmaku: u64,
+    pub up_avatar: Option<String>,
     pub score: f64,
 }
 
@@ -131,6 +134,9 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
         duration: c.duration,
         cover: c.cover.clone(),
         accent: None,
+        views: Some(c.views).filter(|v| *v > 0),
+        danmaku: Some(c.danmaku).filter(|v| *v > 0),
+        up_avatar: c.up_avatar.clone(),
     }
 }
 
@@ -147,6 +153,9 @@ mod tests {
             duration: Some(Millis(dur * 1000)),
             play,
             typeid: typ,
+            views: 1000,
+            danmaku: 10,
+            up_avatar: None,
             score: 0.0,
         }
     }

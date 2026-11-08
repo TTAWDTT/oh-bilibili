@@ -107,6 +107,15 @@ pub struct Track {
     pub cover: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accent: Option<Accent>,
+    /// 播放量。B 站卡片左下角会显示。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub views: Option<u64>,
+    /// 弹幕数。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub danmaku: Option<u64>,
+    /// UP 主头像。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub up_avatar: Option<String>,
 }
 
 /// 音量。构造即夹紧，所以 0.0 到 1.0 这个不变量全应用只维护一处。

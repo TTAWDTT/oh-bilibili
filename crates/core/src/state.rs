@@ -449,6 +449,9 @@ mod tests {
             duration: Some(Millis(200_000)),
             cover: None,
             accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
         }
     }
 

@@ -68,6 +68,9 @@ fn sample_track() -> Track {
         duration: Some(Millis(269_000)),
         cover: Some("https://example.com/c.jpg".into()),
         accent: None,
+        views: Some(1000),
+        danmaku: Some(10),
+        up_avatar: Some("https://i0.hdslb.com/x.jpg".into()),
     }
 }
 

@@ -6,6 +6,9 @@ export type Track = {
   artist: string
   duration_ms: number | null
   cover: string | null
+  views?: number | null
+  danmaku?: number | null
+  up_avatar?: string | null
 }
 
 export type PlayerPhase = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'faulted'

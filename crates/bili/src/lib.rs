@@ -344,6 +344,9 @@ mod wire {
                 duration,
                 play: item["play"].as_u64().unwrap_or(0),
                 typeid: as_u32(&item["typeid"]),
+                views: item["play"].as_u64().unwrap_or(0),
+                danmaku: item["video_review"].as_u64().unwrap_or(0),
+                up_avatar: None,
                 score: 0.0,
             });
         }
@@ -366,6 +369,11 @@ mod wire {
             duration: data["duration"].as_u64().map(|s| Millis(s * 1000)),
             cover: norm_cover(data["pic"].as_str().unwrap_or("")),
             accent: None,
+            views: data["stat"]["view"].as_u64(),
+            danmaku: data["stat"]["danmaku"].as_u64(),
+            up_avatar: data["owner"]["face"]
+                .as_str()
+                .map(|f| f.replacen("http://", "https://", 1)),
         };
         Ok(TrackDetail { track, cid, aid })
     }

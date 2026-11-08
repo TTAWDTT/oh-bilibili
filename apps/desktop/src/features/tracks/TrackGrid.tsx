@@ -26,6 +26,13 @@ function tagsOf(title: string): string[] {
   return tags.slice(0, 2)
 }
 
+/** B 站的计数写法：一万以上用「万」。 */
+function formatCount(n: number): string {
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
+  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
+  return String(n)
+}
+
 type TrackGridProps = {
   tracks: Track[]
   activeKey: string | null
@@ -94,6 +101,21 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             >
               {track.title}
             </h3>
+
+            {track.views ? (
+              <div className="num mt-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
+                <span className="flex items-center gap-1">
+                  <Icon name="play" size={10} />
+                  {formatCount(track.views)}
+                </span>
+                {track.danmaku ? (
+                  <span className="flex items-center gap-1">
+                    <Icon name="queue" size={10} />
+                    {formatCount(track.danmaku)}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="mt-1 flex flex-wrap gap-1">
               {tagsOf(track.title).map((tag) => (
