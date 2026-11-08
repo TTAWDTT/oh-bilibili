@@ -27,6 +27,18 @@ export type PlayerSnapshot = {
   quality_kbps: number | null
 }
 
+export type VideoMeta = {
+  desc: string
+  pubdate: number
+  views: number
+  danmaku: number
+  replies: number
+  favorites: number
+  coins: number
+  shares: number
+  likes: number
+}
+
 export type QueueView = {
   items: Track[]
   index: number | null

@@ -135,6 +135,11 @@ export function danmaku(key: string): Promise<string[]> {
   return call<string[]>('danmaku', { key })
 }
 
+/** 视频详情元信息。 */
+export function videoMeta(key: string): Promise<import('./contract').VideoMeta> {
+  return call<import('./contract').VideoMeta>('video_meta', { key })
+}
+
 /** 相关推荐。 */
 export function related(key: string): Promise<Track[]> {
   return call<Track[]>('related', { key })

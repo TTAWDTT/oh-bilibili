@@ -22,11 +22,27 @@ const SEARCH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10
 /// 取流间隔。
 const PLAY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(300);
 
+/// 视频详情。B 站视频页右侧那栏的信息，我们只取不需要额外请求就能拿到的部分。
+#[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct VideoMeta {
+    pub desc: String,
+    pub pubdate: i64,
+    pub views: u64,
+    pub danmaku: u64,
+    pub replies: u64,
+    pub favorites: u64,
+    pub coins: u64,
+    pub shares: u64,
+    pub likes: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct TrackDetail {
     pub track: Track,
     pub cid: u64,
     pub aid: u64,
+    pub meta: VideoMeta,
 }
 
 #[derive(Debug, Clone)]
@@ -467,6 +483,18 @@ mod wire {
             .as_u64()
             .ok_or_else(|| BiliError::Parse("view 响应缺少 cid".into()))?;
         let aid = data["aid"].as_u64().unwrap_or(0);
+        let stat = &data["stat"];
+        let meta = VideoMeta {
+            desc: data["desc"].as_str().unwrap_or("").trim().to_string(),
+            pubdate: data["pubdate"].as_i64().unwrap_or(0),
+            views: stat["view"].as_u64().unwrap_or(0),
+            danmaku: stat["danmaku"].as_u64().unwrap_or(0),
+            replies: stat["reply"].as_u64().unwrap_or(0),
+            favorites: stat["favorite"].as_u64().unwrap_or(0),
+            coins: stat["coin"].as_u64().unwrap_or(0),
+            shares: stat["share"].as_u64().unwrap_or(0),
+            likes: stat["like"].as_u64().unwrap_or(0),
+        };
         let track = Track {
             key: key.clone(),
             title: search::strip_tags(data["title"].as_str().unwrap_or("（无标题）")),
@@ -482,7 +510,12 @@ mod wire {
             tname: data["tname"].as_str().map(|s| s.to_string()),
             typeid: data["tid"].as_u64().map(|v| v as u32),
         };
-        Ok(TrackDetail { track, cid, aid })
+        Ok(TrackDetail {
+            track,
+            cid,
+            aid,
+            meta,
+        })
     }
 
     /// 字幕 JSON 的 body 是 `[{from: 秒, content: "..."}]`。

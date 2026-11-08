@@ -113,6 +113,20 @@ pub struct PlayerSnapshot {
     pub quality_kbps: Option<u16>,
 }
 
+/// 视频详情视图，字段与 TS 契约逐一对应。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct VideoMetaView {
+    pub desc: String,
+    pub pubdate: i64,
+    pub views: u64,
+    pub danmaku: u64,
+    pub replies: u64,
+    pub favorites: u64,
+    pub coins: u64,
+    pub shares: u64,
+    pub likes: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueueView {
     pub items: Vec<Track>,

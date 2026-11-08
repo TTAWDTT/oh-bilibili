@@ -70,6 +70,26 @@ async fn danmaku(
     engine.danmaku(&TrackKey::from_provider(key)).await
 }
 
+/// 视频详情元信息。
+#[tauri::command(rename_all = "snake_case")]
+async fn video_meta(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<bilimusic_core::wire::VideoMetaView, WireError> {
+    let m = engine.video_meta(&TrackKey::from_provider(key)).await?;
+    Ok(bilimusic_core::wire::VideoMetaView {
+        desc: m.desc,
+        pubdate: m.pubdate,
+        views: m.views,
+        danmaku: m.danmaku,
+        replies: m.replies,
+        favorites: m.favorites,
+        coins: m.coins,
+        shares: m.shares,
+        likes: m.likes,
+    })
+}
+
 /// 相关推荐。
 #[tauri::command(rename_all = "snake_case")]
 async fn related(
@@ -394,6 +414,7 @@ pub fn run() {
             danmaku,
             danmaku_heat,
             related,
+            video_meta,
             mv_source,
             search_q,
             player_state,

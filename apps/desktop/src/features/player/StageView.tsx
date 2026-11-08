@@ -8,6 +8,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { DanmakuLayer } from './DanmakuLayer'
 import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
+import { VideoInfo } from './VideoInfo'
 import { usePlayerStore } from './playerStore'
 
 /**
@@ -147,6 +148,8 @@ export function StageView() {
         <div className="mt-6 text-[var(--accent)]">
           <LevelBars />
         </div>
+
+        <VideoInfo trackKey={track.key} />
       </div>
 
       {related.length > 0 ? (
