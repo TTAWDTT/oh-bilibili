@@ -4,7 +4,6 @@ import { useAuthStore } from '../features/auth/authStore'
 import { useLibraryStore } from '../features/library/libraryStore'
 import { CreatePlaylistModal } from '../features/library/CreatePlaylistModal'
 import { Avatar } from '../shared/ui/Avatar'
-import { Bili2233 } from '../shared/ui/Bili2233'
 import { Icon } from '../shared/ui/Icon'
 import { Skeleton } from '../shared/ui/Skeleton'
 
@@ -80,12 +79,9 @@ export function Sidebar() {
             <Skeleton className="h-2.5 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <div className="px-3 py-2">
-            <Bili2233 width={120} />
-            <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-3)]">
-              还没有歌单，点上面的加号建一个。
-            </p>
-          </div>
+          <p className="px-3 py-1 text-[13px] leading-relaxed text-[var(--text-3)]">
+            还没有歌单，点上面的加号建一个。
+          </p>
         ) : (
           playlists.map((playlist) => {
             const active = view.kind === 'playlist' && view.id === playlist.id

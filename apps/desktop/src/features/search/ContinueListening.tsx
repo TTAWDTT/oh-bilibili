@@ -1,3 +1,4 @@
+import { useAppStore } from '../../app/appStore'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
@@ -14,6 +15,7 @@ import { usePlayerStore } from '../player/playerStore'
 export function ContinueListening() {
   const [tracks, setTracks] = useState<Track[]>([])
   const play = usePlayerStore((state) => state.play)
+  const setStage = useAppStore((state) => state.setStage)
 
   useEffect(() => {
     let cancelled = false
@@ -38,7 +40,7 @@ export function ContinueListening() {
           <button
             key={track.key}
             type="button"
-            onClick={() => void play(track.key)}
+            onClick={() => void play(track.key).then(() => setStage(true))}
             title={`${track.title} · ${track.artist}`}
             className="bili-card bili-card-enter bili-press w-[150px] shrink-0 text-left"
             style={{ '--i': i } as React.CSSProperties}

@@ -1,4 +1,3 @@
-import { Bili2233 } from '../../shared/ui/Bili2233'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { QrChallenge, QrStatus, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -100,12 +99,6 @@ export function AuthModal() {
       description="用手机 B 站扫码，或把登录链接复制到手机上打开。凭据只存本机，不上传。"
       onClose={() => setOpen(false)}
     >
-      {!loggedIn ? (
-        <div className="flex justify-center pb-1">
-          <Bili2233 width={190} />
-        </div>
-      ) : null}
-
       {loggedIn && auth?.user ? (
         <div className="flex items-center gap-4 border-b border-hairline pb-5">
           {auth.user.avatar ? (

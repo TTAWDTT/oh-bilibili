@@ -1,3 +1,4 @@
+import { useAppStore } from '../../app/appStore'
 import { useEffect, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
@@ -23,6 +24,7 @@ const MEDAL = ['#fb7299', '#ffa63c', '#00aeec']
 export function HotRanking({ onPick, limit = 10 }: { onPick: (keyword: string) => void; limit?: number }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const play = usePlayerStore((state) => state.playContext)
+  const setStage = useAppStore((state) => state.setStage)
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +73,12 @@ export function HotRanking({ onPick, limit = 10 }: { onPick: (keyword: string) =
           <li key={track.key}>
             <button
               type="button"
-              onClick={() => void play(tracks.map((t) => t.key), i)}
+              onClick={() => {
+                void play(
+                  tracks.map((t) => t.key),
+                  i,
+                ).then(() => setStage(true))
+              }}
               title={`${track.title} · ${track.artist}`}
               className="bili-nav-item group flex w-full items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-left hover:bg-[var(--panel-raised)]"
             >

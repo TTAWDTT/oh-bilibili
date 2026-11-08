@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Bili2233 } from '../../shared/ui/Bili2233'
 
 type Slide = {
   image: string | undefined
@@ -96,9 +95,6 @@ export function SearchBanner() {
                   />
                 ))}
               </div>
-            </div>
-            <div className="shrink-0 translate-y-2">
-              <Bili2233 width={228} />
             </div>
           </div>
         </div>

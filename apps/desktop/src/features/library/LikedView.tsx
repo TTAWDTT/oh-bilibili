@@ -36,7 +36,6 @@ export function LikedView() {
         {tracks.length === 0 ? (
           <div className="flex min-h-[320px] flex-1 items-center justify-center">
             <EmptyState
-              art
               icon="heart"
               title="一个红心都没点，下次一定？"
               detail="在任意歌曲上点一下红心，它会出现在这里。"
