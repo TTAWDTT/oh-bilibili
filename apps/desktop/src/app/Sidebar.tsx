@@ -4,6 +4,7 @@ import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { useLibraryStore } from '../features/library/libraryStore'
 import { CreatePlaylistModal } from '../features/library/CreatePlaylistModal'
+import { Avatar } from '../shared/ui/Avatar'
 import { Icon } from '../shared/ui/Icon'
 import { Skeleton } from '../shared/ui/Skeleton'
 
@@ -75,9 +76,7 @@ export function Sidebar() {
         data-row="account"
         className="t flex shrink-0 items-center gap-2 border-t border-hairline px-3 py-2 text-left hover:bg-[var(--hover)]"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline text-[var(--text-3)]">
-          <Icon name="user" size={13} />
-        </span>
+        <Avatar src={user?.avatar ?? null} alt={user?.uname ?? '未登录'} size={24} />
         <span className="min-w-0">
           <span className="block truncate text-[12px] text-[var(--text-1)]">
             {user?.uname ?? '未登录'}
