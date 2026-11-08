@@ -27,6 +27,10 @@ export function Avatar({ src, alt, size = 24 }: { src: string | null; alt: strin
           className="h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
+      ) : alt && alt !== '未登录' ? (
+        <span className="text-[var(--text-2)]" style={{ fontSize: Math.round(size * 0.46) }}>
+          {alt.slice(0, 1)}
+        </span>
       ) : (
         <Icon name="user" size={Math.round(size * 0.55)} />
       )}
