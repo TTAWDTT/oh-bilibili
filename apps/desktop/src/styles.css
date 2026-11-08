@@ -38,8 +38,8 @@
   --text-3: #9499a0;
 
   /* 唯一的强调色：只用于焦点、进度、激活态 */
-  --accent: #fb7299;
-  --accent-soft: rgb(251 114 153 / 0.14);
+  --accent: #00aeec;
+  --accent-soft: rgb(0 174 236 / 0.14);
 
   --radius-sm: 4px;
   --radius-md: 6px;

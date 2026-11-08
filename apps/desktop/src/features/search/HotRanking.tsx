@@ -61,7 +61,7 @@ export function HotRanking({ onPick }: { onPick: (keyword: string) => void }) {
         <button
           type="button"
           onClick={() => onPick('音乐')}
-          className="text-[11px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+          className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
         >
           更多 ›
         </button>
@@ -85,7 +85,7 @@ export function HotRanking({ onPick }: { onPick: (keyword: string) => void }) {
                 <Cover cover={track.cover} title={track.title} className="h-full w-full" glyphClassName="text-[13px] text-white/85" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] text-[var(--text-1)] group-hover:text-[var(--bili-pink)]">
+                <span className="block truncate text-[12px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                   {track.title}
                 </span>
                 <span className="num block truncate text-[10.5px] text-[var(--text-3)]">

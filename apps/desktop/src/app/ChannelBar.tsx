@@ -71,7 +71,7 @@ function DanmakuToggle() {
       className={[
         'bili-press flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11.5px] transition-colors',
         enabled
-          ? 'border-[var(--bili-pink)] bg-[color-mix(in_oklab,var(--bili-pink)_10%,white)] text-[var(--bili-pink)]'
+          ? 'border-[var(--accent)] bg-[color-mix(in_oklab,var(--bili-pink)_10%,white)] text-[var(--accent)]'
           : 'border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-2)]',
       ].join(' ')}
     >

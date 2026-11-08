@@ -138,7 +138,7 @@ export function StageView() {
             type="button"
             aria-label={snapshot?.phase === 'playing' ? '暂停' : '播放'}
             onClick={() => void toggle()}
-            className="bili-press flex h-14 w-14 items-center justify-center rounded-full bg-[var(--bili-pink)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
+            className="bili-press flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
           >
             <Icon name={snapshot?.phase === 'playing' ? 'pause' : 'play'} size={22} />
           </button>
@@ -174,7 +174,7 @@ export function StageView() {
                     glyphClassName="text-[20px] font-semibold text-white/80"
                   />
                 </span>
-                <span className="mt-1 line-clamp-1 block text-[11px] text-[var(--text-2)] group-hover:text-[var(--bili-pink)]">
+                <span className="mt-1 line-clamp-1 block text-[11px] text-[var(--text-2)] group-hover:text-[var(--accent)]">
                   {item.title}
                 </span>
               </button>

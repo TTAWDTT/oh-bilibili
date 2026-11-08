@@ -73,7 +73,7 @@ export function SearchBanner() {
                     onClick={() => setActive(dot)}
                     className={[
                       'h-1.5 rounded-full transition-all duration-300',
-                      dot === active ? 'w-6 bg-[var(--bili-pink)]' : 'w-1.5 bg-white/70 hover:bg-white',
+                      dot === active ? 'w-6 bg-[var(--accent)]' : 'w-1.5 bg-white/70 hover:bg-white',
                     ].join(' ')}
                   />
                 ))}

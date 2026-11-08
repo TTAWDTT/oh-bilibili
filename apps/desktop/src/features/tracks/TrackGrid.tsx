@@ -219,7 +219,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               type="button"
               title="点击复制 BV 号"
               onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
-              className="num mt-1 block font-mono text-[11px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+              className="num mt-1 block font-mono text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
             >
               {track.key}
             </button>
@@ -229,7 +229,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               aria-label={`看 ${track.title} 的 MV`}
               title="看 MV"
               onClick={() => setMv({ key: track.key, title: track.title })}
-              className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+              className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
             >
               <Icon name="biliTv" size={11} />
               看 MV
