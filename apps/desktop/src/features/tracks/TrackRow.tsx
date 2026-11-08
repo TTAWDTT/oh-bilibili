@@ -5,6 +5,7 @@ import { Cover } from '../../shared/ui/Cover'
 import { Equalizer } from '../../shared/ui/Equalizer'
 import { Icon } from '../../shared/ui/Icon'
 import { ReactionButtons } from '../../shared/ui/ReactionButtons'
+import { useAppStore } from '../../app/appStore'
 import { DownloadButton } from '../downloads/DownloadButton'
 import { AddToPlaylistModal } from '../library/AddToPlaylist'
 
@@ -20,6 +21,7 @@ type TrackRowProps = {
 }
 
 export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProps) {
+  const setMv = useAppStore((state) => state.setMv)
   const [adding, setAdding] = useState(false)
 
   return (
@@ -79,7 +81,17 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         >
           <Icon name="plus" size={14} />
         </button>
-        <DownloadButton trackKey={track.key} size={14} />
+  
+      <button
+        type="button"
+        aria-label={`看 ${track.title} 的 MV`}
+        title="看 MV"
+        onClick={() => setMv({ key: track.key, title: track.title })}
+        className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:text-[var(--text-1)]"
+      >
+        <Icon name="play" size={13} />
+      </button>
+      <DownloadButton trackKey={track.key} size={14} />
       </div>
 
       <AddToPlaylistModal track={track} open={adding} onClose={() => setAdding(false)} />

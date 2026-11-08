@@ -20,6 +20,7 @@ type AppStore = {
   /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
   searchFocus: number
   authOpen: boolean
+  mv: { key: string; title: string } | null
   toasts: Toast[]
   navigate: (view: View) => void
   setRail: (tab: RailTab | null) => void
@@ -27,6 +28,7 @@ type AppStore = {
   closeRail: () => void
   focusSearch: () => void
   setAuthOpen: (open: boolean) => void
+  setMv: (mv: { key: string; title: string } | null) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
 }
@@ -37,6 +39,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   rail: null,
   searchFocus: 0,
   authOpen: false,
+  mv: null,
   toasts: [],
   navigate: (view) => set({ view }),
   setRail: (tab) => set({ rail: tab }),
@@ -44,6 +47,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setAuthOpen: (open) => set({ authOpen: open }),
+  setMv: (mv) => set({ mv }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1
     const toast: Toast = { id: toastSeq, tone, title, detail }

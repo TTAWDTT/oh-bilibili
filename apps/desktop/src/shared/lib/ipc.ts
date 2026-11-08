@@ -111,6 +111,20 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+/** 本地 MV 代理端口。浏览器预览没有这个能力，返回 0。 */
+export async function mvPort(): Promise<number> {
+  try {
+    return await call<number>('mv_port', {})
+  } catch {
+    return 0
+  }
+}
+
+/** 取一条可播放的 mp4 直链；必须经本地代理转发才有 Referer。 */
+export function mvSource(key: string): Promise<string> {
+  return call<string>('mv_source', { key })
+}
+
 export function authStatus(): Promise<AuthSnapshot> {
   return call<AuthSnapshot>('auth_status', {})
 }
