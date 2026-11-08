@@ -33,9 +33,17 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Music",
     "shortDescription": "Bilibili 音源音乐播放器",
-    "icon": ["icons/icon.png"]
+    "icon": [
+      "icons/icon.png"
+    ],
+    "resources": {
+      "../../../resources/yt-dlp": "yt-dlp"
+    }
   }
 }

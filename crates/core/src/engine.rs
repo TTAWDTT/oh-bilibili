@@ -386,9 +386,20 @@ impl Engine {
         // B 站字幕那一级还没接，README 已写明。
         let doc = match lyrics::from_local(&track) {
             Some(doc) => doc,
-            None => lyrics::from_lrclib(&self.http, &track)
-                .await
-                .unwrap_or_else(LyricDoc::empty),
+            None => match lyrics::from_lrclib(&self.http, &track).await {
+                Some(doc) => doc,
+                None => match self.source.subtitles(key).await {
+                    Ok(lines) if !lines.is_empty() => LyricDoc {
+                        synced: true,
+                        source: "bilibili-subtitle".into(),
+                        lines: lines
+                            .into_iter()
+                            .map(|(at_ms, text)| crate::lyrics::LyricLine { at_ms, text })
+                            .collect(),
+                    },
+                    _ => LyricDoc::empty(),
+                },
+            },
         };
         lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
         Ok(doc)
@@ -569,6 +580,8 @@ fn find_ytdlp() -> Option<std::path::PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("resources").join("yt-dlp"));
+            // macOS 打包后资源在 Contents/Resources/
+            candidates.push(dir.join("..").join("Resources").join("yt-dlp"));
             candidates.push(dir.parent().map(|p| p.join("resources").join("yt-dlp")).unwrap_or_default());
         }
     }

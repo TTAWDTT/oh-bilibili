@@ -146,6 +146,43 @@ impl Source {
         self.client.set_favorite(detail.aid, folder, on).await
     }
 
+    /// B 站字幕。作为歌词的第三级来源：视频没挂字幕就返回空。
+    pub async fn subtitles(&self, key: &TrackKey) -> Result<Vec<(u64, String)>, BiliError> {
+        let detail = self.detail(key).await?;
+        let value = self
+            .client
+            .signed_get(
+                &format!("{}/x/player/wbi/v2", client::API),
+                vec![
+                    ("bvid", key.as_opaque().to_string()),
+                    ("cid", detail.cid.to_string()),
+                ],
+                PLAY_INTERVAL,
+            )
+            .await?;
+
+        let Some(list) = value["data"]["subtitle"]["subtitles"].as_array() else {
+            return Ok(Vec::new());
+        };
+        let Some(url) = list
+            .iter()
+            .filter_map(|s| s["subtitle_url"].as_str())
+            .find(|u| !u.is_empty())
+        else {
+            return Ok(Vec::new());
+        };
+        let absolute = if url.starts_with("//") {
+            format!("https:{url}")
+        } else {
+            url.to_string()
+        };
+        let body = self
+            .client
+            .get_json(&absolute, std::time::Duration::from_millis(200))
+            .await?;
+        Ok(wire::subtitle_lines(&body))
+    }
+
     /// 给音频层用的请求头。`audio` 不认识 B 站，只认识这些键值。
     pub fn stream_headers(&self) -> Vec<(String, String)> {
         let cookie = self.client.cookie_header();
@@ -254,6 +291,26 @@ mod wire {
         Ok(TrackDetail { track, cid, aid })
     }
 
+    /// 字幕 JSON 的 body 是 `[{from: 秒, content: "..."}]`。
+    pub fn subtitle_lines(value: &serde_json::Value) -> Vec<(u64, String)> {
+        value["body"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        let from = item["from"].as_f64()?;
+                        let content = item["content"].as_str()?.trim().to_string();
+                        if content.is_empty() {
+                            return None;
+                        }
+                        Some(((from.max(0.0) * 1000.0).round() as u64, content))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     pub fn audio_streams(value: &serde_json::Value) -> Result<Vec<AudioStream>, BiliError> {
         let audio = value["data"]["dash"]["audio"]
             .as_array()
@@ -305,6 +362,21 @@ mod tests {
         let streams = wire::audio_streams(&v).expect("应该有一档可用");
         assert_eq!(streams.len(), 1);
         assert_eq!(streams[0].quality, Quality::K192);
+    }
+
+    #[test]
+    fn 字幕_json_解析成时间轴() {
+        let v = serde_json::json!({
+            "body": [
+                { "from": 1.5, "content": "第一句" },
+                { "from": 3.0, "content": "  第二句  " },
+                { "from": 4.0, "content": "   " }
+            ]
+        });
+        let lines = wire::subtitle_lines(&v);
+        assert_eq!(lines.len(), 2, "空白行要丢掉");
+        assert_eq!(lines[0], (1500, "第一句".to_string()));
+        assert_eq!(lines[1].1, "第二句");
     }
 
     #[test]
