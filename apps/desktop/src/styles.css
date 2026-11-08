@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-regular.css";
+@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-bold.css";
 @import "./ui.css";
 
 /*
@@ -15,8 +17,8 @@
   --color-ink-raised: #1f1f1f;
   --color-hairline: #2b2b2b;
   --color-muted: #9a9a9a;
-  --font-sans: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", system-ui, sans-serif;
-  --font-display: -apple-system, "SF Pro Display", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Times New Roman", "LXGW WenKai Lite", "Songti SC", "STZhongsong", serif;
+  --font-display: "Times New Roman", "LXGW WenKai Lite", "Songti SC", serif;
 }
 
 :root {

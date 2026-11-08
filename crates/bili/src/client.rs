@@ -121,7 +121,7 @@ impl Client {
             is_login: data["isLogin"].as_bool().unwrap_or(false),
             mid: data["mid"].as_u64().filter(|m| *m > 0),
             uname: data["uname"].as_str().map(|s| s.to_string()),
-            avatar: data["face"].as_str().map(|s| s.to_string()),
+            avatar: data["face"].as_str().map(|s| s.replacen("http://", "https://", 1)),
         };
         if let Ok(mut guard) = self.nav.write() {
             *guard = nav.clone();
