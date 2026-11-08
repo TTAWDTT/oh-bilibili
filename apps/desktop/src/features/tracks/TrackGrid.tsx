@@ -1,6 +1,7 @@
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { formatDuration } from '../../shared/lib/format'
+import { Avatar } from '../../shared/ui/Avatar'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { usePlayerStore } from '../player/playerStore'
@@ -129,8 +130,8 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             </div>
 
             <div className="mt-1 flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-3)]">
-              <span className="flex min-w-0 items-center gap-1">
-                <Icon name="user" size={11} />
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
                 <span className="truncate" title={track.artist}>
                   {track.artist}
                 </span>
