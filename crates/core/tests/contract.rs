@@ -14,11 +14,50 @@ fn contract() -> String {
     std::fs::read_to_string(path).expect("读不到 contract.ts，测试要在 workspace 根跑")
 }
 
+/// 递归收集所有出现过的键。只看顶层的旧版本漏掉了嵌套 Track 里的 `duration`，
+/// 于是界面拿到的时长恒为空，测试还是绿的。
 fn keys_of(value: &serde_json::Value) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    collect(value, &mut out);
+    out
+}
+
+fn collect(value: &serde_json::Value, out: &mut BTreeSet<String>) {
     match value {
-        serde_json::Value::Object(map) => map.keys().cloned().collect(),
-        _ => BTreeSet::new(),
+        serde_json::Value::Object(map) => {
+            for (k, v) in map {
+                out.insert(k.clone());
+                collect(v, out);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect(item, out);
+            }
+        }
+        _ => {}
     }
+}
+
+/// 抽出 contract.ts 里某个对象类型声明的字段名集合。
+fn ts_fields(ts: &str, type_name: &str) -> BTreeSet<String> {
+    let start = ts
+        .find(&format!("export type {type_name} = {{"))
+        .unwrap_or_else(|| panic!("contract.ts 里找不到 {type_name}"));
+    let rest = &ts[start..];
+    let end = rest.find('}').expect("类型声明没有闭合");
+    rest[..end]
+        .lines()
+        .filter_map(|line| {
+            let name = line.trim().split(':').next()?.trim();
+            let name = name.trim_end_matches('?');
+            name.chars()
+                .next()
+                .filter(|c| c.is_ascii_alphabetic())
+                .map(|_| name.to_string())
+        })
+        .filter(|n| !n.starts_with("export"))
+        .collect()
 }
 
 fn sample_track() -> Track {
@@ -45,13 +84,33 @@ fn 播放快照的字段_ts_侧都有() {
         quality_kbps: Some(192),
     };
     let value = serde_json::to_value(&snapshot).expect("可序列化");
-    let ts = contract();
-    for key in keys_of(&value) {
-        assert!(
-            ts.contains(&format!("{key}:")),
-            "Rust 序列化出 `{key}`，但 contract.ts 里没有同名字段"
-        );
-    }
+    let declared = ts_fields(&contract(), "PlayerSnapshot");
+    // 只看顶层：嵌套的 Track 由下面那条专门的测试负责。
+    let top: std::collections::BTreeSet<String> = value
+        .as_object()
+        .expect("对象")
+        .keys()
+        .cloned()
+        .collect();
+    let missing: Vec<&String> = top.difference(&declared).collect();
+    assert!(missing.is_empty(), "PlayerSnapshot 缺字段：{missing:?}");
+}
+
+#[test]
+fn 曲目的字段名两边完全一致() {
+    let value = serde_json::to_value(sample_track()).expect("可序列化");
+    let rust_keys = keys_of(&value);
+    let ts_keys = ts_fields(&contract(), "Track");
+    let missing: Vec<&String> = rust_keys.difference(&ts_keys).collect();
+    let extra: Vec<&String> = ts_keys.difference(&rust_keys).collect();
+    assert!(
+        missing.is_empty(),
+        "Rust 发这些键但 TS 没声明：{missing:?}（界面会读不到值）"
+    );
+    assert!(
+        extra.is_empty(),
+        "TS 声明这些键但 Rust 从不发：{extra:?}（界面永远拿到 undefined）"
+    );
 }
 
 #[test]
@@ -61,10 +120,15 @@ fn 队列视图的字段_ts_侧都有() {
         index: Some(0),
     };
     let value = serde_json::to_value(&view).expect("可序列化");
-    let ts = contract();
-    for key in keys_of(&value) {
-        assert!(ts.contains(&format!("{key}:")), "contract.ts 缺字段 `{key}`");
-    }
+    let declared = ts_fields(&contract(), "QueueView");
+    let top: std::collections::BTreeSet<String> = value
+        .as_object()
+        .expect("对象")
+        .keys()
+        .cloned()
+        .collect();
+    let missing: Vec<&String> = top.difference(&declared).collect();
+    assert!(missing.is_empty(), "QueueView 缺字段：{missing:?}");
 }
 
 #[test]

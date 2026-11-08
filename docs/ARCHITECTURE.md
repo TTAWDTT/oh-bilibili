@@ -7,7 +7,7 @@
 1. **播放位置的真值只在声卡侧。** 播放器状态里没有 `position` 字段，UI 拿到的是投影快照。三份独立设计各自得出同一条结论，这是本项目最重要的决定。
 2. **wire 类型不出 `bili`。** B 站返回的 JSON 解析在 `bili` 内部完成，出门只有领域类型。
 3. **依赖方向由 `cargo` 校验，不由评审意见保证。** 有一条测试读 `cargo metadata` 断言允许的边。
-4. **机器不可跨越线程。** 状态机带 `PhantomData<Rc<()>>`，`!Send` 是类型事实，不是约定。
+4. **播放位置只由声卡线程写。** `Clock` 是唯一的帧计数来源，其他任何地方都只读。状态机的迁移全是显式方法的返回值，没有「拿到就随手赋值」的路径。
 5. **迁移只追加，一事务一版本，用 `PRAGMA user_version`。**
 
 ## 二、crate 依赖图
@@ -64,10 +64,15 @@ enum PlayerState {
 }
 ```
 
-两条必须成立的性质，已用 TLC 在 47 个状态上验证：
+两条必须成立的性质，用 TLC 验证过，规格在 `docs/verification/Player.tla`：
 
 - `FreshSource`：`playing` 或 `paused` 时手上的音源一定属于当前 `token`。
 - `NoSourceWhenIdle`：空闲态手里没有音源。
+- `PositionNeverRewinds`：进度永不倒退。
+- 无死锁。
+
+有限状态模型共 47 个状态、95 步，三条规则全部成立。模型省略了 seek、音量、循环模式、
+多音轨降级与播放队列。复现命令见 `docs/verification/README.md`。
 
 `LoadToken` 单调递增。迟到的取流响应因为 token 不匹配，在类型上无处可落。这是 c-1 与 c-2 争论的那个竞态的答案。
 
@@ -92,7 +97,7 @@ CREATE INDEX idx_reactions_pending ON reactions(mid, state);
 
 - 取消喜欢不是「删行」，是 `want = 0`。删行等于丢掉意图。
 - 换号时 `UPDATE reactions SET state = 'stale' WHERE mid <> ?`，一条幂等 UPDATE，不是一堆特例分支。
-- 运行期仍然用 `LikeSync<Pending|InFlight|Done>` 管并发，落盘只存**想要什么**和**到哪一步**。记录是数据，机器是运行期值。
+- 落盘只存**想要什么**（`want`）和**到哪一步**（`state`）。并发控制目前靠「一次只推 20 条」的串行循环，没有单独的租约机器；这是简化，文档与代码一致。
 
 ## 六、错误只有一个形状
 
@@ -128,5 +133,5 @@ pub enum WireError {
 ## 十、已知缺口
 
 - 登录、点赞、收藏的真机验证需要用户账号。代码路径用 fixture 测，线上成功性不作为已完成项。
-- `cargo public-api` 闸门在本轮未接入，先用 `cargo metadata` 依赖断言替代，列入后续。
+- `cargo public-api` 闸门未接入。依赖方向已由 `crates/core/tests/deps.rs` 用 `cargo metadata` 断言。
 - 播放队列不跨重启恢复，这是 v1 的明确非目标。

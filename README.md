@@ -75,6 +75,12 @@ cargo test -p bilimusic-bili --test live -- --ignored --nocapture
 cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
 ```
 
+## 关于截图
+
+`docs/assets/` 下的界面截图是在浏览器里用内存 mock 数据渲染的，不是 Tauri 真窗口，
+所以图里的码率、时长、歌词都来自 `apps/desktop/src/shared/lib/mock*.ts`。
+真窗口的视觉效果一致，但数据来源不同。这台机器没有录屏权限，拿不到真窗口截图。
+
 ## 已知缺口
 
 - **登录系功能没有真机验证。** 二维码登录、点赞、收藏三条路径写完了，离线测试只覆盖「未登录时被正确挡住」与「二维码能生成」。真账号下的成功路径需要你自己点一遍。

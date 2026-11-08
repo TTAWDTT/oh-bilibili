@@ -232,6 +232,13 @@ impl Engine {
     }
 
     pub async fn next(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        // 单曲循环：播完重放同一首，而不是走到下一首。
+        if *lock(&self.repeat) == "one" {
+            let current = lock(&self.queue).current().map(|e| e.track.key.clone());
+            if let Some(key) = current {
+                return self.play_key(&key).await;
+            }
+        }
         let wrapped = *lock(&self.repeat) == "all";
         let next_key = {
             let mut q = lock(&self.queue);
@@ -354,6 +361,19 @@ impl Engine {
 
     pub async fn fav_set(&self, key: &TrackKey, faved: bool) -> Result<(), WireError> {
         self.source.set_favorite(key, faved).await?;
+        if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
+            let id = self.library.upsert_track(&t)?;
+            if let Some(mid) = self.source.nav().mid {
+                self.library.set_reaction(id, mid, ReactionKind::Fav, faved)?;
+                let pending = self.library.pending_reactions(mid, 50)?;
+                if let Some(r) = pending
+                    .iter()
+                    .find(|r| r.track_id == id && r.kind == ReactionKind::Fav)
+                {
+                    self.library.mark_reaction(r, ReactionState::Synced)?;
+                }
+            }
+        }
         Ok(())
     }
 

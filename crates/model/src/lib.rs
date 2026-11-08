@@ -100,7 +100,8 @@ pub struct Track {
     pub key: TrackKey,
     pub title: String,
     pub artist: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// 序列化成 `duration_ms`：界面契约用的就是这个字段名，改这里等于改协议。
+    #[serde(rename = "duration_ms", skip_serializing_if = "Option::is_none")]
     pub duration: Option<Millis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
