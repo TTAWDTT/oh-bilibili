@@ -78,6 +78,7 @@ impl Engine {
             self.emit(AppEvent::Progress {
                 position_ms: snap.position_ms,
                 duration_ms: snap.duration_ms,
+                level: lock(&self.player).clock().level(),
             });
         }
     }

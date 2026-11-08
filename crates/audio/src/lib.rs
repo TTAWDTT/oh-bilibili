@@ -7,7 +7,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 pub mod player;
 pub use player::Player;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use symphonia::core::audio::SampleBuffer;
@@ -193,6 +193,8 @@ pub struct Clock {
     frames: AtomicU64,
     sample_rate: AtomicU64,
     playing: AtomicBool,
+    /// 最近一帧的 RMS 响度（0..1），只有声卡回调写。
+    level: AtomicU32,
 }
 
 impl Clock {
@@ -223,6 +225,15 @@ impl Clock {
     pub fn set_playing(&self, playing: bool) {
         self.playing.store(playing, Ordering::Relaxed);
     }
+    /// 写响度。由声卡回调在每帧缓冲之后调用。
+    pub fn set_level(&self, v: f32) {
+        self.level.store(v.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+    }
+
+    pub fn level(&self) -> f32 {
+        f32::from_bits(self.level.load(Ordering::Relaxed))
+    }
+
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate.load(Ordering::Relaxed) as u32
     }

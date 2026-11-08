@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { PlayerSnapshot, QueueView, RepeatMode, Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { syncPlayhead } from '../../shared/lib/playhead'
+import { setLevel } from '../../shared/lib/level'
 import { toastFailure } from '../../app/notice'
 
 /** 只认最后一次发起的命令，迟到的响应不能覆盖用户更晚的操作。 */
@@ -22,7 +23,7 @@ type PlayerStore = {
   setVolume: (volume: number) => Promise<void>
   cycleRepeat: () => Promise<void>
   setShuffle: (on: boolean) => void
-  applyProgress: (positionMs: number, durationMs: number) => void
+  applyProgress: (positionMs: number, durationMs: number, level?: number) => void
   applyTrack: (track: Track) => void
   applyBuffering: (track: Track) => void
   applyStopped: () => void
@@ -106,9 +107,10 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     setShuffle: (on) => {
       void run('随机播放', () => ipc.playerShuffle(on))
     },
-    applyProgress: (positionMs, durationMs) => {
+    applyProgress: (positionMs, durationMs, level = 0) => {
       const current = get().snapshot
       if (!current) return
+      setLevel(level)
       apply({ ...current, position_ms: positionMs, duration_ms: durationMs })
     },
     applyTrack: (track) => {

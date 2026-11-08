@@ -129,13 +129,13 @@ export function playIndex(index: number): void {
   state.duration = track.duration_ms ?? 30_000
   state.phase = 'playing'
   emit({ type: 'now_playing', track, index })
-  emit({ type: 'progress', position_ms: 0, duration_ms: state.duration })
+  emit({ type: 'progress', position_ms: 0, duration_ms: state.duration, level: 0 })
 }
 
 export function endPlayback(): void {
   state.phase = 'ended'
   state.position = state.duration
-  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration })
+  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
   emit({ type: 'stopped' })
 }
 
@@ -153,7 +153,7 @@ export function step(direction: 1 | -1, announce = false): void {
     if (target < 0) {
       if (state.repeat !== 'all') {
         state.position = 0
-        emit({ type: 'progress', position_ms: 0, duration_ms: state.duration })
+        emit({ type: 'progress', position_ms: 0, duration_ms: state.duration, level: 0 })
         return
       }
       target = total - 1
@@ -183,7 +183,7 @@ function tick(): void {
 
   if (state.phase === 'playing') {
     state.position = Math.min(state.position + delta, state.duration)
-    emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration })
+    emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
     if (state.position >= state.duration) {
       if (state.repeat === 'one') state.position = 0
       else step(1)
@@ -218,5 +218,5 @@ export function ensureClock(): void {
 
 export function setPosition(position: number): void {
   state.position = clamp(position, 0, state.duration)
-  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration })
+  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
 }

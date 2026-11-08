@@ -1,3 +1,4 @@
+import { LevelBars } from './LevelBars'
 import { useAppStore } from '../../app/appStore'
 import type { RailTab } from '../../app/appStore'
 import { Cover } from '../../shared/ui/Cover'
@@ -109,6 +110,7 @@ export function PlayerBar() {
 
       <div className="flex min-w-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
+        <LevelBars />
         <VolumeControl />
         <span className="h-5 w-px bg-white/32" />
         <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />

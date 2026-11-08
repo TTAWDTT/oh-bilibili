@@ -188,6 +188,16 @@ fn run_engine(
                 *s = 0.0;
             }
             let frames = (out.len() / channels) as u64;
+            // RMS 才是「有多响」，取绝对值平均会虚高。
+            if written > 0 {
+                let mut sum = 0.0f32;
+                for s in out.iter().take(written) {
+                    sum += s * s;
+                }
+                cb_clock.set_level((sum / written as f32).sqrt());
+            } else {
+                cb_clock.set_level(0.0);
+            }
             cb_clock.advance(frames);
         },
         |err| eprintln!("音频输出错误: {err}"),

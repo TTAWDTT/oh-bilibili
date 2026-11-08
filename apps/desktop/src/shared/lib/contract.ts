@@ -75,7 +75,7 @@ export type WireError = {
 export type SearchPage = { tracks: Track[]; page: number }
 
 export type AppEvent =
-  | { type: 'progress'; position_ms: number; duration_ms: number }
+  | { type: 'progress'; position_ms: number; duration_ms: number; level: number }
   | { type: 'now_playing'; track: Track; index: number | null }
   | { type: 'buffering'; track: Track }
   | { type: 'stopped' }

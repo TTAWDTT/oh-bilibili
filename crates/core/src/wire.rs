@@ -138,6 +138,8 @@ pub enum AppEvent {
     Progress {
         position_ms: u64,
         duration_ms: u64,
+        /// 0..1 的响度，界面拿它驱动频谱柱。
+        level: f32,
     },
     NowPlaying {
         track: Track,
