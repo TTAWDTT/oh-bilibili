@@ -177,7 +177,7 @@ export function LyricsView({ track }: { track: Track | null }) {
                 className="py-2"
               >
                 <button type="button" onClick={() => void seek(line.at_ms)} data-row="lyric"
-                    className="t w-full text-left" tabIndex={-1}>
+                    className="t w-full text-center" tabIndex={-1}>
                   {isActive ? (
                     <span className="block text-[16px] font-medium leading-[1.55] tracking-[-0.01em]">
                       <ActiveLine line={line} nextAt={nextAt} />
