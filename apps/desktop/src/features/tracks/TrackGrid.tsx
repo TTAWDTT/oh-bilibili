@@ -1,3 +1,4 @@
+import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { toastDone, toastFailure } from '../../app/notice'
@@ -12,7 +13,11 @@ import { usePlayerStore } from '../player/playerStore'
 /** 从标题里认出分辨率与音质角标。B 站自己在封面右上角标这些。 */
 function coverFlags(title: string): string[] {
   const flags: string[] = []
-  if (/4\s*K|2160/i.test(title)) flags.push('4K')
+  if (/8\s*k|4320/i.test(title)) flags.push('8K')
+  else if (/4\s*k|2160/i.test(title)) flags.push('4K')
+  else if (/1080/i.test(title)) flags.push('1080P')
+  if (/60\s*fps|60帧/i.test(title)) flags.push('60FPS')
+  if (/hdr/i.test(title)) flags.push('HDR')
   if (/hi-?res|hires/i.test(title)) flags.push('Hi-Res')
   if (/无损/.test(title)) flags.push('无损')
   if (/杜比|\(dolby\)/i.test(title)) flags.push('杜比')
@@ -174,6 +179,15 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 </span>
               ))}
             </div>
+
+            <button
+              type="button"
+              title="点击复制 BV 号"
+              onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
+              className="num mt-1 block font-mono text-[10.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              {track.key}
+            </button>
 
             <button
               type="button"
