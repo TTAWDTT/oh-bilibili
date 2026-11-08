@@ -53,14 +53,14 @@ export function MvOverlay() {
   if (!mv) return null
 
   return (
-    <div
+    <div data-clickable
       role="dialog"
       aria-modal="true"
       aria-label="MV 播放"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-8"
       onClick={() => setMv(null)}
     >
-      <div className="w-full max-w-[960px]" onClick={(e) => e.stopPropagation()}>
+      <div data-clickable className="w-full max-w-[960px]" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="truncate text-[14px] text-[var(--text-1)]" title={mv.title}>
             {mv.title}

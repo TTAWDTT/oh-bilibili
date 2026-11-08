@@ -655,3 +655,17 @@ button:disabled {
   cursor: default;
   opacity: 0.5;
 }
+
+/* 输入框兜底：聚焦时给一圈 B 站蓝，任何输入框都不会「点了没反应」 */
+input:not([type='checkbox']):not([type='radio']):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent);
+  border-radius: 4px;
+}
+
+/* 可点击的容器：hover 时给一点点背景，提示它可以点 */
+[data-clickable]:hover {
+  background: var(--ga1);
+}
