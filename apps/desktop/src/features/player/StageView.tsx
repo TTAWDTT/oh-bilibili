@@ -4,6 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { DanmakuLayer } from './DanmakuLayer'
 import { LevelBars } from './LevelBars'
 import { usePlayerStore } from './playerStore'
 
@@ -70,6 +71,7 @@ export function StageView() {
         />
       ) : null}
       <div className="pointer-events-none absolute inset-0 bg-black/45" />
+      <DanmakuLayer trackKey={track.key} playing={snapshot?.phase === 'playing'} />
 
       <button
         type="button"

@@ -284,6 +284,40 @@ impl Client {
         }
     }
 
+    /// 取原始字节。弹幕接口给的是压缩流，需要调用方自己解。
+    pub async fn get_bytes(&self, url: &str, min_interval: Duration) -> Result<Vec<u8>, BiliError> {
+        self.wait_cooldown().await?;
+        self.gate(min_interval).await;
+        let cookie = self.cookie_header();
+        let mut req = self
+            .http
+            .get(url)
+            .header("Referer", REFERER)
+            .header("User-Agent", UA);
+        if !cookie.is_empty() {
+            req = req.header("Cookie", cookie);
+        }
+        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        Ok(resp.bytes().await.map_err(|e| BiliError::Network(e.to_string()))?.to_vec())
+    }
+
+    /// 取原始文本。弹幕接口返回的是 XML，不是 JSON。
+    pub async fn get_text(&self, url: &str, min_interval: Duration) -> Result<String, BiliError> {
+        self.wait_cooldown().await?;
+        self.gate(min_interval).await;
+        let cookie = self.cookie_header();
+        let mut req = self
+            .http
+            .get(url)
+            .header("Referer", REFERER)
+            .header("User-Agent", UA);
+        if !cookie.is_empty() {
+            req = req.header("Cookie", cookie);
+        }
+        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        resp.text().await.map_err(|e| BiliError::Network(e.to_string()))
+    }
+
     /// 把响应里的 Set-Cookie 收进罐里。登录靠的就是这一步。
     fn absorb_cookies(&self, headers: &reqwest::header::HeaderMap) {
         let mut jar = match self.jar.write() {

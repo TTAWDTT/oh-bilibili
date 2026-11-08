@@ -170,6 +170,7 @@ name = "bilimusic-bili"
 version = "0.1.0"
 dependencies = [
  "bilimusic-model",
+ "flate2",
  "md-5",
  "qrcode",
  "reqwest 0.12.28",

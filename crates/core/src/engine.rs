@@ -441,6 +441,10 @@ impl Engine {
         self.source.cookie_header()
     }
 
+    pub async fn danmaku(&self, key: &TrackKey) -> Result<Vec<String>, WireError> {
+        Ok(self.source.danmaku(key).await?)
+    }
+
     pub async fn mv_url(&self, key: &TrackKey) -> Result<String, WireError> {
         Ok(self.source.mv_url(key).await?)
     }

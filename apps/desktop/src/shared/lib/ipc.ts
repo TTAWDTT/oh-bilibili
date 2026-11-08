@@ -111,6 +111,11 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+/** 这条视频的真实弹幕。 */
+export function danmaku(key: string): Promise<string[]> {
+  return call<string[]>('danmaku', { key })
+}
+
 /** 本地 MV 代理端口。浏览器预览没有这个能力，返回 0。 */
 export async function mvPort(): Promise<number> {
   try {

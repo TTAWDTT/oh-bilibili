@@ -257,3 +257,17 @@
   0%, 90%, 100% { opacity: 1; }
   94% { opacity: 0.45; }
 }
+
+/* 弹幕：从右向左匀速穿过，带一点描边保证在封面背景上可读 */
+.danmaku {
+  right: -40%;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.85);
+  animation-name: danmaku-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes danmaku-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-180vw); }
+}

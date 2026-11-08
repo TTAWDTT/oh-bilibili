@@ -61,6 +61,15 @@ fn mv_port(port: tauri::State<'_, MvPort>) -> u16 {
     port.0
 }
 
+/// 这条视频的真实弹幕文本。
+#[tauri::command(rename_all = "snake_case")]
+async fn danmaku(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<String>, WireError> {
+    engine.danmaku(&TrackKey::from_provider(key)).await
+}
+
 /// 取一条可播放的 mp4 直链；界面会把它交给本地代理转发。
 #[tauri::command(rename_all = "snake_case")]
 async fn mv_source(
@@ -325,6 +334,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             health,
             mv_port,
+            danmaku,
             mv_source,
             search_q,
             player_state,

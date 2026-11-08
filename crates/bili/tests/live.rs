@@ -77,3 +77,18 @@ async fn 搜索到取流的完整链路可用() {
     );
     assert!(bytes.len() >= 1024, "至少应该拿到 1KB 音频字节");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 能取到真实弹幕() {
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let first = tracks.first().expect("有结果");
+    let lines = source.danmaku(&first.key).await.expect("弹幕接口");
+    println!("弹幕条数：{}", lines.len());
+    if let Some(sample) = lines.first() {
+        println!("样本：{sample}");
+    }
+    assert!(!lines.is_empty(), "这条视频应该有多条弹幕");
+}

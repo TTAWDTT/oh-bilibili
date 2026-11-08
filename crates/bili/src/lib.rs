@@ -217,6 +217,43 @@ impl Source {
         self.client.import_cookies(pairs);
     }
 
+    /// 拉这条视频的真实弹幕。B 站返回 XML，这里只取出文本，够滚动用就行。
+    pub async fn danmaku(&self, key: &TrackKey) -> Result<Vec<String>, BiliError> {
+        let detail = self.detail(key).await?;
+        let url = format!(
+            "https://api.bilibili.com/x/v1/dm/list.so?oid={}",
+            detail.cid
+        );
+        let raw = self
+            .client
+            .get_bytes(&url, std::time::Duration::from_millis(300))
+            .await?;
+        // B 站弹幕接口返回 deflate 压缩的 XML，不先解压拿到的是二进制。
+        let mut body = String::new();
+        {
+            use std::io::Read;
+            let mut decoder = flate2::read::DeflateDecoder::new(raw.as_slice());
+            if decoder.read_to_string(&mut body).is_err() {
+                body = String::from_utf8_lossy(&raw).to_string();
+            }
+        }
+
+        // <d p="时间,模式,...">文本</d>，只取文本与出现顺序。
+        let mut out = Vec::new();
+        for chunk in body.split("<d ").skip(1) {
+            if let Some((_, rest)) = chunk.split_once('>') {
+                let text = rest.split("</d>").next().unwrap_or("").trim();
+                if !text.is_empty() && text.chars().count() <= 40 {
+                    out.push(text.to_string());
+                }
+            }
+            if out.len() >= 60 {
+                break;
+            }
+        }
+        Ok(out)
+    }
+
     /// 当前 cookie 串，代理转发视频时要带上。
     pub fn cookie_header(&self) -> String {
         self.client.cookie_header()
