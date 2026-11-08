@@ -5,6 +5,7 @@ import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { DanmakuLayer } from './DanmakuLayer'
+import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
 import { usePlayerStore } from './playerStore'
 
@@ -81,6 +82,8 @@ export function StageView() {
       >
         <Icon name="close" size={16} />
       </button>
+
+      <DanmakuPanel />
 
       <div className="relative flex w-full max-w-[560px] flex-col items-center px-8">
         <div className="stage-disc">

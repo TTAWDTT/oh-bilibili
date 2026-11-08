@@ -15,6 +15,7 @@ import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { ChannelBar } from './ChannelBar'
+import { BackToTop } from '../shared/ui/BackToTop'
 import { Sidebar } from './Sidebar'
 import { StageGlow } from './StageGlow'
 import { StatusBar } from './StatusBar'
@@ -75,6 +76,7 @@ export default function App() {
         </div>
       </div>
 
+      <BackToTop targetId="scroll-main" />
       <PlayerBar />
       <StatusBar />
       <MvOverlay />

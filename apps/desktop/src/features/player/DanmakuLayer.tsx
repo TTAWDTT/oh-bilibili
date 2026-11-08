@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
+import { useDanmakuSettings } from './danmakuSettings'
 
 /**
  * 弹幕层。取这条视频的真实弹幕，按固定节奏从右向左飘过。
@@ -9,6 +10,10 @@ import * as ipc from '../../shared/lib/ipc'
  */
 export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing: boolean }) {
   const [lines, setLines] = useState<string[]>([])
+  const enabled = useDanmakuSettings((s) => s.enabled)
+  const opacity = useDanmakuSettings((s) => s.opacity)
+  const size = useDanmakuSettings((s) => s.size)
+  const speed = useDanmakuSettings((s) => s.speed)
 
   useEffect(() => {
     let cancelled = false
@@ -23,7 +28,7 @@ export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing:
     }
   }, [trackKey])
 
-  if (lines.length === 0) return null
+  if (!enabled || lines.length === 0) return null
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
@@ -33,7 +38,10 @@ export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing:
           className="danmaku absolute whitespace-nowrap text-[13px] text-white"
           style={{
             top: `${8 + (i * 100) / Math.max(1, Math.min(lines.length, 18))}%`,
-            animationDuration: `${11 + (i % 5) * 2}s`,
+            // 速度越大，动画时长越短
+            animationDuration: `${(11 + (i % 5) * 2) / speed}s`,
+            opacity,
+            fontSize: `${size}px`,
             animationDelay: `${i * 0.9}s`,
             animationPlayState: playing ? 'running' : 'paused',
           }}

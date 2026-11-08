@@ -86,7 +86,7 @@ export function SearchView() {
     <div className="flex h-full flex-col">
 
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
         <form
           className="flex items-center gap-2"
           onSubmit={(event) => {
