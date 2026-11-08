@@ -257,7 +257,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   aria-label="点赞"
                   title="点赞"
                   onClick={() => void act('like', track)}
-                  className="hover:text-[var(--accent)]"
+                  className="bili-icon-hover hover:text-[var(--accent)]"
                 >
                   <Icon name="thumb" size={12} />
                 </button>
@@ -267,7 +267,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   aria-label="投币"
                   title="投币"
                   onClick={() => setConfirming(track.key)}
-                  className="hover:text-[var(--accent)]"
+                  className="bili-icon-hover hover:text-[var(--accent)]"
                 >
                   <Icon name="coin" size={12} />
                 </button>
@@ -277,7 +277,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   aria-label="收藏"
                   title="收藏"
                   onClick={() => void act('fav', track)}
-                  className="hover:text-[var(--accent)]"
+                  className="bili-icon-hover hover:text-[var(--accent)]"
                 >
                   <Icon name="bookmarkStar" size={12} />
                 </button>
@@ -287,7 +287,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   aria-label="稍后再看"
                   title="稍后再看"
                   onClick={() => void later(track)}
-                  className="hover:text-[var(--accent)]"
+                  className="bili-icon-hover hover:text-[var(--accent)]"
                 >
                   <Icon name="watchLater" size={12} />
                 </button>

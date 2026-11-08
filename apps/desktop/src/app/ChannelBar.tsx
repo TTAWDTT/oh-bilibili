@@ -41,7 +41,7 @@ export function ChannelBar() {
                 : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
             ].join(' ')}
           >
-            <PartitionIcon kind={channel.kind} size={18} />
+            <span className="bili-channel-icon inline-flex"><PartitionIcon kind={channel.kind} size={18} /></span>
             {channel.label}
             {active ? (
               <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[var(--accent)]" />

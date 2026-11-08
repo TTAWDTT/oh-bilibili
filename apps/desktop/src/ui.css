@@ -561,3 +561,71 @@
   0%, 80%, 100% { transform: scaleY(1); }
   88% { transform: scaleY(0.15); }
 }
+
+/* ── 弹性动效 ─────────────────────────────────────────
+ * 之前全站用的是 cubic-bezier(0.22,1,0.36,1)：干脆、线性、像开发工具。
+ * B 站的动作是「弹」的：按下先缩，松手过冲一点再回稳。
+ * 这里引入一条带过冲的弹簧曲线，所有交互都用它。
+ */
+:root {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 按钮：按下缩到 0.94 并带过冲回弹 */
+.bili-press {
+  transition: transform 180ms var(--spring), box-shadow 180ms var(--spring);
+}
+
+.bili-press:active {
+  transform: scale(0.94);
+}
+
+/* 卡片：hover 抬起时轻微放大，像被拎起来 */
+.bili-card {
+  transition: transform 220ms var(--spring), box-shadow 220ms var(--spring);
+}
+
+.bili-card:hover {
+  transform: translateY(-3px) scale(1.012);
+  box-shadow: 0 10px 26px -12px rgb(0 0 0 / 0.28);
+}
+
+/* 卡片进场：带过冲的弹入 */
+@keyframes bili-card-spring {
+  0% { opacity: 0; transform: translateY(14px) scale(0.97); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.004); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bili-card-enter {
+  animation: bili-card-spring 420ms var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 26ms);
+}
+
+/* 图标按钮：hover 时轻轻放大 */
+.bili-icon-hover {
+  transition: transform 160ms var(--spring), color 160ms var(--ease);
+}
+
+.bili-icon-hover:hover {
+  transform: scale(1.18);
+}
+
+/* 频道项：hover 时图标先弹一下 */
+.bili-channel-icon {
+  transition: transform 180ms var(--spring);
+}
+
+button:hover > .bili-channel-icon {
+  transform: scale(1.15) rotate(-4deg);
+}
+
+/* 搜索框聚焦：整个框轻微放大，像被"吸住" */
+.bili-focus-scale {
+  transition: transform 200ms var(--spring), border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+
+.bili-focus-scale:focus-within {
+  transform: scale(1.006);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
+}

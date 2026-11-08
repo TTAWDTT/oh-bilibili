@@ -125,7 +125,7 @@ export function SearchView() {
             setNonce((current) => current + 1)
           }}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[4px] border border-hairline bg-[var(--panel-raised)] px-4 py-3 focus-within:border-[var(--line)]">
+          <div className="bili-focus-scale flex min-w-0 flex-1 items-center gap-2 rounded-[6px] border border-hairline bg-[var(--panel-raised)] px-4 py-3 focus-within:border-[var(--accent)]">
             <Icon name="search" size={18} className="text-[var(--text-2)]" />
             <input
               ref={inputRef}
