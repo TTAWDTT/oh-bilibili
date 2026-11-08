@@ -93,6 +93,11 @@ export function queueState(): Promise<QueueView> {
   return call<QueueView>('queue_state', {})
 }
 
+/** 队列恢复进度 (已补, 总数)；没有在恢复时为 null。 */
+export function queueRestoreProgress(): Promise<[number, number] | null> {
+  return call<[number, number] | null>('queue_restore_progress', {})
+}
+
 /** 队列内重排。两个参数都是曲目键，后端换成条目身份再移动。 */
 export function queueMove(from: string, to: string): Promise<QueueView> {
   return call<QueueView>('queue_move', { from, to })

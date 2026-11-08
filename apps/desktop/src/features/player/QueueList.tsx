@@ -1,3 +1,5 @@
+import * as ipc from '../../shared/lib/ipc'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { formatDuration } from '../../shared/lib/format'
 import type { Track } from '../../shared/lib/contract'
@@ -77,6 +79,26 @@ export function QueueList() {
   const queue = usePlayerStore((state) => state.queue)
   const playContext = usePlayerStore((state) => state.playContext)
   const moveInQueue = usePlayerStore((state) => state.moveInQueue)
+  const [restore, setRestore] = useState<[number, number] | null>(null)
+
+  // 队列在后台补齐时每两秒问一次进度，补完就停。
+  useEffect(() => {
+    let alive = true
+    const tick = async (): Promise<void> => {
+      try {
+        const p = await ipc.queueRestoreProgress()
+        if (!alive) return
+        setRestore(p)
+        if (p) window.setTimeout(() => void tick(), 2000)
+      } catch {
+        // 拿不到就不显示，不值得打断
+      }
+    }
+    void tick()
+    return () => {
+      alive = false
+    }
+  }, [])
   const navigate = useAppStore((state) => state.navigate)
 
   if (!queue) {
@@ -117,8 +139,13 @@ export function QueueList() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-[var(--text-2)]">
-        接下来 · {queue.items.length} 首
+      <div className="flex items-center justify-between px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-[var(--text-2)]">
+        <span>接下来 · {queue.items.length} 首</span>
+        {restore ? (
+          <span className="num text-[var(--accent)]">
+            恢复中 {restore[0]}/{restore[1]}
+          </span>
+        ) : null}
       </div>
       {queue.items.length > VIRTUAL_THRESHOLD ? (
         <div className="flex min-h-0 flex-1 flex-col">

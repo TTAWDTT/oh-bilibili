@@ -48,6 +48,8 @@ pub struct Engine {
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
     downloads: Mutex<Vec<DownloadView>>,
+    /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
+    restoring: Mutex<Option<(usize, usize)>>,
 }
 
 impl Engine {
@@ -79,6 +81,7 @@ impl Engine {
             events,
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
+            restoring: Mutex::new(None),
         });
         engine.restore_queue();
         Ok(engine)
@@ -417,30 +420,36 @@ impl Engine {
         }
 
         // 有缺的就后台补，补完再整体替换队列。
-        if tracks.len() < keys.len() {
+        let already = tracks.len();
+        if already < keys.len() {
             let engine = self.clone();
             std::thread::spawn(move || {
                 let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                     Ok(rt) => rt,
                     Err(_) => return,
                 };
+                let total = keys.len();
+                *lock(&engine.restoring) = Some((already, total));
                 rt.block_on(async {
+                    let mut done = already;
                     for key in &keys {
-                        if lock(&engine.known).contains_key(key) {
-                            continue;
+                        if !lock(&engine.known).contains_key(key) {
+                            let track_key = TrackKey::from_provider(key.clone());
+                            if let Ok(detail) = engine.source.detail(&track_key).await {
+                                engine.remember(&detail.track);
+                            }
+                            // 限速队列本身会排队，这里只需要给彼此留点间隔。
+                            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
                         }
-                        let track_key = TrackKey::from_provider(key.clone());
-                        if let Ok(detail) = engine.source.detail(&track_key).await {
-                            engine.remember(&detail.track);
-                        }
-                        // 限速队列本身会排队，这里只需要给彼此留点间隔。
-                        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                        done += 1;
+                        *lock(&engine.restoring) = Some((done, total));
                     }
                     let filled = engine.tracks_for(&keys);
                     if !filled.is_empty() {
                         let mut q = lock(&engine.queue);
                         *q = Queue::from_tracks(&filled, 0);
                     }
+                    *lock(&engine.restoring) = None;
                 });
             });
         }
@@ -469,6 +478,11 @@ impl Engine {
             items: queue.items(),
             index: queue.index(),
         })
+    }
+
+    /// 队列恢复进度。界面据此显示「正在恢复 n/m」。
+    pub fn queue_restore_progress(&self) -> Option<(usize, usize)> {
+        *lock(&self.restoring)
     }
 
     pub fn queue_view(&self) -> QueueView {
