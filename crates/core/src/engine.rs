@@ -64,7 +64,7 @@ impl Engine {
         let library = Library::open(db_path)?;
         let player = Player::start().map_err(|e| WireError::internal(e.to_string()))?;
         let (events, _) = tokio::sync::broadcast::channel(256);
-        Ok(Arc::new(Engine {
+        let engine = Arc::new(Engine {
             cookie_file,
             source,
             library,
@@ -79,7 +79,9 @@ impl Engine {
             events,
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
-        }))
+        });
+        engine.restore_queue();
+        Ok(engine)
     }
 
     /// 进度心跳。只在真的在播时发，UI 不用自己算时间。
@@ -272,6 +274,7 @@ impl Engine {
             let mut q = lock(&self.queue);
             *q = Queue::from_tracks(&tracks, start);
         }
+        self.persist_queue();
         self.play_key(&key).await
     }
 
@@ -378,6 +381,42 @@ impl Engine {
         }
     }
 
+    /// 把当前队列写成一行 JSON。队列是上下文，重启要能接上。
+    fn persist_queue(&self) {
+        let keys: Vec<String> = lock(&self.queue)
+            .items()
+            .iter()
+            .map(|t| t.key.as_opaque().to_string())
+            .collect();
+        if keys.is_empty() {
+            return;
+        }
+        if let Ok(json) = serde_json::to_string(&keys) {
+            let _ = self.library.save_queue(&json);
+        }
+    }
+
+    /// 启动时恢复上次的队列。曲目详情从已知缓存里取，取不到的丢弃。
+    fn restore_queue(&self) {
+        let Ok(Some(raw)) = self.library.load_queue() else {
+            return;
+        };
+        let Ok(keys): Result<Vec<String>, _> = serde_json::from_str(&raw) else {
+            return;
+        };
+        let known = lock(&self.known);
+        let tracks: Vec<Track> = keys
+            .iter()
+            .filter_map(|k| known.get(k).cloned())
+            .collect();
+        drop(known);
+        if tracks.is_empty() {
+            return;
+        }
+        let mut q = lock(&self.queue);
+        *q = Queue::from_tracks(&tracks, 0);
+    }
+
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
     pub fn queue_move(&self, from: &str, to: &str) -> Result<QueueView, WireError> {
         let mut queue = lock(&self.queue);
@@ -388,6 +427,9 @@ impl Engine {
             .entry_id_of(to)
             .ok_or_else(|| WireError::input("to", "目标项不在队列里"))?;
         queue.move_entry(from_id, Some(to_id));
+        drop(queue);
+        self.persist_queue();
+        let queue = lock(&self.queue);
         Ok(QueueView {
             items: queue.items(),
             index: queue.index(),

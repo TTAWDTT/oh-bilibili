@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -457,6 +457,27 @@ impl Library {
         })
     }
 
+    /// 存队列快照。只保留一行，每次覆盖。
+    pub fn save_queue(&self, payload: &str) -> Result<()> {
+        self.with(|conn| {
+            conn.execute(
+                "INSERT INTO queue_snapshot (id, payload, saved_at) VALUES (1, ?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, saved_at = excluded.saved_at",
+                params![payload, now_ms()],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn load_queue(&self) -> Result<Option<String>> {
+        self.with(|conn| {
+            conn.query_row("SELECT payload FROM queue_snapshot WHERE id = 1", [], |r| {
+                r.get(0)
+            })
+            .optional()
+        })
+    }
+
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         self.with(|conn| {
             conn.query_row("SELECT value FROM settings WHERE key = ?1", params![key], |r| {
@@ -504,7 +525,7 @@ fn now_ms() -> i64 {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 1] = [r#"
+const MIGRATIONS: [&str; 2] = [r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -572,6 +593,13 @@ CREATE TABLE lyrics (
 CREATE TABLE settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+"#, r#"
+-- v2：队列快照。队列本身是上下文，重启恢复到离开时的样子。
+CREATE TABLE queue_snapshot (
+  id       INTEGER PRIMARY KEY CHECK (id = 1),
+  payload  TEXT NOT NULL,
+  saved_at INTEGER NOT NULL
 );
 "#];
 
@@ -681,6 +709,15 @@ mod tests {
         assert_eq!(changed, 1);
         assert_eq!(l.pending_reactions(2, 10).unwrap().len(), 1);
         assert_eq!(l.pending_reactions(1, 10).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn 队列快照能覆盖写入() {
+        let l = lib();
+        assert_eq!(l.load_queue().unwrap(), None);
+        l.save_queue(r#"["BV1","BV2"]"#).unwrap();
+        l.save_queue(r#"["BV3"]"#).unwrap();
+        assert_eq!(l.load_queue().unwrap().as_deref(), Some(r#"["BV3"]"#));
     }
 
     #[test]
