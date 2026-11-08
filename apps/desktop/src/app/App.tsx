@@ -72,7 +72,8 @@ export default function App() {
   }, [trackKey, setRail])
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--bg,var(--color-ink))] text-[var(--text-1)]">
+    <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
+      style={{ background: 'var(--color-ink)' }}>
       <StageGlow />
       <TitleBar />
       <ChannelBar />

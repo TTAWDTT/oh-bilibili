@@ -81,7 +81,7 @@ export function DownloadsView() {
                           className="t h-full origin-left"
                           style={{
                             transform: `scaleX(${item.progress})`,
-                            background: 'linear-gradient(90deg, var(--accent), var(--accent-deep))',
+                            background: 'linear-gradient(90deg, var(--accent), var(--bili-pink))',
                           }}
                         />
                       </div>
