@@ -7,7 +7,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
-import { TrackList } from '../tracks/TrackList'
+import { TrackGrid } from '../tracks/TrackGrid'
 
 const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -39,7 +39,6 @@ export function SearchView() {
   const seq = useRef(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const focusSeq = useAppStore((state) => state.searchFocus)
-  const playContext = usePlayerStore((state) => state.playContext)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
 
@@ -82,10 +81,6 @@ export function SearchView() {
     setPage(1)
     setNonce((current) => current + 1)
   }
-
-  const keys = tracks.map((track) => track.key)
-  const activeKey = snapshot?.track?.key ?? null
-  const playing = snapshot?.phase === 'playing'
 
   return (
     <div className="flex h-full flex-col">
@@ -188,11 +183,10 @@ export function SearchView() {
             ) : null}
 
             {tracks.length > 0 ? (
-              <TrackList
+              <TrackGrid
                 tracks={tracks}
-                activeKey={activeKey}
-                playing={playing}
-                onPlay={(index) => void playContext(keys, index)}
+                activeKey={snapshot?.track?.key ?? null}
+                playing={snapshot?.phase === 'playing'}
               />
             ) : null}
 
