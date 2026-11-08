@@ -39,7 +39,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[4px] border border-white/32 px-4 py-2 text-[12px] text-white/85 hover:border-white/32 hover:text-white"
+            className="t press flex items-center gap-2 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/85 hover:border-white/32 hover:text-white"
           >
             <Icon name="plus" size={14} />
             新建歌单

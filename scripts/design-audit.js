@@ -114,6 +114,9 @@
   const strayH = new Map()
   for (const n of clickable) {
     if (n.hasAttribute('data-row')) continue
+    // 纯文字按钮（无边框、无底色）是链接形态，不参与控件高度标尺
+    if (parseFloat(getComputedStyle(n).borderTopWidth) === 0 &&
+        getComputedStyle(n).backgroundColor === 'rgba(0, 0, 0, 0)') continue
     const h = Math.round(n.getBoundingClientRect().height)
     if (h < 18 || h > 56) continue
     if (!ALLOWED_H.some((a) => Math.abs(a - h) <= 1)) {

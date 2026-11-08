@@ -129,7 +129,7 @@ export function SettingsView() {
               type="button"
               onClick={() => void sync()}
               disabled={syncing}
-              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-white/32 px-4 py-2 text-[12px] text-white/85 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-40"
+              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/85 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-40"
             >
               <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
               {syncing ? '同步中…' : '立即同步'}
