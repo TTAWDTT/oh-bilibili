@@ -478,3 +478,20 @@
   height: 60%;
   opacity: 1;
 }
+
+/* 全局弹幕带：从右向左匀速穿过窗口顶部 */
+.bili-strip-item {
+  right: -30%;
+  animation-name: bili-strip-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes bili-strip-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-190vw);
+  }
+}

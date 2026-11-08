@@ -18,6 +18,7 @@ import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { ChannelBar } from './ChannelBar'
+import { DanmakuStrip } from './DanmakuStrip'
 import { BackToTop } from '../shared/ui/BackToTop'
 import { Sidebar } from './Sidebar'
 import { StageGlow } from './StageGlow'
@@ -74,6 +75,7 @@ export default function App() {
       <StageGlow />
       <TitleBar />
       <ChannelBar />
+      <DanmakuStrip />
 
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />

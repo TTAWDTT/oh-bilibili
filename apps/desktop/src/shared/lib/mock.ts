@@ -27,6 +27,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
       return matched.slice((page - 1) * 8, page * 8)
     }
+    case 'danmaku':
+      return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']
     case 'library_playlists':
       return state.playlists.map((item) => ({ id: item.id, name: item.name }))
     case 'library_create': {
