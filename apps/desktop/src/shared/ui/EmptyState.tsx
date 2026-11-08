@@ -1,3 +1,4 @@
+import { BiliTvArt } from './BiliTvArt'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
@@ -13,7 +14,13 @@ type EmptyStateProps = {
 export function EmptyState({ icon, title, detail, action, compact = false }: EmptyStateProps) {
   return (
     <div className={compact ? 'flex flex-col items-center px-4 py-10 text-center' : 'flex flex-col items-center px-3 py-16 text-center'}>
-      <Icon name={icon} size={22} className="text-white/48" />
+      {icon === 'biliTv' ? (
+        <span className="text-[var(--accent)]">
+          <BiliTvArt />
+        </span>
+      ) : (
+        <Icon name={icon} size={22} className="text-white/48" />
+      )}
       <h3 className="mt-3 text-[14px] font-medium text-white/85" title={title}>
         {title}
       </h3>

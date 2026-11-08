@@ -69,7 +69,7 @@ export function QueueList() {
   if (queue.items.length === 0) {
     return (
       <EmptyState
-        icon="queue"
+        icon="biliTv"
         title="队列是空的"
         detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
         action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}

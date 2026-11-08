@@ -158,3 +158,20 @@
     stage-spin 9s linear infinite,
     stage-breath 4s ease-in-out infinite;
 }
+
+/* 空态插画眨眼：每 6 秒眨一次，够慢才不像闪烁。 */
+@keyframes bili-tv-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+.bili-tv__eyes {
+  transform-origin: 48px 55px;
+  animation: bili-tv-blink 6s ease-in-out infinite;
+}

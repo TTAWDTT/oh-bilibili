@@ -103,7 +103,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
           <LyricsView track={track} />
         ) : (
           <EmptyState
-            icon="music"
+            icon="biliTv"
             title="还没有在播放"
             detail="挑一首歌，歌词会跟着进度滚动。"
             action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}

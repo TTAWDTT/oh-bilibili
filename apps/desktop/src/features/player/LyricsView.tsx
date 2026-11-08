@@ -129,7 +129,7 @@ export function LyricsView({ track }: { track: Track | null }) {
   if (!doc || doc.lines.length === 0) {
     return (
       <EmptyState
-        icon="lyrics"
+        icon="biliTv"
         title={track ? '这首歌还没有歌词' : '还没有在播放'}
         detail={track ? '三级回退都没查到时不去编造，播放本身不受影响。' : '挑一首歌，歌词会跟着进度滚动。'}
         action={track ? { label: '看看队列', onClick: () => toggleRail('queue') } : { label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
