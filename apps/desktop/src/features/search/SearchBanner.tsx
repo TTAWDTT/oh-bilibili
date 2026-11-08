@@ -1,39 +1,90 @@
+import { useEffect, useState } from 'react'
 import { Bili2233 } from '../../shared/ui/Bili2233'
 
+type Slide = {
+  title: string
+  desc: string
+  from: string
+  to: string
+}
+
 /**
- * 搜索页顶部的横向横幅。
+ * 首页大图 banner。B 站首页顶部是一张会自动切换的大图，是整个站最醒目的位置。
  *
- * B 站首页顶部有一条大图 banner，是它最好认的一处。这里用渐变 + 2233 + 一句标语
- * 复刻那个位置，让打开应用的第一眼就是 B 站的样子。
+ * 这里用渐变 + 2233 娘做轮播：三张轮流淡入，每张停留 6 秒。没有图片资源时，
+ * 渐变加插画比一张假照片更合适，也更省体积。
  */
+const SLIDES: Slide[] = [
+  {
+    title: '干杯，把 B 站的声音装进口袋',
+    desc: '搜索、播放、弹幕、歌词、投币三连，全在本机完成。',
+    from: 'color-mix(in oklab, var(--bili-pink) 30%, white)',
+    to: 'color-mix(in oklab, var(--bili-blue) 18%, white)',
+  },
+  {
+    title: '22 娘和 33 娘守在这里',
+    desc: '每一条音轨都来自你自己的 B 站账号，不经任何中转。',
+    from: 'color-mix(in oklab, var(--bili-blue) 26%, white)',
+    to: 'color-mix(in oklab, var(--bili-pink) 16%, white)',
+  },
+  {
+    title: '一键三连，也是一种收藏方式',
+    desc: '点赞、投币、收进「哔哩哔哩 music」，和你账号里同步。',
+    from: 'color-mix(in oklab, #ffb027 30%, white)',
+    to: 'color-mix(in oklab, var(--bili-pink) 22%, white)',
+  },
+]
+
 export function SearchBanner() {
+  const [active, setActive] = useState(0)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setActive((i) => (i + 1) % SLIDES.length), 6000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   return (
-    <div className="relative mb-5 overflow-hidden rounded-[8px]">
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(105deg, color-mix(in oklab, var(--bili-pink) 22%, white) 0%, color-mix(in oklab, var(--bili-pink) 8%, white) 46%, color-mix(in oklab, var(--bili-blue) 14%, white) 100%)',
-        }}
-      />
-      {/* 右上角一枚圆形的柔光，B 站 banner 常见的高光处理 */}
-      <div
-        className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full"
-        style={{ background: 'radial-gradient(circle, rgb(255 255 255 / 0.85), transparent 70%)' }}
-      />
-      <div className="relative flex items-center justify-between gap-6 px-6 py-5">
-        <div className="min-w-0">
-          <div className="text-[19px] font-semibold leading-tight text-[#5b3b46]">
-            干杯，把 B 站的声音装进口袋
+    <div className="relative mb-5 h-[196px] overflow-hidden rounded-[10px]">
+      {SLIDES.map((slide, i) => (
+        <div
+          key={slide.title}
+          aria-hidden={i !== active}
+          className="bili-banner-slide absolute inset-0 transition-opacity duration-700"
+          style={{
+            opacity: i === active ? 1 : 0,
+            background: `linear-gradient(105deg, ${slide.from} 0%, ${slide.to} 100%)`,
+          }}
+        >
+          {/* 右上角柔光 */}
+          <div
+            className="pointer-events-none absolute -right-12 -top-20 h-72 w-72 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgb(255 255 255 / 0.9), transparent 70%)' }}
+          />
+          <div className="relative flex h-full items-center justify-between gap-6 px-8">
+            <div className="min-w-0">
+              <div className="text-[24px] font-semibold leading-tight text-[#4c3340]">{slide.title}</div>
+              <p className="mt-2 max-w-[420px] text-[13px] leading-relaxed text-[#7d5a67]">{slide.desc}</p>
+              <div className="mt-4 flex items-center gap-1.5">
+                {SLIDES.map((_, dot) => (
+                  <button
+                    key={dot}
+                    type="button"
+                    aria-label={`第 ${dot + 1} 张`}
+                    onClick={() => setActive(dot)}
+                    className={[
+                      'h-1.5 rounded-full transition-all duration-300',
+                      dot === active ? 'w-6 bg-[var(--bili-pink)]' : 'w-1.5 bg-white/70 hover:bg-white',
+                    ].join(' ')}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="shrink-0 translate-y-2">
+              <Bili2233 width={228} />
+            </div>
           </div>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#8a6470]">
-            搜索、播放、弹幕、歌词、投币三连，全在本机完成。
-          </p>
         </div>
-        <div className="shrink-0">
-          <Bili2233 width={168} />
-        </div>
-      </div>
+      ))}
     </div>
   )
 }
