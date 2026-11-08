@@ -1,0 +1,16 @@
+{
+  "name": "bilimusic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run tauri:dev -w @bilimusic/desktop",
+    "web": "npm run dev -w @bilimusic/desktop",
+    "build": "npm run build -w @bilimusic/desktop",
+    "bundle": "npm run tauri:build -w @bilimusic/desktop",
+    "typecheck": "npm run typecheck -w @bilimusic/desktop"
+  }
+}

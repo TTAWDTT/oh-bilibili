@@ -1,0 +1,11 @@
+[package]
+name = "bilimusic-bili"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "B 站接口适配层：签名、搜索、取流、收藏与点赞"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
