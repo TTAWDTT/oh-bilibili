@@ -315,3 +315,61 @@
   border: 1px solid color-mix(in oklab, var(--bili-blue) 45%, transparent);
   background: color-mix(in oklab, var(--bili-blue) 8%, transparent);
 }
+
+/* ── 灵动感 ─────────────────────────────────────────
+ * B 站的界面是「轻快」的：hover 有小抬升，按下有回弹，卡片进场错峰。
+ * 全部用 transform 与 opacity，不动布局，所以不会掉帧。
+ */
+
+/* 卡片：hover 抬起 2px 并加深阴影，像被手指按住又松开 */
+.bili-card {
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.bili-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
+}
+
+/* 卡片进场：错峰淡入上移。--i 是序号，由组件传入 */
+@keyframes bili-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bili-card-enter {
+  animation: bili-card-in 320ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+/* 主按钮按下：缩到 0.96 再弹回，给指尖一个回应 */
+.bili-press {
+  transition: transform 120ms var(--ease);
+}
+
+.bili-press:active {
+  transform: scale(0.96);
+}
+
+/* 特色背景：极淡的蓝粉斜纹网格，只在大块留白处看得出来 */
+.bili-canvas {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      color-mix(in oklab, var(--bili-blue) 4%, transparent) 0 1px,
+      transparent 1px 26px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--bili-pink) 3%, transparent) 0 1px,
+      transparent 1px 26px
+    );
+}

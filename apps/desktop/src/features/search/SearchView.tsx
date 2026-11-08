@@ -112,7 +112,7 @@ export function SearchView() {
             setPage((p) => p + 1)
           }
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6"
+        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6"
       >
         <form
           className="flex items-center gap-2"

@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useState } from 'react'
 import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
@@ -122,12 +123,16 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
       {tracks.map((track, index) => {
         const active = track.key === activeKey
         return (
-          <article key={track.key} className="group">
+          <article
+            key={track.key}
+            className="bili-card bili-card-enter group"
+            style={{ '--i': Math.min(index, 12) } as React.CSSProperties}
+          >
             <button
               type="button"
               onClick={() => void playContext(tracks.map((t) => t.key), index)}
               aria-label={`播放 ${track.title}`}
-              className="relative block w-full overflow-hidden rounded-[6px] border border-[var(--line)]"
+              className="bili-press relative block w-full overflow-hidden rounded-[6px] border border-[var(--line)]"
               style={{ aspectRatio: '16 / 10' }}
             >
               <Cover
