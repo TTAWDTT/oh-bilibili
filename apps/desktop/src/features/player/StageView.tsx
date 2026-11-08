@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
+import type { Track } from '../../shared/lib/contract'
 import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
@@ -23,6 +24,7 @@ export function StageView() {
   const next = usePlayerStore((state) => state.next)
   const prev = usePlayerStore((state) => state.prev)
   const [doc, setDoc] = useState<LyricDoc | null>(null)
+  const [related, setRelated] = useState<Track[]>([])
   const track = snapshot?.track ?? null
 
   useEffect(() => {
@@ -34,6 +36,24 @@ export function StageView() {
         if (!cancelled) setDoc(d)
       })
       .catch(() => setDoc(null))
+    return () => {
+      cancelled = true
+    }
+  }, [open, track])
+
+  // 相关推荐只在舞台打开时拉，关掉就不再请求。
+  useEffect(() => {
+    if (!open || !track) {
+      setRelated([])
+      return
+    }
+    let cancelled = false
+    void ipc
+      .related(track.key)
+      .then((list) => {
+        if (!cancelled) setRelated(list.slice(0, 8))
+      })
+      .catch(() => setRelated([]))
     return () => {
       cancelled = true
     }
@@ -128,6 +148,35 @@ export function StageView() {
           <LevelBars />
         </div>
       </div>
+
+      {related.length > 0 ? (
+        <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-black/35 px-6 py-3 backdrop-blur">
+          <div className="mb-2 text-[11px] text-white/45">相关推荐</div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {related.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => void usePlayerStore.getState().play(item.key)}
+                title={item.title}
+                className="group w-[132px] shrink-0 text-left"
+              >
+                <span className="relative block overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
+                  <Cover
+                    cover={item.cover}
+                    title={item.title}
+                    className="h-full w-full"
+                    glyphClassName="text-[20px] font-semibold text-white/80"
+                  />
+                </span>
+                <span className="mt-1 line-clamp-1 block text-[11px] text-white/75 group-hover:text-[var(--accent)]">
+                  {item.title}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -70,6 +70,15 @@ async fn danmaku(
     engine.danmaku(&TrackKey::from_provider(key)).await
 }
 
+/// 相关推荐。
+#[tauri::command(rename_all = "snake_case")]
+async fn related(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<Track>, WireError> {
+    engine.related(&TrackKey::from_provider(key)).await
+}
+
 /// 弹幕密度曲线，用来画高能进度条。
 #[tauri::command(rename_all = "snake_case")]
 async fn danmaku_heat(
@@ -368,6 +377,7 @@ pub fn run() {
             mv_port,
             danmaku,
             danmaku_heat,
+            related,
             mv_source,
             search_q,
             player_state,

@@ -457,6 +457,14 @@ impl Engine {
         Ok(self.source.danmaku_heat(key, buckets).await?)
     }
 
+    pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, WireError> {
+        let tracks = self.source.related(key).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
+    }
+
     pub async fn danmaku(&self, key: &TrackKey) -> Result<Vec<String>, WireError> {
         Ok(self.source.danmaku(key).await?)
     }

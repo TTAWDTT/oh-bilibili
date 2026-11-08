@@ -303,6 +303,48 @@ impl Source {
         Ok(heat)
     }
 
+    /// 相关推荐。B 站播放页底部那排，用的是同一条推荐接口。
+    pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, BiliError> {
+        let value = self
+            .client
+            .get_json(
+                &format!(
+                    "{}/x/web-interface/archive/related?bvid={}",
+                    client::API,
+                    key.as_opaque()
+                ),
+                PLAY_INTERVAL,
+            )
+            .await?;
+
+        let Some(list) = value["data"].as_array() else {
+            return Ok(Vec::new());
+        };
+        let mut out = Vec::with_capacity(list.len());
+        for item in list {
+            let Some(bvid) = item["bvid"].as_str() else {
+                continue;
+            };
+            let typeid = item["typeid"].as_u64().unwrap_or(0) as u32;
+            out.push(Track {
+                key: TrackKey::from_provider(bvid),
+                title: search::strip_tags(item["title"].as_str().unwrap_or("（无标题）")),
+                artist: item["owner"]["name"].as_str().unwrap_or("").to_string(),
+                duration: item["duration"].as_u64().map(Millis),
+                cover: wire::norm_cover(item["pic"].as_str().unwrap_or("")),
+                accent: None,
+                views: item["stat"]["view"].as_u64(),
+                danmaku: item["stat"]["danmaku"].as_u64(),
+                up_avatar: item["owner"]["face"]
+                    .as_str()
+                    .map(|f| f.replacen("http://", "https://", 1)),
+                tname: search::partition_name(typeid).map(|n| n.to_string()),
+                typeid: Some(typeid),
+            });
+        }
+        Ok(out)
+    }
+
     /// 当前 cookie 串，代理转发视频时要带上。
     pub fn cookie_header(&self) -> String {
         self.client.cookie_header()
@@ -352,7 +394,7 @@ mod wire {
         }
     }
 
-    fn norm_cover(pic: &str) -> Option<String> {
+    pub fn norm_cover(pic: &str) -> Option<String> {
         if pic.is_empty() {
             return None;
         }

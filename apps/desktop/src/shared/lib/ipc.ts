@@ -125,6 +125,11 @@ export function danmaku(key: string): Promise<string[]> {
   return call<string[]>('danmaku', { key })
 }
 
+/** 相关推荐。 */
+export function related(key: string): Promise<Track[]> {
+  return call<Track[]>('related', { key })
+}
+
 /** 弹幕密度曲线，用来画高能进度条。 */
 export function danmakuHeat(key: string, buckets: number): Promise<number[]> {
   return call<number[]>('danmaku_heat', { key, buckets })
