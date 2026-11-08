@@ -4,6 +4,9 @@
 //! 解码与输出分两个线程：解码线程往前推，声卡回调消费，中间是一个有界环形缓冲。
 
 use std::io::{Read, Seek, SeekFrom};
+
+pub mod player;
+pub use player::Player;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -21,6 +24,11 @@ use symphonia::core::probe::Hint;
 pub struct Media(Box<dyn symphonia::core::io::MediaSource>);
 
 impl Media {
+    /// 交给解码器时用。这是本 crate 内部唯一的出口。
+    pub(crate) fn into_inner(self) -> Box<dyn symphonia::core::io::MediaSource> {
+        self.0
+    }
+
     pub fn new<T>(mut inner: T) -> Media
     where
         T: Read + Seek + Send + Sync + 'static,
@@ -204,6 +212,13 @@ impl Clock {
     pub fn reset(&self, sample_rate: u32) {
         self.frames.store(0, Ordering::Relaxed);
         self.sample_rate.store(sample_rate as u64, Ordering::Relaxed);
+    }
+    /// seek 之后重设位置。帧计数是唯一真值，所以这里直接换算成帧。
+    pub fn seek_to_ms(&self, ms: u64) {
+        let rate = self.sample_rate.load(Ordering::Relaxed);
+        if rate > 0 {
+            self.frames.store(ms * rate / 1000, Ordering::Relaxed);
+        }
     }
     pub fn set_playing(&self, playing: bool) {
         self.playing.store(playing, Ordering::Relaxed);

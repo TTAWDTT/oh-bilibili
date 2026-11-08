@@ -6,6 +6,8 @@ license.workspace = true
 description = "audio"
 
 [dependencies]
+cpal = "0.18.2"
+ringbuf = "0.6.0"
 serde.workspace = true
 symphonia = { version = "0.5.4", features = ["aac", "isomp4"] }
 thiserror.workspace = true

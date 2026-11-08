@@ -4,6 +4,7 @@
 //! 这个 crate 之外的代码不会看到 bvid、cid、dash、fnval 这些词。
 
 pub mod client;
+pub mod media;
 pub mod error;
 pub mod search;
 pub mod wbi;
