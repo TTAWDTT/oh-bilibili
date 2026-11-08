@@ -75,14 +75,14 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         glyphClassName="text-[20px] font-semibold text-white/70"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13.5px] font-medium leading-tight text-white" title={track.title}>
+        <div className="truncate text-[13px] font-medium leading-tight text-white" title={track.title}>
           {track.title}
         </div>
         <div className="mt-1 flex items-center gap-2">
           <span className="truncate text-[12px] text-white/62" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-[3px] border border-white/32 px-2 py-[1px] font-mono text-[9px] text-white/62">
+          <span className="num shrink-0 rounded-[3px] border border-white/32 px-2 py-0 font-mono text-[10px] text-white/62">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>

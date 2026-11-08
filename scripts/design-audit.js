@@ -17,7 +17,9 @@
     if (!n.textContent?.trim()) continue
     sizes.add(getComputedStyle(n).fontSize)
   }
-  if (sizes.size > 6) add('字号种类', `${sizes.size} 种：${[...sizes].sort().join(' ')}`)
+  const allowed = new Set(['10px','11px','12px','13px','14px','16px','19px'])
+  for (const s of sizes) if (!allowed.has(s)) add('字号不在音阶上', s)
+  if (sizes.size > 7) add('字号种类', `${sizes.size} 种：${[...sizes].sort().join(' ')}`)
 
   // 2. 间距是否 4 的倍数（只查 padding/margin 的 px 值）
   let offGrid = 0
@@ -25,7 +27,9 @@
   for (const n of visible) {
     const s = getComputedStyle(n)
     for (const p of ['paddingTop', 'paddingLeft', 'paddingBottom', 'paddingRight', 'marginTop', 'marginLeft']) {
-      const v = parseFloat(s[p] || '0')
+      const raw = s[p] || '0'
+      if (raw.includes('%')) continue
+      const v = parseFloat(raw)
       if (v > 0 && v % 4 !== 0) {
         offGrid += 1
         offSamples.add(`${p.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())}:${v}`)

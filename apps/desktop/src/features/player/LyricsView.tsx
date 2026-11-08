@@ -144,7 +144,7 @@ export function LyricsView({ track }: { track: Track | null }) {
         <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/48">纯文本 · {doc.source}</div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-8">
           {doc.lines.map((line, index) => (
-            <p key={index} className="py-2 text-[13.5px] leading-relaxed text-white/62">
+            <p key={index} className="py-2 text-[13px] leading-relaxed text-white/62">
               {line.text}
             </p>
           ))}
@@ -161,7 +161,7 @@ export function LyricsView({ track }: { track: Track | null }) {
       </div>
       <div ref={scrollerRef} className="lyrics-mask min-h-0 flex-1 overflow-hidden px-5">
         <div
-          className="t relative py-[42%]"
+          className="t relative aspect-square"
           style={{ transform: `translateY(${offset}px)` }}
         >
           {doc.lines.map((line, index) => {

@@ -50,7 +50,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ReactionButtons track={track} size={15} />
-          <span className="num rounded-[3px] border border-white/32 px-2 py-[1px] font-mono text-[9px] text-white/62">
+          <span className="num rounded-[3px] border border-white/32 px-2 py-0 font-mono text-[10px] text-white/62">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>

@@ -109,7 +109,7 @@ export function AuthModal() {
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13.5px] text-white/85">{auth.user.uname}</div>
+            <div className="truncate text-[13px] text-white/85">{auth.user.uname}</div>
             <div className="mt-0.5 font-mono text-[11px] text-white/48">UID {auth.user.mid}</div>
           </div>
           <button

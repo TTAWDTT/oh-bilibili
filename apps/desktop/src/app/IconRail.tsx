@@ -54,7 +54,7 @@ export function IconRail() {
             ) : null}
             <Icon name={item.icon} size={17} />
             {badge > 0 ? (
-              <span className="absolute -right-0.5 -top-1 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[9px] leading-[14px] text-black">
+              <span className="absolute -right-0.5 -top-1 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[10px] leading-[14px] text-black">
                 {badge > 99 ? '99' : badge}
               </span>
             ) : null}
