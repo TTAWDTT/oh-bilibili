@@ -27,6 +27,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
       aria-current={active ? 'true' : undefined}
       style={{ height: TRACK_ROW_HEIGHT }}
       className="group flex items-center gap-2 border-b border-hairline px-4"
+      data-row="track"
     >
       <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/48">
         {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
