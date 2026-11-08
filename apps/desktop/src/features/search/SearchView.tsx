@@ -10,6 +10,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 import { ChannelGrid } from './ChannelGrid'
+import { ContinueListening } from './ContinueListening'
 import { HotRanking } from './HotRanking'
 import { SearchBanner } from './SearchBanner'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
@@ -206,6 +207,8 @@ export function SearchView() {
                 </button>
               ))}
             </div>
+            <ContinueListening />
+
             <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
               <ChannelGrid onPick={(kw) => pick(kw)} />
               <HotRanking onPick={(kw) => pick(kw)} />

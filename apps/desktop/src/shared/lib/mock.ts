@@ -27,6 +27,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
       return matched.slice((page - 1) * 8, page * 8)
     }
+    case 'library_history':
+      // 预览模式给几条近期记录，让「继续听」区块有内容可看。
+      return CATALOG.slice(0, 5)
     case 'danmaku':
       return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']
     case 'library_playlists':

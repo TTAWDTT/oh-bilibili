@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { useLibraryStore } from '../features/library/libraryStore'
@@ -9,6 +8,12 @@ import { Icon } from '../shared/ui/Icon'
 import { Skeleton } from '../shared/ui/Skeleton'
 
 /** 侧栏行：24px 高，hover 是深灰填充而不是只改文字色——这是编辑器式列表的通用手感。 */
+/** 歌单色块。按 id 取固定色，同一个歌单每次都是同一个颜色。 */
+const PLAYLIST_COLORS = ['#fb7299', '#00aeec', '#ffb027', '#7ba05b', '#a06bd9', '#ff8f6b']
+function playlistColor(id: number): string {
+  return PLAYLIST_COLORS[id % PLAYLIST_COLORS.length] ?? '#9499a0'
+}
+
 const ROW =
   'bili-nav-item t mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[12px]'
 const ROW_IDLE = 'text-[var(--text-2)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]'
@@ -63,6 +68,13 @@ export function Sidebar() {
                 onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
                 className={[ROW, active ? ROW_ACTIVE : ROW_IDLE].join(' ')}
               >
+                <span
+                  aria-hidden
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] text-[9px] text-white"
+                  style={{ background: playlistColor(playlist.id) }}
+                >
+                  {playlist.name.slice(0, 1)}
+                </span>
                 <span className="truncate">{playlist.name}</span>
               </button>
             )
@@ -93,4 +105,3 @@ export function Sidebar() {
 }
 
 
-export type { View }
