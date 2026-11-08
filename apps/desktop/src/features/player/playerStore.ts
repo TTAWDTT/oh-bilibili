@@ -23,6 +23,7 @@ type PlayerStore = {
   setVolume: (volume: number) => Promise<void>
   cycleRepeat: () => Promise<void>
   setShuffle: (on: boolean) => void
+  moveInQueue: (from: string, to: string) => Promise<void>
   applyProgress: (positionMs: number, durationMs: number, level?: number) => void
   applyTrack: (track: Track) => void
   applyBuffering: (track: Track) => void
@@ -106,6 +107,24 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     },
     setShuffle: (on) => {
       void run('随机播放', () => ipc.playerShuffle(on))
+    },
+    moveInQueue: async (from, to) => {
+      // 乐观更新：先动本地顺序，接口失败再回滚，拖拽不会卡顿。
+      const current = get().queue
+      if (!current) return
+      const items = [...current.items]
+      const fromIdx = items.findIndex((t) => t.key === from)
+      const toIdx = items.findIndex((t) => t.key === to)
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return
+      const moved = items.splice(fromIdx, 1)[0]
+      if (!moved) return
+      items.splice(toIdx, 0, moved)
+      set({ queue: { ...current, items } })
+      try {
+        set({ queue: await ipc.queueMove(from, to) })
+      } catch {
+        set({ queue: current })
+      }
     },
     applyProgress: (positionMs, durationMs, level = 0) => {
       const current = get().snapshot

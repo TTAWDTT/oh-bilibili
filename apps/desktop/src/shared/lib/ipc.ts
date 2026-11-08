@@ -93,6 +93,11 @@ export function queueState(): Promise<QueueView> {
   return call<QueueView>('queue_state', {})
 }
 
+/** 队列内重排。两个参数都是曲目键，后端换成条目身份再移动。 */
+export function queueMove(from: string, to: string): Promise<QueueView> {
+  return call<QueueView>('queue_move', { from, to })
+}
+
 export function libraryPlaylists(): Promise<Playlist[]> {
   return call<Playlist[]>('library_playlists', {})
 }

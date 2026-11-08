@@ -49,6 +49,14 @@ impl Queue {
         self.entries.iter().map(|e| e.track.clone()).collect()
     }
 
+    /// 按曲目键找条目身份。界面只认 TrackKey，不认内部 EntryId。
+    pub fn entry_id_of(&self, key: &str) -> Option<EntryId> {
+        self.entries
+            .iter()
+            .find(|e| e.track.key.as_opaque() == key)
+            .map(|e| e.id)
+    }
+
     pub fn position_of(&self, id: EntryId) -> Option<usize> {
         self.entries.iter().position(|e| e.id == id)
     }

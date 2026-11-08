@@ -15,11 +15,13 @@ function QueueRow({
   index,
   active,
   onPlay,
+  onMove,
 }: {
   track: Track
   index: number
   active: boolean
   onPlay: () => void
+  onMove: (from: string, to: string) => void
 }) {
   return (
     <button
@@ -27,10 +29,33 @@ function QueueRow({
       onClick={onPlay}
       aria-current={active ? 'true' : undefined}
       style={{ height: QUEUE_ROW_HEIGHT }}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', track.key)
+        event.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        const from = event.dataTransfer.getData('text/plain')
+        if (from && from !== track.key) onMove(from, track.key)
+      }}
       className="t group flex w-full items-center gap-2 border-b border-hairline px-4 text-left"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
-        {active ? <Equalizer size="sm" /> : <span className="num font-mono text-[10px] text-[var(--text-2)]">{index + 1}</span>}
+        {active ? (
+          <Equalizer size="sm" />
+        ) : (
+          <>
+            <span className="num font-mono text-[10px] text-[var(--text-2)] group-hover:hidden">{index + 1}</span>
+            <span className="hidden cursor-grab text-[11px] text-[var(--text-3)] group-hover:block" aria-hidden>
+              ⠿
+            </span>
+          </>
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span
@@ -51,6 +76,7 @@ function QueueRow({
 export function QueueList() {
   const queue = usePlayerStore((state) => state.queue)
   const playContext = usePlayerStore((state) => state.playContext)
+  const moveInQueue = usePlayerStore((state) => state.moveInQueue)
   const navigate = useAppStore((state) => state.navigate)
 
   if (!queue) {
@@ -85,6 +111,7 @@ export function QueueList() {
       index={index}
       active={queue.index === index}
       onPlay={() => void playContext(keys, index)}
+      onMove={(from, to) => void moveInQueue(from, to)}
     />
   )
 

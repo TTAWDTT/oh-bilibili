@@ -378,6 +378,22 @@ impl Engine {
         }
     }
 
+    /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
+    pub fn queue_move(&self, from: &str, to: &str) -> Result<QueueView, WireError> {
+        let mut queue = lock(&self.queue);
+        let from_id = queue
+            .entry_id_of(from)
+            .ok_or_else(|| WireError::input("from", "这一项不在队列里"))?;
+        let to_id = queue
+            .entry_id_of(to)
+            .ok_or_else(|| WireError::input("to", "目标项不在队列里"))?;
+        queue.move_entry(from_id, Some(to_id));
+        Ok(QueueView {
+            items: queue.items(),
+            index: queue.index(),
+        })
+    }
+
     pub fn queue_view(&self) -> QueueView {
         let q = lock(&self.queue);
         QueueView {

@@ -226,6 +226,15 @@ fn queue_state(engine: tauri::State<'_, Arc<Engine>>) -> QueueView {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn queue_move(
+    engine: tauri::State<'_, Arc<Engine>>,
+    from: String,
+    to: String,
+) -> Result<QueueView, WireError> {
+    engine.queue_move(&from, &to)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn library_history(
     engine: tauri::State<'_, Arc<Engine>>,
     limit: u32,
@@ -428,6 +437,7 @@ pub fn run() {
             player_repeat,
             player_shuffle,
             queue_state,
+            queue_move,
             library_history,
             library_playlists,
             library_create,
