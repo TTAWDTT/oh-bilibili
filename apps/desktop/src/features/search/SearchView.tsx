@@ -234,7 +234,12 @@ export function SearchView() {
               </div>
             ) : null}
 
-            <SearchBanner />
+            <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <SearchBanner />
+              <div className="hidden h-full rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 xl:block">
+                <HotRanking onPick={(kw) => pick(kw)} limit={6} />
+              </div>
+            </div>
 
             <div className="mt-8 text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -251,10 +256,7 @@ export function SearchView() {
             </div>
             <ContinueListening />
 
-            <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-              <ChannelGrid onPick={(kw) => pick(kw)} />
-              <HotRanking onPick={(kw) => pick(kw)} />
-            </div>
+            <ChannelGrid onPick={(kw) => pick(kw)} />
 
             <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[14px] leading-relaxed text-[var(--text-2)]">{HINT}</p>
           </div>

@@ -44,7 +44,7 @@ export function SearchBanner() {
   }, [])
 
   return (
-    <div className="relative mb-5 h-[196px] overflow-hidden rounded-[10px]">
+    <div className="relative h-full min-h-[236px] overflow-hidden rounded-[8px]">
       {SLIDES.map((slide, i) => (
         <div
           key={slide.title}
