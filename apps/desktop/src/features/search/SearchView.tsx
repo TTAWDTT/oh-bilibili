@@ -22,7 +22,7 @@ function PagerButton({ label, disabled, onClick }: { label: string; disabled: bo
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="t press rounded-[4px] border border-hairline px-4 py-1 text-[12px] text-white/70 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-30"
+      className="t press rounded-[4px] border border-hairline h-8 px-4 text-[12px] text-white/70 hover:border-white/32 hover:text-white disabled:cursor-default disabled:opacity-30"
     >
       {label}
     </button>
@@ -117,7 +117,7 @@ export function SearchView() {
                 onClick={() => setQuery('')}
                 aria-label="清空输入"
                 title="清空输入"
-                className="t press rounded-[4px] p-1 text-white/48 hover:text-white"
+                className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white"
               >
                 <Icon name="close" size={14} />
               </button>

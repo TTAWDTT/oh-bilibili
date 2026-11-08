@@ -33,7 +33,7 @@ export function Sidebar() {
           aria-label="新建歌单"
           title="新建歌单"
           onClick={() => setCreating(true)}
-          className="t -mt-1 rounded-[3px] p-1 text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]"
+          className="t -mt-1 rounded-[3px] h-6 w-6 text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]"
         >
           <Icon name="plus" size={13} />
         </button>

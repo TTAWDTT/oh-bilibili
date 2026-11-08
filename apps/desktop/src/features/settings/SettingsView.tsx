@@ -97,7 +97,7 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => void logout()}
-                  className="t press flex shrink-0 items-center gap-1 rounded-[4px] border border-white/32 px-4 py-1 text-[12px] text-white/70 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
+                  className="t press flex items-center justify-center flex shrink-0 items-center gah-6 w-6 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/70 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
                 >
                   <Icon name="logout" size={13} />
                   退出

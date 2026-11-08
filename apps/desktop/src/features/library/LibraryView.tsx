@@ -86,7 +86,7 @@ export function LibraryView() {
                     </span>
                     <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-white/48">{count}</span>
                   </button>
-                  <div className="flex w-[68px] shrink-0 items-center justify-end gap-1">
+                  <div className="flex w-[68px] shrink-0 items-center justify-end gah-6 w-6">
                     <button
                       type="button"
                       aria-label={`播放 ${playlist.name}`}
@@ -99,7 +99,7 @@ export function LibraryView() {
                           0,
                         )
                       }}
-                      className="t press rounded-[4px] p-1 text-white/48 hover:text-white disabled:cursor-default disabled:opacity-20"
+                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white disabled:cursor-default disabled:opacity-20"
                     >
                       <Icon name="play" size={14} />
                     </button>
@@ -108,7 +108,7 @@ export function LibraryView() {
                       aria-label={`打开 ${playlist.name}`}
                       title="打开歌单"
                       onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                      className="t press rounded-[4px] p-1 text-white/48 hover:text-white"
+                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white"
                     >
                       <Icon name="chevronRight" size={14} />
                     </button>

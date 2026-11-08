@@ -27,7 +27,7 @@ export function IconRail() {
   const downloads = useDownloadsStore((state) => state.items)
 
   return (
-    <nav aria-label="主导航" className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-[var(--panel-alt)] py-2">
+    <nav aria-label="主导航" className="flex w-11 shrink-0 flex-col items-center gah-6 w-6 border-r border-hairline bg-[var(--panel-alt)] py-2">
       {NAV.map((item) => {
         const active = view.kind === item.view.kind
         const running = (downloads ?? []).filter(
@@ -54,7 +54,7 @@ export function IconRail() {
             ) : null}
             <Icon name={item.icon} size={17} />
             {badge > 0 ? (
-              <span className="absolute -right-0.5 -top-1 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[10px] leading-[14px] text-black">
+              <span className="absolute -right-0.5 -toh-6 w-6 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[10px] leading-[14px] text-black">
                 {badge > 99 ? '99' : badge}
               </span>
             ) : null}

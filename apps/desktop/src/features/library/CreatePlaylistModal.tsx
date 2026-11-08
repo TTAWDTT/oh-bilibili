@@ -58,14 +58,14 @@ export function CreatePlaylistModal({ open, onClose }: CreatePlaylistModalProps)
           <button
             type="button"
             onClick={onClose}
-            className="t press rounded-[4px] px-4 py-1 text-[12px] text-white/62 hover:text-white"
+            className="t press rounded-[4px] h-8 px-4 text-[12px] text-white/62 hover:text-white"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={busy || name.trim().length === 0}
-            className="t press rounded-[4px] bg-white px-4 py-1 text-[12px] font-medium text-black hover:bg-white/85 disabled:cursor-default disabled:opacity-35"
+            className="t press rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85 disabled:cursor-default disabled:opacity-35"
           >
             {busy ? '创建中…' : '创建'}
           </button>

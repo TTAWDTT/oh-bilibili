@@ -92,7 +92,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
         <button
           type="submit"
           disabled={busy || name.trim().length === 0}
-          className="t press shrink-0 rounded-[4px] bg-white px-4 py-1 text-[12px] font-medium text-black hover:bg-white/85 disabled:cursor-default disabled:opacity-30"
+          className="t press shrink-0 rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85 disabled:cursor-default disabled:opacity-30"
         >
           新建
         </button>

@@ -84,7 +84,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
           aria-label="收起右栏"
           title="收起右栏（Esc）"
           onClick={closeRail}
-          className="t press rounded-[4px] p-1 text-white/48 hover:text-white"
+          className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white"
         >
           <Icon name="close" size={14} />
         </button>

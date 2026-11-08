@@ -16,7 +16,7 @@ export function VolumeControl() {
         aria-label={shown > 0 ? '静音' : '取消静音'}
         title={shown > 0 ? '静音' : '取消静音'}
         onClick={() => void setVolume(shown > 0 ? 0 : 0.7)}
-        className="t press rounded-[4px] p-1 hover:text-white"
+        className="t press flex items-center justify-center rounded-[4px] h-6 w-6 hover:text-white"
       >
         <Icon name={shown > 0 ? 'volume' : 'mute'} size={16} />
       </button>
