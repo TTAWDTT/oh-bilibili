@@ -81,7 +81,10 @@ export function StageView() {
   const upcoming = lines[active + 1]?.text ?? ''
 
   return (
-    <div className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden">
+    <div
+      className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden"
+      style={{ background: 'var(--ga0)' }}
+    >
       {/* 背景：同一张封面铺满并重度模糊，画面颜色全部来自这张图 */}
       {track.cover ? (
         <img
@@ -93,8 +96,9 @@ export function StageView() {
         />
       ) : null}
       {/* 浅色底：白色半透明压住封面，让文字在任何封面上都读得清 */}
-      <div className="pointer-events-none absolute inset-0 bg-white/88" />
-      <div className="bili-canvas pointer-events-none absolute inset-0 opacity-45" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--ga0)' }} />
+      <div className="pointer-events-none absolute inset-0 bg-white/55" />
+      <div className="bili-canvas pointer-events-none absolute inset-0 opacity-60" />
       <DanmakuLayer trackKey={track.key} playing={snapshot?.phase === 'playing'} />
 
       <button
