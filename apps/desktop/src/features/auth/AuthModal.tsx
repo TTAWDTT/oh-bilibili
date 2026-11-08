@@ -102,9 +102,9 @@ export function AuthModal() {
       {loggedIn && auth?.user ? (
         <div className="flex items-center gap-4 border-b border-hairline pb-5">
           {auth.user.avatar ? (
-            <img src={auth.user.avatar} alt="" className="h-12 w-12 rounded-[6px] border border-white/12 object-cover" />
+            <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-white/12 object-cover" />
           ) : (
-            <span className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-white/10 text-[16px] font-medium text-white/90">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/10 text-[16px] font-medium text-white/90">
               {auth.user.uname.slice(0, 1)}
             </span>
           )}
@@ -115,7 +115,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="t press rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+            className="t press rounded-[4px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
           >
             完成
           </button>
@@ -142,7 +142,7 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="t press flex items-center gap-1.5 rounded-[6px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-white/28 hover:text-white"
+              className="t press flex items-center gap-1.5 rounded-[4px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-white/28 hover:text-white"
             >
               <Icon name="refresh" size={12} />
               重新生成

@@ -31,7 +31,7 @@ function RailToggle({
       disabled={!enabled}
       onClick={() => toggleRail(tab)}
       className={[
-        't press relative flex h-8 items-center gap-1 rounded-[6px] px-2',
+        't press relative flex h-8 items-center gap-1 rounded-[4px] px-2',
         enabled
           ? active
             ? 'text-[var(--accent)]'
@@ -53,13 +53,13 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
       <button
         type="button"
         onClick={() => navigate({ kind: 'search' })}
-        className="t group flex items-center gap-3 px-1 py-1 text-left"
+        className="t group flex items-center gap-2 px-1 py-1 text-left"
       >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[6px] border border-hairline text-white/25">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-white/25">
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
+          <span className="block text-[12.5px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
           <span className="mt-1 block text-[11.5px] text-white/38 group-hover:text-white/60">去搜索里挑一首 →</span>
         </span>
       </button>
@@ -67,11 +67,11 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-center gap-2">
       <Cover
         cover={track.cover}
         title={track.title}
-        className="h-12 w-12 shrink-0 rounded-[6px] border border-white/12"
+        className="h-10 w-10 shrink-0 rounded-[4px] border border-white/12"
         glyphClassName="text-[20px] font-semibold text-white/60"
       />
       <div className="min-w-0 flex-1">
@@ -99,10 +99,10 @@ export function PlayerBar() {
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
-    <section className="relative z-20 grid h-[88px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-white/[0.018] px-6">
+    <section className="relative z-20 grid h-16 shrink-0 overflow-hidden grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-[var(--panel)] px-3">
       <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
 
-      <div className="flex min-w-0 flex-col items-center gap-2">
+      <div className="flex min-w-0 flex-col items-center gap-0.5">
         <Transport />
         <PlaybackProgress />
       </div>

@@ -63,12 +63,12 @@ export function QrPanel({ state, url }: QrPanelProps) {
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[13px] font-medium ${status.tone}`}>{status.title}</div>
+          <div className={`text-[12.5px] font-medium ${status.tone}`}>{status.title}</div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-white/36">{status.detail}</p>
           <button
             type="button"
             onClick={() => void copy()}
-            className="t press mt-3 flex items-center gap-1.5 rounded-[6px] border border-white/12 px-3 py-1.5 text-[11px] text-white/72 hover:border-white/28 hover:text-white"
+            className="t press mt-3 flex items-center gap-1.5 rounded-[4px] border border-white/12 px-3 py-1.5 text-[11px] text-white/72 hover:border-white/28 hover:text-white"
           >
             <Icon name="copy" size={12} />
             复制登录链接

@@ -33,8 +33,8 @@ export function DownloadsView() {
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (
-              <div key={index} className="flex items-center gap-3 border-b border-hairline px-4 py-4">
-                <Skeleton className="h-10 w-10 shrink-0 rounded-[6px]" />
+              <div key={index} className="flex items-center gap-2 border-b border-hairline px-4 py-4">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-[4px]" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-3 w-48 max-w-[45%]" />
                   <Skeleton className="h-2.5 w-64 max-w-[60%]" />
@@ -53,23 +53,23 @@ export function DownloadsView() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
+            <div className="flex items-center gap-2 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
               <span className="flex-1">曲目</span>
               <span className="w-16 text-right">进度</span>
             </div>
             {items.map((item) => {
               const state = STATE[item.state]
               return (
-                <div key={item.key} className="group flex items-center gap-3 border-b border-hairline px-4 py-3">
+                <div key={item.key} className="group flex items-center gap-2 border-b border-hairline px-4 py-3">
                   <Cover
                     cover={null}
                     title={item.title}
-                    className="h-10 w-10 shrink-0 rounded-[6px] border border-white/10"
+                    className="h-10 w-10 shrink-0 rounded-[4px] border border-white/10"
                     glyphClassName="text-[16px] font-medium text-white/55"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[13px] text-white/70 group-hover:text-white" title={item.title}>
+                      <span className="truncate text-[12.5px] text-white/70 group-hover:text-white" title={item.title}>
                         {item.title}
                       </span>
                       <span className={`shrink-0 text-[10px] ${state.tone}`}>{state.label}</span>

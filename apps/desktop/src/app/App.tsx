@@ -11,7 +11,6 @@ import { SearchView } from '../features/search/SearchView'
 import { SettingsView } from '../features/settings/SettingsView'
 import { useAccentVars, useTrackAccent } from '../shared/lib/accent'
 import { ToastHost } from '../shared/ui/ToastHost'
-import { Aurora } from './Aurora'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { Sidebar } from './Sidebar'
@@ -60,8 +59,6 @@ export default function App() {
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-ink text-white">
-      <Aurora accent={accent} />
-      <div className="grain pointer-events-none absolute inset-0 z-[1]" />
       <TitleBar />
 
       <div className="relative z-10 flex min-h-0 flex-1">

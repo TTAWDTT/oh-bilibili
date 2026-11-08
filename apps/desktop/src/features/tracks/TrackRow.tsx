@@ -26,7 +26,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
     <div
       aria-current={active ? 'true' : undefined}
       style={{ height: TRACK_ROW_HEIGHT }}
-      className="group flex items-center gap-3 border-b border-hairline px-4"
+      className="group flex items-center gap-2 border-b border-hairline px-4"
     >
       <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/28">
         {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
@@ -37,7 +37,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         onClick={onPlay}
         aria-label={`播放 ${track.title}`}
         title={`播放 ${track.title}`}
-        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[6px] border border-white/10"
+        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[4px] border border-white/10"
       >
         <Cover
           cover={track.cover}
@@ -50,7 +50,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
       <button type="button" onClick={onPlay} className="min-w-0 flex-1 text-left">
         <span
           className={[
-            't block truncate text-[13px]',
+            't block truncate text-[12.5px]',
             active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white',
           ].join(' ')}
           title={track.title}

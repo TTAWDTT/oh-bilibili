@@ -22,7 +22,7 @@ function PagerButton({ label, disabled, onClick }: { label: string; disabled: bo
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="t press rounded-[6px] border border-hairline px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white disabled:cursor-default disabled:opacity-30"
+      className="t press rounded-[4px] border border-hairline px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white disabled:cursor-default disabled:opacity-30"
     >
       {label}
     </button>
@@ -98,7 +98,7 @@ export function SearchView() {
             setNonce((current) => current + 1)
           }}
         >
-          <div className="flex items-center gap-3 rounded-[6px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
+          <div className="flex items-center gap-2 rounded-[4px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
             <Icon name="search" size={18} className="text-white/32" />
             <input
               ref={inputRef}

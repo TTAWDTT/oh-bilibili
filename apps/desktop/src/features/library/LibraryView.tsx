@@ -39,7 +39,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[6px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white"
+            className="t press flex items-center gap-2 rounded-[4px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -76,12 +76,12 @@ export function LibraryView() {
                   <button
                     type="button"
                     onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                    className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2 py-3.5 text-left"
                   >
                     <span className="text-white/26 group-hover:text-white/60">
                       <Icon name="library" size={15} />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-white/70 group-hover:text-white" title={playlist.name}>
                       {playlist.name}
                     </span>
                     <span className="num w-16 shrink-0 text-right font-mono text-[10.5px] text-white/32">{count}</span>

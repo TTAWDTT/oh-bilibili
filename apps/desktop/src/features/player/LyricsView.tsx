@@ -142,7 +142,7 @@ export function LyricsView({ track }: { track: Track | null }) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/28">纯文本 · {doc.source}</div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-8">
           {doc.lines.map((line, index) => (
             <p key={index} className="py-2 text-[13.5px] leading-relaxed text-white/48">
               {line.text}

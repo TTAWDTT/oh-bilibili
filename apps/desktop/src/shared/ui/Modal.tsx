@@ -47,7 +47,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         aria-label={title}
         className={`modal-panel relative w-full ${width} border border-white/14 bg-[#0b0b10]`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-3 py-5">
           <div>
             <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em] text-white/94">{title}</h2>
             {description ? <p className="mt-2 max-w-sm text-[12.5px] leading-relaxed text-white/44">{description}</p> : null}
@@ -62,7 +62,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
             <Icon name="close" size={16} />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-3 py-5">{children}</div>
       </div>
     </div>,
     document.body,

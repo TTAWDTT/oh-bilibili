@@ -21,7 +21,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
   const tone = TONE[toast.tone]
   return (
     <div
-      className={`toast-in pointer-events-auto flex items-start gap-3 rounded-[6px] border ${tone.edge} bg-[#0a0a10]/92 px-4 py-3 shadow-[0_18px_48px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
+      className={`toast-in pointer-events-auto flex items-start gap-2 rounded-[4px] border ${tone.edge} bg-[#0a0a10]/92 px-4 py-3 shadow-[0_18px_48px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
       role="status"
     >
       <span className={`mt-[1px] shrink-0 ${tone.tint}`}>

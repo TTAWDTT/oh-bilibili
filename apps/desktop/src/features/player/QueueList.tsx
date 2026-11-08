@@ -27,7 +27,7 @@ function QueueRow({
       onClick={onPlay}
       aria-current={active ? 'true' : undefined}
       style={{ height: QUEUE_ROW_HEIGHT }}
-      className="t group flex w-full items-center gap-3 border-b border-hairline px-4 text-left"
+      className="t group flex w-full items-center gap-2 border-b border-hairline px-4 text-left"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
         {active ? <Equalizer size="sm" /> : <span className="num font-mono text-[10px] text-white/28">{index + 1}</span>}
@@ -57,7 +57,7 @@ export function QueueList() {
     return (
       <div aria-hidden>
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="flex h-12 items-center gap-3 border-b border-hairline px-4">
+          <div key={index} className="flex h-12 items-center gap-2 border-b border-hairline px-4">
             <Skeleton className="h-2.5 w-3" />
             <Skeleton className="h-3 w-2/3" />
           </div>

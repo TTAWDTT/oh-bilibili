@@ -37,7 +37,7 @@ export function Sidebar() {
   const user = auth?.logged_in === true ? auth.user : null
 
   return (
-    <aside className="flex w-[232px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-white/[0.018]">
+    <aside className="flex w-[224px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-[var(--panel)]">
       <nav className="flex flex-col pt-1">
         {NAV.map((item) => {
           const active = view.kind === item.view.kind
@@ -50,7 +50,7 @@ export function Sidebar() {
               onClick={() => navigate(item.view)}
               className={[
                 ROW,
-                'gap-3 px-4 py-2.5 text-[13px]',
+                'gap-2 px-4 py-1.5 text-[12.5px]',
                 active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/62 hover:text-white',
               ].join(' ')}
             >
@@ -115,16 +115,16 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => (user ? navigate({ kind: 'settings' }) : setAuthOpen(true))}
-          className="t flex w-full items-center gap-3 px-1 py-2 text-left"
+          className="t flex w-full items-center gap-2 px-1 py-2 text-left"
         >
           {user?.avatar ? (
-            <img src={user.avatar} alt="" className="h-9 w-9 rounded-[6px] border border-white/12 object-cover" />
+            <img src={user.avatar} alt="" className="h-9 w-9 rounded-[4px] border border-white/12 object-cover" />
           ) : user ? (
-            <span className="flex h-9 w-9 items-center justify-center rounded-[6px] bg-white/10 text-[13px] font-medium text-white/90">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[4px] bg-white/10 text-[12.5px] font-medium text-white/90">
               {user.uname.slice(0, 1)}
             </span>
           ) : (
-            <span className="flex h-9 w-9 items-center justify-center rounded-[6px] border border-white/12 text-white/40">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-white/12 text-white/40">
               <Icon name="user" size={16} />
             </span>
           )}

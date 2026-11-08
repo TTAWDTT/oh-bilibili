@@ -31,7 +31,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
       <Cover
         cover={track.cover}
         title={track.title}
-        className="h-[84px] w-[84px] shrink-0 rounded-[6px] border border-white/12"
+        className="h-[84px] w-[84px] shrink-0 rounded-[4px] border border-white/12"
         glyphClassName="text-[30px] font-semibold text-white/60"
       />
       <div className="min-w-0 flex-1">
@@ -69,8 +69,8 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
   const queued = queue?.items.length ?? 0
 
   return (
-    <aside aria-label="播放右栏" className="flex h-full w-[336px] flex-col overflow-hidden border-l border-hairline bg-white/[0.018]">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
+    <aside aria-label="播放右栏" className="flex h-full w-[var(--rail-w)] flex-col overflow-hidden border-l border-hairline bg-[var(--panel)]">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
         <div className="flex h-full items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />
           <RailTabButton

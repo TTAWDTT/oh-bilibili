@@ -1,28 +1,49 @@
 @import "tailwindcss";
-/* 霞鹜文楷 Lite：只引常规与粗体两个字重，其余靠浏览器按需取子集。 */
-@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-regular.css";
-@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-bold.css";
 @import "./ui.css";
 
+/*
+ * 设计语言：仿 Cursor。
+ *
+ * 三条硬规则，所有组件都从这里取值，不要在组件里散写字号与颜色：
+ * 1. 纯中性灰阶，没有渐变、没有发光、没有毛玻璃。层次靠 1px 边框与两级背景差。
+ * 2. 密集：正文 12.5px，行高 30px，圆角 4px。宁可小，不要松。
+ * 3. 强调色只出现在焦点环、进度条、激活图标这类微小面积上，永远不填大面积。
+ */
+
 @theme {
-  --color-ink: #050507;
-  --color-ink-raised: #0b0b12;
-  --color-hairline: rgb(255 255 255 / 0.09);
-  --color-muted: rgb(255 255 255 / 0.46);
-  --font-sans: "LXGW WenKai Lite", "PingFang SC", -apple-system, system-ui, sans-serif;
-  --font-display: "LXGW WenKai Lite", "PingFang SC", -apple-system, system-ui, sans-serif;
+  --color-ink: #181818;
+  --color-ink-raised: #1f1f1f;
+  --color-hairline: #2b2b2b;
+  --color-muted: #9a9a9a;
+  --font-sans: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+  --font-display: -apple-system, "SF Pro Display", "PingFang SC", "Segoe UI", system-ui, sans-serif;
 }
 
 :root {
   color-scheme: dark;
-  --accent: #b9c6d4;
-  --accent-soft: rgb(185 198 212 / 0.09);
-  --accent-deep: rgb(150 165 182 / 0.07);
-  /* 全站唯一的时长与缓动：新增过渡只准引用这两个变量 */
-  --dur: 240ms;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --rail-w: 336px;
-  --focus-ring: rgb(255 255 255 / 0.86);
+
+  /* 面板与分隔 */
+  --panel: #1f1f1f;
+  --panel-raised: #242424;
+  --panel-hover: #2a2a2a;
+  --line: #2b2b2b;
+
+  /* 文本三级 */
+  --text-1: #d9d9d9;
+  --text-2: #9a9a9a;
+  --text-3: #6b6b6b;
+
+  /* 唯一的强调色：只用于焦点、进度、激活态 */
+  --accent: #5b9dff;
+  --accent-soft: rgb(91 157 255 / 0.16);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --dur: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --rail-w: 320px;
+  --focus-ring: var(--accent);
 }
 
 html,
@@ -34,180 +55,17 @@ body,
 body {
   margin: 0;
   background: var(--color-ink);
-  color: #fff;
+  color: var(--text-1);
   font-family: var(--font-sans);
+  font-size: 12.5px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
   cursor: default;
 }
 
-/* 深空色晕：三团低速漂移的光，作为整个应用的底色氛围 */
-@keyframes aurora-nebula {
-  0% {
-    transform: translate3d(-4%, -2%, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(4%, 3%, 0) scale(1.12);
-  }
-  100% {
-    transform: translate3d(-2%, 5%, 0) scale(1.04);
-  }
-}
-
-@keyframes aurora-ember {
-  0% {
-    transform: translate3d(3%, 4%, 0) scale(1.08);
-  }
-  50% {
-    transform: translate3d(-5%, -3%, 0) scale(1);
-  }
-  100% {
-    transform: translate3d(2%, -6%, 0) scale(1.15);
-  }
-}
-
-@keyframes aurora-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.aurora-blob {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(90px) saturate(150%);
-  will-change: transform;
-}
-
-.aurora-nebula {
-  animation: aurora-nebula 26s ease-in-out infinite alternate;
-}
-
-.aurora-ember {
-  animation: aurora-ember 34s ease-in-out infinite alternate;
-}
-
-.aurora-in {
-  animation: aurora-in var(--dur) var(--ease) both;
-}
-
-/* 细噪点，压掉大面积渐变的塑料感 */
-.grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-}
-
-.text-gradient {
-  background: linear-gradient(96deg, #ffffff 8%, #ffd6e7 34%, #b9a8ff 62%, #7bf0ff 96%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -160% 0;
-  }
-  100% {
-    background-position: 260% 0;
-  }
-}
-
-.skeleton {
-  background: linear-gradient(
-    100deg,
-    rgb(255 255 255 / 0.045) 20%,
-    rgb(255 255 255 / 0.1) 42%,
-    rgb(255 255 255 / 0.045) 64%
-  );
-  background-size: 220% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.toast-in {
-  animation: toast-in var(--dur) var(--ease) both;
-}
-
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.modal-panel {
-  animation: modal-in var(--dur) var(--ease) both;
-}
-
-@keyframes pulse-soft {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-
-.pulse-soft {
-  animation: pulse-soft 1.6s ease-in-out infinite;
-}
-
-@keyframes eq-bounce {
-  0%,
-  100% {
-    transform: scaleY(0.35);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.eq > span {
-  transform-origin: bottom;
-  animation: eq-bounce 900ms ease-in-out infinite;
-}
-
-@keyframes spin-slow {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 歌词上下淡出，滚动时边缘不生硬 */
-.lyrics-mask {
-  mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 82%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 82%, transparent 100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+/* 数字与时间：等宽且对齐，避免进度条两侧数字抖动 */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }

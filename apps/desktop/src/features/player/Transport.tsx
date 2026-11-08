@@ -24,7 +24,7 @@ function TransportButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        't press flex h-8 w-8 items-center justify-center rounded-[6px]',
+        't press flex h-8 w-8 items-center justify-center rounded-[4px]',
         active ? 'text-[var(--accent)]' : 'text-white/58 hover:text-white',
         disabled ? 'cursor-default opacity-30' : '',
       ].join(' ')}
