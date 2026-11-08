@@ -42,6 +42,21 @@ impl TrackKey {
     }
 }
 
+/// 本地主键。由数据库分配，跨会话稳定，与 TrackKey 是两个东西。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct TrackId(pub i64);
+
+/// 歌单主键。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PlaylistId(pub i64);
+
+/// 队列条目的身份。是身份不是下标，所以重排和随机不会互相踩。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EntryId(pub u64);
+
 /// 音轨档位。闭集且有序，「不低于」是纯代数比较。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

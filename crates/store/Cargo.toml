@@ -6,5 +6,7 @@ license.workspace = true
 description = "store"
 
 [dependencies]
+rusqlite = "0.41.1"
+bilimusic-model = { path = "../model" }
 serde.workspace = true
 thiserror.workspace = true
