@@ -10,29 +10,18 @@ import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 
-const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
 // 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
 const HINT = '本机直连 B 站｜不承诺无损，最高约 192K｜红心先落本机，登录后同步'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
-function PagerButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="t press rounded-[4px] border border-hairline h-8 px-4 text-[12px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-white disabled:cursor-default disabled:opacity-30"
-    >
-      {label}
-    </button>
-  )
-}
 
 export function SearchView() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
@@ -72,8 +61,9 @@ export function SearchView() {
         )
         .then((next) => {
           if (seq.current !== ticket) return
-          setTracks(next)
+          setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setStatus('ready')
+          setLoadingMore(false)
         })
         .catch((cause: unknown) => {
           if (seq.current !== ticket) return
@@ -94,7 +84,19 @@ export function SearchView() {
     <div className="flex h-full flex-col">
 
 
-      <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div
+        id="scroll-main"
+        onScroll={(event) => {
+          const el = event.currentTarget
+          if (loadingMore || status !== 'ready' || tracks.length === 0) return
+          // 距离底部不到 240px 就预取下一页，做得像 B 站那样无感。
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
+            setLoadingMore(true)
+            setPage((p) => p + 1)
+          }
+        }}
+        className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6"
+      >
         <form
           className="flex items-center gap-2"
           onSubmit={(event) => {
@@ -237,14 +239,15 @@ export function SearchView() {
             ) : null}
 
             {status === 'ready' && tracks.length > 0 ? (
-              <div className="mt-6 flex items-center justify-center gap-2">
-                <PagerButton label="上一页" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} />
-                <span className="num px-2 font-mono text-[11px] text-[var(--text-2)]">{page}</span>
-                <PagerButton
-                  label="下一页"
-                  disabled={tracks.length < PAGE_SIZE}
-                  onClick={() => setPage((current) => current + 1)}
-                />
+              <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[11.5px] text-[var(--text-3)]">
+                {loadingMore ? (
+                  <>
+                    <span className="bili-tv-mark text-[var(--accent)]">◌</span>
+                    正在加载更多…
+                  </>
+                ) : (
+                  <span className="text-[var(--text-3)]">已加载 {tracks.length} 首 · 继续下滑查看更多</span>
+                )}
               </div>
             ) : null}
           </section>
