@@ -72,7 +72,7 @@ export function SettingsView() {
     <div className="flex h-full flex-col">
       
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-2">
+      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-2">
         <div className="max-w-[880px]">
           <Section title="快捷键">
             <ShortcutTable />

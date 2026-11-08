@@ -29,7 +29,7 @@ export function DownloadsView() {
     <div className="flex h-full flex-col">
       
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (

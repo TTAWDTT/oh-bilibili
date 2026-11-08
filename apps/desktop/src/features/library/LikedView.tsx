@@ -23,7 +23,7 @@ export function LikedView() {
             <button
               type="button"
               onClick={() => void playContext(keys, 0)}
-              className="t press flex items-center gap-2 rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85"
+              className="bili-press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--bili-pink)] px-4 text-[12px] font-medium text-white hover:opacity-90"
             >
               <Icon name="play" size={13} />
               播放全部
@@ -32,7 +32,7 @@ export function LikedView() {
         }
       />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-8 pt-2">
+      <div className="bili-canvas flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-8 pt-2">
         {tracks.length === 0 ? (
           <div className="flex min-h-[320px] flex-1 items-center justify-center">
             <EmptyState

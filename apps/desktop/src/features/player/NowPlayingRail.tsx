@@ -17,7 +17,9 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       aria-pressed={active}
       className={[
         't flex h-8 items-center border-b-2 text-[12px]',
-        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-[var(--text-2)] hover:text-white',
+        active
+          ? 'border-[var(--bili-pink)] font-medium text-[var(--bili-pink)]'
+          : 'border-transparent text-[var(--text-2)] hover:text-[var(--text-1)]',
       ].join(' ')}
     >
       {label}
@@ -74,6 +76,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
 
   return (
     <aside aria-label="播放右栏" className="flex h-full w-[var(--rail-w)] flex-col overflow-hidden border-l border-hairline bg-[var(--panel)]">
+      <span className="bili-topline h-[2px] w-full opacity-70" />
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
         <div className="flex h-full items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />

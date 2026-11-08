@@ -47,7 +47,7 @@ export function LibraryView() {
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
         {playlists === null ? (
           <div className="mt-8">
             <PlaylistRowsSkeleton rows={4} />
