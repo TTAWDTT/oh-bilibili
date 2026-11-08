@@ -9,6 +9,7 @@ import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
+import { useSearchHistory } from '../../shared/lib/searchHistory'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
 // 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
@@ -27,6 +28,9 @@ export function SearchView() {
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState('全部')
   const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
+  const history = useSearchHistory((s) => s.items)
+  const pushHistory = useSearchHistory((s) => s.push)
+  const clearHistory = useSearchHistory((s) => s.clear)
   const authorQuery = useAppStore((state) => state.authorQuery)
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
 
@@ -72,6 +76,7 @@ export function SearchView() {
         )
         .then((next) => {
           if (seq.current !== ticket) return
+          if (page === 1) pushHistory(trimmed)
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setStatus('ready')
           setLoadingMore(false)
@@ -156,6 +161,33 @@ export function SearchView() {
 
         {trimmed.length === 0 ? (
           <div className="mt-6">
+            {history.length > 0 ? (
+              <div className="mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">搜索历史</span>
+                  <button
+                    type="button"
+                    onClick={clearHistory}
+                    className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                  >
+                    清空
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  {history.map((word) => (
+                    <button
+                      key={word}
+                      type="button"
+                      onClick={() => pick(word)}
+                      className="t rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[11.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                    >
+                      {word}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               {SUGGESTIONS.map((suggestion) => (
