@@ -155,7 +155,7 @@ export function SearchView() {
                   : status === 'loading'
                     ? '正在搜索…'
                     : status === 'ready'
-                      ? `第 ${page} 页 · ${tracks.length} 首`
+                      ? `为你找到 ${tracks.length} 首 · 按标题匹配排序 · 第 ${page} 页`
                       : ''}
               </span>
               {status === 'loading' && tracks.length > 0 ? (
