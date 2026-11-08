@@ -5,7 +5,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
@@ -304,7 +304,7 @@ export function SearchView() {
               </div>
             ) : null}
 
-            {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}
+            {status === 'loading' && tracks.length === 0 ? <BiliLoader label="正在 B 站里翻…" /> : null}
 
             {status === 'error' && error ? (
               <div className="flex min-h-[320px] items-center justify-center">
