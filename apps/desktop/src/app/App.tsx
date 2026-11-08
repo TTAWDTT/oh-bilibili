@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
+import { HistoryView } from '../features/library/HistoryView'
 import { LibraryView } from '../features/library/LibraryView'
 import { LikedView } from '../features/library/LikedView'
 import { PlaylistView } from '../features/library/PlaylistView'
@@ -35,6 +36,8 @@ function CurrentView({ view }: { view: View }) {
       return <LikedView />
     case 'downloads':
       return <DownloadsView />
+    case 'history':
+      return <HistoryView />
     case 'settings':
       return <SettingsView />
   }

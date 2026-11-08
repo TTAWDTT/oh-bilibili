@@ -148,9 +148,10 @@ impl Engine {
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
                 drop(st);
-                self.library
-                    .upsert_track(&self.track_of(key)?)
-                    .map_err(WireError::from)?;
+                let storing = self.track_of(key)?;
+                let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
+                // 每次真正进入播放才记一条历史，切歌失败不记。
+                self.library.push_history(track_id).map_err(WireError::from)?;
                 self.emit(AppEvent::NowPlaying {
                     track: self.track_of(key)?,
                     index: self.queue.lock().ok().and_then(|q| q.index()),
@@ -334,6 +335,11 @@ impl Engine {
             items: q.items(),
             index: q.index(),
         }
+    }
+
+    /// 播放历史，最近的在前。
+    pub fn history(&self, limit: u32) -> Result<Vec<Track>, WireError> {
+        Ok(self.library.history(limit)?)
     }
 
     pub fn playlists(&self) -> Result<Vec<bilimusic_store::Playlist>, WireError> {

@@ -181,6 +181,14 @@ fn queue_state(engine: tauri::State<'_, Arc<Engine>>) -> QueueView {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn library_history(
+    engine: tauri::State<'_, Arc<Engine>>,
+    limit: u32,
+) -> Result<Vec<Track>, WireError> {
+    engine.history(limit)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn library_playlists(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<PlaylistView>, WireError> {
     Ok(engine
         .playlists()?
@@ -373,6 +381,7 @@ pub fn run() {
             player_repeat,
             player_shuffle,
             queue_state,
+            library_history,
             library_playlists,
             library_create,
             library_add,

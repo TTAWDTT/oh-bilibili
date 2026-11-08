@@ -95,6 +95,10 @@ export function libraryAdd(playlistId: number, key: string): Promise<null> {
   return call<null>('library_add', { playlist_id: playlistId, key })
 }
 
+export function libraryHistory(limit: number): Promise<Track[]> {
+  return call<Track[]>('library_history', { limit })
+}
+
 export function libraryTracks(playlistId: number): Promise<Track[]> {
   return call<Track[]>('library_tracks', { playlist_id: playlistId })
 }

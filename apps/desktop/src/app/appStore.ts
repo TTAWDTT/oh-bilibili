@@ -5,7 +5,7 @@ export type View =
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }
   | { kind: 'liked' }
-  | { kind: 'downloads' }
+  | { kind: 'downloads' | 'history' }
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'
