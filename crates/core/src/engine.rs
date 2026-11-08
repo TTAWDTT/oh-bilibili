@@ -125,6 +125,45 @@ impl Engine {
             .await
     }
 
+    /// 按分区补齐搜索结果。
+    ///
+    /// B 站搜索接口已不收 tids，只能靠翻页凑够数量。这里最多翻 `max_pages` 页，
+    /// 把命中的都收集起来；频道用不到全量时不至于打爆限速队列。
+    pub async fn search_by_partition(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+        partition_ids: &[u32],
+        max_pages: u32,
+    ) -> Result<Vec<Track>, WireError> {
+        if partition_ids.is_empty() {
+            return self.search_ordered(query, page, order).await;
+        }
+        let mut out: Vec<Track> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for extra in 0..max_pages.clamp(1, 4) {
+            let p = page + extra;
+            let tracks = self.search_ordered(query, p, order).await?;
+            if tracks.is_empty() {
+                break;
+            }
+            let before = out.len();
+            for t in tracks {
+                let hit = t.typeid.map(|id| partition_ids.contains(&id)).unwrap_or(false);
+                if hit && seen.insert(t.key.as_opaque().to_string()) {
+                    self.remember(&t);
+                    out.push(t);
+                }
+            }
+            // 这一页一条都没新增，说明后面也很难再命中，提前收手。
+            if out.len() == before {
+                break;
+            }
+        }
+        Ok(out)
+    }
+
     pub async fn search_ordered(
         &self,
         query: &str,

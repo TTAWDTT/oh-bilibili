@@ -116,6 +116,7 @@ async fn search_q(
     query: String,
     page: u32,
     order: Option<String>,
+    partition_ids: Option<Vec<u32>>,
 ) -> Result<Vec<Track>, WireError> {
     use bilimusic_model::SearchOrder;
     let order = match order.as_deref() {
@@ -124,7 +125,14 @@ async fn search_q(
         Some("danmaku") => SearchOrder::Danmaku,
         _ => SearchOrder::TotalRank,
     };
-    engine.search_ordered(&query, page, order).await
+    let ids = partition_ids.unwrap_or_default();
+    if ids.is_empty() {
+        engine.search_ordered(&query, page, order).await
+    } else {
+        engine
+            .search_by_partition(&query, page, order, &ids, 3)
+            .await
+    }
 }
 
 #[tauri::command]

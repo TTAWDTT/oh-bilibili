@@ -38,8 +38,14 @@ export async function searchQ(
   query: string,
   page: number,
   order?: string,
+  partitionIds?: number[],
 ): Promise<Track[]> {
-  const result = await call<Track[] | SearchPage>('search_q', { query, page, order })
+  const result = await call<Track[] | SearchPage>('search_q', {
+    query,
+    page,
+    order,
+    partition_ids: partitionIds ?? [],
+  })
   return Array.isArray(result) ? result : result.tracks
 }
 

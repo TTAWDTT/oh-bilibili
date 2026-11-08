@@ -141,3 +141,18 @@ async fn 按播放量排序确实改变结果顺序() {
     println!("播放前五：{:?}", cv_list.iter().take(5).collect::<Vec<_>>());
     assert!(!same_order, "order=click 应该改变排序，否则这个参数已经失效");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 分区过滤能按类型筛结果() {
+    use bilimusic_model::SearchOrder;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let all = source
+        .search_ordered(&q, SearchOrder::TotalRank)
+        .await
+        .expect("搜索");
+    let music: Vec<_> = all.iter().filter(|t| t.typeid == Some(3)).collect();
+    println!("全部 {} 条，其中音乐区 {} 条", all.len(), music.len());
+    assert!(all.iter().all(|t| t.typeid.is_some()), "每条都应该带 typeid");
+}

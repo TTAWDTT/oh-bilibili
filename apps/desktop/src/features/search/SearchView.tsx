@@ -8,7 +8,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackGrid } from '../tracks/TrackGrid'
-import { PARTITIONS, PartitionFilter, matchesPartition } from './PartitionFilter'
+import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 
 const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -64,7 +64,12 @@ export function SearchView() {
       setStatus('loading')
       if (page === 1) setTracks([])
       ipc
-        .searchQ(trimmed, page)
+        .searchQ(
+          trimmed,
+          page,
+          order,
+          (PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!).ids,
+        )
         .then((next) => {
           if (seq.current !== ticket) return
           setTracks(next)
@@ -225,9 +230,7 @@ export function SearchView() {
 
             {tracks.length > 0 ? (
               <TrackGrid
-                tracks={tracks.filter((t) =>
-                  matchesPartition(t.typeid ?? undefined, PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!),
-                )}
+                tracks={tracks}
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}
               />
