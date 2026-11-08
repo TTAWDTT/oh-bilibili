@@ -380,6 +380,7 @@ mod wire {
             up_avatar: data["owner"]["face"]
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1)),
+            tname: data["tname"].as_str().map(|s| s.to_string()),
         };
         Ok(TrackDetail { track, cid, aid })
     }

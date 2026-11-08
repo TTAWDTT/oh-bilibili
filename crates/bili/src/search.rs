@@ -26,6 +26,31 @@ const NEGATIVE: [&str; 10] = [
     "鬼畜", "教程", "教学", "搬运", "合集", "直播回放", "解说", "reaction", "翻唱教学", "求三连",
 ];
 
+/// B 站的固定分区表。typeid 是接口给的，名字是查表得到的，不是编的。
+pub fn partition_name(typeid: u32) -> Option<&'static str> {
+    let name = match typeid {
+        1 | 24 | 25 | 47 | 210 => "动画",
+        3 => "音乐",
+        4 | 17 | 65 | 136 | 171 => "游戏",
+        5 | 71 => "娱乐",
+        23 | 27 => "电影",
+        11 | 13 => "电视剧",
+        21 | 76 | 75 => "生活",
+        119 => "鬼畜",
+        129 => "舞蹈",
+        138 | 239 => "搞笑",
+        155 => "时尚",
+        160 | 168 => "生活",
+        181 => "影视",
+        188 => "数码",
+        201 | 124 => "科技",
+        211 => "美食",
+        217 => "动物",
+        _ => return None,
+    };
+    Some(name)
+}
+
 /// B 站音乐区的一级分区 id。
 const MUSIC_TYP: [u32; 2] = [3, 1008];
 
@@ -137,6 +162,7 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
         views: Some(c.views).filter(|v| *v > 0),
         danmaku: Some(c.danmaku).filter(|v| *v > 0),
         up_avatar: c.up_avatar.clone(),
+        tname: partition_name(c.typeid).map(|n| n.to_string()),
     }
 }
 

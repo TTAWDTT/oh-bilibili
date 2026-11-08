@@ -37,6 +37,29 @@ function formatCount(n: number): string {
   return String(n)
 }
 
+/** B 站各分区的代表色，用于分区标签底色。 */
+function partitionColor(name: string): string {
+  const table: Record<string, string> = {
+    音乐: '#fca39a',
+    舞蹈: '#ff6699',
+    游戏: '#53b6ff',
+    鬼畜: '#ff8f6b',
+    动画: '#ffa3b6',
+    生活: '#ffb027',
+    影视: '#ffa0a0',
+    电影: '#ff8f9c',
+    电视剧: '#ff8fa3',
+    搞笑: '#ffd05b',
+    科技: '#00aeec',
+    数码: '#00aeec',
+    美食: '#f6c34a',
+    动物: '#8bd28b',
+    时尚: '#ff9ec4',
+    娱乐: '#ff9ec4',
+  }
+  return table[name] ?? '#9499a0'
+}
+
 type TrackGridProps = {
   tracks: Track[]
   activeKey: string | null
@@ -134,6 +157,14 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             ) : null}
 
             <div className="mt-1 flex flex-wrap gap-1">
+              {track.tname ? (
+                <span
+                  className="rounded-[2px] px-1.5 text-[10.5px] leading-[16px] text-white"
+                  style={{ background: partitionColor(track.tname) }}
+                >
+                  {track.tname}
+                </span>
+              ) : null}
               {tagsOf(track.title).map((tag) => (
                 <span
                   key={tag}

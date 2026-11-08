@@ -71,6 +71,7 @@ fn sample_track() -> Track {
         views: Some(1000),
         danmaku: Some(10),
         up_avatar: Some("https://i0.hdslb.com/x.jpg".into()),
+        tname: Some("音乐".into()),
     }
 }
 

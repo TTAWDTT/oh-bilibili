@@ -452,6 +452,7 @@ mod tests {
             views: None,
             danmaku: None,
             up_avatar: None,
+            tname: None,
         }
     }
 

@@ -116,6 +116,9 @@ pub struct Track {
     /// UP 主头像。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub up_avatar: Option<String>,
+    /// 分区名，如「音乐」「鬼畜」。由 typeid 查 B 站固定分区表得到。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tname: Option<String>,
 }
 
 /// 音量。构造即夹紧，所以 0.0 到 1.0 这个不变量全应用只维护一处。
