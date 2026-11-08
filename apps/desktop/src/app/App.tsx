@@ -14,6 +14,7 @@ import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { IconRail } from './IconRail'
 import { Sidebar } from './Sidebar'
+import { StageGlow } from './StageGlow'
 import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
@@ -58,6 +59,7 @@ export default function App() {
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-ink text-white">
+      <StageGlow />
       <TitleBar />
 
       <div className="relative z-10 flex min-h-0 flex-1">
