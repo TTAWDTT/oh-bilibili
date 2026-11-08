@@ -166,6 +166,22 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// 这条视频是否已在稍后再看里。
+    pub async fn in_watch_later(&self, key: &TrackKey) -> Result<bool, BiliError> {
+        let detail = self.detail(key).await?;
+        Ok(self.client.watch_later().await?.contains(&detail.aid))
+    }
+
+    /// 加入或移出稍后再看。
+    pub async fn set_watch_later(&self, key: &TrackKey, on: bool) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        if on {
+            self.client.watch_later_add(detail.aid).await
+        } else {
+            self.client.watch_later_remove(detail.aid).await
+        }
+    }
+
     /// 关注 UP 主。
     pub async fn set_follow(&self, mid: u64, on: bool) -> Result<(), BiliError> {
         self.client.follow(mid, on).await

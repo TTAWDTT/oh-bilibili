@@ -187,3 +187,15 @@ async fn 搜索结果的_up_主带_mid() {
     println!("带 UP mid 的：{with_mid}/{}", tracks.len());
     assert!(with_mid > 0, "关注按钮需要 UP 的 mid");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 稍后再看未登录时明确报需要登录() {
+    let source = Source::open().await.expect("Source");
+    source.logout().await;
+    let key = bilimusic_model::TrackKey::from_provider("BV1d4411N7zD");
+    match source.set_watch_later(&key, true).await {
+        Err(bilimusic_bili::error::BiliError::NeedsLogin(_)) => {}
+        other => panic!("预期 NeedsLogin，实际 {other:?}"),
+    }
+}

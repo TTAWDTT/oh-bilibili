@@ -135,6 +135,11 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+/** 加入或移出稍后再看。 */
+export function watchLaterSet(key: string, on: boolean): Promise<null> {
+  return call<null>('watch_later_set', { key, on })
+}
+
 /** 关注或取关 UP 主。 */
 export function followSet(mid: number, on: boolean): Promise<null> {
   return call<null>('follow_set', { mid, on })

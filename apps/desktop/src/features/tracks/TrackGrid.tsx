@@ -94,6 +94,16 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
     }
   }
 
+  /** 稍后再看：写进 B 站账号的待看列表。 */
+  const later = async (track: Track): Promise<void> => {
+    try {
+      await ipc.watchLaterSet(track.key, true)
+      toastDone('已加入稍后再看')
+    } catch (e) {
+      toastFailure('稍后再看', toWireError(e))
+    }
+  }
+
   /** 投币不可撤销，B 站硬币还是稀缺资源，所以必须二次确认。 */
   const [confirming, setConfirming] = useState<string | null>(null)
 
@@ -259,6 +269,16 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   className="hover:text-[var(--accent)]"
                 >
                   <Icon name="bookmark" size={12} />
+                </button>
+                <span className="h-2.5 w-px bg-[var(--line)]" />
+                <button
+                  type="button"
+                  aria-label="稍后再看"
+                  title="稍后再看"
+                  onClick={() => void later(track)}
+                  className="hover:text-[var(--accent)]"
+                >
+                  <Icon name="clock" size={12} />
                 </button>
               </span>
             </div>

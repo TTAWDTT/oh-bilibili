@@ -25,6 +25,46 @@ impl Client {
         Ok(())
     }
 
+    /// 稍后再看的列表。未登录会返回 NeedsLogin。
+    pub async fn watch_later(&self) -> Result<Vec<u64>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/v2/history/toview"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["list"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list.iter().filter_map(|i| i["aid"].as_u64()).collect())
+    }
+
+    /// 加入稍后再看。
+    pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        self.post_form(
+            &format!("{API}/x/v2/history/toview/add"),
+            vec![("aid", aid.to_string()), ("csrf", csrf)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// 从稍后再看移除。
+    pub async fn watch_later_remove(&self, aid: u64) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        self.post_form(
+            &format!("{API}/x/v2/history/toview/del"),
+            vec![("aid", aid.to_string()), ("csrf", csrf)],
+        )
+        .await?;
+        Ok(())
+    }
+
     /// 关注或取关一个 UP 主。`act` 1 关注、2 取关。
     pub async fn follow(&self, mid: u64, on: bool) -> Result<(), BiliError> {
         let csrf = self

@@ -539,6 +539,11 @@ impl Engine {
         Ok(())
     }
 
+    pub async fn watch_later_set(&self, key: &TrackKey, on: bool) -> Result<(), WireError> {
+        self.source.set_watch_later(key, on).await?;
+        Ok(())
+    }
+
     pub async fn follow_set(&self, mid: u64, on: bool) -> Result<(), WireError> {
         self.source.set_follow(mid, on).await?;
         Ok(())
