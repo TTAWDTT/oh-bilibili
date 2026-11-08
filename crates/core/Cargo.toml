@@ -15,3 +15,6 @@ bilimusic-audio = { path = "../audio" }
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

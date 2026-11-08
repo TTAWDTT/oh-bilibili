@@ -163,6 +163,17 @@ impl Library {
         })
     }
 
+    pub fn track_by_key_id(&self, id: TrackId) -> Result<Option<Track>> {
+        self.with(|conn| {
+            conn.query_row(
+                "SELECT provider_key, title, artist, cover, duration_ms FROM tracks WHERE id = ?1",
+                params![id.0],
+                row_to_track,
+            )
+            .optional()
+        })
+    }
+
     /// 键集分页。游标是上一页最后一个 id，不是 offset。
     pub fn page_tracks(&self, after: Option<&PageCursor>, limit: u32) -> Result<Vec<Track>> {
         let limit = limit.clamp(1, 200) as i64;

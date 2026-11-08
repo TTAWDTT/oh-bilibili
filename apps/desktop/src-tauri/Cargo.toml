@@ -16,3 +16,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde.workspace = true
 serde_json.workspace = true
+bilimusic-core = { path = "../../../crates/core" }
+bilimusic-model = { path = "../../../crates/model" }
+tokio = { workspace = true, features = ["rt", "time", "sync"] }

@@ -220,28 +220,34 @@ impl Client {
 
         let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
         let status = resp.status();
+        self.absorb_cookies(resp.headers());
         let body = resp
             .text()
             .await
             .map_err(|e| BiliError::Network(e.to_string()))?;
 
+        self.classify(status.as_u16(), &body, allow_guest).await
+    }
+
+    async fn classify(
+        &self,
+        status: u16,
+        body: &str,
+        allow_guest: bool,
+    ) -> Result<Value, BiliError> {
         // 风控时返回的是 HTML 拦截页，不是 JSON。这一条要单独识别。
-        let value: Value = match serde_json::from_str(&body) {
+        let value: Value = match serde_json::from_str(body) {
             Ok(v) => v,
             Err(_) => {
                 let head: String = body.chars().take(120).collect();
-                if status == reqwest::StatusCode::PRECONDITION_FAILED || status == 412 {
+                if status == 412 {
                     self.set_cooldown(Duration::from_secs(60)).await;
                 }
-                return Err(BiliError::Blocked {
-                    status: status.as_u16(),
-                    head,
-                });
+                return Err(BiliError::Blocked { status, head });
             }
         };
 
-        let code = value["code"].as_i64().unwrap_or(0);
-        match code {
+        match value["code"].as_i64().unwrap_or(0) {
             0 => Ok(value),
             -101 if allow_guest => Ok(value),
             -101 => Err(BiliError::NeedsLogin(
@@ -259,6 +265,56 @@ impl Client {
                 message: value["message"].as_str().unwrap_or("未知错误").into(),
             }),
         }
+    }
+
+    /// 把响应里的 Set-Cookie 收进罐里。登录靠的就是这一步。
+    fn absorb_cookies(&self, headers: &reqwest::header::HeaderMap) {
+        let mut jar = match self.jar.write() {
+            Ok(j) => j,
+            Err(_) => return,
+        };
+        for raw in headers.get_all("set-cookie").iter() {
+            let Ok(text) = raw.to_str() else { continue };
+            let pair = text.split(';').next().unwrap_or_default();
+            let Some((name, value)) = pair.split_once('=') else {
+                continue;
+            };
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            jar.insert(name.to_string(), value.trim().to_string());
+        }
+    }
+
+    /// 表单 POST。点赞、收藏、建收藏夹都走这里，所以也要过闸门。
+    pub async fn post_form(
+        &self,
+        url: &str,
+        form: Vec<(&str, String)>,
+    ) -> Result<Value, BiliError> {
+        self.wait_cooldown().await?;
+        self.gate(Duration::from_millis(400)).await;
+
+        let cookie = self.cookie_header();
+        let mut req = self
+            .http
+            .post(url)
+            .header("Referer", REFERER)
+            .header("Origin", "https://www.bilibili.com")
+            .header("Accept", "application/json, text/plain, */*")
+            .form(&form);
+        if !cookie.is_empty() {
+            req = req.header("Cookie", cookie);
+        }
+        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let status = resp.status();
+        self.absorb_cookies(resp.headers());
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| BiliError::Network(e.to_string()))?;
+        self.classify(status.as_u16(), &body, false).await
     }
 
     /// 签名版 GET：先拿密钥，再拼查询串。

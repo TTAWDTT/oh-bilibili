@@ -140,6 +140,15 @@ impl Queue {
         true
     }
 
+    /// 按曲目键跳转。播放单个搜索结果时用，队列里没有就补进去。
+    pub fn jump_by_key(&mut self, key: &TrackKey) -> bool {
+        if let Some(entry) = self.entries.iter().find(|e| &e.track.key == key) {
+            let id = entry.id;
+            return self.jump(id);
+        }
+        false
+    }
+
     pub fn set_shuffle(&mut self, on: bool) {
         if on {
             if self.order.is_none() {

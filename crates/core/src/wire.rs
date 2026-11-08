@@ -40,12 +40,30 @@ impl WireError {
             message: message.into(),
         }
     }
+    pub fn message(&self) -> &str {
+        match self {
+            WireError::Retryable { message, .. }
+            | WireError::RateLimited { message, .. }
+            | WireError::NeedsLogin { message }
+            | WireError::Input { message, .. }
+            | WireError::Internal { message } => message,
+        }
+    }
+
     pub fn needs_login(message: impl Into<String>) -> WireError {
         WireError::NeedsLogin {
             message: message.into(),
         }
     }
 }
+
+impl std::fmt::Display for WireError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl std::error::Error for WireError {}
 
 impl From<bilimusic_bili::error::BiliError> for WireError {
     fn from(e: bilimusic_bili::error::BiliError) -> WireError {

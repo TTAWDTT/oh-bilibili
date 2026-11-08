@@ -1,0 +1,191 @@
+import { useEffect, useRef, useState } from 'react'
+import type { LyricDoc, LyricLine, Track } from '../../shared/lib/contract'
+import * as ipc from '../../shared/lib/ipc'
+import { clamp } from '../../shared/lib/format'
+import { readPlayhead } from '../../shared/lib/playhead'
+import { EmptyState } from '../../shared/ui/EmptyState'
+import { Skeleton } from '../../shared/ui/Skeleton'
+import { toastFailure } from '../../app/notice'
+import { usePlayerStore } from './playerStore'
+
+function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
+  const fillRef = useRef<HTMLSpanElement | null>(null)
+
+  useEffect(() => {
+    let frame = 0
+    const paint = (): void => {
+      const end = Math.max(nextAt, line.at_ms + 800)
+      const progress = clamp((readPlayhead() - line.at_ms) / (end - line.at_ms), 0, 1)
+      const node = fillRef.current
+      if (node) node.style.clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`
+      frame = requestAnimationFrame(paint)
+    }
+    frame = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(frame)
+  }, [line.at_ms, nextAt])
+
+  return (
+    <span className="relative block">
+      <span className="text-white/24">{line.text}</span>
+      <span
+        ref={fillRef}
+        aria-hidden
+        className="absolute inset-0 block"
+        style={{
+          backgroundImage: 'linear-gradient(96deg, #ffffff 8%, var(--accent) 92%)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+        }}
+      >
+        {line.text}
+      </span>
+    </span>
+  )
+}
+
+export function LyricsView({ track }: { track: Track | null }) {
+  const position = usePlayerStore((state) => state.snapshot?.position_ms ?? 0)
+  const seek = usePlayerStore((state) => state.seek)
+  const [doc, setDoc] = useState<LyricDoc | null>(null)
+  const [loading, setLoading] = useState(false)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const lineRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [offset, setOffset] = useState(0)
+  const key = track?.key ?? null
+
+  useEffect(() => {
+    if (!key) {
+      setDoc(null)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setDoc(null)
+    ipc
+      .lyricsGet(key)
+      .then((next) => {
+        if (cancelled) return
+        setDoc(next)
+        setLoading(false)
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return
+        setLoading(false)
+        setDoc(null)
+        toastFailure('读取歌词', cause)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [key])
+
+  let active = -1
+  if (doc && doc.synced) {
+    doc.lines.forEach((line, index) => {
+      if (line.at_ms <= position) active = index
+    })
+  }
+
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    const recalc = (): void => {
+      const line = lineRefs.current[active]
+      if (!line) {
+        setOffset(0)
+        return
+      }
+      setOffset(scroller.clientHeight * 0.42 - line.offsetTop - line.offsetHeight / 2)
+    }
+    recalc()
+    const observer = new ResizeObserver(recalc)
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [active, doc])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center gap-4 px-7 py-10" aria-hidden>
+        {Array.from({ length: 7 }, (_, index) => (
+          <Skeleton key={index} className={index % 2 === 0 ? 'h-3.5 w-4/5' : 'h-3.5 w-3/5'} />
+        ))}
+      </div>
+    )
+  }
+
+  if (!doc || doc.lines.length === 0) {
+    return (
+      <EmptyState
+        icon="lyrics"
+        title={track ? '这首歌还没有歌词' : '还在等一首歌'}
+        detail={track ? '三级回退都没查到时，界面不会空转；播放不受影响。' : '播放后这里会跟随进度滚动。'}
+        action={null}
+        compact
+      />
+    )
+  }
+
+  if (!doc.synced) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/24">纯文本 · {doc.source}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
+          {doc.lines.map((line, index) => (
+            <p key={index} className="py-1.5 text-[13.5px] leading-relaxed text-white/46">
+              {line.text}
+            </p>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between px-5 pb-1 pt-4 text-[10px] tracking-[0.14em] text-white/24">
+        <span>歌词</span>
+        <span>{doc.source}</span>
+      </div>
+      <div ref={scrollerRef} className="lyrics-mask min-h-0 flex-1 overflow-hidden px-5">
+        <div
+          className="relative py-[42%] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{ transform: `translateY(${offset}px)` }}
+        >
+          {doc.lines.map((line, index) => {
+            const next = doc.lines[index + 1]
+            const nextAt = next ? next.at_ms : line.at_ms + 4000
+            const isActive = index === active
+            return (
+              <div
+                key={`${line.at_ms}-${index}`}
+                ref={(node) => {
+                  lineRefs.current[index] = node
+                }}
+                className="py-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => void seek(line.at_ms)}
+                  className="w-full text-left"
+                  tabIndex={-1}
+                >
+                  {isActive ? (
+                    <span className="block text-[16px] font-medium leading-[1.55] tracking-[-0.01em]">
+                      <ActiveLine line={line} nextAt={nextAt} />
+                    </span>
+                  ) : (
+                    <span className="block text-[14px] leading-[1.6] text-white/30 transition-colors duration-300 hover:text-white/55">
+                      {line.text}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}

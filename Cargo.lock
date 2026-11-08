@@ -144,10 +144,13 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 name = "bilimusic"
 version = "0.1.0"
 dependencies = [
+ "bilimusic-core",
+ "bilimusic-model",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tokio",
 ]
 
 [[package]]

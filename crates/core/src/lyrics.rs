@@ -106,27 +106,76 @@ struct LrclibHit {
     plain_lyrics: Option<String>,
 }
 
+/// 把 B 站投稿标题洗成能拿去搜歌词的歌名。
+///
+/// 投稿标题里塞满了【4K修复】【Hi-Res】这类前缀和「MV」「官方版」这类后缀，
+/// 直接拿去搜命中率很低。
+pub fn clean_title(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut depth = 0i32;
+    for ch in raw.chars() {
+        match ch {
+            '【' | '[' | '（' | '(' => depth += 1,
+            '】' | ']' | '）' | ')' => depth = (depth - 1).max(0),
+            _ if depth == 0 => out.push(ch),
+            _ => {}
+        }
+    }
+    let mut cleaned = out.trim().to_string();
+    for noise in [
+        "MV", "mv", "官方版", "高清", "修复版", "完整版", "无损", "动态歌词", "歌词版", "翻唱",
+        "2160P", "1080P", "4K", "8K", "Hi-Res", "杜比音效",
+    ] {
+        cleaned = cleaned.replace(noise, " ");
+    }
+    cleaned = cleaned.replace(['-', '｜', '|', '/'], " ");
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// 搜索歌词时依次尝试的候选查询。
+///
+/// B 站投稿标题结构千奇百怪，单次查询命中率不够，用一组由粗到细的候选去试。
+pub fn lyric_queries(raw: &str) -> Vec<String> {
+    let whole = clean_title(raw);
+    let mut out = Vec::new();
+    if !whole.is_empty() {
+        out.push(whole.clone());
+    }
+    // 「周杰伦 晴天」这种整串没命中时，只留最后两个词再试一次。
+    let words: Vec<&str> = whole.split_whitespace().collect();
+    if words.len() > 2 {
+        out.push(words[words.len().saturating_sub(2)..].join(" "));
+    }
+    out
+}
+
 /// 从 lrclib 找歌词。这个接口免鉴权，实测返回逐字时间轴。
 pub async fn from_lrclib(
     http: &reqwest::Client,
     track: &Track,
 ) -> Option<LyricDoc> {
-    let duration = track.duration.map(|d| d.0 / 1000).unwrap_or(0);
-    let url = format!(
-        "https://lrclib.net/api/get?artist_name={}&track_name={}&duration={}",
-        urlencode(&track.artist),
-        urlencode(&track.title),
-        duration
-    );
-    let resp = http
-        .get(url)
-        .header("User-Agent", "BiliMusic/0.1 (https://github.com/bilimusic)")
-        .send()
-        .await
-        .ok()?
-        .error_for_status()
-        .ok()?;
-    let hit: LrclibHit = resp.json().await.ok()?;
+    // 用搜索而不是精确匹配：B 站投稿的「歌手」是 UP 主，拿去做精确查询必然落空。
+    let mut hits: Vec<LrclibHit> = Vec::new();
+    for keyword in lyric_queries(&track.title) {
+        let url = format!("https://lrclib.net/api/search?q={}", urlencode(&keyword));
+        let Some(resp) = http
+            .get(url)
+            .header("User-Agent", "BiliMusic/0.1 (https://github.com/bilimusic)")
+            .send()
+            .await
+            .ok()
+            .and_then(|r| r.error_for_status().ok())
+        else {
+            continue;
+        };
+        if let Ok(list) = resp.json::<Vec<LrclibHit>>().await {
+            if list.iter().any(|h| h.synced_lyrics.is_some()) {
+                hits = list;
+                break;
+            }
+        }
+    }
+    let hit = hits.into_iter().find(|h| h.synced_lyrics.is_some())?;
     if let Some(synced) = hit.synced_lyrics {
         let mut doc = parse_lrc(&synced);
         if !doc.lines.is_empty() {
@@ -204,6 +253,23 @@ mod tests {
         assert_eq!(doc.current_index(Millis(1500)), Some(0));
         assert_eq!(doc.current_index(Millis(3500)), Some(1));
         assert_eq!(doc.current_index(Millis(99_000)), Some(2));
+    }
+
+    #[test]
+    fn 投稿标题能洗成歌名() {
+        assert_eq!(
+            clean_title("【4K修复】周杰伦 - 晴天MV 2160P修复版"),
+            "周杰伦 晴天"
+        );
+        assert_eq!(clean_title("晴天"), "晴天");
+        assert_eq!(clean_title("【纯音乐】"), "");
+    }
+
+    #[test]
+    fn 歌词候选查询由粗到细() {
+        let q = lyric_queries("【4K修复】周杰伦 - 晴天MV 2160P修复版");
+        assert!(q[0].contains("周杰伦"));
+        assert!(q.iter().any(|s| s.contains("晴天")));
     }
 
     #[test]

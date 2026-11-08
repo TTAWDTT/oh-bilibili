@@ -3,8 +3,10 @@
 //! 出门只有领域类型：`Track`、`TrackDetail`、`AudioStream`。
 //! 这个 crate 之外的代码不会看到 bvid、cid、dash、fnval 这些词。
 
+pub mod auth;
 pub mod client;
 pub mod media;
+pub mod sync;
 pub mod error;
 pub mod search;
 pub mod wbi;
@@ -110,6 +112,38 @@ impl Source {
             )
             .await?;
         wire::audio_streams(&value)
+    }
+
+    pub async fn login_qr(&self) -> Result<auth::QrChallenge, BiliError> {
+        self.client.qrcode_generate().await
+    }
+
+    pub async fn poll_qr(&self, key: &str) -> Result<auth::QrStatus, BiliError> {
+        let status = self.client.qrcode_poll(key).await?;
+        if status == auth::QrStatus::Confirmed {
+            let _ = self.client.refresh_nav().await?;
+        }
+        Ok(status)
+    }
+
+    pub async fn logout(&self) {
+        self.client.clear_cookies();
+    }
+
+    /// 喜欢：登录后用 aid 点赞；游客直接拒绝。
+    pub async fn set_like(&self, key: &TrackKey, on: bool) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        self.client.like_video(detail.aid, on).await
+    }
+
+    /// 收藏：落到固定名字的收藏夹，没有就建。
+    pub async fn set_favorite(&self, key: &TrackKey, on: bool) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        let folder = self
+            .client
+            .ensure_fav_folder(sync::DEFAULT_FOLDER)
+            .await?;
+        self.client.set_favorite(detail.aid, folder, on).await
     }
 
     /// 给音频层用的请求头。`audio` 不认识 B 站，只认识这些键值。
