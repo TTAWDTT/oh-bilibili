@@ -3,9 +3,17 @@ name = "bilimusic-bili"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "B 站接口适配层：签名、搜索、取流、收藏与点赞"
+description = "B 站接口适配层：签名、指纹、限速、搜索清洗、取流"
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "time", "sync"] }
+bilimusic-model = { path = "../model" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "charset"] }
+md-5 = "0.10"
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

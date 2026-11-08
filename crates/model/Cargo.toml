@@ -1,0 +1,10 @@
+[package]
+name = "bilimusic-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "领域词汇表：值对象与不变量"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true

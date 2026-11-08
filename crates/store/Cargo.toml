@@ -3,7 +3,7 @@ name = "bilimusic-store"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "本地曲库：SQLite schema 与仓储"
+description = "store"
 
 [dependencies]
 serde.workspace = true

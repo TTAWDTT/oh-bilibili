@@ -3,7 +3,8 @@ name = "bilimusic-audio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "音频引擎：解码、重采样、输出"
+description = "audio"
 
 [dependencies]
+serde.workspace = true
 thiserror.workspace = true

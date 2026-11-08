@@ -1,11 +1,10 @@
 [package]
-name = "bilimusic-lyrics"
+name = "bilimusic-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "歌词：lrclib、B 站字幕、本地 lrc"
+description = "core"
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true

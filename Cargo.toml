@@ -2,10 +2,11 @@
 resolver = "2"
 members = [
   "apps/desktop/src-tauri",
+  "crates/model",
   "crates/bili",
-  "crates/audio",
   "crates/store",
-  "crates/lyrics",
+  "crates/audio",
+  "crates/core",
 ]
 
 [workspace.package]
