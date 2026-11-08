@@ -223,12 +223,17 @@ impl Source {
         self.client.import_cookies(pairs);
     }
 
-    /// 拉这条视频的真实弹幕。B 站返回 XML，这里只取出文本，够滚动用就行。
-    pub async fn danmaku(&self, key: &TrackKey) -> Result<Vec<String>, BiliError> {
+    /// 拉这条视频的真实弹幕，带时间戳。
+    ///
+    /// `<d p="秒,模式,字号,颜色,时间戳,...">文本</d>`，第一个字段是出现时间。
+    pub async fn danmaku_items(&self, key: &TrackKey) -> Result<Vec<(f64, String)>, BiliError> {
         let detail = self.detail(key).await?;
+        Ok(self.danmaku_by_cid(detail.cid).await?)
+    }
+
+    async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<(f64, String)>, BiliError> {
         let url = format!(
-            "https://api.bilibili.com/x/v1/dm/list.so?oid={}",
-            detail.cid
+            "https://api.bilibili.com/x/v1/dm/list.so?oid={cid}"
         );
         let raw = self
             .client
@@ -244,20 +249,58 @@ impl Source {
             }
         }
 
-        // <d p="时间,模式,...">文本</d>，只取文本与出现顺序。
         let mut out = Vec::new();
         for chunk in body.split("<d ").skip(1) {
-            if let Some((_, rest)) = chunk.split_once('>') {
-                let text = rest.split("</d>").next().unwrap_or("").trim();
-                if !text.is_empty() && text.chars().count() <= 40 {
-                    out.push(text.to_string());
-                }
+            let Some((attrs, rest)) = chunk.split_once('>') else {
+                continue;
+            };
+            let text = rest.split("</d>").next().unwrap_or("").trim();
+            if text.is_empty() || text.chars().count() > 40 {
+                continue;
             }
-            if out.len() >= 60 {
-                break;
-            }
+            let secs = attrs
+                .split('"')
+                .nth(1)
+                .and_then(|p| p.split(',').next())
+                .and_then(|t| t.parse::<f64>().ok())
+                .unwrap_or(0.0);
+            out.push((secs, text.to_string()));
         }
         Ok(out)
+    }
+
+    /// 拉这条视频的真实弹幕文本，够滚动用。
+    pub async fn danmaku(&self, key: &TrackKey) -> Result<Vec<String>, BiliError> {
+        let items = self.danmaku_items(key).await?;
+        Ok(items.into_iter().map(|(_, t)| t).take(60).collect())
+    }
+
+    /// 高能进度：把弹幕按时间分桶，得到一条密度曲线。
+    ///
+    /// B 站播放器进度条上那些亮色段就是这么来的——弹幕越密的地方越亮。
+    pub async fn danmaku_heat(
+        &self,
+        key: &TrackKey,
+        buckets: usize,
+    ) -> Result<Vec<u32>, BiliError> {
+        let items = self.danmaku_items(key).await?;
+        let buckets = buckets.clamp(8, 200);
+        let mut heat = vec![0u32; buckets];
+        if items.is_empty() {
+            return Ok(heat);
+        }
+        let max_t = items
+            .iter()
+            .map(|(t, _)| *t)
+            .fold(0.0_f64, f64::max)
+            .max(1.0);
+        for (t, _) in &items {
+            let idx = ((t / max_t) * (buckets as f64 - 1.0)).round() as usize;
+            if let Some(slot) = heat.get_mut(idx.min(buckets - 1)) {
+                *slot += 1;
+            }
+        }
+        Ok(heat)
     }
 
     /// 当前 cookie 串，代理转发视频时要带上。

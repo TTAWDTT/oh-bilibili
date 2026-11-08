@@ -121,6 +121,11 @@ export function danmaku(key: string): Promise<string[]> {
   return call<string[]>('danmaku', { key })
 }
 
+/** 弹幕密度曲线，用来画高能进度条。 */
+export function danmakuHeat(key: string, buckets: number): Promise<number[]> {
+  return call<number[]>('danmaku_heat', { key, buckets })
+}
+
 /** 本地 MV 代理端口。浏览器预览没有这个能力，返回 0。 */
 export async function mvPort(): Promise<number> {
   try {

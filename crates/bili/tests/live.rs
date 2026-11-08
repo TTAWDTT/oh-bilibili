@@ -95,3 +95,18 @@ async fn 能取到真实弹幕() {
     }
     assert!(!lines.is_empty(), "这条视频应该有多条弹幕");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 弹幕能算成密度曲线() {
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let first = tracks.first().expect("有结果");
+    let heat = source.danmaku_heat(&first.key, 40).await.expect("密度");
+    let peak = heat.iter().copied().max().unwrap_or(0);
+    let non_zero = heat.iter().filter(|v| **v > 0).count();
+    println!("40 桶里 {non_zero} 个非空，峰值 {peak}");
+    assert_eq!(heat.len(), 40);
+    assert!(peak > 0, "应该算出非零密度");
+}

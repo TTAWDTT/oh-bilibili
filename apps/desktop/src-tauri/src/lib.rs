@@ -70,6 +70,18 @@ async fn danmaku(
     engine.danmaku(&TrackKey::from_provider(key)).await
 }
 
+/// 弹幕密度曲线，用来画高能进度条。
+#[tauri::command(rename_all = "snake_case")]
+async fn danmaku_heat(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    buckets: usize,
+) -> Result<Vec<u32>, WireError> {
+    engine
+        .danmaku_heat(&TrackKey::from_provider(key), buckets)
+        .await
+}
+
 /// 取一条可播放的 mp4 直链；界面会把它交给本地代理转发。
 #[tauri::command(rename_all = "snake_case")]
 async fn mv_source(
@@ -347,6 +359,7 @@ pub fn run() {
             health,
             mv_port,
             danmaku,
+            danmaku_heat,
             mv_source,
             search_q,
             player_state,
