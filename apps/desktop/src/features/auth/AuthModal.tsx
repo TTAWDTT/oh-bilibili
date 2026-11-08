@@ -142,7 +142,7 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="t press flex items-center justify-center flex items-center gah-6 w-6 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/70 hover:border-white/32 hover:text-white"
+              className="t press flex items-center justify-center flex items-center gap-1 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/70 hover:border-white/32 hover:text-white"
             >
               <Icon name="refresh" size={12} />
               重新生成

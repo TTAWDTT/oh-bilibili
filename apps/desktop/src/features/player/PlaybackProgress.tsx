@@ -25,7 +25,7 @@ export function PlaybackProgress() {
   }
 
   return (
-    <div className="flex w-full items-center gah-6 w-6">
+    <div className="flex w-full items-center gap-1">
       <div className="min-w-0 flex-1">
         <Slider
           value={ratio}

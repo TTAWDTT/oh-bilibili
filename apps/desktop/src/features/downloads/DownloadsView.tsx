@@ -90,7 +90,7 @@ export function DownloadsView() {
                         type="button"
                         onClick={() => void copyPath(item.path ?? '')}
                         title="复制文件路径"
-                        className="t mt-1.5 flex max-w-full items-center gah-6 w-6 text-left text-[11px] text-white/48 hover:text-white/70"
+                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[11px] text-white/48 hover:text-white/70"
                       >
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>

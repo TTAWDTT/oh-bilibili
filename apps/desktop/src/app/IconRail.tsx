@@ -27,7 +27,7 @@ export function IconRail() {
   const downloads = useDownloadsStore((state) => state.items)
 
   return (
-    <nav aria-label="主导航" className="flex w-11 shrink-0 flex-col items-center gah-6 w-6 border-r border-hairline bg-[var(--panel-alt)] py-2">
+    <nav aria-label="主导航" className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-[var(--panel-alt)] py-2">
       {NAV.map((item) => {
         const active = view.kind === item.view.kind
         const running = (downloads ?? []).filter(

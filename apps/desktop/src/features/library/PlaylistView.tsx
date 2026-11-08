@@ -81,7 +81,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
         <button
           type="button"
           onClick={() => navigate({ kind: 'library' })}
-          className="t press flex items-center justify-center mb-3 flex w-fit items-center gah-6 w-6 pr-2 text-[12px] text-white/62 hover:text-white"
+          className="t press flex items-center justify-center mb-3 flex w-fit items-center gap-1 pr-2 text-[12px] text-white/62 hover:text-white"
         >
           <Icon name="chevronLeft" size={13} />
           曲库

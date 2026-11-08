@@ -86,7 +86,7 @@ export function LibraryView() {
                     </span>
                     <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-white/48">{count}</span>
                   </button>
-                  <div className="flex w-[68px] shrink-0 items-center justify-end gah-6 w-6">
+                  <div className="flex w-[68px] shrink-0 items-center justify-end gap-1">
                     <button
                       type="button"
                       aria-label={`播放 ${playlist.name}`}

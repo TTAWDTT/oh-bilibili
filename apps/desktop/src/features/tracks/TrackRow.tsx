@@ -68,7 +68,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         {formatDuration(track.duration_ms)}
       </span>
 
-      <div className="flex shrink-0 items-center gah-6 w-6">
+      <div className="flex shrink-0 items-center gap-1">
         <ReactionButtons track={track} size={14} />
         <button
           type="button"

@@ -14,7 +14,7 @@ export function ShortcutTable() {
         {SHORTCUTS.map((shortcut) => (
           <tr key={shortcut.label} className="border-t border-hairline first:border-t-0">
             <td className="w-[88px] py-1 pr-4 align-middle">
-              <span className="flex flex-wrap items-center gah-6 w-6">
+              <span className="flex flex-wrap items-center gap-1">
                 {shortcut.keys.map((key) => (
                   <kbd key={key} className="kbd">
                     {key}

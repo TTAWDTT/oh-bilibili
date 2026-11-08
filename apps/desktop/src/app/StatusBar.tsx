@@ -15,7 +15,7 @@ export function StatusBar() {
   return (
     <footer className="flex h-[22px] shrink-0 items-center justify-between border-t border-hairline bg-[var(--panel-alt)] px-2 text-[11px] text-[var(--text-3)]">
       <div className="flex items-center gap-3">
-        <span className="flex items-center gah-6 w-6">
+        <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           本机直连
         </span>
