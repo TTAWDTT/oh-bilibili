@@ -327,3 +327,40 @@ mod tests {
         assert_eq!(c[0].typeid, 3);
     }
 }
+
+#[cfg(test)]
+mod auth_tests {
+    use super::*;
+
+    /// 没有登录态时，点赞与收藏必须在发请求之前就被挡住。
+    /// 这条不依赖网络，可以离线跑。
+    #[tokio::test]
+    async fn 未登录时点赞直接报需要登录() {
+        let source = Source::open().await.expect("Source 能开");
+        source.logout().await;
+        let key = TrackKey::from_provider("BV1d4411N7zD");
+        match source.set_like(&key, true).await {
+            Err(BiliError::NeedsLogin(_)) => {}
+            other => panic!("预期 NeedsLogin，实际 {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn 未登录时收藏同样被挡() {
+        let source = Source::open().await.expect("Source 能开");
+        source.logout().await;
+        let key = TrackKey::from_provider("BV1d4411N7zD");
+        match source.set_favorite(&key, true).await {
+            Err(BiliError::NeedsLogin(_)) => {}
+            other => panic!("预期 NeedsLogin，实际 {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn 二维码挑战有可渲染内容() {
+        let source = Source::open().await.expect("Source 能开");
+        let qr = source.login_qr().await.expect("二维码应该能生成");
+        assert!(!qr.key.is_empty(), "qrcode_key 不能为空");
+        assert!(qr.url.starts_with("http"), "二维码内容应该是一个链接");
+    }
+}

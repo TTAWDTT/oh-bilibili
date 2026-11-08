@@ -231,18 +231,33 @@ async fn auth_logout(engine: tauri::State<'_, Arc<Engine>>) -> Result<AuthSnapsh
 
 #[tauri::command(rename_all = "snake_case")]
 fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
-    let _ = engine;
-    Vec::new()
+    engine
+        .downloads()
+        .into_iter()
+        .map(|d| DownloadView {
+            key: d.key,
+            title: d.title,
+            state: d.state,
+            progress: d.progress,
+            path: d.path,
+        })
+        .collect()
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn download_enqueue(
-    _engine: tauri::State<'_, Arc<Engine>>,
-    _key: String,
+async fn download_enqueue(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
 ) -> Result<DownloadView, WireError> {
-    Err(WireError::internal(
-        "下载需要先安装 yt-dlp 到 resources/yt-dlp，见 README",
-    ))
+    let arc = engine.inner().clone();
+    let view = arc.enqueue_download(&TrackKey::from_provider(key)).await?;
+    Ok(DownloadView {
+        key: view.key,
+        title: view.title,
+        state: view.state,
+        progress: view.progress,
+        path: view.path,
+    })
 }
 
 #[tauri::command(rename_all = "snake_case")]

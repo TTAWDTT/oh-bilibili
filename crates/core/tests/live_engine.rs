@@ -40,3 +40,37 @@ async fn 引擎能搜到歌并真的开始播放() {
     let lyrics = engine.lyrics_get(&tracks[0].key).await.expect("歌词请求成功");
     println!("歌词：{} 行，来源 {}", lyrics.lines.len(), lyrics.source);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与 yt-dlp"]
+async fn 能把一首歌下载到本地并落到磁盘() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-dl-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
+    let first = tracks.first().expect("有结果").clone();
+
+    let view = engine.enqueue_download(&first.key).await.expect("下载任务应该起得来");
+    println!("任务：{} 状态 {}", view.title, view.state);
+    assert_eq!(view.state, "running");
+
+    // 等后台任务落地
+    let mut done = None;
+    for _ in 0..60 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if let Some(item) = engine.downloads().into_iter().find(|d| d.key == view.key) {
+            if item.state == "done" || item.state == "failed" {
+                done = Some(item);
+                break;
+            }
+        }
+    }
+    let finished = done.expect("60 秒内应该结束");
+    println!("最终状态 {} 路径 {:?}", finished.state, finished.path);
+    assert_eq!(finished.state, "done", "下载应该成功");
+    let path = finished.path.expect("成功时必须有路径");
+    let size = std::fs::metadata(&path).expect("文件存在").len();
+    println!("落盘 {size} 字节");
+    assert!(size > 100_000, "音频文件不该这么小");
+}

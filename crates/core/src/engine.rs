@@ -19,6 +19,15 @@ use crate::lyrics::{self, LyricDoc};
 use crate::state::{LoadToken, PlayerState, Prepared, Queue};
 use crate::wire::{AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, WireError};
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DownloadView {
+    pub key: String,
+    pub title: String,
+    pub state: String,
+    pub progress: f32,
+    pub path: Option<String>,
+}
+
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -36,6 +45,7 @@ pub struct Engine {
     repeat: Mutex<String>,
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
+    downloads: Mutex<Vec<DownloadView>>,
 }
 
 impl Engine {
@@ -57,6 +67,7 @@ impl Engine {
             repeat: Mutex::new("off".into()),
             events,
             http: reqwest::Client::new(),
+            downloads: Mutex::new(Vec::new()),
         }))
     }
 
@@ -398,6 +409,83 @@ impl Engine {
         self.auth()
     }
 
+    pub fn downloads(&self) -> Vec<DownloadView> {
+        lock(&self.downloads).clone()
+    }
+
+    /// 用 yt-dlp 把一首歌落到本地。任务在后台跑，进度靠事件与轮询列表两种方式看。
+    pub async fn enqueue_download(
+        self: &Arc<Self>,
+        key: &TrackKey,
+    ) -> Result<DownloadView, WireError> {
+        let track = self.track_of(key)?;
+        let bin = find_ytdlp().ok_or_else(|| {
+            WireError::internal("找不到 yt-dlp，先运行 scripts/fetch-yt-dlp.sh")
+        })?;
+
+        let view = DownloadView {
+            key: key.as_opaque().to_string(),
+            title: track.title.clone(),
+            state: "running".into(),
+            progress: 0.0,
+            path: None,
+        };
+        {
+            let mut list = lock(&self.downloads);
+            list.retain(|d| d.key != view.key);
+            list.push(view.clone());
+        }
+        self.emit(AppEvent::Download {
+            view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
+        });
+
+        let dir = download_dir();
+        std::fs::create_dir_all(&dir).ok();
+        let url = format!("https://www.bilibili.com/video/{}", key.as_opaque());
+        let template = dir.join("%(title)s.%(ext)s");
+        let engine = self.clone();
+        let view_key = view.key.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let output = std::process::Command::new(&bin)
+                .arg("--no-playlist")
+                .arg("-f")
+                .arg("ba")
+                .arg("-o")
+                .arg(&template)
+                .arg(&url)
+                .output();
+
+            let (state, path) = match output {
+                Ok(out) if out.status.success() => ("done", newest_file(&dir)),
+                Ok(out) => {
+                    eprintln!(
+                        "yt-dlp 失败: {}",
+                        String::from_utf8_lossy(&out.stderr).chars().take(400).collect::<String>()
+                    );
+                    ("failed", None)
+                }
+                Err(e) => {
+                    eprintln!("起不动 yt-dlp: {e}");
+                    ("failed", None)
+                }
+            };
+            let mut list = lock(&engine.downloads);
+            if let Some(item) = list.iter_mut().find(|d| d.key == view_key) {
+                item.state = state.to_string();
+                item.progress = if state == "done" { 1.0 } else { 0.0 };
+                item.path = path.map(|p| p.to_string_lossy().to_string());
+                let snapshot = item.clone();
+                drop(list);
+                engine.emit(AppEvent::Download {
+                    view: serde_json::to_value(&snapshot).unwrap_or(serde_json::Value::Null),
+                });
+            }
+        });
+
+        Ok(view)
+    }
+
     /// 把待推的意图推到 B 站。目前只处理喜欢。
     pub async fn sync_now(self: &Arc<Self>) -> Result<(), WireError> {
         let Some(mid) = self.source.nav().mid else {
@@ -447,4 +535,46 @@ mod tauri_runtime {
             .map_err(|e| WireError::internal(e.to_string()))?;
         rx.recv().map_err(|e| WireError::internal(e.to_string()))?
     }
+}
+
+
+/// yt-dlp 的查找顺序：随包资源、当前目录、PATH。
+fn find_ytdlp() -> Option<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("resources").join("yt-dlp"));
+            candidates.push(dir.parent().map(|p| p.join("resources").join("yt-dlp")).unwrap_or_default());
+        }
+    }
+    // 测试与开发时工作目录在 crate 里，所以往上找两层。
+    for rel in ["resources/yt-dlp", "../../resources/yt-dlp", "../../../resources/yt-dlp"] {
+        candidates.push(std::path::PathBuf::from(rel));
+    }
+    for c in candidates {
+        if c.is_file() {
+            return Some(c);
+        }
+    }
+    if std::process::Command::new("yt-dlp").arg("--version").output().is_ok() {
+        return Some(std::path::PathBuf::from("yt-dlp"));
+    }
+    None
+}
+
+fn download_dir() -> std::path::PathBuf {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("Music")
+        .join("BiliMusic")
+}
+
+fn newest_file(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+        .map(|e| e.path())
 }
