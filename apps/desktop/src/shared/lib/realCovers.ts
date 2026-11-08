@@ -35,3 +35,34 @@ export const REAL_COVERS: Readonly<Record<string, string>> = {
   "起风了": "https://i2.hdslb.com/bfs/archive/457945d2d3c9b83ea082607f76802250561151ba.jpg",
   "遇见": "https://i0.hdslb.com/bfs/archive/0a06ccb5297656bcef1ead639e1bb97288691563.jpg",
 }
+
+/**
+ * 真实 UP 主头像。
+ *
+ * 取自 B 站搜索结果里的 upic 字段。预览模式下没有 Rust 侧的接口，
+ * 这张表让卡片和排行榜里的 UP 行显示真实头像而不是占位图标。
+ * 真机走真实接口，不会用到这里。
+ */
+export const REAL_AVATARS: Readonly<Record<string, string>> = {
+  "七里香": "https://i0.hdslb.com/bfs/face/b0ed7e439e92e89d9cbd948b9149065b6373942c.jpg",
+  "光年之外": "https://i0.hdslb.com/bfs/face/a7176b4e205f2fae521faf3b6d22eca17a44e7a3.jpg",
+  "句号": "https://i0.hdslb.com/bfs/face/04c88d67899e142857c93d39c0a0aef9b9515ce2.jpg",
+  "告白气球": "https://i0.hdslb.com/bfs/face/b20ba233710bca9312db60eca9ba45cc5e22739c.jpg",
+  "夜空中最亮的星": "https://i0.hdslb.com/bfs/face/a7176b4e205f2fae521faf3b6d22eca17a44e7a3.jpg",
+  "大鱼": "https://i2.hdslb.com/bfs/face/a7fcdfc58422856532acd445278df9d8bb5a4c68.jpg",
+  "孤勇者": "https://i1.hdslb.com/bfs/face/dac1188920e679077ab0000e099167227a8439c8.jpg",
+  "孤城": "https://i2.hdslb.com/bfs/face/9d062cb00fc0f9bd7b22b2c99f56777191e74ac4.jpg",
+  "小幸运": "https://i1.hdslb.com/bfs/face/7fbc47516e1cbf85b037fbf0f754bb8293c5d2ab.jpg",
+  "少年": "https://i0.hdslb.com/bfs/face/6bebe025b32090d508293ecd172ff8923002ad9f.jpg",
+  "山楂树之恋": "https://i0.hdslb.com/bfs/face/6c206123f7de642489776b4c2a7c05b6ab6da529.jpg",
+  "我记得": "https://i0.hdslb.com/bfs/face/a7176b4e205f2fae521faf3b6d22eca17a44e7a3.jpg",
+  "春庭雪": "https://i2.hdslb.com/bfs/face/2b18dbf2ff4d03691319926df47e5efdae8c580b.jpg",
+  "晴天": "https://i2.hdslb.com/bfs/face/ae0d28f7a465137bb6a95909ca859829863ada90.jpg",
+  "江南": "https://i0.hdslb.com/bfs/face/a7176b4e205f2fae521faf3b6d22eca17a44e7a3.jpg",
+  "海底": "https://i0.hdslb.com/bfs/face/52b1b8e3c56efd82bf87581b34a107a4372f97d8.jpg",
+  "漠河舞厅": "https://i1.hdslb.com/bfs/face/b3ab4cfee245a40cf302812e228ae24a35963452.jpg",
+  "稻香": "https://i2.hdslb.com/bfs/face/e47b5bebf9947b04a092ee7553232736c164c4c8.jpg",
+  "说谎": "https://i0.hdslb.com/bfs/face/a7176b4e205f2fae521faf3b6d22eca17a44e7a3.jpg",
+  "起风了": "https://i2.hdslb.com/bfs/face/8e9646544b0083d3f437968c0ed7e1d352d7f8db.jpg",
+  "遇见": "https://i0.hdslb.com/bfs/face/d53f099f612e3e678c24ded2054e8cb868f157c7.jpg",
+}

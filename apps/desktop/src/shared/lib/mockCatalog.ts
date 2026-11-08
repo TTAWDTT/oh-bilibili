@@ -1,6 +1,6 @@
 import type { LyricDoc, Track } from './contract'
 import { hueFor } from './format'
-import { REAL_COVERS } from './realCovers'
+import { REAL_AVATARS, REAL_COVERS } from './realCovers'
 
 type Seed = { title: string; artist: string }
 
@@ -106,6 +106,7 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     duration_ms: 26_000 + ((index * 1700) % 7000),
     // 有真封面就用真封面，没有才退回生成图。
     cover: REAL_COVERS[seed.title] ?? coverArt(seed.title, hueFor(key), index),
+    up_avatar: REAL_AVATARS[seed.title] ?? null,
     // 播放量按名次递减，排行榜才有真实感；不是随机数。
     views: 9_800_000 - index * 420_000,
     danmaku: 42_000 - index * 1_800,
