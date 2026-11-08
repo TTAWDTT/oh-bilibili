@@ -39,7 +39,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/85 hover:border-white/32 hover:text-white"
+            className="t press flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[12px] text-[var(--text-1)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -63,7 +63,7 @@ export function LibraryView() {
           </div>
         ) : (
           <section className="mt-8">
-            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/48">
+            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-2)]">
               <span className="flex-1">歌单</span>
               <span className="num w-16 text-right">曲目</span>
               <span className="w-[68px]" />
@@ -78,13 +78,13 @@ export function LibraryView() {
                     onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
                     className="flex min-w-0 flex-1 items-center gap-2 py-3 text-left"
                   >
-                    <span className="text-white/48 group-hover:text-white/70">
+                    <span className="text-[var(--text-2)] group-hover:text-[var(--text-2)]">
                       <Icon name="library" size={15} />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={playlist.name}>
                       {playlist.name}
                     </span>
-                    <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-white/48">{count}</span>
+                    <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-[var(--text-2)]">{count}</span>
                   </button>
                   <div className="flex w-[68px] shrink-0 items-center justify-end gap-1">
                     <button
@@ -99,7 +99,7 @@ export function LibraryView() {
                           0,
                         )
                       }}
-                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white disabled:cursor-default disabled:opacity-20"
+                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-white disabled:cursor-default disabled:opacity-20"
                     >
                       <Icon name="play" size={14} />
                     </button>
@@ -108,7 +108,7 @@ export function LibraryView() {
                       aria-label={`打开 ${playlist.name}`}
                       title="打开歌单"
                       onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white"
+                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-[var(--text-1)]"
                     >
                       <Icon name="chevronRight" size={14} />
                     </button>

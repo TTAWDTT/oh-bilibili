@@ -75,7 +75,7 @@ export function StageView() {
         type="button"
         onClick={() => setStage(false)}
         aria-label="退出舞台"
-        className="t press absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-[4px] text-white/50 hover:bg-white/10 hover:text-white"
+        className="t press absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-[4px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
       >
         <Icon name="close" size={16} />
       </button>
@@ -86,24 +86,24 @@ export function StageView() {
             cover={track.cover}
             title={track.title}
             className="h-[240px] w-[240px] rounded-full border border-white/20"
-            glyphClassName="text-[64px] font-semibold text-white/80"
+            glyphClassName="text-[64px] font-semibold text-[var(--text-1)]"
           />
         </div>
 
-        <h2 className="mt-8 max-w-full truncate text-[26px] font-semibold text-white" title={track.title}>
+        <h2 className="mt-8 max-w-full truncate text-[26px] font-semibold text-[var(--text-1)]" title={track.title}>
           {track.title}
         </h2>
-        <p className="mt-1 truncate text-[13px] text-white/55" title={track.artist}>
+        <p className="mt-1 truncate text-[13px] text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </p>
 
         <div className="mt-10 flex min-h-[92px] flex-col items-center text-center">
-          <p className="stage-line text-[27px] leading-[1.45] text-white">{current || '♪'}</p>
-          <p className="mt-3 text-[14px] leading-[1.5] text-white/40">{upcoming}</p>
+          <p className="stage-line text-[27px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
+          <p className="mt-3 text-[14px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
         </div>
 
-        <div className="mt-8 flex items-center gap-6 text-white/70">
-          <button type="button" aria-label="上一首" onClick={() => void prev()} className="t press hover:text-white">
+        <div className="mt-8 flex items-center gap-6 text-[var(--text-2)]">
+          <button type="button" aria-label="上一首" onClick={() => void prev()} className="t press hover:text-[var(--text-1)]">
             <Icon name="prev" size={22} />
           </button>
           <button
@@ -114,7 +114,7 @@ export function StageView() {
           >
             <Icon name={snapshot?.phase === 'playing' ? 'pause' : 'play'} size={22} />
           </button>
-          <button type="button" aria-label="下一首" onClick={() => void next()} className="t press hover:text-white">
+          <button type="button" aria-label="下一首" onClick={() => void next()} className="t press hover:text-[var(--text-1)]">
             <Icon name="next" size={22} />
           </button>
         </div>

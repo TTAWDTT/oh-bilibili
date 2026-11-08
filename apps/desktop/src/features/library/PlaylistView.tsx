@@ -68,7 +68,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'search' })}
-                className="t press rounded-[4px] border border-white/32 h-8 px-4 text-[12px] text-white/70 hover:border-white/32 hover:text-white"
+                className="t press rounded-[4px] border border-[var(--line)] h-8 px-4 text-[12px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
               >
                 去添加
               </button>
@@ -81,7 +81,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
         <button
           type="button"
           onClick={() => navigate({ kind: 'library' })}
-          className="t press flex items-center justify-center mb-3 flex w-fit items-center gap-1 pr-2 text-[12px] text-white/62 hover:text-white"
+          className="t press flex items-center justify-center mb-3 flex w-fit items-center gap-1 pr-2 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
         >
           <Icon name="chevronLeft" size={13} />
           曲库

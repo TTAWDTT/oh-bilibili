@@ -27,7 +27,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
         }}
         className={[
           't press flex h-6 w-6 items-center justify-center rounded-[4px]',
-          liked ? 'text-[var(--accent)]' : 'text-white/48 hover:text-white',
+          liked ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:text-white',
         ].join(' ')}
       >
         <Icon name={liked ? 'heartFilled' : 'heart'} size={size} />
@@ -43,7 +43,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
         }}
         className={[
           't press flex h-6 w-6 items-center justify-center rounded-[4px]',
-          faved ? 'text-[#ffc46b]' : 'text-white/48 hover:text-white',
+          faved ? 'text-[#ffc46b]' : 'text-[var(--text-2)] hover:text-white',
         ].join(' ')}
       >
         <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={size} />

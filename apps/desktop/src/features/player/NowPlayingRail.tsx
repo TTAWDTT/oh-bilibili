@@ -17,7 +17,7 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       aria-pressed={active}
       className={[
         't flex h-8 items-center border-b-2 text-[12px]',
-        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/62 hover:text-white',
+        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-[var(--text-2)] hover:text-white',
       ].join(' ')}
     >
       {label}
@@ -34,27 +34,27 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         <Cover
           cover={track.cover}
           title={track.title}
-          className="h-[84px] w-[84px] rounded-[4px] border border-white/32"
-          glyphClassName="text-[30px] font-semibold text-white/70"
+          className="h-[84px] w-[84px] rounded-[4px] border border-[var(--line)]"
+          glyphClassName="text-[30px] font-semibold text-[var(--text-2)]"
         />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/48">
+        <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-[var(--text-2)]">
           正在播放
           {loading ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] pulse-soft" /> : null}
         </div>
         <div
-          className="mt-2 truncate font-display text-[19px] font-semibold leading-[1.2] tracking-[-0.02em] text-white"
+          className="mt-2 truncate font-display text-[19px] font-semibold leading-[1.2] tracking-[-0.02em] text-[var(--text-1)]"
           title={track.title}
         >
           {track.title}
         </div>
-        <div className="mt-1 truncate text-[12px] text-white/62" title={track.artist}>
+        <div className="mt-1 truncate text-[12px] text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ReactionButtons track={track} size={15} />
-          <span className="num rounded-[3px] border border-white/32 px-2 py-0 font-mono text-[10px] text-white/62">
+          <span className="num rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[10px] text-[var(--text-2)]">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>
@@ -88,7 +88,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
           aria-label="收起右栏"
           title="收起右栏（Esc）"
           onClick={closeRail}
-          className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-white/48 hover:text-white"
+          className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-[var(--text-1)]"
         >
           <Icon name="close" size={14} />
         </button>

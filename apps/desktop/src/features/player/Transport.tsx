@@ -25,7 +25,7 @@ function TransportButton({
       onClick={onClick}
       className={[
         't press flex h-8 w-8 items-center justify-center rounded-[4px]',
-        active ? 'text-[var(--accent)]' : 'text-white/70 hover:text-white',
+        active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:text-white',
         disabled ? 'cursor-default opacity-30' : '',
       ].join(' ')}
     >
@@ -66,7 +66,7 @@ export function Transport() {
           't press mx-1 flex h-10 w-10 items-center justify-center rounded-full',
           hasTrack
             ? 'bg-white text-black active:scale-[0.96]'
-            : 'cursor-default border border-white/32 bg-white/[0.04] text-white/48',
+            : 'cursor-default border border-[var(--line)] bg-[var(--panel-raised)] text-[var(--text-2)]',
         ].join(' ')}
       >
         {loading ? (

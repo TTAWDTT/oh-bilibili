@@ -62,14 +62,14 @@ export function MvOverlay() {
     >
       <div className="w-full max-w-[960px]" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="truncate text-[13px] text-white/80" title={mv.title}>
+          <span className="truncate text-[13px] text-[var(--text-1)]" title={mv.title}>
             {mv.title}
           </span>
           <button
             type="button"
             onClick={() => setMv(null)}
             aria-label="关闭"
-            className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-white/60 hover:text-white"
+            className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-white/60 hover:text-[var(--text-1)]"
           >
             <Icon name="close" size={14} />
           </button>
@@ -90,7 +90,7 @@ export function MvOverlay() {
             onError={() => setError('视频加载失败，可能是直链已过期，重新打开一次。')}
           />
         ) : (
-          <div className="flex h-[300px] items-center justify-center border border-hairline text-[13px] text-white/40">
+          <div className="flex h-[300px] items-center justify-center border border-hairline text-[13px] text-[var(--text-3)]">
             正在取流…
           </div>
         )}

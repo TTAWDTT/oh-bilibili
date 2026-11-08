@@ -10,13 +10,13 @@ export function VolumeControl() {
   const shown = draft ?? volume
 
   return (
-    <div className="flex items-center gap-2 text-white/62">
+    <div className="flex items-center gap-2 text-[var(--text-2)]">
       <button
         type="button"
         aria-label={shown > 0 ? '静音' : '取消静音'}
         title={shown > 0 ? '静音' : '取消静音'}
         onClick={() => void setVolume(shown > 0 ? 0 : 0.7)}
-        className="t press flex items-center justify-center rounded-[4px] h-6 w-6 hover:text-white"
+        className="t press flex items-center justify-center rounded-[4px] h-6 w-6 hover:text-[var(--text-1)]"
       >
         <Icon name={shown > 0 ? 'volume' : 'mute'} size={16} />
       </button>
@@ -33,7 +33,7 @@ export function VolumeControl() {
           }}
         />
       </div>
-      <span className="num w-7 shrink-0 text-right font-mono text-[10px] text-white/48">
+      <span className="num w-7 shrink-0 text-right font-mono text-[10px] text-[var(--text-2)]">
         {Math.round(shown * 100)}
       </span>
     </div>

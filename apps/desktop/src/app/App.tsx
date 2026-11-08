@@ -60,7 +60,7 @@ export default function App() {
   }, [trackKey, setRail])
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-ink text-white">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--bg,var(--color-ink))] text-[var(--text-1)]">
       <StageGlow />
       <TitleBar />
 

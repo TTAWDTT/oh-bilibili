@@ -52,7 +52,7 @@ export function Cover({ cover, title, className, glyphClassName }: CoverProps) {
       <span
         className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--accent)] opacity-60"
       />
-      <span className={`relative ${glyphClassName ?? 'text-[40%] font-semibold text-white/80'}`}>
+      <span className={`relative ${glyphClassName ?? 'text-[40%] font-semibold text-[var(--text-1)]'}`}>
         {initials(title)}
       </span>
     </div>

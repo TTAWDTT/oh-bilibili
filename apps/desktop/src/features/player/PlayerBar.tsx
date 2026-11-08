@@ -37,8 +37,8 @@ function RailToggle({
         enabled
           ? active
             ? 'text-[var(--accent)]'
-            : 'text-white/62 hover:text-white'
-          : 'cursor-default text-white/48',
+            : 'text-[var(--text-2)] hover:text-white'
+          : 'cursor-default text-[var(--text-2)]',
       ].join(' ')}
     >
       <Icon name={tab === 'lyrics' ? 'lyrics' : 'queue'} size={16} />
@@ -57,12 +57,12 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         onClick={() => setStage(true)}
         className="t group flex h-10 items-center gap-2 px-1 text-left"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-white/48">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-[var(--text-2)]">
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
-          <span className="mt-1 block text-[12px] text-white/48 group-hover:text-white/70">去搜索里挑一首 →</span>
+          <span className="block text-[13px] font-medium text-[var(--text-2)] group-hover:text-[var(--text-1)]">还没有在播放</span>
+          <span className="mt-1 block text-[12px] text-[var(--text-2)] group-hover:text-[var(--text-2)]">去搜索里挑一首 →</span>
         </span>
       </button>
     )
@@ -73,18 +73,18 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
       <Cover
         cover={track.cover}
         title={track.title}
-        className="h-10 w-10 shrink-0 rounded-[4px] border border-white/32"
-        glyphClassName="text-[20px] font-semibold text-white/70"
+        className="h-10 w-10 shrink-0 rounded-[4px] border border-[var(--line)]"
+        glyphClassName="text-[20px] font-semibold text-[var(--text-2)]"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium leading-tight text-white" title={track.title}>
+        <div className="truncate text-[13px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
           {track.title}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <span className="truncate text-[12px] text-white/62" title={track.artist}>
+          <span className="truncate text-[12px] text-[var(--text-2)]" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-[3px] border border-white/32 px-2 py-0 font-mono text-[10px] text-white/62">
+          <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[10px] text-[var(--text-2)]">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>

@@ -13,10 +13,10 @@
  */
 
 @theme {
-  --color-ink: #181818;
-  --color-ink-raised: #1f1f1f;
-  --color-hairline: #2b2b2b;
-  --color-muted: #9a9a9a;
+  --color-ink: #f6f7f8;
+  --color-ink-raised: #ffffff;
+  --color-hairline: #e3e5e7;
+  --color-muted: #9499a0;
   --font-sans: "Times New Roman", "LXGW WenKai Lite", "Songti SC", "STZhongsong", serif;
   --font-display: "Times New Roman", "LXGW WenKai Lite", "Songti SC", serif;
 }
@@ -25,21 +25,21 @@
   color-scheme: dark;
 
   /* 面板与分隔 */
-  --panel: #1c1c1c;
-  --panel-alt: #1c1c1c;
-  --panel-raised: #232323;
-  --panel-hover: #2a2a2a;
-  --hover: #2a2a2a;
-  --line: #2b2b2b;
+  --panel: #ffffff;
+  --panel-alt: #ffffff;
+  --panel-raised: #f1f2f3;
+  --panel-hover: #f1f2f3;
+  --hover: #f1f2f3;
+  --line: #e3e5e7;
 
   /* 文本三级 */
-  --text-1: #d9d9d9;
-  --text-2: #9a9a9a;
-  --text-3: #858585;
+  --text-1: #18191c;
+  --text-2: #61666d;
+  --text-3: #9499a0;
 
   /* 唯一的强调色：只用于焦点、进度、激活态 */
-  --accent: #d9a15b;
-  --accent-soft: rgb(217 161 91 / 0.16);
+  --accent: #fb7299;
+  --accent-soft: rgb(251 114 153 / 0.14);
 
   --radius-sm: 4px;
   --radius-md: 6px;
