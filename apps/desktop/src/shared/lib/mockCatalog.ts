@@ -39,6 +39,12 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     // 浏览器 mock 的假音源统一在 30 秒上下，进度、切歌、歌词一屏内就能走完。
     duration_ms: 26_000 + ((index * 1700) % 7000),
     cover: coverArt(seed.title, hueFor(key)),
+    // 播放量按名次递减，排行榜才有真实感；不是随机数。
+    views: 9_800_000 - index * 420_000,
+    danmaku: 42_000 - index * 1_800,
+    tname: '音乐',
+    typeid: 3,
+    up_mid: 900000 + index,
   }
 })
 

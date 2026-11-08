@@ -31,7 +31,7 @@ export function HotRanking({ onPick }: { onPick: (keyword: string) => void }) {
       .then(async (list) => {
         // 关键词命中不到时退一步拿全量，预览模式也能有榜单可看。
         // 真实接口下「音乐」不会为空，这条分支只在 mock 里走。
-        const next = list.length > 0 ? list : await ipc.searchQ('', 1, 'click').catch(() => [])
+        const next = list.length >= 3 ? list : await ipc.searchQ('', 1, 'click').catch(() => list)
         if (!cancelled) setTracks(next.slice(0, 10))
       })
       .catch(() => {
