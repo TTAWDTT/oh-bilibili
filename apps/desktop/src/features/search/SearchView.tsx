@@ -1,3 +1,4 @@
+import { Bili2233 } from '../../shared/ui/Bili2233'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track, WireError } from '../../shared/lib/contract'
@@ -188,7 +189,14 @@ export function SearchView() {
               </div>
             ) : null}
 
-            <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
+            <div className="mt-6 flex flex-col items-center">
+              <Bili2233 width={260} />
+              <p className="mt-1 text-[12px] text-[var(--text-3)]">
+                22 娘和 33 娘在等你说一首歌的名字
+              </p>
+            </div>
+
+            <div className="mt-7 text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button

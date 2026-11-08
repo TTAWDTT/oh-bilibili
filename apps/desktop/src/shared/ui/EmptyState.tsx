@@ -1,9 +1,12 @@
+import { Bili2233 } from './Bili2233'
 import { BiliTvArt } from './BiliTvArt'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
 type EmptyStateProps = {
   icon: IconName
+  /** 用 2233 娘插画代替图标。空态面积大时用它，比一个小图标有存在感。 */
+  art?: boolean
   title: string
   detail: string
   action: { label: string; onClick: () => void } | null
@@ -11,10 +14,14 @@ type EmptyStateProps = {
 }
 
 /** 空态与错误态都必须给出下一步动作：没有 action 的空态只是一个死胡同。 */
-export function EmptyState({ icon, title, detail, action, compact = false }: EmptyStateProps) {
+export function EmptyState({ icon, art = false, title, detail, action, compact = false }: EmptyStateProps) {
   return (
     <div className={compact ? 'flex flex-col items-center px-4 py-10 text-center' : 'flex flex-col items-center px-3 py-16 text-center'}>
-      {icon === 'biliTv' ? (
+      {art ? (
+        <span className="block">
+          <Bili2233 width={168} />
+        </span>
+      ) : icon === 'biliTv' ? (
         <span className="text-[var(--accent)]">
           <BiliTvArt />
         </span>

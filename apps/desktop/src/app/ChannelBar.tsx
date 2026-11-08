@@ -23,7 +23,7 @@ export function ChannelBar() {
   return (
     <nav
       aria-label="频道"
-      className="flex h-12 shrink-0 items-stretch gap-1 border-b border-[var(--line)] bg-[var(--panel)] pl-[80px] pr-4"
+      className="relative flex h-12 shrink-0 items-stretch gap-1 border-b border-[var(--line)] bg-[var(--panel)] pl-[80px] pr-4"
     >
       {CHANNELS.map((channel) => {
         const active = view.kind === channel.view.kind
@@ -48,6 +48,7 @@ export function ChannelBar() {
           </button>
         )
       })}
+      <span className="bili-topline absolute inset-x-0 bottom-0 h-[2px] opacity-70" />
     </nav>
   )
 }

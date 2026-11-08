@@ -271,3 +271,47 @@
   from { transform: translateX(0); }
   to { transform: translateX(-180vw); }
 }
+
+/* 2233 娘：轻微上下浮动，两颗头错开相位，看起来像在轻轻点头 */
+.bili-2233__girl-a,
+.bili-2233__girl-b {
+  animation: bili-2233-float 3.4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.bili-2233__girl-b {
+  animation-delay: -1.7s;
+}
+
+@keyframes bili-2233-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.bili-2233__heart {
+  animation: bili-2233-pulse 2.2s ease-in-out infinite;
+  transform-origin: 100px 60px;
+}
+
+@keyframes bili-2233-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.25); opacity: 1; }
+}
+
+/* B 站主题：22 娘蓝与 33 娘粉双色。蓝色只用于次级强调，比如链接与标签描边。 */
+:root {
+  --bili-blue: #00aeec;
+  --bili-pink: #fb7299;
+}
+
+/* 顶栏底部一条双色渐变，B 站网页端顶部也是粉色系的过渡。 */
+.bili-topline {
+  background: linear-gradient(90deg, var(--bili-pink) 0%, var(--bili-pink) 42%, var(--bili-blue) 100%);
+}
+
+/* 分区胶囊用蓝底描边，和粉色主按钮形成 B 站的双色识别 */
+.bili-tag-blue {
+  color: var(--bili-blue);
+  border: 1px solid color-mix(in oklab, var(--bili-blue) 45%, transparent);
+  background: color-mix(in oklab, var(--bili-blue) 8%, transparent);
+}
