@@ -81,6 +81,8 @@ type TrackGridProps = {
 export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const setMv = useAppStore((state) => state.setMv)
+  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+  const navigate = useAppStore((state) => state.navigate)
 
   /** 三连动作统一入口：失败走同一套提示，不静默。 */
   const act = async (kind: 'like' | 'fav', track: Track): Promise<void> => {
@@ -216,9 +218,18 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             <div className="mt-1 flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-3)]">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
-                <span className="truncate" title={track.artist}>
+                <button
+                  type="button"
+                  title={`看 ${track.artist} 的更多视频`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setAuthorQuery(track.artist)
+                    navigate({ kind: 'search' })
+                  }}
+                  className="truncate hover:text-[var(--accent)] hover:underline"
+                >
                   {track.artist}
-                </span>
+                </button>
               </span>
               {/* 三连：赞 / 币 / 藏，都是真接口，不是装饰 */}
               <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">

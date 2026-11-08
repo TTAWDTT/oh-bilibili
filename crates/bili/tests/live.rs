@@ -157,3 +157,22 @@ async fn 分区过滤能按类型筛结果() {
     assert!(all.iter().all(|t| t.typeid.is_some()), "每条都应该带 typeid");
     assert!(!music.is_empty(), "晴天应该有音乐区结果");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 按_up_主名能搜到他的投稿() {
+    use bilimusic_model::SearchOrder;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("zyl2012_音乐无限", 1).expect("查询");
+    let tracks = source
+        .search_ordered(&q, SearchOrder::TotalRank)
+        .await
+        .expect("搜索");
+    let same_author = tracks
+        .iter()
+        .filter(|t| t.artist.contains("zyl2012"))
+        .count();
+    println!("搜到 {} 条，其中同作者 {} 条", tracks.len(), same_author);
+    println!("首条作者：{:?}", tracks.first().map(|t| &t.artist));
+    assert!(!tracks.is_empty(), "按 UP 名应该能搜到东西");
+}

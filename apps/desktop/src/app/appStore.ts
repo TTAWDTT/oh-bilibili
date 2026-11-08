@@ -22,6 +22,8 @@ type AppStore = {
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
+  /** 搜索页要预填的作者名。点 UP 主时写入，搜索页消费后清空。 */
+  authorQuery: string | null
   toasts: Toast[]
   navigate: (view: View) => void
   setRail: (tab: RailTab | null) => void
@@ -31,6 +33,7 @@ type AppStore = {
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
+  setAuthorQuery: (q: string | null) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
 }
@@ -43,6 +46,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   authOpen: false,
   mv: null,
   stage: false,
+  authorQuery: null,
   toasts: [],
   navigate: (view) => set({ view }),
   setRail: (tab) => set({ rail: tab }),
@@ -52,6 +56,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),
+  setAuthorQuery: (q) => set({ authorQuery: q }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1
     const toast: Toast = { id: toastSeq, tone, title, detail }

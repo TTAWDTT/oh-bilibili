@@ -27,6 +27,17 @@ export function SearchView() {
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState('全部')
   const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
+  const authorQuery = useAppStore((state) => state.authorQuery)
+  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+
+  // 从别处点 UP 主进来时，把名字填进搜索框并立刻搜一次。
+  useEffect(() => {
+    if (!authorQuery) return
+    setQuery(authorQuery)
+    setPage(1)
+    setNonce((n) => n + 1)
+    setAuthorQuery(null)
+  }, [authorQuery, setAuthorQuery])
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
