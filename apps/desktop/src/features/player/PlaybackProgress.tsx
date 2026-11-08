@@ -17,7 +17,6 @@ export function PlaybackProgress() {
   }, [])
 
   const ratio = scrub ?? (duration > 0 ? Math.min(1, now / duration) : 0)
-  const shown = scrub === null ? Math.min(now, duration) : scrub * duration
 
   const commit = (value: number): void => {
     if (duration <= 0) return
@@ -27,7 +26,6 @@ export function PlaybackProgress() {
 
   return (
     <div className="flex w-full items-center gap-1.5">
-      <span className="num w-9 shrink-0 text-right font-mono text-[10px] text-white/40">{formatTime(shown)}</span>
       <div className="min-w-0 flex-1">
         <Slider
           value={ratio}

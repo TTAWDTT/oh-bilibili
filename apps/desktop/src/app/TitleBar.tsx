@@ -2,15 +2,15 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="relative z-20 flex h-9 shrink-0 items-center justify-between border-b border-hairline bg-white/[0.018] pl-[92px] pr-6"
+      className="relative z-20 flex h-7 shrink-0 items-center justify-between border-b border-hairline bg-[var(--panel-alt)] pl-[82px] pr-3"
     >
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-medium tracking-[0.26em] text-white/36">BILIMUSIC</span>
-        <span className="rounded-[4px] border border-hairline px-2 py-[1px] text-[9px] tracking-[0.12em] text-white/30">
+        <span className="text-[11.5px] text-[var(--text-2)]">BILIMUSIC</span>
+        <span className="rounded-[3px] border border-hairline px-1.5 text-[9.5px] text-[var(--text-3)]">
           ALPHA
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/24">
+      <div className="flex items-center gap-2 text-[10.5px] text-[var(--text-3)]">
         <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
         本机直连
       </div>

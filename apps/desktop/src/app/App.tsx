@@ -13,7 +13,9 @@ import { useAccentVars, useTrackAccent } from '../shared/lib/accent'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
+import { IconRail } from './IconRail'
 import { Sidebar } from './Sidebar'
+import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
@@ -62,6 +64,7 @@ export default function App() {
       <TitleBar />
 
       <div className="relative z-10 flex min-h-0 flex-1">
+        <IconRail />
         <Sidebar />
         <main className="block min-w-0 flex-1 overflow-hidden">
           <CurrentView view={view} />
@@ -72,6 +75,7 @@ export default function App() {
       </div>
 
       <PlayerBar />
+      <StatusBar />
       <ToastHost />
       <AuthModal />
     </div>
