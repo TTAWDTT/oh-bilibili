@@ -32,8 +32,34 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-[224px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-[var(--panel-alt)]">
+      <span className={SECTION}>我的</span>
+      <div className="pb-1">
+        {(
+          [
+            { label: '历史记录', kind: 'history' as const, icon: 'clock' as const },
+            { label: '我的收藏夹', kind: 'favs' as const, icon: 'bookmarkStar' as const },
+            { label: '已下载', kind: 'downloads' as const, icon: 'download' as const },
+            { label: '我喜欢的音乐', kind: 'liked' as const, icon: 'thumb' as const },
+          ]
+        ).map((item) => {
+          const active = view.kind === item.kind
+          return (
+            <button
+              key={item.kind}
+              type="button"
+              onClick={() => navigate({ kind: item.kind })}
+              aria-current={active ? 'page' : undefined}
+              className={[ROW, active ? ROW_ACTIVE : ROW_IDLE, 'w-[calc(100%-8px)]'].join(' ')}
+            >
+              <Icon name={item.icon} size={15} className="shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <div className="flex items-center justify-between pr-2">
-        <span className={SECTION}>歌单</span>
+        <span className={SECTION}>我的歌单</span>
         <button
           type="button"
           aria-label="新建歌单"
