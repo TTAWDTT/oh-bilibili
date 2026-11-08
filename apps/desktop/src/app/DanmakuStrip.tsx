@@ -17,7 +17,7 @@ export function DanmakuStrip() {
   const enabled = useDanmakuSettings((s) => s.enabled)
   const opacity = useDanmakuSettings((s) => s.opacity)
   const speed = useDanmakuSettings((s) => s.speed)
-  const [lines, setLines] = useState<string[]>([])
+  const [lines, setLines] = useState<[string, string][]>([])
 
   useEffect(() => {
     if (!trackKey) {
@@ -26,9 +26,16 @@ export function DanmakuStrip() {
     }
     let cancelled = false
     void ipc
-      .danmaku(trackKey)
+      .danmakuColored(trackKey)
       .then((list) => {
-        if (!cancelled) setLines(list.slice(0, 10))
+        if (cancelled) return
+        // B 站默认白字（0xFFFFFF），在浅色底上改用深色；其余彩色照原样用。
+        setLines(
+          list.slice(0, 10).map(([, text, rgb]) => {
+            const hex = `#${rgb.toString(16).padStart(6, '0')}`
+            return [text, rgb === 0xffffff ? 'var(--text-1)' : hex] as [string, string]
+          }),
+        )
       })
       .catch(() => setLines([]))
     return () => {
@@ -40,11 +47,12 @@ export function DanmakuStrip() {
 
   return (
     <div className="pointer-events-none relative h-6 shrink-0 overflow-hidden border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bili-pink)_5%,white)]" aria-hidden>
-      {lines.map((text, i) => (
+      {lines.map(([text, color], i) => (
         <span
           key={`${i}-${text}`}
-          className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[12px] text-[var(--text-1)]"
+          className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[12px]"
           style={{
+            color,
             top: `${(i % 2) * 11}px`,
             animationDuration: `${(14 + (i % 4) * 3) / speed}s`,
             animationDelay: `${i * 1.6}s`,

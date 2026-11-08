@@ -295,12 +295,30 @@ impl Source {
     /// 拉这条视频的真实弹幕，带时间戳。
     ///
     /// `<d p="秒,模式,字号,颜色,时间戳,...">文本</d>`，第一个字段是出现时间。
-    pub async fn danmaku_items(&self, key: &TrackKey) -> Result<Vec<(f64, String)>, BiliError> {
+    pub async fn danmaku_colored(
+        &self,
+        key: &TrackKey,
+    ) -> Result<Vec<(f64, String, u32)>, BiliError> {
         let detail = self.detail(key).await?;
-        Ok(self.danmaku_by_cid(detail.cid).await?)
+        let items = self.danmaku_by_cid(detail.cid).await?;
+        Ok(items)
     }
 
-    async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<(f64, String)>, BiliError> {
+    /// 兼容旧调用：只要文本。
+    async fn danmaku_texts(&self, key: &TrackKey) -> Result<Vec<(f64, String)>, BiliError> {
+        Ok(self
+            .danmaku_colored(key)
+            .await?
+            .into_iter()
+            .map(|(t, s, _)| (t, s))
+            .collect())
+    }
+
+    pub async fn danmaku_items(&self, key: &TrackKey) -> Result<Vec<(f64, String)>, BiliError> {
+        self.danmaku_texts(key).await
+    }
+
+    async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<(f64, String, u32)>, BiliError> {
         let url = format!(
             "https://api.bilibili.com/x/v1/dm/list.so?oid={cid}"
         );
@@ -327,13 +345,15 @@ impl Source {
             if text.is_empty() || text.chars().count() > 40 {
                 continue;
             }
-            let secs = attrs
-                .split('"')
-                .nth(1)
-                .and_then(|p| p.split(',').next())
-                .and_then(|t| t.parse::<f64>().ok())
-                .unwrap_or(0.0);
-            out.push((secs, text.to_string()));
+            let Some(p) = attrs.split('"').nth(1) else { continue };
+            let fields: Vec<&str> = p.split(',').collect();
+            let secs = fields.first().and_then(|t| t.parse::<f64>().ok()).unwrap_or(0.0);
+            // 第 4 个字段是十进制 RGB，B 站默认白色 16777215。
+            let color = fields
+                .get(3)
+                .and_then(|t| t.parse::<u32>().ok())
+                .unwrap_or(0xFFFFFF);
+            out.push((secs, text.to_string(), color));
         }
         Ok(out)
     }

@@ -177,6 +177,11 @@ export function related(key: string): Promise<Track[]> {
   return call<Track[]>('related', { key })
 }
 
+/** 带颜色的弹幕：时间、文本、十进制 RGB。 */
+export function danmakuColored(key: string): Promise<[number, string, number][]> {
+  return call<[number, string, number][]>('danmaku_colored', { key })
+}
+
 /** 弹幕密度曲线，用来画高能进度条。 */
 export function danmakuHeat(key: string, buckets: number): Promise<number[]> {
   return call<number[]>('danmaku_heat', { key, buckets })

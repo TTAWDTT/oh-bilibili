@@ -199,3 +199,16 @@ async fn 稍后再看未登录时明确报需要登录() {
         other => panic!("预期 NeedsLogin，实际 {other:?}"),
     }
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 弹幕带真实颜色() {
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let first = tracks.first().expect("有结果");
+    let items = source.danmaku_colored(&first.key).await.expect("弹幕");
+    let colored = items.iter().filter(|(_, _, c)| *c != 0xFFFFFF).count();
+    println!("共 {} 条，其中 {} 条有彩色", items.len(), colored);
+    assert!(!items.is_empty());
+}

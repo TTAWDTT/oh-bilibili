@@ -99,6 +99,15 @@ async fn related(
     engine.related(&TrackKey::from_provider(key)).await
 }
 
+/// 带颜色的弹幕。颜色是 B 站用户发弹幕时选的，真实的。
+#[tauri::command(rename_all = "snake_case")]
+async fn danmaku_colored(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<(f64, String, u32)>, WireError> {
+    engine.danmaku_colored(&TrackKey::from_provider(key)).await
+}
+
 /// 弹幕密度曲线，用来画高能进度条。
 #[tauri::command(rename_all = "snake_case")]
 async fn danmaku_heat(
@@ -474,6 +483,7 @@ pub fn run() {
             health,
             mv_port,
             danmaku,
+            danmaku_colored,
             danmaku_heat,
             related,
             video_meta,

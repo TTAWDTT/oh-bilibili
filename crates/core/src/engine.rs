@@ -632,6 +632,13 @@ impl Engine {
         self.source.cookie_header()
     }
 
+    pub async fn danmaku_colored(
+        &self,
+        key: &TrackKey,
+    ) -> Result<Vec<(f64, String, u32)>, WireError> {
+        Ok(self.source.danmaku_colored(key).await?)
+    }
+
     pub async fn danmaku_heat(&self, key: &TrackKey, buckets: usize) -> Result<Vec<u32>, WireError> {
         Ok(self.source.danmaku_heat(key, buckets).await?)
     }
