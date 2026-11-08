@@ -1,5 +1,6 @@
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
+import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import { PartitionIcon } from '../shared/ui/PartitionIcon'
 
 type ChannelKind = 'search' | 'music' | 'anime' | 'film' | 'history' | 'favs' | 'settings'
@@ -49,6 +50,32 @@ export function ChannelBar() {
         )
       })}
       <span className="bili-topline absolute inset-x-0 bottom-0 h-[2px] opacity-70" />
+      <div className="ml-auto flex items-center gap-2 pr-1">
+        <DanmakuToggle />
+      </div>
+      <span className="bili-topline absolute inset-x-0 bottom-0 h-[2px] opacity-70" />
     </nav>
+  )
+}
+
+/** 弹幕总开关。B 站播放器上就是这样一个「弹」字按钮，一眼能认出来。 */
+function DanmakuToggle() {
+  const enabled = useDanmakuSettings((s) => s.enabled)
+  const setEnabled = useDanmakuSettings((s) => s.setEnabled)
+  return (
+    <button
+      type="button"
+      onClick={() => setEnabled(!enabled)}
+      aria-pressed={enabled}
+      title={enabled ? '关闭弹幕' : '打开弹幕'}
+      className={[
+        'bili-press flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11.5px] transition-colors',
+        enabled
+          ? 'border-[var(--bili-pink)] bg-[color-mix(in_oklab,var(--bili-pink)_10%,white)] text-[var(--bili-pink)]'
+          : 'border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-2)]',
+      ].join(' ')}
+    >
+      弹
+    </button>
   )
 }
