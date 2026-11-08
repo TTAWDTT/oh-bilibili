@@ -100,3 +100,15 @@
   line-height: 1;
   color: rgb(255 255 255 / 0.72);
 }
+
+/* Linear 的做法：行内操作静止时不占视觉，hover 或键盘聚焦才出现。
+   列表一行里三个图标常驻会让整页看起来全是按钮，扫读时噪音太大。 */
+[data-row='track'] > div:last-child {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+[data-row='track']:hover > div:last-child,
+[data-row='track']:focus-within > div:last-child {
+  opacity: 1;
+}
