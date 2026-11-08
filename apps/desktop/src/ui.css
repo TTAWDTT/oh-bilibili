@@ -629,3 +629,29 @@ button:hover > .bili-channel-icon {
   transform: scale(1.006);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
 }
+
+/* ── 基础交互兜底 ─────────────────────────────────────
+ * 审计发现 72 个按钮没有悬停或按下反馈，点了没反应等于「死的」。
+ * 与其逐个补 class，不如在按钮这一层统一给：指针手型 + 按下回弹。
+ * 需要更精细反馈的地方仍然用 .bili-press / .bili-icon-hover 覆盖。
+ */
+button:not(:disabled),
+[role='button'] {
+  cursor: pointer;
+  transition:
+    transform 160ms var(--spring),
+    color 160ms var(--ease),
+    background-color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    opacity 160ms var(--ease);
+}
+
+button:not(:disabled):active,
+[role='button']:active {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
