@@ -31,11 +31,11 @@ function RailToggle({
       disabled={!enabled}
       onClick={() => toggleRail(tab)}
       className={[
-        't press relative flex h-8 items-center gap-1 rounded-full px-2',
+        't press relative flex h-8 items-center gap-1 rounded-[6px] px-2',
         enabled
           ? active
             ? 'text-[var(--accent)]'
-            : 'text-white/42 hover:bg-white/8 hover:text-white/84'
+            : 'text-white/42 hover:text-white'
           : 'cursor-default text-white/18',
       ].join(' ')}
     >
@@ -53,14 +53,14 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
       <button
         type="button"
         onClick={() => navigate({ kind: 'search' })}
-        className="t press flex items-center gap-3 rounded-xl px-1 py-1 text-left hover:bg-white/[0.04]"
+        className="t group flex items-center gap-3 px-1 py-1 text-left"
       >
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/14 text-white/28">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center border border-hairline text-white/25">
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-medium text-white/72">还没有在播放</span>
-          <span className="mt-1 block text-[11.5px] text-white/38">去搜索里挑一首 →</span>
+          <span className="block text-[13px] font-medium text-white/70 group-hover:text-white">还没有在播放</span>
+          <span className="mt-1 block text-[11.5px] text-white/38 group-hover:text-white/60">去搜索里挑一首 →</span>
         </span>
       </button>
     )
@@ -68,15 +68,12 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <div className="relative shrink-0">
-        <div className="absolute -inset-1 rounded-xl opacity-70 blur-lg" style={{ background: 'var(--accent-soft)' }} />
-        <Cover
-          cover={track.cover}
-          title={track.title}
-          className="relative h-14 w-14 rounded-xl border border-white/12"
-          glyphClassName="text-[22px] font-semibold text-white/60"
-        />
-      </div>
+      <Cover
+        cover={track.cover}
+        title={track.title}
+        className="h-12 w-12 shrink-0 rounded-[6px] border border-white/12"
+        glyphClassName="text-[20px] font-semibold text-white/60"
+      />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13.5px] font-medium leading-tight text-white" title={track.title}>
           {track.title}
@@ -85,7 +82,7 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           <span className="truncate text-[11.5px] text-white/44" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-full border border-white/12 px-1.5 py-[1px] font-mono text-[9px] text-white/40">
+          <span className="num shrink-0 rounded-[3px] border border-white/12 px-1.5 py-[1px] font-mono text-[9px] text-white/40">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>
@@ -101,24 +98,22 @@ export function PlayerBar() {
   const track = snapshot?.track ?? null
 
   return (
-    <div className="relative z-20 px-3 pb-3">
-      {/* 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏 */}
-      <section className="glass grid h-[92px] grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 rounded-[24px] border border-hairline px-5 shadow-[0_24px_70px_-34px_rgba(0,0,0,0.95)]">
-        <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
+    // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
+    <section className="relative z-20 grid h-[88px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-white/[0.018] px-6">
+      <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
 
-        <div className="flex min-w-0 flex-col items-center gap-2">
-          <Transport />
-          <PlaybackProgress />
-        </div>
+      <div className="flex min-w-0 flex-col items-center gap-2">
+        <Transport />
+        <PlaybackProgress />
+      </div>
 
-        <div className="flex min-w-0 items-center justify-end gap-2">
-          {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
-          <VolumeControl />
-          <span className="h-5 w-px bg-white/10" />
-          <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
-          <RailToggle tab="queue" active={rail === 'queue'} count={queued} enabled={queued > 0} />
-        </div>
-      </section>
-    </div>
+      <div className="flex min-w-0 items-center justify-end gap-2">
+        {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
+        <VolumeControl />
+        <span className="h-5 w-px bg-white/10" />
+        <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
+        <RailToggle tab="queue" active={rail === 'queue'} count={queued} enabled={queued > 0} />
+      </div>
+    </section>
   )
 }

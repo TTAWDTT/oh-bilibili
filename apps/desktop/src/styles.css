@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* 霞鹜文楷 Lite：只引常规与粗体两个字重，其余靠浏览器按需取子集。 */
+@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-regular.css";
+@import "lxgw-wenkai-lite-webfont/lxgwwenkailite-bold.css";
 @import "./ui.css";
 
 @theme {
@@ -6,8 +9,8 @@
   --color-ink-raised: #0b0b12;
   --color-hairline: rgb(255 255 255 / 0.09);
   --color-muted: rgb(255 255 255 / 0.46);
-  --font-sans: "SF Pro Text", "PingFang SC", -apple-system, system-ui, sans-serif;
-  --font-display: "SF Pro Display", "PingFang SC", -apple-system, system-ui, sans-serif;
+  --font-sans: "LXGW WenKai Lite", "PingFang SC", -apple-system, system-ui, sans-serif;
+  --font-display: "LXGW WenKai Lite", "PingFang SC", -apple-system, system-ui, sans-serif;
 }
 
 :root {
@@ -97,12 +100,6 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
   opacity: 0.05;
   mix-blend-mode: overlay;
-}
-
-.glass {
-  background: rgb(255 255 255 / 0.045);
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
 }
 
 .text-gradient {

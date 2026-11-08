@@ -64,9 +64,9 @@ export default function App() {
       <div className="grain pointer-events-none absolute inset-0 z-[1]" />
       <TitleBar />
 
-      <div className="relative z-10 flex min-h-0 flex-1 px-3">
+      <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
-        <main className="glass ml-3 block min-w-0 flex-1 overflow-hidden rounded-[26px] border border-hairline">
+        <main className="block min-w-0 flex-1 overflow-hidden">
           <CurrentView view={view} />
         </main>
         <div className="rail-slot" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>

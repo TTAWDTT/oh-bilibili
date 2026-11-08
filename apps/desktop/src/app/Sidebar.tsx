@@ -20,6 +20,9 @@ const NAV: readonly NavItem[] = [
   { view: { kind: 'settings' }, label: '设置', icon: 'settings' },
 ]
 
+/** 左栏与主区共用同一条发丝线：激活项靠左侧 2px 色条标记，不再铺底色。 */
+const ROW = 't group flex items-center border-l-2 text-left'
+
 export function Sidebar() {
   const view = useAppStore((state) => state.view)
   const navigate = useAppStore((state) => state.navigate)
@@ -34,8 +37,8 @@ export function Sidebar() {
   const user = auth?.logged_in === true ? auth.user : null
 
   return (
-    <aside className="glass flex w-[232px] shrink-0 flex-col overflow-hidden rounded-[26px] border border-hairline">
-      <nav className="flex flex-col gap-1 px-3 pt-4">
+    <aside className="flex w-[232px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-white/[0.018]">
+      <nav className="flex flex-col pt-1">
         {NAV.map((item) => {
           const active = view.kind === item.view.kind
           const badge = item.view.kind === 'liked' ? likedCount : item.view.kind === 'downloads' ? runningDownloads : 0
@@ -46,16 +49,15 @@ export function Sidebar() {
               aria-current={active ? 'page' : undefined}
               onClick={() => navigate(item.view)}
               className={[
-                'group t press flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px]',
-                active
-                  ? 'bg-white/14 text-white'
-                  : 'text-white/62 hover:bg-white/[0.06] hover:text-white/88',
+                ROW,
+                'gap-3 px-4 py-2.5 text-[13px]',
+                active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/62 hover:text-white',
               ].join(' ')}
             >
-              <span className={active ? 'text-[var(--accent)]' : 'text-white/50 group-hover:text-white/75'}>
+              <span className={active ? 'text-[var(--accent)]' : 'text-white/40 group-hover:text-white/80'}>
                 <Icon name={item.icon} />
               </span>
-              <span className="flex-1 text-left">{item.label}</span>
+              <span className="flex-1">{item.label}</span>
               {badge > 0 ? (
                 <span className="rounded-full bg-white/10 px-1.5 py-[1px] font-mono text-[10px] text-white/55">{badge}</span>
               ) : null}
@@ -64,28 +66,28 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-6 flex items-center justify-between px-5">
+      <div className="mt-4 flex items-center justify-between border-t border-hairline pl-4 pr-3 pb-1 pt-3">
         <span className="text-[10px] uppercase tracking-[0.22em] text-white/32">歌单</span>
         <button
           type="button"
           aria-label="新建歌单"
           title="新建歌单"
           onClick={() => setCreating(true)}
-          className="t press rounded-full p-1 text-white/34 hover:bg-white/10 hover:text-white/80"
+          className="t press rounded-[4px] p-1 text-white/34 hover:text-white"
         >
           <Icon name="plus" size={14} />
         </button>
       </div>
 
-      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
         {playlists === null ? (
-          <div className="space-y-2 px-3 py-2">
-            <Skeleton className="h-3.5 w-3/4" />
-            <Skeleton className="h-3.5 w-2/3" />
-            <Skeleton className="h-3.5 w-4/5" />
+          <div className="space-y-2.5 px-4 py-2">
+            <Skeleton className="h-3 w-3/4" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-3 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="px-3 py-2 text-[11.5px] leading-relaxed text-white/32">还没有歌单，点上面的加号建一个。</p>
+          <p className="px-4 py-2 text-[11.5px] leading-relaxed text-white/32">还没有歌单，点上面的加号建一个。</p>
         ) : (
           playlists.map((playlist) => {
             const active = view.kind === 'playlist' && view.id === playlist.id
@@ -97,11 +99,12 @@ export function Sidebar() {
                 title={playlist.name}
                 onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
                 className={[
-                  't press truncate rounded-lg px-3 py-2 text-left text-[12.5px]',
-                  active ? 'bg-white/10 text-white/92' : 'text-white/48 hover:bg-white/[0.05] hover:text-white/82',
+                  ROW,
+                  'truncate px-4 py-1.5 text-[12.5px]',
+                  active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/48 hover:text-white',
                 ].join(' ')}
               >
-                {playlist.name}
+                <span className="truncate">{playlist.name}</span>
               </button>
             )
           })
@@ -112,16 +115,16 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => (user ? navigate({ kind: 'settings' }) : setAuthOpen(true))}
-          className="t press flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/[0.06]"
+          className="t flex w-full items-center gap-3 px-1 py-2 text-left"
         >
           {user?.avatar ? (
-            <img src={user.avatar} alt="" className="h-9 w-9 rounded-full border border-white/12 object-cover" />
+            <img src={user.avatar} alt="" className="h-9 w-9 rounded-[6px] border border-white/12 object-cover" />
           ) : user ? (
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#ff3d81] to-[#7c4dff] text-[13px] font-medium text-white/90">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[6px] bg-white/10 text-[13px] font-medium text-white/90">
               {user.uname.slice(0, 1)}
             </span>
           ) : (
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/40">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[6px] border border-white/12 text-white/40">
               <Icon name="user" size={16} />
             </span>
           )}

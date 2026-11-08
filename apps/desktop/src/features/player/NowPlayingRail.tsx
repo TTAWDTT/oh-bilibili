@@ -16,8 +16,8 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       onClick={onClick}
       aria-pressed={active}
       className={[
-        't press rounded-full px-3 py-1 text-[11.5px]',
-        active ? 'bg-white/14 text-white' : 'text-white/44 hover:bg-white/[0.06] hover:text-white/80',
+        't -mb-px border-b-2 py-3 text-[11.5px]',
+        active ? 'border-[var(--accent)] text-white' : 'border-transparent text-white/44 hover:text-white',
       ].join(' ')}
     >
       {label}
@@ -27,16 +27,13 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
 
 function TrackHeader({ track, quality, loading }: { track: Track; quality: number | null; loading: boolean }) {
   return (
-    <div className="flex gap-4 px-5 pt-4">
-      <div className="relative shrink-0">
-        <div className="absolute -inset-3 rounded-2xl opacity-60 blur-2xl" style={{ background: 'var(--accent-soft)' }} />
-        <Cover
-          cover={track.cover}
-          title={track.title}
-          className="relative h-[84px] w-[84px] rounded-xl border border-white/12"
-          glyphClassName="text-[30px] font-semibold text-white/60"
-        />
-      </div>
+    <div className="flex gap-4 px-5 py-4">
+      <Cover
+        cover={track.cover}
+        title={track.title}
+        className="h-[84px] w-[84px] shrink-0 rounded-[6px] border border-white/12"
+        glyphClassName="text-[30px] font-semibold text-white/60"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-white/32">
           正在播放
@@ -53,7 +50,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ReactionButtons track={track} size={15} />
-          <span className="num rounded-full border border-white/12 px-2 py-[1px] font-mono text-[9px] text-white/40">
+          <span className="num rounded-[3px] border border-white/12 px-2 py-[1px] font-mono text-[9px] text-white/40">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>
@@ -72,12 +69,9 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
   const queued = queue?.items.length ?? 0
 
   return (
-    <aside
-      aria-label="播放右栏"
-      className="glass flex h-full w-[336px] flex-col overflow-hidden rounded-[26px] border border-hairline"
-    >
-      <div className="flex items-center justify-between px-3 pt-3">
-        <div className="flex items-center gap-1">
+    <aside aria-label="播放右栏" className="flex h-full w-[336px] flex-col overflow-hidden border-l border-hairline bg-white/[0.018]">
+      <div className="flex items-center justify-between border-b border-hairline pl-5 pr-3">
+        <div className="flex items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />
           <RailTabButton
             active={tab === 'queue'}
@@ -90,7 +84,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
           aria-label="收起右栏"
           title="收起右栏（Esc）"
           onClick={closeRail}
-          className="t press rounded-full p-1.5 text-white/34 hover:bg-white/8 hover:text-white/80"
+          className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white"
         >
           <Icon name="close" size={14} />
         </button>
@@ -98,7 +92,7 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
 
       {track ? <TrackHeader track={track} quality={snapshot?.quality_kbps ?? null} loading={snapshot?.phase === 'loading'} /> : null}
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col border-t border-hairline">
+      <div className="flex min-h-0 flex-1 flex-col border-t border-hairline">
         {tab === 'queue' ? (
           <QueueList />
         ) : track ? (

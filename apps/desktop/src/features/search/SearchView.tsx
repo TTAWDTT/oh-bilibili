@@ -5,18 +5,14 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageHeader } from '../../shared/ui/PageHeader'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { TrackList } from '../tracks/TrackList'
 
 const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
-const HINTS = [
-  { title: '本机直连', detail: '请求从这台电脑直达 B 站，不经过任何中间服务器。' },
-  { title: '不承诺无损', detail: 'B 站音轨最高约 192K，播放页如实显示实际码率。' },
-  { title: '喜欢可离线', detail: '红心先落本机，登录后统一同步到 B 站账号。' },
-]
+// 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
+const HINT = '本机直连 B 站｜不承诺无损，最高约 192K｜红心先落本机，登录后同步'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -26,7 +22,7 @@ function PagerButton({ label, disabled, onClick }: { label: string; disabled: bo
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="t press rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white/85 disabled:cursor-default disabled:opacity-30"
+      className="t press rounded-[6px] border border-hairline px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white disabled:cursor-default disabled:opacity-30"
     >
       {label}
     </button>
@@ -93,22 +89,7 @@ export function SearchView() {
 
   return (
     <div className="h-full max-w-[1040px] overflow-y-auto px-8 pb-10 pt-8">
-      <PageHeader
-        eyebrow="搜索"
-        title="搜一首歌"
-        subtitle="歌名、UP 主都行。结果按标题匹配度排序，音源从你自己的 B 站账号可访问的视频里取。"
-        actions={
-          trimmed ? (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              className="t press rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white/85"
-            >
-              清空
-            </button>
-          ) : null
-        }
-      />
+
 
       <form
         onSubmit={(event) => {
@@ -117,7 +98,7 @@ export function SearchView() {
         }}
         className="mt-6"
       >
-        <div className="glass flex items-center gap-3 rounded-2xl border border-hairline px-4 py-3 focus-within:border-white/28">
+        <div className="flex items-center gap-3 rounded-[6px] border border-hairline bg-white/[0.02] px-4 py-3 focus-within:border-white/28">
           <Icon name="search" size={18} className="text-white/32" />
           <input
             ref={inputRef}
@@ -136,7 +117,7 @@ export function SearchView() {
               onClick={() => setQuery('')}
               aria-label="清空输入"
               title="清空输入"
-              className="t press rounded-full p-1 text-white/34 hover:bg-white/10 hover:text-white/80"
+              className="t press rounded-[4px] p-1 text-white/34 hover:text-white"
             >
               <Icon name="close" size={14} />
             </button>
@@ -150,32 +131,23 @@ export function SearchView() {
 
       {trimmed.length === 0 ? (
         <div className="mt-10">
-          <div className="text-[10.5px] uppercase tracking-[0.22em] text-white/32">试试这些</div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
             {SUGGESTIONS.map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
                 onClick={() => pick(suggestion)}
-                className="t press rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-[12.5px] text-white/64 hover:border-white/24 hover:bg-white/[0.06] hover:text-white/92"
+                className="t press text-[12.5px] text-white/45 underline-offset-4 hover:text-white hover:underline"
               >
                 {suggestion}
               </button>
             ))}
           </div>
-
-          <div className="mt-12 grid gap-3 sm:grid-cols-3">
-            {HINTS.map((hint) => (
-              <div key={hint.title} className="rounded-2xl border border-hairline bg-white/[0.02] p-4">
-                <div className="text-[12.5px] text-white/76">{hint.title}</div>
-                <div className="mt-2 text-[11px] leading-relaxed text-white/38">{hint.detail}</div>
-              </div>
-            ))}
-          </div>
+          <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[11.5px] leading-relaxed text-white/34">{HINT}</p>
         </div>
       ) : (
         <section className="mt-8">
-          <div className="mb-2 flex min-h-5 items-center justify-between px-3 text-[10.5px] tracking-[0.16em] text-white/32">
+          <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[10.5px] tracking-[0.16em] text-white/32">
             <span>
               {status === 'error'
                 ? '搜索失败'

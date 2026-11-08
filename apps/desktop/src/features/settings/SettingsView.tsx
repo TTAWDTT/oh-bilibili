@@ -11,9 +11,10 @@ import { Icon } from '../../shared/ui/Icon'
 import { PageHeader } from '../../shared/ui/PageHeader'
 import { ShortcutTable } from './ShortcutTable'
 
-function Card({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+/** 设置项之间只用一条发丝线分隔：分组是信息层级，不需要再画一层框。 */
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className={['rounded-2xl border border-hairline bg-white/[0.02] p-5', className ?? ''].join(' ')}>
+    <section className="border-b border-hairline py-6">
       <h2 className="text-[10px] uppercase tracking-[0.22em] text-white/32">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
@@ -22,7 +23,7 @@ function Card({ title, children, className }: { title: string; children: ReactNo
 
 function Chip({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
+    <span className="flex items-center gap-2 rounded-[4px] border border-white/10 px-2.5 py-1.5">
       <span className="text-[9.5px] uppercase tracking-[0.14em] text-white/32">{label}</span>
       <span className="num font-mono text-[10.5px] text-white/72">{value}</span>
     </span>
@@ -69,25 +70,23 @@ export function SettingsView() {
   }, [syncing])
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
+    <div className="h-full overflow-y-auto px-8 pb-12 pt-8">
       <PageHeader
-        eyebrow="设置"
-        title="设置"
-        subtitle="账号、同步、快捷键与版本信息。这里没有账号切换，只有一个当前登录的账号。"
         actions={null}
       />
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
-        <Card title="快捷键" className="lg:col-span-2">
+      <div className="mt-6 max-w-[880px]">
+        <Section title="快捷键">
           <ShortcutTable />
-        </Card>
-        <Card title="账号">
+        </Section>
+
+        <Section title="账号">
           {user ? (
             <div className="flex items-center gap-4">
               {user.avatar ? (
-                <img src={user.avatar} alt="" className="h-14 w-14 rounded-full border border-white/12 object-cover" />
+                <img src={user.avatar} alt="" className="h-12 w-12 rounded-[6px] border border-white/12 object-cover" />
               ) : (
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#ff3d81] to-[#7c4dff] text-[18px] font-medium text-white/90">
+                <span className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-white/10 text-[17px] font-medium text-white/90">
                   {user.uname.slice(0, 1)}
                 </span>
               )}
@@ -100,7 +99,7 @@ export function SettingsView() {
               <button
                 type="button"
                 onClick={() => void logout()}
-                className="t press flex shrink-0 items-center gap-1.5 rounded-full border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
+                className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
               >
                 <Icon name="logout" size={13} />
                 退出
@@ -115,15 +114,15 @@ export function SettingsView() {
               <button
                 type="button"
                 onClick={() => setAuthOpen(true)}
-                className="t press mt-4 rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+                className="t press mt-4 rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
               >
                 扫码登录
               </button>
             </div>
           )}
-        </Card>
+        </Section>
 
-        <Card title="同步">
+        <Section title="同步">
           <div className="text-[13px] text-white/84">喜欢与收藏</div>
           <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
             离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
@@ -132,14 +131,14 @@ export function SettingsView() {
             type="button"
             onClick={() => void sync()}
             disabled={syncing}
-            className="t press mt-4 flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] text-white/84 hover:border-white/24 hover:bg-white/[0.1] disabled:cursor-default disabled:opacity-40"
+            className="t press mt-4 flex items-center gap-2 rounded-[6px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white disabled:cursor-default disabled:opacity-40"
           >
             <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
             {syncing ? '同步中…' : '立即同步'}
           </button>
-        </Card>
+        </Section>
 
-        <Card title="音质">
+        <Section title="音质">
           <div className="text-[13px] text-white/84">如实显示，不承诺无损</div>
           <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
             B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
@@ -148,9 +147,9 @@ export function SettingsView() {
             <Chip label="档位" value="64 / 132 / 192K" />
             <Chip label="引擎" value={health?.engine ?? (healthFailed ? '不可用' : '…')} />
           </div>
-        </Card>
+        </Section>
 
-        <Card title="关于">
+        <Section title="关于">
           <div className="text-[13px] text-white/84">BiliMusic alpha</div>
           <p className="mt-2 text-[11.5px] leading-relaxed text-white/36">
             音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
@@ -161,26 +160,25 @@ export function SettingsView() {
             <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
           </div>
           {isTauri ? null : (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-[#7bf0ff]/18 bg-[#7bf0ff]/[0.05] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#9fe6ff]/70">
+            <div className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-[#9fe6ff]/70">
               <Icon name="info" size={13} className="mt-[2px] shrink-0" />
               当前跑在浏览器预览：音源是 30 秒假音频，登录会在约 5 秒后自动成功。
             </div>
           )}
-        </Card>
+        </Section>
 
+        {healthFailed ? (
+          <div className="py-4">
+            <EmptyState
+              icon="alert"
+              title="外壳信息读不到"
+              detail="IPC 通道可能没起来，界面其余部分仍可独立工作。"
+              action={{ label: '重试', onClick: () => setHealthNonce((current) => current + 1) }}
+              compact
+            />
+          </div>
+        ) : null}
       </div>
-
-      {healthFailed ? (
-        <div className="mt-4">
-          <EmptyState
-            icon="alert"
-            title="外壳信息读不到"
-            detail="IPC 通道可能没起来，界面其余部分仍可独立工作。"
-            action={{ label: '重试', onClick: () => setHealthNonce((current) => current + 1) }}
-            compact
-          />
-        </div>
-      ) : null}
     </div>
   )
 }

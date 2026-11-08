@@ -27,22 +27,19 @@ function QueueRow({
       onClick={onPlay}
       aria-current={active ? 'true' : undefined}
       style={{ height: QUEUE_ROW_HEIGHT }}
-      className={[
-        't press flex w-full items-center gap-3 rounded-xl px-3 text-left',
-        active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]',
-      ].join(' ')}
+      className="t group flex w-full items-center gap-3 border-b border-hairline px-4 text-left"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
         {active ? <Equalizer size="sm" /> : <span className="num font-mono text-[10px] text-white/28">{index + 1}</span>}
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={['block truncate text-[12.5px]', active ? 'text-[var(--accent)]' : 'text-white/78'].join(' ')}
+          className={['block truncate text-[12.5px]', active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white'].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[10.5px] text-white/36" title={track.artist}>
+        <span className="mt-1 block truncate text-[10.5px] text-white/36 group-hover:text-white/55" title={track.artist}>
           {track.artist}
         </span>
       </span>
@@ -58,9 +55,12 @@ export function QueueList() {
 
   if (!queue) {
     return (
-      <div className="space-y-3 px-5 py-5" aria-hidden>
-        {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-9 w-full rounded-lg" />
+      <div aria-hidden>
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="flex h-12 items-center gap-3 border-b border-hairline px-4">
+            <Skeleton className="h-2.5 w-3" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
         ))}
       </div>
     )
@@ -94,11 +94,11 @@ export function QueueList() {
         接下来 · {queue.items.length} 首
       </div>
       {queue.items.length > VIRTUAL_THRESHOLD ? (
-        <div className="flex min-h-0 flex-1 flex-col px-2 pb-4">
+        <div className="flex min-h-0 flex-1 flex-col">
           <VirtualList items={queue.items} rowHeight={QUEUE_ROW_HEIGHT} renderRow={rows} />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {queue.items.map((track, index) => (
             <div key={`${track.key}-${index}`} style={{ height: QUEUE_ROW_HEIGHT }}>
               {rows(track, index)}

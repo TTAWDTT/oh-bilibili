@@ -118,7 +118,7 @@ export function Slider({
         />
       </div>
       <div
-        className="t pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full bg-white opacity-0 shadow-[0_0_14px_var(--accent)] group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
+        className="t pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full bg-white opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
         style={{ left: `${clamp(value, 0, 1) * 100}%` }}
       />
     </div>

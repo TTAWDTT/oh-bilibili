@@ -1,57 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
-import { hueFor } from '../../shared/lib/format'
+import type { Track } from '../../shared/lib/contract'
+import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { PageHeader } from '../../shared/ui/PageHeader'
-import { PlaylistGridSkeleton } from '../../shared/ui/Skeleton'
+import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
+import { usePlayerStore } from '../player/playerStore'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
 import { useLibraryStore } from './libraryStore'
 
-function PlaylistCard({ name, onClick }: { name: string; onClick: () => void }) {
-  const hue = hueFor(name)
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="t press group relative overflow-hidden rounded-2xl border border-hairline bg-white/[0.025] p-4 text-left hover:border-white/18 hover:bg-white/[0.05]"
-    >
-      <div
-        className="relative aspect-square overflow-hidden rounded-xl"
-        style={{ background: `linear-gradient(145deg, hsl(${hue} 60% 20%), hsl(${(hue + 46) % 360} 78% 40%))` }}
-      >
-        <div className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/12 blur-xl" />
-        <div className="absolute inset-0 flex items-center justify-center text-white/30">
-          <Icon name="library" size={34} />
-        </div>
-        <div className="t absolute bottom-2 right-2 rounded-full bg-black/35 p-1.5 text-white/75 opacity-0 backdrop-blur group-hover:opacity-100">
-          <Icon name="play" size={13} />
-        </div>
-      </div>
-      <div className="mt-3 truncate text-[13px] text-white/84" title={name}>
-        {name}
-      </div>
-      <div className="mt-1 text-[10.5px] text-white/32">歌单</div>
-    </button>
-  )
-}
-
 export function LibraryView() {
   const playlists = useLibraryStore((state) => state.playlists)
+  const revision = useLibraryStore((state) => state.revision)
   const navigate = useAppStore((state) => state.navigate)
+  const playContext = usePlayerStore((state) => state.playContext)
+  const [tracksByList, setTracksByList] = useState<Record<number, readonly Track[]>>({})
   const [creating, setCreating] = useState(false)
+
+  // 曲目数是列表行的第二列，逐张读一次；读失败只影响这一列，不挡住整页。
+  useEffect(() => {
+    if (!playlists) return
+    let alive = true
+    Promise.all(playlists.map(async (playlist) => [playlist.id, await ipc.libraryTracks(playlist.id)] as const))
+      .then((entries) => {
+        if (alive) setTracksByList(Object.fromEntries(entries))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [playlists, revision])
 
   return (
     <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
       <PageHeader
-        eyebrow="曲库"
-        title="歌单"
-        subtitle="全部存在本机，按你自己的顺序收着。登录后喜欢与收藏会同步到 B 站账号。"
         actions={
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] text-white/84 hover:border-white/24 hover:bg-white/[0.1]"
+            className="t press flex items-center gap-2 rounded-[6px] border border-white/14 px-4 py-2 text-[12px] text-white/84 hover:border-white/30 hover:text-white"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -60,8 +48,8 @@ export function LibraryView() {
       />
 
       {playlists === null ? (
-        <div className="mt-7">
-          <PlaylistGridSkeleton cards={6} />
+        <div className="mt-8">
+          <PlaylistRowsSkeleton rows={4} />
         </div>
       ) : playlists.length === 0 ? (
         <div className="flex min-h-[320px] items-center justify-center">
@@ -73,15 +61,61 @@ export function LibraryView() {
           />
         </div>
       ) : (
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
-          {playlists.map((playlist) => (
-            <PlaylistCard
-              key={playlist.id}
-              name={playlist.name}
-              onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-            />
-          ))}
-        </div>
+        <section className="mt-8 max-w-[900px]">
+          <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
+            <span className="flex-1">歌单</span>
+            <span className="num w-16 text-right">曲目</span>
+            <span className="w-[68px]" />
+          </div>
+          {playlists.map((playlist) => {
+            const tracks = tracksByList[playlist.id]
+            const count = tracks ? `${tracks.length} 首` : '——'
+            return (
+              <div key={playlist.id} className="group flex items-center gap-4 border-b border-hairline px-4">
+                <button
+                  type="button"
+                  onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
+                  className="flex min-w-0 flex-1 items-center gap-3 py-3.5 text-left"
+                >
+                  <span className="text-white/26 group-hover:text-white/60">
+                    <Icon name="library" size={15} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-white/70 group-hover:text-white" title={playlist.name}>
+                    {playlist.name}
+                  </span>
+                  <span className="num w-16 shrink-0 text-right font-mono text-[10.5px] text-white/32">{count}</span>
+                </button>
+                <div className="flex w-[68px] shrink-0 items-center justify-end gap-0.5">
+                  <button
+                    type="button"
+                    aria-label={`播放 ${playlist.name}`}
+                    title="播放歌单"
+                    disabled={!tracks || tracks.length === 0}
+                    onClick={() => {
+                      if (!tracks || tracks.length === 0) return
+                      void playContext(
+                        tracks.map((track) => track.key),
+                        0,
+                      )
+                    }}
+                    className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white disabled:cursor-default disabled:opacity-20"
+                  >
+                    <Icon name="play" size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`打开 ${playlist.name}`}
+                    title="打开歌单"
+                    onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
+                    className="t press rounded-[4px] p-1.5 text-white/34 hover:text-white"
+                  >
+                    <Icon name="chevronRight" size={14} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </section>
       )}
 
       <CreatePlaylistModal open={creating} onClose={() => setCreating(false)} />

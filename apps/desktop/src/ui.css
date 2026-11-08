@@ -1,6 +1,6 @@
 /*
  * 交互与动效工具层。全站只有两个常量（--dur / --ease）和三条工具类，
- * 按钮、卡片、右栏都从这里取过渡与按压反馈，避免每个组件各自发明一套。
+ * 按钮与右栏都从这里取过渡与按压反馈，避免每个组件各自发明一套。
  */
 
 /* 基础层：选区、可选中文本、键盘焦点环、细滚动条 */
@@ -13,7 +13,7 @@
   cursor: text;
 }
 
-/* 键盘焦点环必须可见：两条头发丝一样的白线在玻璃底上才分得清。 */
+/* 键盘焦点环必须可见：两条头发丝一样的白线在纯黑底上才分得清。 */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -82,7 +82,6 @@
 
 .rail-slot[data-open='true'] {
   width: var(--rail-w);
-  margin-left: 12px;
   opacity: 1;
 }
 
@@ -94,7 +93,7 @@
   height: 20px;
   padding: 0 5px;
   border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 6px;
+  border-radius: 4px;
   background: rgb(255 255 255 / 0.06);
   font-family: var(--font-sans);
   font-size: 10.5px;

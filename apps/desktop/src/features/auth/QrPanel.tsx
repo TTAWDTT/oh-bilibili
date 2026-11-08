@@ -46,9 +46,9 @@ export function QrPanel({ state, url }: QrPanelProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+    <div>
       <div className="flex gap-4">
-        <div className="relative flex h-[124px] w-[124px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-gradient-to-br from-white/[0.07] to-transparent">
+        <div className="relative flex h-[124px] w-[124px] shrink-0 items-center justify-center overflow-hidden border border-white/12">
           <span
             className="absolute inset-2 rounded-full border border-dashed border-white/12"
             style={{ animation: state === 'waiting' ? 'spin-slow 22s linear infinite' : undefined }}
@@ -68,14 +68,14 @@ export function QrPanel({ state, url }: QrPanelProps) {
           <button
             type="button"
             onClick={() => void copy()}
-            className="t press mt-3 flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-[11px] text-white/72 hover:border-white/24 hover:text-white/92"
+            className="t press mt-3 flex items-center gap-1.5 rounded-[6px] border border-white/12 px-3 py-1.5 text-[11px] text-white/72 hover:border-white/28 hover:text-white"
           >
             <Icon name="copy" size={12} />
             复制登录链接
           </button>
         </div>
       </div>
-      <div className="selectable mt-3 break-all rounded-lg border border-white/8 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/34">
+      <div className="selectable mt-4 break-all rounded-[4px] border border-white/8 bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-white/34">
         {url}
       </div>
     </div>

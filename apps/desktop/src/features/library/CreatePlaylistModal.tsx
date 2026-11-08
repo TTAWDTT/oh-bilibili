@@ -52,20 +52,20 @@ export function CreatePlaylistModal({ open, onClose }: CreatePlaylistModalProps)
           onChange={(event) => setName(event.target.value)}
           placeholder="给歌单起个名字"
           aria-label="歌单名"
-          className="t w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[13px] text-white/90 placeholder:text-white/26 focus:border-white/28"
+          className="t w-full rounded-[6px] border border-white/12 bg-white/[0.03] px-4 py-3 text-[13px] text-white/90 placeholder:text-white/26 focus:border-white/28"
         />
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="t press rounded-full px-4 py-1.5 text-[12px] text-white/50 hover:bg-white/8 hover:text-white/85"
+            className="t press rounded-[6px] px-4 py-1.5 text-[12px] text-white/50 hover:text-white"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={busy || name.trim().length === 0}
-            className="t press rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/88 disabled:cursor-default disabled:opacity-35"
+            className="t press rounded-[6px] bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/88 disabled:cursor-default disabled:opacity-35"
           >
             {busy ? '创建中…' : '创建'}
           </button>

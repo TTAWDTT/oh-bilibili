@@ -45,26 +45,24 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`modal-panel relative w-full ${width} overflow-hidden rounded-3xl border border-white/12 bg-[#0a0a10]/94 shadow-[0_50px_140px_-30px_rgba(0,0,0,0.92)]`}
+        className={`modal-panel relative w-full ${width} border border-white/14 bg-[#0b0b10]`}
       >
-        <div className="flex items-start justify-between gap-4 px-6 pb-1 pt-6">
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div>
-            <h2 className="font-display text-[22px] font-semibold tracking-[-0.01em] text-white/94">{title}</h2>
-            {description ? (
-              <p className="mt-2 max-w-sm text-[12.5px] leading-relaxed text-white/44">{description}</p>
-            ) : null}
+            <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em] text-white/94">{title}</h2>
+            {description ? <p className="mt-2 max-w-sm text-[12.5px] leading-relaxed text-white/44">{description}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="关闭"
             title="关闭（Esc）"
-            className="t press rounded-full p-2 text-white/45 hover:bg-white/10 hover:text-white/85"
+            className="t press rounded-[4px] p-2 text-white/45 hover:text-white"
           >
             <Icon name="close" size={16} />
           </button>
         </div>
-        <div className="px-6 pb-6 pt-4">{children}</div>
+        <div className="px-6 py-5">{children}</div>
       </div>
     </div>,
     document.body,

@@ -26,13 +26,10 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
     <div
       aria-current={active ? 'true' : undefined}
       style={{ height: TRACK_ROW_HEIGHT }}
-      className={[
-        'group flex items-center gap-3 rounded-xl px-3',
-        active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05] active:bg-white/[0.09]',
-      ].join(' ')}
+      className="group flex items-center gap-3 border-b border-hairline px-4"
     >
       <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-white/28">
-        {active ? <Equalizer size="sm" /> : index + 1}
+        {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
       </span>
 
       <button
@@ -40,7 +37,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         onClick={onPlay}
         aria-label={`播放 ${track.title}`}
         title={`播放 ${track.title}`}
-        className="t press relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 hover:border-white/30"
+        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[6px] border border-white/10"
       >
         <Cover
           cover={track.cover}
@@ -48,19 +45,19 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
           className="h-full w-full"
           glyphClassName="text-[16px] font-medium text-white/55"
         />
-        <span className="t absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-          {active && playing ? <Equalizer size="sm" /> : <Icon name="play" size={13} />}
-        </span>
       </button>
 
       <button type="button" onClick={onPlay} className="min-w-0 flex-1 text-left">
         <span
-          className={['t block truncate text-[13px]', active ? 'text-[var(--accent)]' : 'text-white/84 hover:text-white'].join(' ')}
+          className={[
+            't block truncate text-[13px]',
+            active ? 'text-[var(--accent)]' : 'text-white/70 group-hover:text-white',
+          ].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[10.5px] text-white/36" title={track.artist}>
+        <span className="mt-1 block truncate text-[10.5px] text-white/36 group-hover:text-white/55" title={track.artist}>
           {track.artist}
         </span>
       </button>
@@ -69,14 +66,14 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         {formatDuration(track.duration_ms)}
       </span>
 
-      <div className="t flex shrink-0 items-center gap-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className="flex shrink-0 items-center gap-0.5">
         <ReactionButtons track={track} size={14} />
         <button
           type="button"
           aria-label="加入歌单"
           title="加入歌单"
           onClick={() => setAdding(true)}
-          className="t press rounded-full p-1.5 text-white/34 hover:bg-white/8 hover:text-white/80"
+          className="t press rounded-[4px] p-1.5 text-white/30 hover:text-white"
         >
           <Icon name="plus" size={14} />
         </button>

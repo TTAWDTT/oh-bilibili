@@ -26,8 +26,8 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           void toggleLike(track)
         }}
         className={[
-          't press rounded-full p-1.5',
-          liked ? 'text-[var(--accent)]' : 'text-white/34 hover:bg-white/8 hover:text-white/80',
+          't press rounded-[4px] p-1.5',
+          liked ? 'text-[var(--accent)]' : 'text-white/34 hover:text-white',
         ].join(' ')}
       >
         <Icon name={liked ? 'heartFilled' : 'heart'} size={size} />
@@ -42,8 +42,8 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           void toggleFav(track)
         }}
         className={[
-          't press rounded-full p-1.5',
-          faved ? 'text-[#ffc46b]' : 'text-white/34 hover:bg-white/8 hover:text-white/80',
+          't press rounded-[4px] p-1.5',
+          faved ? 'text-[#ffc46b]' : 'text-white/34 hover:text-white',
         ].join(' ')}
       >
         <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={size} />

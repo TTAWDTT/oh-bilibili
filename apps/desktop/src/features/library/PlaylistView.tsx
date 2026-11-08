@@ -55,29 +55,21 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
       <button
         type="button"
         onClick={() => navigate({ kind: 'library' })}
-        className="t press mb-4 flex w-fit items-center gap-1 rounded-full pr-2 text-[11.5px] text-white/40 hover:text-white/76"
+        className="t press mb-4 flex w-fit items-center gap-1 pr-2 text-[11.5px] text-white/40 hover:text-white"
       >
         <Icon name="chevronLeft" size={13} />
         曲库
       </button>
 
       <PageHeader
-        eyebrow="歌单"
-        title={name}
-        subtitle={
-          tracks === null
-            ? '正在读取本机歌单…'
-            : tracks.length === 0
-              ? '这张歌单还是空的。'
-              : `${tracks.length} 首 · ${formatSpan(total)}`
-        }
+        title={tracks ? `${name} · ${tracks.length} 首 · ${formatSpan(total)}` : name}
         actions={
           tracks !== null && tracks.length > 0 ? (
             <>
               <button
                 type="button"
                 onClick={() => void playContext(keys, 0)}
-                className="t press flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
+                className="t press flex items-center gap-2 rounded-[6px] bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
               >
                 <Icon name="play" size={13} />
                 播放全部
@@ -85,7 +77,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'search' })}
-                className="t press rounded-full border border-white/12 px-4 py-2 text-[12px] text-white/72 hover:border-white/24 hover:text-white/92"
+                className="t press rounded-[6px] border border-white/12 px-4 py-2 text-[12px] text-white/72 hover:border-white/28 hover:text-white"
               >
                 去添加
               </button>

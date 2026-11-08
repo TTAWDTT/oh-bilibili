@@ -29,21 +29,24 @@ export function DownloadsView() {
   return (
     <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
       <PageHeader
-        eyebrow="下载"
-        title="离线备份"
-        subtitle="下载走本机 yt-dlp，只导出音轨，不经过任何中转。文件存到你指定的目录。"
         actions={null}
       />
 
-      <div className="mt-7">
+      <div className="mt-7 max-w-[920px]">
         {items === null ? (
-          <div className="flex flex-col gap-3" aria-hidden>
+          <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (
-              <Skeleton key={index} className="h-[76px] w-full rounded-2xl" />
+              <div key={index} className="flex items-center gap-3 border-b border-hairline px-4 py-4">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-[6px]" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-48 max-w-[45%]" />
+                  <Skeleton className="h-2.5 w-64 max-w-[60%]" />
+                </div>
+              </div>
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex min-h-[320px] max-w-[920px] items-center justify-center">
+          <div className="flex min-h-[320px] items-center justify-center">
             <EmptyState
               icon="download"
               title="还没有下载"
@@ -52,30 +55,33 @@ export function DownloadsView() {
             />
           </div>
         ) : (
-          <div className="flex max-w-[920px] flex-col gap-3">
+          <>
+            <div className="flex items-center gap-3 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-white/32">
+              <span className="flex-1">曲目</span>
+              <span className="w-16 text-right">进度</span>
+            </div>
             {items.map((item) => {
               const state = STATE[item.state]
               return (
-                <div
-                  key={item.key}
-                  className="flex items-center gap-4 rounded-2xl border border-hairline bg-white/[0.025] px-4 py-3.5"
-                >
+                <div key={item.key} className="group flex items-center gap-3 border-b border-hairline px-4 py-3">
                   <Cover
                     cover={null}
                     title={item.title}
-                    className="h-11 w-11 shrink-0 rounded-lg border border-white/10"
-                    glyphClassName="text-[18px] font-medium text-white/55"
+                    className="h-10 w-10 shrink-0 rounded-[6px] border border-white/10"
+                    glyphClassName="text-[16px] font-medium text-white/55"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[13px] text-white/84" title={item.title}>{item.title}</span>
+                      <span className="truncate text-[13px] text-white/70 group-hover:text-white" title={item.title}>
+                        {item.title}
+                      </span>
                       <span className={`shrink-0 text-[10px] ${state.tone}`}>{state.label}</span>
                     </div>
                     {item.state === 'running' ? (
-                      <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-white/12">
+                      <div className="mt-2 h-[2px] w-full overflow-hidden bg-white/12">
                         {/* 进度用 scaleX 而不是 width，跑进度时不触发布局 */}
                         <div
-                          className="t h-full origin-left rounded-full"
+                          className="t h-full origin-left"
                           style={{
                             transform: `scaleX(${item.progress})`,
                             background: 'linear-gradient(90deg, var(--accent), var(--accent-deep))',
@@ -87,7 +93,7 @@ export function DownloadsView() {
                         type="button"
                         onClick={() => void copyPath(item.path ?? '')}
                         title="复制文件路径"
-                        className="t mt-2 flex max-w-full items-center gap-1.5 text-left text-[10.5px] text-white/34 hover:text-white/68"
+                        className="t mt-1.5 flex max-w-full items-center gap-1.5 text-left text-[10.5px] text-white/34 hover:text-white/68"
                       >
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
@@ -96,23 +102,23 @@ export function DownloadsView() {
                       <div className="mt-1.5 text-[10.5px] text-white/26">等待开始</div>
                     )}
                   </div>
-                  {item.state === 'done' ? (
-                    <span className="shrink-0 text-[#7bf0a0]">
-                      <Icon name="check" size={16} />
-                    </span>
-                  ) : item.state === 'failed' ? (
-                    <span className="shrink-0 text-[#ff6b8a]">
-                      <Icon name="alert" size={16} />
-                    </span>
-                  ) : (
-                    <span className="num shrink-0 font-mono text-[10px] text-white/32">
-                      {Math.round(item.progress * 100)}%
-                    </span>
-                  )}
+                  <span className="flex w-16 shrink-0 justify-end">
+                    {item.state === 'done' ? (
+                      <span className="text-[#7bf0a0]">
+                        <Icon name="check" size={16} />
+                      </span>
+                    ) : item.state === 'failed' ? (
+                      <span className="text-[#ff6b8a]">
+                        <Icon name="alert" size={16} />
+                      </span>
+                    ) : (
+                      <span className="num font-mono text-[10px] text-white/32">{Math.round(item.progress * 100)}%</span>
+                    )}
+                  </span>
                 </div>
               )
             })}
-          </div>
+          </>
         )}
       </div>
     </div>
