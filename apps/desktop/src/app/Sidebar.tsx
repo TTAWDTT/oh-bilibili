@@ -12,7 +12,7 @@ const ROW =
   't mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[12px]'
 const ROW_IDLE = 'text-[var(--text-2)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]'
 const ROW_ACTIVE = 'bg-[var(--hover)] text-[var(--text-1)]'
-const SECTION = 'px-3 pb-1 pt-3 text-[11px] font-medium text-[var(--text-3)]'
+const SECTION = 'px-3 pb-1 pt-3 text-[11px] font-medium tracking-[0.08em] text-[var(--text-3)]'
 
 export function Sidebar() {
   const view = useAppStore((state) => state.view)
