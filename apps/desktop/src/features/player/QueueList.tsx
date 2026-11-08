@@ -7,7 +7,7 @@ import { Skeleton } from '../../shared/ui/Skeleton'
 import { VirtualList } from '../../shared/ui/VirtualList'
 import { usePlayerStore } from './playerStore'
 
-const QUEUE_ROW_HEIGHT = 48
+const QUEUE_ROW_HEIGHT = 40
 const VIRTUAL_THRESHOLD = 100
 
 function QueueRow({
