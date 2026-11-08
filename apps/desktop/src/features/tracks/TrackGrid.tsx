@@ -119,7 +119,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   }
 
   return (
-    <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))]">
+    <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(226px,1fr))]">
       {tracks.map((track, index) => {
         const active = track.key === activeKey
         return (
@@ -132,7 +132,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               type="button"
               onClick={() => void playContext(tracks.map((t) => t.key), index)}
               aria-label={`播放 ${track.title}`}
-              className="bili-press relative block w-full overflow-hidden rounded-[6px] border border-[var(--line)]"
+              className="bili-press relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
               style={{ aspectRatio: '16 / 10' }}
             >
               <Cover
@@ -173,7 +173,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
 
             <h3
               className={[
-                'mt-2 line-clamp-2 text-[13px] leading-[1.45] transition-colors',
+                'mt-2 line-clamp-2 text-[15px] leading-[1.4] transition-colors',
                 active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent)]',
               ].join(' ')}
               title={track.title}
@@ -182,7 +182,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             </h3>
 
             {track.views ? (
-              <div className="num mt-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
+              <div className="num mt-1.5 flex items-center gap-2 text-[11.5px] text-[var(--text-3)]">
                 <span className="flex items-center gap-1">
                   <Icon name="play" size={10} />
                   {formatCount(track.views)}
@@ -199,7 +199,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             <div className="mt-1 flex flex-wrap gap-1">
               {track.tname ? (
                 <span
-                  className="rounded-[2px] px-1.5 text-[10.5px] leading-[16px] text-white"
+                  className="rounded-[3px] px-1.5 text-[11px] leading-[17px] text-white"
                   style={{ background: partitionColor(track.tname) }}
                 >
                   {track.tname}
@@ -208,7 +208,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               {tagsOf(track.title).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 text-[10.5px] leading-[16px] text-[var(--text-2)]"
+                  className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[11px] leading-[17px] text-[var(--text-2)]"
                 >
                   #{tag}
                 </span>
@@ -219,7 +219,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               type="button"
               title="点击复制 BV 号"
               onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
-              className="num mt-1 block font-mono text-[10.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              className="num mt-1 block font-mono text-[11px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
             >
               {track.key}
             </button>
@@ -229,13 +229,13 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               aria-label={`看 ${track.title} 的 MV`}
               title="看 MV"
               onClick={() => setMv({ key: track.key, title: track.title })}
-              className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
             >
               <Icon name="biliTv" size={11} />
               看 MV
             </button>
 
-            <div className="mt-1 flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-3)]">
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-[var(--text-3)]">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
                 <button
