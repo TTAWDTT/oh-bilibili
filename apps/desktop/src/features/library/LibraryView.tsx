@@ -6,7 +6,6 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { PageHeader } from '../../shared/ui/PageHeader'
 import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
-import { usePlayerStore } from '../player/playerStore'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
 import { useLibraryStore } from './libraryStore'
 
@@ -14,7 +13,6 @@ export function LibraryView() {
   const playlists = useLibraryStore((state) => state.playlists)
   const revision = useLibraryStore((state) => state.revision)
   const navigate = useAppStore((state) => state.navigate)
-  const playContext = usePlayerStore((state) => state.playContext)
   const [tracksByList, setTracksByList] = useState<Record<number, readonly Track[]>>({})
   const [creating, setCreating] = useState(false)
 
@@ -62,58 +60,45 @@ export function LibraryView() {
             />
           </div>
         ) : (
-          <section className="mt-8">
-            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[12px] uppercase tracking-[0.2em] text-[var(--text-2)]">
-              <span className="flex-1">歌单</span>
-              <span className="num w-16 text-right">曲目</span>
-              <span className="w-[68px]" />
-            </div>
+          <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
             {playlists.map((playlist) => {
               const tracks = tracksByList[playlist.id]
-              const count = tracks ? `${tracks.length} 首` : '——'
+              const count = tracks ? tracks.length : 0
               return (
-                <div key={playlist.id} className="group flex items-center gap-4 border-b border-hairline px-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                    className="flex min-w-0 flex-1 items-center gap-2 py-3 text-left"
-                  >
-                    <span className="text-[var(--text-2)] group-hover:text-[var(--text-2)]">
-                      <Icon name="library" size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={playlist.name}>
+                <button
+                  key={playlist.id}
+                  type="button"
+                  onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
+                  className="bili-card bili-card-enter bili-press overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
+                >
+                  {/* 封面拼图区：四宫格铺满卡片上半部 */}
+                  <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
+                    {Array.from({ length: 4 }, (_, i) => {
+                      const cover = tracks?.[i]?.cover
+                      return (
+                        <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
+                          {cover ? (
+                            <img
+                              src={cover}
+                              alt=""
+                              aria-hidden
+                              referrerPolicy="no-referrer"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </span>
+                      )
+                    })}
+                  </span>
+                  <span className="block px-3 py-2">
+                    <span className="line-clamp-1 block text-[14px] font-medium text-[var(--text-1)]" title={playlist.name}>
                       {playlist.name}
                     </span>
-                    <span className="num w-16 shrink-0 text-right font-mono text-[12px] text-[var(--text-2)]">{count}</span>
-                  </button>
-                  <div className="flex w-[68px] shrink-0 items-center justify-end gap-1">
-                    <button
-                      type="button"
-                      aria-label={`播放 ${playlist.name}`}
-                      title="播放歌单"
-                      disabled={!tracks || tracks.length === 0}
-                      onClick={() => {
-                        if (!tracks || tracks.length === 0) return
-                        void playContext(
-                          tracks.map((track) => track.key),
-                          0,
-                        )
-                      }}
-                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-white disabled:cursor-default disabled:opacity-20"
-                    >
-                      <Icon name="play" size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`打开 ${playlist.name}`}
-                      title="打开歌单"
-                      onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                      className="t press flex items-center justify-center rounded-[4px] h-6 w-6 text-[var(--text-2)] hover:text-[var(--text-1)]"
-                    >
-                      <Icon name="chevronRight" size={14} />
-                    </button>
-                  </div>
-                </div>
+                    <span className="num mt-0.5 block text-[12px] text-[var(--text-3)]">
+                      {count > 0 ? `${count} 首` : '空歌单'}
+                    </span>
+                  </span>
+                </button>
               )
             })}
           </section>
