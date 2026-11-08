@@ -174,16 +174,16 @@ export function LyricsView({ track }: { track: Track | null }) {
                 ref={(node) => {
                   lineRefs.current[index] = node
                 }}
-                className="py-2"
+                className={isActive ? 'py-3' : 'py-2'}
               >
                 <button type="button" onClick={() => void seek(line.at_ms)} data-row="lyric"
                     className="t w-full text-center" tabIndex={-1}>
                   {isActive ? (
-                    <span className="block text-[16px] font-medium leading-[1.55] tracking-[-0.01em]">
+                    <span className="block text-[19px] font-medium leading-[1.5] tracking-[-0.01em] text-white">
                       <ActiveLine line={line} nextAt={nextAt} />
                     </span>
                   ) : (
-                    <span className="t block text-[14px] leading-[1.6] text-white/48 hover:text-white/70">
+                    <span className="t block text-[13px] leading-[1.6] text-white/38 hover:text-white/70">
                       {line.text}
                     </span>
                   )}
