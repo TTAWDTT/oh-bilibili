@@ -19,6 +19,7 @@ import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { ChannelBar } from './ChannelBar'
 import { DanmakuStrip } from './DanmakuStrip'
+import { MascotCorner } from './MascotCorner'
 import { BackToTop } from '../shared/ui/BackToTop'
 import { Sidebar } from './Sidebar'
 import { StageGlow } from './StageGlow'
@@ -89,6 +90,7 @@ export default function App() {
         </div>
       </div>
 
+      <MascotCorner />
       <BackToTop targetId="scroll-main" />
       <PlayerBar />
       <StatusBar />

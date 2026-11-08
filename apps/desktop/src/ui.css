@@ -495,3 +495,38 @@
     transform: translateX(-190vw);
   }
 }
+
+/* 右下角常驻的 2233：轻微起伏，像站在那里呼吸 */
+.bili-mascot {
+  animation: bili-mascot-idle 4.2s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+@keyframes bili-mascot-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-1deg); }
+}
+
+.bili-mascot-bubble {
+  animation: bili-mascot-pop 220ms var(--ease) both;
+}
+
+@keyframes bili-mascot-pop {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 背景纹理加深：原来 3-4% 几乎看不见，提到 7-9% 才读得出是 B 站配色 */
+.bili-canvas {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      color-mix(in oklab, var(--bili-blue) 9%, transparent) 0 1px,
+      transparent 1px 24px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--bili-pink) 7%, transparent) 0 1px,
+      transparent 1px 24px
+    );
+}
