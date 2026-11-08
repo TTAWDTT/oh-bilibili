@@ -115,7 +115,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black transition hover:bg-white/88"
+            className="t press rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
           >
             完成
           </button>
@@ -142,7 +142,7 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="flex items-center gap-1.5 rounded-full border border-white/12 px-3.5 py-1.5 text-[11.5px] text-white/60 transition hover:border-white/24 hover:text-white/88"
+              className="t press flex items-center gap-1.5 rounded-full border border-white/12 px-4 py-1.5 text-[11.5px] text-white/60 hover:border-white/24 hover:text-white/88"
             >
               <Icon name="refresh" size={12} />
               重新生成

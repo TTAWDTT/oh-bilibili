@@ -24,8 +24,8 @@ function TransportButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        'flex h-8 w-8 items-center justify-center rounded-full transition duration-200',
-        active ? 'text-[var(--accent)]' : 'text-white/58 hover:text-white/92',
+        't press flex h-8 w-8 items-center justify-center rounded-full',
+        active ? 'text-[var(--accent)]' : 'text-white/58 hover:text-white',
         disabled ? 'cursor-default opacity-30' : 'hover:bg-white/8',
       ].join(' ')}
     >
@@ -49,7 +49,7 @@ export function Transport() {
   const shuffle = snapshot?.shuffle ?? false
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2">
       <TransportButton label={shuffle ? '关闭随机播放' : '随机播放'} active={shuffle} onClick={() => setShuffle(!shuffle)}>
         <Icon name="shuffle" size={16} />
       </TransportButton>
@@ -59,14 +59,14 @@ export function Transport() {
       <button
         type="button"
         aria-label={playing ? '暂停' : '播放'}
-        title={playing ? '暂停' : '播放'}
+        title={playing ? '暂停（空格）' : '播放（空格）'}
         disabled={!hasTrack}
         onClick={() => void toggle()}
         className={[
-          'mx-1 flex h-10 w-10 items-center justify-center rounded-full transition duration-200',
+          't press mx-1 flex h-10 w-10 items-center justify-center rounded-full',
           hasTrack
-            ? 'bg-white text-black hover:scale-[1.04]'
-            : 'border border-white/12 bg-white/[0.04] text-white/28',
+            ? 'bg-white text-black hover:scale-[1.04] active:scale-[0.96]'
+            : 'cursor-default border border-white/12 bg-white/[0.04] text-white/28',
         ].join(' ')}
       >
         {loading ? (

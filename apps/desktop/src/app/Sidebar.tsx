@@ -46,7 +46,7 @@ export function Sidebar() {
               aria-current={active ? 'page' : undefined}
               onClick={() => navigate(item.view)}
               className={[
-                'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] transition duration-200',
+                'group t press flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px]',
                 active
                   ? 'bg-white/14 text-white'
                   : 'text-white/62 hover:bg-white/[0.06] hover:text-white/88',
@@ -65,13 +65,13 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-6 flex items-center justify-between px-5">
-        <span className="text-[10px] uppercase tracking-[0.22em] text-white/30">歌单</span>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-white/32">歌单</span>
         <button
           type="button"
           aria-label="新建歌单"
           title="新建歌单"
           onClick={() => setCreating(true)}
-          className="rounded-full p-1 text-white/34 transition hover:bg-white/10 hover:text-white/80"
+          className="t press rounded-full p-1 text-white/34 hover:bg-white/10 hover:text-white/80"
         >
           <Icon name="plus" size={14} />
         </button>
@@ -85,7 +85,7 @@ export function Sidebar() {
             <Skeleton className="h-3.5 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="px-3 py-2 text-[11.5px] leading-relaxed text-white/28">还没有歌单，点上面的加号建一个。</p>
+          <p className="px-3 py-2 text-[11.5px] leading-relaxed text-white/32">还没有歌单，点上面的加号建一个。</p>
         ) : (
           playlists.map((playlist) => {
             const active = view.kind === 'playlist' && view.id === playlist.id
@@ -94,9 +94,10 @@ export function Sidebar() {
                 key={playlist.id}
                 type="button"
                 aria-current={active ? 'page' : undefined}
+                title={playlist.name}
                 onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
                 className={[
-                  'truncate rounded-lg px-3 py-2 text-left text-[12.5px] transition duration-200',
+                  't press truncate rounded-lg px-3 py-2 text-left text-[12.5px]',
                   active ? 'bg-white/10 text-white/92' : 'text-white/48 hover:bg-white/[0.05] hover:text-white/82',
                 ].join(' ')}
               >
@@ -111,7 +112,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => (user ? navigate({ kind: 'settings' }) : setAuthOpen(true))}
-          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/[0.06]"
+          className="t press flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/[0.06]"
         >
           {user?.avatar ? (
             <img src={user.avatar} alt="" className="h-9 w-9 rounded-full border border-white/12 object-cover" />
@@ -126,7 +127,7 @@ export function Sidebar() {
           )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12.5px] text-white/82">{user ? user.uname : '未登录'}</span>
-            <span className="mt-0.5 block truncate text-[10.5px] text-white/32">
+            <span className="mt-1 block truncate text-[10.5px] text-white/32">
               {user ? `UID ${user.mid}` : '扫码登录后同步喜欢'}
             </span>
           </span>

@@ -14,7 +14,7 @@ function PlaylistCard({ name, onClick }: { name: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="group relative overflow-hidden rounded-2xl border border-hairline bg-white/[0.025] p-3.5 text-left transition duration-300 hover:border-white/18 hover:bg-white/[0.05]"
+      className="t press group relative overflow-hidden rounded-2xl border border-hairline bg-white/[0.025] p-4 text-left hover:border-white/18 hover:bg-white/[0.05]"
     >
       <div
         className="relative aspect-square overflow-hidden rounded-xl"
@@ -24,12 +24,14 @@ function PlaylistCard({ name, onClick }: { name: string; onClick: () => void }) 
         <div className="absolute inset-0 flex items-center justify-center text-white/30">
           <Icon name="library" size={34} />
         </div>
-        <div className="absolute bottom-2 right-2 rounded-full bg-black/35 p-1.5 text-white/75 opacity-0 backdrop-blur transition duration-200 group-hover:opacity-100">
+        <div className="t absolute bottom-2 right-2 rounded-full bg-black/35 p-1.5 text-white/75 opacity-0 backdrop-blur group-hover:opacity-100">
           <Icon name="play" size={13} />
         </div>
       </div>
-      <div className="mt-3 truncate text-[13px] text-white/84">{name}</div>
-      <div className="mt-0.5 text-[10.5px] text-white/30">歌单</div>
+      <div className="mt-3 truncate text-[13px] text-white/84" title={name}>
+        {name}
+      </div>
+      <div className="mt-1 text-[10.5px] text-white/32">歌单</div>
     </button>
   )
 }
@@ -40,7 +42,7 @@ export function LibraryView() {
   const [creating, setCreating] = useState(false)
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-7">
+    <div className="h-full overflow-y-auto px-8 pb-10 pt-8">
       <PageHeader
         eyebrow="曲库"
         title="歌单"
@@ -49,7 +51,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] text-white/82 transition hover:border-white/24 hover:bg-white/[0.1]"
+            className="t press flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] text-white/84 hover:border-white/24 hover:bg-white/[0.1]"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -62,14 +64,16 @@ export function LibraryView() {
           <PlaylistGridSkeleton cards={6} />
         </div>
       ) : playlists.length === 0 ? (
-        <EmptyState
-          icon="library"
-          title="还没有歌单"
-          detail="建一个歌单，把歌按自己的顺序收起来。"
-          action={{ label: '新建歌单', onClick: () => setCreating(true) }}
-        />
+        <div className="flex min-h-[320px] items-center justify-center">
+          <EmptyState
+            icon="library"
+            title="还没有歌单"
+            detail="建一个歌单，把歌按自己的顺序收起来。"
+            action={{ label: '新建歌单', onClick: () => setCreating(true) }}
+          />
+        </div>
       ) : (
-        <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
           {playlists.map((playlist) => (
             <PlaylistCard
               key={playlist.id}

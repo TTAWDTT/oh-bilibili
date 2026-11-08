@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAppStore } from '../../app/appStore'
 import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
@@ -7,7 +8,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { PageHeader } from '../../shared/ui/PageHeader'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
-import { TrackRow } from '../tracks/TrackRow'
+import { TrackList } from '../tracks/TrackList'
 
 const PAGE_SIZE = 8
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -19,6 +20,19 @@ const HINTS = [
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
+function PagerButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="t press rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white/85 disabled:cursor-default disabled:opacity-30"
+    >
+      {label}
+    </button>
+  )
+}
+
 export function SearchView() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -27,9 +41,18 @@ export function SearchView() {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const focusSeq = useAppStore((state) => state.searchFocus)
   const playContext = usePlayerStore((state) => state.playContext)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
+
+  // ⌘K 只在自增时抢焦点，用户自己点进来的渲染不会被打断。
+  useEffect(() => {
+    if (focusSeq === 0) return
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [focusSeq])
 
   useEffect(() => {
     if (trimmed.length === 0) {
@@ -69,7 +92,7 @@ export function SearchView() {
   const playing = snapshot?.phase === 'playing'
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-7">
+    <div className="h-full max-w-[1040px] overflow-y-auto px-8 pb-10 pt-8">
       <PageHeader
         eyebrow="搜索"
         title="搜一首歌"
@@ -79,7 +102,7 @@ export function SearchView() {
             <button
               type="button"
               onClick={() => setQuery('')}
-              className="rounded-full border border-white/10 px-3.5 py-1.5 text-[11.5px] text-white/52 transition hover:border-white/24 hover:text-white/85"
+              className="t press rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 hover:border-white/24 hover:text-white/85"
             >
               清空
             </button>
@@ -94,9 +117,10 @@ export function SearchView() {
         }}
         className="mt-6"
       >
-        <div className="glass flex items-center gap-3 rounded-2xl border border-hairline px-4 py-3 transition focus-within:border-white/26">
-          <Icon name="search" size={18} className="text-white/30" />
+        <div className="glass flex items-center gap-3 rounded-2xl border border-hairline px-4 py-3 focus-within:border-white/28">
+          <Icon name="search" size={18} className="text-white/32" />
           <input
+            ref={inputRef}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
@@ -104,31 +128,36 @@ export function SearchView() {
             }}
             aria-label="搜索歌曲"
             placeholder="歌名、UP 主，或者一句歌词"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-white/90 outline-none placeholder:text-white/24"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-white/90 placeholder:text-white/26"
           />
           {query ? (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label="清空输入"
-              className="rounded-full p-1 text-white/34 transition hover:bg-white/10 hover:text-white/80"
+              title="清空输入"
+              className="t press rounded-full p-1 text-white/34 hover:bg-white/10 hover:text-white/80"
             >
               <Icon name="close" size={14} />
             </button>
-          ) : null}
+          ) : (
+            <kbd className="kbd hidden shrink-0 sm:inline-flex" aria-hidden>
+              ⌘K
+            </kbd>
+          )}
         </div>
       </form>
 
       {trimmed.length === 0 ? (
         <div className="mt-10">
-          <div className="text-[10.5px] uppercase tracking-[0.22em] text-white/28">试试这些</div>
+          <div className="text-[10.5px] uppercase tracking-[0.22em] text-white/32">试试这些</div>
           <div className="mt-3 flex flex-wrap gap-2">
             {SUGGESTIONS.map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
                 onClick={() => pick(suggestion)}
-                className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-[12.5px] text-white/62 transition hover:border-white/22 hover:bg-white/[0.06] hover:text-white/90"
+                className="t press rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-[12.5px] text-white/64 hover:border-white/24 hover:bg-white/[0.06] hover:text-white/92"
               >
                 {suggestion}
               </button>
@@ -138,15 +167,15 @@ export function SearchView() {
           <div className="mt-12 grid gap-3 sm:grid-cols-3">
             {HINTS.map((hint) => (
               <div key={hint.title} className="rounded-2xl border border-hairline bg-white/[0.02] p-4">
-                <div className="text-[12.5px] text-white/72">{hint.title}</div>
-                <div className="mt-1.5 text-[11px] leading-relaxed text-white/34">{hint.detail}</div>
+                <div className="text-[12.5px] text-white/76">{hint.title}</div>
+                <div className="mt-2 text-[11px] leading-relaxed text-white/38">{hint.detail}</div>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <section className="mt-7">
-          <div className="mb-2 flex min-h-5 items-center justify-between px-3 text-[10.5px] tracking-[0.16em] text-white/30">
+        <section className="mt-8">
+          <div className="mb-2 flex min-h-5 items-center justify-between px-3 text-[10.5px] tracking-[0.16em] text-white/32">
             <span>
               {status === 'error'
                 ? '搜索失败'
@@ -164,57 +193,45 @@ export function SearchView() {
           {status === 'loading' && tracks.length === 0 ? <TrackListSkeleton rows={6} /> : null}
 
           {status === 'error' && error ? (
-            <EmptyState
-              icon="alert"
-              title={error.message}
-              detail="检查网络或登录状态后再试一次。"
-              action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
-            />
+            <div className="flex min-h-[320px] items-center justify-center">
+              <EmptyState
+                icon="alert"
+                title={error.message}
+                detail="检查网络或登录状态后再试一次。"
+                action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
+              />
+            </div>
           ) : null}
 
           {status === 'ready' && tracks.length === 0 ? (
-            <EmptyState
-              icon="search"
-              title={`没有找到「${trimmed}」`}
-              detail="换个关键词，或者换个说法试试。"
-              action={{ label: '清空条件', onClick: () => setQuery('') }}
-            />
+            <div className="flex min-h-[320px] items-center justify-center">
+              <EmptyState
+                icon="search"
+                title={`没有找到「${trimmed}」`}
+                detail="换个关键词，或者换个说法试试。"
+                action={{ label: '清空条件', onClick: () => setQuery('') }}
+              />
+            </div>
           ) : null}
 
           {tracks.length > 0 ? (
-            <div className="flex flex-col gap-0.5">
-              {tracks.map((track, index) => (
-                <TrackRow
-                  key={track.key}
-                  track={track}
-                  index={(page - 1) * PAGE_SIZE + index}
-                  active={track.key === activeKey}
-                  playing={playing}
-                  onPlay={() => void playContext(keys, index)}
-                />
-              ))}
-            </div>
+            <TrackList
+              tracks={tracks}
+              activeKey={activeKey}
+              playing={playing}
+              onPlay={(index) => void playContext(keys, index)}
+            />
           ) : null}
 
           {status === 'ready' && tracks.length > 0 ? (
             <div className="mt-6 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                disabled={page === 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                className="rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 transition hover:border-white/24 hover:text-white/85 disabled:cursor-default disabled:opacity-30"
-              >
-                上一页
-              </button>
-              <span className="px-2 font-mono text-[11px] text-white/30">{page}</span>
-              <button
-                type="button"
+              <PagerButton label="上一页" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} />
+              <span className="num px-2 font-mono text-[11px] text-white/32">{page}</span>
+              <PagerButton
+                label="下一页"
                 disabled={tracks.length < PAGE_SIZE}
                 onClick={() => setPage((current) => current + 1)}
-                className="rounded-full border border-white/10 px-4 py-1.5 text-[11.5px] text-white/52 transition hover:border-white/24 hover:text-white/85 disabled:cursor-default disabled:opacity-30"
-              >
-                下一页
-              </button>
+              />
             </div>
           ) : null}
         </section>

@@ -6,6 +6,7 @@ import { readPlayhead } from '../../shared/lib/playhead'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Skeleton } from '../../shared/ui/Skeleton'
 import { toastFailure } from '../../app/notice'
+import { useAppStore } from '../../app/appStore'
 import { usePlayerStore } from './playerStore'
 
 function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
@@ -47,6 +48,8 @@ function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
 export function LyricsView({ track }: { track: Track | null }) {
   const position = usePlayerStore((state) => state.snapshot?.position_ms ?? 0)
   const seek = usePlayerStore((state) => state.seek)
+  const navigate = useAppStore((state) => state.navigate)
+  const toggleRail = useAppStore((state) => state.toggleRail)
   const [doc, setDoc] = useState<LyricDoc | null>(null)
   const [loading, setLoading] = useState(false)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -91,18 +94,26 @@ export function LyricsView({ track }: { track: Track | null }) {
   useEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) return
+    let frame = 0
+    // 量在帧回调里做：既不与 React 提交同帧布局，也能合并 ResizeObserver 的连续触发。
     const recalc = (): void => {
-      const line = lineRefs.current[active]
-      if (!line) {
-        setOffset(0)
-        return
-      }
-      setOffset(scroller.clientHeight * 0.42 - line.offsetTop - line.offsetHeight / 2)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const line = lineRefs.current[active]
+        if (!line) {
+          setOffset(0)
+          return
+        }
+        setOffset(scroller.clientHeight * 0.42 - line.offsetTop - line.offsetHeight / 2)
+      })
     }
     recalc()
     const observer = new ResizeObserver(recalc)
     observer.observe(scroller)
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
   }, [active, doc])
 
   if (loading) {
@@ -119,9 +130,9 @@ export function LyricsView({ track }: { track: Track | null }) {
     return (
       <EmptyState
         icon="lyrics"
-        title={track ? '这首歌还没有歌词' : '还在等一首歌'}
-        detail={track ? '三级回退都没查到时，界面不会空转；播放不受影响。' : '播放后这里会跟随进度滚动。'}
-        action={null}
+        title={track ? '这首歌还没有歌词' : '还没有在播放'}
+        detail={track ? '三级回退都没查到时不去编造，播放本身不受影响。' : '挑一首歌，歌词会跟着进度滚动。'}
+        action={track ? { label: '看看队列', onClick: () => toggleRail('queue') } : { label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
         compact
       />
     )
@@ -129,11 +140,11 @@ export function LyricsView({ track }: { track: Track | null }) {
 
   if (!doc.synced) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/24">纯文本 · {doc.source}</div>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-white/28">纯文本 · {doc.source}</div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
           {doc.lines.map((line, index) => (
-            <p key={index} className="py-1.5 text-[13.5px] leading-relaxed text-white/46">
+            <p key={index} className="py-2 text-[13.5px] leading-relaxed text-white/48">
               {line.text}
             </p>
           ))}
@@ -143,14 +154,14 @@ export function LyricsView({ track }: { track: Track | null }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-5 pb-1 pt-4 text-[10px] tracking-[0.14em] text-white/24">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center justify-between px-5 pb-1 pt-4 text-[10px] tracking-[0.14em] text-white/28">
         <span>歌词</span>
         <span>{doc.source}</span>
       </div>
       <div ref={scrollerRef} className="lyrics-mask min-h-0 flex-1 overflow-hidden px-5">
         <div
-          className="relative py-[42%] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          className="t relative py-[42%]"
           style={{ transform: `translateY(${offset}px)` }}
         >
           {doc.lines.map((line, index) => {
@@ -165,18 +176,13 @@ export function LyricsView({ track }: { track: Track | null }) {
                 }}
                 className="py-2"
               >
-                <button
-                  type="button"
-                  onClick={() => void seek(line.at_ms)}
-                  className="w-full text-left"
-                  tabIndex={-1}
-                >
+                <button type="button" onClick={() => void seek(line.at_ms)} className="t w-full text-left" tabIndex={-1}>
                   {isActive ? (
                     <span className="block text-[16px] font-medium leading-[1.55] tracking-[-0.01em]">
                       <ActiveLine line={line} nextAt={nextAt} />
                     </span>
                   ) : (
-                    <span className="block text-[14px] leading-[1.6] text-white/30 transition-colors duration-300 hover:text-white/55">
+                    <span className="t block text-[14px] leading-[1.6] text-white/30 hover:text-white/60">
                       {line.text}
                     </span>
                   )}

@@ -66,7 +66,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
               type="button"
               disabled={busy}
               onClick={() => void choose(playlist.id)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12.5px] text-white/78 transition hover:bg-white/[0.06] disabled:opacity-40"
+              className="t press flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12.5px] text-white/78 hover:bg-white/[0.06] disabled:opacity-40"
             >
               <Icon name="library" size={15} className="text-white/32" />
               <span className="min-w-0 flex-1 truncate">{playlist.name}</span>
@@ -89,12 +89,12 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
           onChange={(event) => setName(event.target.value)}
           placeholder="新建歌单并加入"
           aria-label="新歌单名"
-          className="min-w-0 flex-1 rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-[12.5px] text-white/90 outline-none transition placeholder:text-white/24 focus:border-white/26"
+          className="t min-w-0 flex-1 rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2.5 text-[12.5px] text-white/90 placeholder:text-white/26 focus:border-white/28"
         />
         <button
           type="submit"
           disabled={busy || name.trim().length === 0}
-          className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-[12px] font-medium text-black transition hover:bg-white/88 disabled:cursor-default disabled:opacity-30"
+          className="t press shrink-0 rounded-xl bg-white px-4 py-2.5 text-[12px] font-medium text-black hover:bg-white/88 disabled:cursor-default disabled:opacity-30"
         >
           新建
         </button>

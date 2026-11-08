@@ -10,7 +10,7 @@ import { PageHeader } from '../../shared/ui/PageHeader'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useLibraryStore } from '../library/libraryStore'
-import { TrackRow } from '../tracks/TrackRow'
+import { TrackList } from '../tracks/TrackList'
 
 type PlaylistViewProps = {
   id: number
@@ -51,11 +51,11 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
   const playing = snapshot?.phase === 'playing'
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-10 pt-7">
+    <div className="flex h-full max-w-[1040px] flex-col px-8 pb-8 pt-8">
       <button
         type="button"
         onClick={() => navigate({ kind: 'library' })}
-        className="mb-4 flex items-center gap-1 text-[11.5px] text-white/36 transition hover:text-white/72"
+        className="t press mb-4 flex w-fit items-center gap-1 rounded-full pr-2 text-[11.5px] text-white/40 hover:text-white/76"
       >
         <Icon name="chevronLeft" size={13} />
         曲库
@@ -77,7 +77,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => void playContext(keys, 0)}
-                className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black transition hover:bg-white/88"
+                className="t press flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/88"
               >
                 <Icon name="play" size={13} />
                 播放全部
@@ -85,7 +85,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'search' })}
-                className="rounded-full border border-white/12 px-4 py-2 text-[12px] text-white/70 transition hover:border-white/24 hover:text-white/92"
+                className="t press rounded-full border border-white/12 px-4 py-2 text-[12px] text-white/72 hover:border-white/24 hover:text-white/92"
               >
                 去添加
               </button>
@@ -94,40 +94,38 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
         }
       />
 
-      <div className="mt-6">
+      <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
         {tracks === null ? <TrackListSkeleton rows={6} /> : null}
 
         {error ? (
-          <EmptyState
-            icon="alert"
-            title={error}
-            detail="歌单读取失败了，稍后再试一次。"
-            action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              icon="alert"
+              title={error}
+              detail="歌单读取失败了，稍后再试一次。"
+              action={{ label: '重试', onClick: () => setNonce((current) => current + 1) }}
+            />
+          </div>
         ) : null}
 
         {tracks !== null && !error && tracks.length === 0 ? (
-          <EmptyState
-            icon="music"
-            title="这张歌单还是空的"
-            detail="去搜索里找到喜欢的歌，点加号就能收进来。"
-            action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              icon="music"
+              title="这张歌单还是空的"
+              detail="去搜索里找到喜欢的歌，点加号就能收进来。"
+              action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+            />
+          </div>
         ) : null}
 
         {tracks !== null && tracks.length > 0 ? (
-          <div className="flex flex-col gap-0.5">
-            {tracks.map((track, index) => (
-              <TrackRow
-                key={`${track.key}-${index}`}
-                track={track}
-                index={index}
-                active={track.key === activeKey}
-                playing={playing}
-                onPlay={() => void playContext(keys, index)}
-              />
-            ))}
-          </div>
+          <TrackList
+            tracks={tracks}
+            activeKey={activeKey}
+            playing={playing}
+            onPlay={(index) => void playContext(keys, index)}
+          />
         ) : null}
       </div>
     </div>

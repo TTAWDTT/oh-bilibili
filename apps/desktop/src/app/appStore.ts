@@ -12,20 +12,20 @@ export type RailTab = 'lyrics' | 'queue'
 export type ToastTone = 'error' | 'warn' | 'info' | 'success'
 export type Toast = { id: number; tone: ToastTone; title: string; detail: string | null }
 
-/** 窄窗口默认收起右栏，否则内容区会被压到不成样子。 */
-const DEFAULT_RAIL: RailTab | null =
-  typeof window !== 'undefined' && window.matchMedia('(min-width: 1180px)').matches ? 'lyrics' : null
-
 let toastSeq = 0
 
 type AppStore = {
   view: View
   rail: RailTab | null
+  /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
+  searchFocus: number
   authOpen: boolean
   toasts: Toast[]
   navigate: (view: View) => void
+  setRail: (tab: RailTab | null) => void
   toggleRail: (tab: RailTab) => void
   closeRail: () => void
+  focusSearch: () => void
   setAuthOpen: (open: boolean) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
@@ -33,12 +33,16 @@ type AppStore = {
 
 export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'search' },
-  rail: DEFAULT_RAIL,
+  // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
+  rail: null,
+  searchFocus: 0,
   authOpen: false,
   toasts: [],
   navigate: (view) => set({ view }),
+  setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),
+  focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setAuthOpen: (open) => set({ authOpen: open }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1

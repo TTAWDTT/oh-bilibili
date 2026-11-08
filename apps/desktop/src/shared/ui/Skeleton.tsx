@@ -22,7 +22,7 @@ export function TrackListSkeleton({ rows }: { rows: number }) {
 
 export function PlaylistGridSkeleton({ cards }: { cards: number }) {
   return (
-    <div className="grid grid-cols-2 gap-4 xl:grid-cols-3" aria-hidden>
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6" aria-hidden>
       {Array.from({ length: cards }, (_, index) => (
         <div key={index} className="rounded-2xl border border-hairline bg-white/[0.02] p-3.5">
           <Skeleton className="aspect-square w-full rounded-xl" />

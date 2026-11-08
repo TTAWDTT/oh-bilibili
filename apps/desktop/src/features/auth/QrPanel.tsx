@@ -68,7 +68,7 @@ export function QrPanel({ state, url }: QrPanelProps) {
           <button
             type="button"
             onClick={() => void copy()}
-            className="mt-3 flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-[11px] text-white/72 transition hover:border-white/24 hover:text-white/92"
+            className="t press mt-3 flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-[11px] text-white/72 hover:border-white/24 hover:text-white/92"
           >
             <Icon name="copy" size={12} />
             复制登录链接

@@ -27,7 +27,7 @@ export function DownloadButton({ trackKey, size = 16 }: DownloadButtonProps) {
       title={label}
       onClick={onClick}
       className={[
-        'rounded-full p-1.5 transition duration-200',
+        't press rounded-full p-1.5',
         done
           ? 'text-[#7bf0a0]'
           : busy

@@ -1,0 +1,103 @@
+/*
+ * 交互与动效工具层。全站只有两个常量（--dur / --ease）和三条工具类，
+ * 按钮、卡片、右栏都从这里取过渡与按压反馈，避免每个组件各自发明一套。
+ */
+
+/* 基础层：选区、可选中文本、键盘焦点环、细滚动条 */
+::selection {
+  background: var(--accent-soft);
+}
+
+.selectable {
+  user-select: text;
+  cursor: text;
+}
+
+/* 键盘焦点环必须可见：两条头发丝一样的白线在玻璃底上才分得清。 */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.12);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.22);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * 过渡只碰颜色、透明度与 transform。width/height/top/left 上的过渡会触发逐帧布局，
+ * 让列表在滚动与 hover 时抖动，所以这里把它们排除在属性白名单之外。
+ */
+.t {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, filter;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+/* 按下时给一点位移反馈，纯 transform，不参与布局。 */
+.press:active {
+  transform: scale(0.94);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 右栏开合：宽度过渡只发生在这一个槽位上，因为主区必须真的把空间让出来；
+ * 槽位里的内容用裁切跟随，自身不再有布局属性动画。
+ */
+.rail-slot {
+  flex: none;
+  width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    width var(--dur) var(--ease),
+    margin-left var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.rail-slot[data-open='true'] {
+  width: var(--rail-w);
+  margin-left: 12px;
+  opacity: 1;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.06);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  line-height: 1;
+  color: rgb(255 255 255 / 0.72);
+}

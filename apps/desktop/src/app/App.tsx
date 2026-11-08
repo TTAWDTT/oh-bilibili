@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
 import { LibraryView } from '../features/library/LibraryView'
@@ -16,6 +17,7 @@ import { useAppStore } from './appStore'
 import { Sidebar } from './Sidebar'
 import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
+import { useShortcuts } from './useShortcuts'
 
 function CurrentView({ view }: { view: View }) {
   switch (view.kind) {
@@ -36,11 +38,25 @@ function CurrentView({ view }: { view: View }) {
 
 export default function App() {
   useBootstrap()
+  useShortcuts()
   const view = useAppStore((state) => state.view)
   const rail = useAppStore((state) => state.rail)
+  const setRail = useAppStore((state) => state.setRail)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
+  const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
   const accent = useTrackAccent(track)
   useAccentVars(accent)
+
+  // 没歌也没队列时右栏没有任何内容可看，收起它让中间真正铺满。
+  const hasContent = track !== null || queued > 0
+  const railOpen = hasContent && rail !== null
+  const trackKey = track?.key ?? null
+
+  useEffect(() => {
+    if (!trackKey) return
+    // 新歌开播才把右栏拉回来；用户手动收起后不再固执地弹回。
+    if (useAppStore.getState().rail === null) setRail('lyrics')
+  }, [trackKey, setRail])
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-ink text-white">
@@ -48,12 +64,14 @@ export default function App() {
       <div className="grain pointer-events-none absolute inset-0 z-[1]" />
       <TitleBar />
 
-      <div className="relative z-10 flex min-h-0 flex-1 gap-3 px-3">
+      <div className="relative z-10 flex min-h-0 flex-1 px-3">
         <Sidebar />
-        <main className="glass flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-hairline">
+        <main className="glass ml-3 block min-w-0 flex-1 overflow-hidden rounded-[26px] border border-hairline">
           <CurrentView view={view} />
         </main>
-        {rail ? <NowPlayingRail tab={rail} /> : null}
+        <div className="rail-slot" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
+          <NowPlayingRail tab={rail ?? 'lyrics'} />
+        </div>
       </div>
 
       <PlayerBar />

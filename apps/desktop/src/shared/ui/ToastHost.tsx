@@ -35,7 +35,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
         type="button"
         onClick={() => onDismiss(toast.id)}
         aria-label="关闭提示"
-        className="rounded-full p-1 text-white/35 transition hover:bg-white/10 hover:text-white/80"
+        className="t press rounded-full p-1 text-white/35 hover:bg-white/10 hover:text-white/80"
       >
         <Icon name="close" size={13} />
       </button>
