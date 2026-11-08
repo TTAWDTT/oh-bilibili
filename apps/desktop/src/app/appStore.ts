@@ -21,6 +21,7 @@ type AppStore = {
   searchFocus: number
   authOpen: boolean
   mv: { key: string; title: string } | null
+  stage: boolean
   toasts: Toast[]
   navigate: (view: View) => void
   setRail: (tab: RailTab | null) => void
@@ -29,6 +30,7 @@ type AppStore = {
   focusSearch: () => void
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
+  setStage: (open: boolean) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
 }
@@ -40,6 +42,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   searchFocus: 0,
   authOpen: false,
   mv: null,
+  stage: false,
   toasts: [],
   navigate: (view) => set({ view }),
   setRail: (tab) => set({ rail: tab }),
@@ -48,6 +51,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
+  setStage: (open) => set({ stage: open }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1
     const toast: Toast = { id: toastSeq, tone, title, detail }

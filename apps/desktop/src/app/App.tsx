@@ -6,6 +6,7 @@ import { LikedView } from '../features/library/LikedView'
 import { PlaylistView } from '../features/library/PlaylistView'
 import { NowPlayingRail } from '../features/player/NowPlayingRail'
 import { MvOverlay } from '../features/player/MvOverlay'
+import { StageView } from '../features/player/StageView'
 import { PlayerBar } from '../features/player/PlayerBar'
 import { usePlayerStore } from '../features/player/playerStore'
 import { SearchView } from '../features/search/SearchView'
@@ -77,6 +78,7 @@ export default function App() {
       <PlayerBar />
       <StatusBar />
       <MvOverlay />
+      <StageView />
       <ToastHost />
       <AuthModal />
     </div>

@@ -80,6 +80,23 @@ impl Client {
         self.jar.read().ok()?.get(name).cloned()
     }
 
+    /// 导出 cookie，交给上层落盘。
+    pub fn export_cookies(&self) -> Vec<(String, String)> {
+        self.jar
+            .read()
+            .map(|jar| jar.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
+    }
+
+    /// 导入上次落盘的 cookie。登录态靠这个跨重启保留。
+    pub fn import_cookies(&self, pairs: &[(String, String)]) {
+        if let Ok(mut jar) = self.jar.write() {
+            for (k, v) in pairs {
+                jar.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
     pub fn clear_cookies(&self) {
         if let Ok(mut jar) = self.jar.write() {
             jar.clear();

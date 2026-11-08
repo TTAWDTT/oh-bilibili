@@ -47,13 +47,13 @@ function RailToggle({
 }
 
 function TrackInfo({ track, quality }: { track: Track | null; quality: number | null }) {
-  const navigate = useAppStore((state) => state.navigate)
+  const setStage = useAppStore((state) => state.setStage)
 
   if (!track) {
     return (
       <button
         type="button"
-        onClick={() => navigate({ kind: 'search' })}
+        onClick={() => setStage(true)}
         className="t group flex h-10 items-center gap-2 px-1 text-left"
       >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-hairline text-white/48">

@@ -175,3 +175,46 @@
   transform-origin: 48px 55px;
   animation: bili-tv-blink 6s ease-in-out infinite;
 }
+
+/* 舞台：封面像一张唱片在转，转速比真实 33 转慢，避免眩晕。 */
+.stage-disc {
+  position: relative;
+  isolation: isolate;
+}
+
+.stage-disc::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 0 60px rgb(255 255 255 / 0.08);
+}
+
+.stage-disc > img,
+.stage-disc > div {
+  animation: stage-rotate 26s linear infinite;
+}
+
+@keyframes stage-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 当前歌词轻微呼吸，跟节拍走但不夸张 */
+@keyframes stage-line-breathe {
+  0%,
+  100% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+.stage-line {
+  animation: stage-line-breathe 4.5s ease-in-out infinite;
+}

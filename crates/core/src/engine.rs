@@ -33,6 +33,8 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 pub struct Engine {
+    /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
+    cookie_file: std::path::PathBuf,
     source: Source,
     library: Library,
     player: Mutex<Player>,
@@ -50,11 +52,20 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(db_path: &std::path::Path) -> Result<Arc<Engine>, WireError> {
-        let source = tauri_runtime::block_on_bili()?;
+        let mut source = tauri_runtime::block_on_bili()?;
+        // 启动时把上次的登录态装回去，否则每次重开都要重新扫码。
+        let cookie_file = db_path.with_file_name("cookies.json");
+        if let Ok(raw) = std::fs::read_to_string(&cookie_file) {
+            if let Ok(pairs) = serde_json::from_str::<Vec<(String, String)>>(&raw) {
+                source.import_cookies(&pairs);
+                let _ = tauri_runtime::block_on_nav(&source);
+            }
+        }
         let library = Library::open(db_path)?;
         let player = Player::start().map_err(|e| WireError::internal(e.to_string()))?;
         let (events, _) = tokio::sync::broadcast::channel(256);
         Ok(Arc::new(Engine {
+            cookie_file,
             source,
             library,
             player: Mutex::new(player),
@@ -418,6 +429,14 @@ impl Engine {
         }
     }
 
+    /// 把当前 cookie 写进应用数据目录。含登录令牌，只存本机。
+    fn persist_cookies(&self) {
+        let pairs = self.source.export_cookies();
+        if let Ok(json) = serde_json::to_string(&pairs) {
+            let _ = std::fs::write(&self.cookie_file, json);
+        }
+    }
+
     pub fn cookie_header(&self) -> String {
         self.source.cookie_header()
     }
@@ -441,6 +460,7 @@ impl Engine {
         };
         let auth = self.auth();
         if status == QrStatus::Confirmed {
+            self.persist_cookies();
             self.emit(AppEvent::AuthChanged { auth: auth.clone() });
         }
         Ok((label.to_string(), auth))
@@ -448,6 +468,7 @@ impl Engine {
 
     pub async fn auth_logout(&self) -> AuthSnapshot {
         self.source.logout().await;
+        let _ = std::fs::remove_file(&self.cookie_file);
         self.emit(AppEvent::AuthChanged {
             auth: self.auth(),
         });
@@ -563,6 +584,17 @@ mod tauri_runtime {
     ///
     /// 在独立线程上开一个小 runtime，这样既不依赖调用方是否已经在 async 上下文里，
     /// 也不会出现「runtime 里再 block_on」的 panic。
+    /// 用一次短 runtime 刷新 nav，让导入的 cookie 生效。
+    pub fn block_on_nav(source: &Source) -> Result<(), WireError> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| WireError::internal(e.to_string()))?;
+        rt.block_on(source.refresh_session())
+            .map(|_| ())
+            .map_err(WireError::from)
+    }
+
     pub fn block_on_bili() -> Result<Source, WireError> {
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::Builder::new()

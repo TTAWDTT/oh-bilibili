@@ -209,6 +209,14 @@ impl Source {
             .ok_or_else(|| BiliError::Parse("这条视频没有可播放的 mp4".into()))
     }
 
+    pub fn export_cookies(&self) -> Vec<(String, String)> {
+        self.client.export_cookies()
+    }
+
+    pub fn import_cookies(&self, pairs: &[(String, String)]) {
+        self.client.import_cookies(pairs);
+    }
+
     /// 当前 cookie 串，代理转发视频时要带上。
     pub fn cookie_header(&self) -> String {
         self.client.cookie_header()
