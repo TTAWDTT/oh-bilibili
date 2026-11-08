@@ -11,6 +11,13 @@ const ICONS = {
       <circle cx="15.4" cy="10.4" r=".9" fill="currentColor" stroke="none" />
     </>
   ),
+  coin: (
+    <>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 7.6v8.8" />
+      <path d="M9.4 10.2h5.2M9.4 13.8h5.2" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.4" />

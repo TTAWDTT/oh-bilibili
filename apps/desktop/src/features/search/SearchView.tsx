@@ -122,6 +122,14 @@ export function SearchView() {
               </kbd>
             )}
           </div>
+          <button
+            type="submit"
+            aria-label="搜索"
+            className="search-btn-pink ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
+          >
+            <Icon name="search" size={15} />
+          </button>
+
         </form>
 
         {trimmed.length === 0 ? (
