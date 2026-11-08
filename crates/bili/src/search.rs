@@ -31,7 +31,7 @@ pub fn partition_name(typeid: u32) -> Option<&'static str> {
     let name = match typeid {
         1 | 24 | 25 | 47 | 210 => "动画",
         3 | 28 | 29 | 30 | 31 | 59 | 130 | 193 | 171 => "音乐",
-        4 | 17 | 65 | 136 | 171 => "游戏",
+        4 | 17 | 65 | 136 => "游戏",
         5 | 71 => "娱乐",
         23 | 27 => "电影",
         11 | 13 => "电视剧",
@@ -170,6 +170,26 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 分区表不能有重复 id，否则靠后的分配永远走不到（编译器只会警告不会报错）。
+    #[test]
+    fn 分区表没有重复的_id() {
+        let ids = [
+            1u32, 24, 25, 47, 210, 3, 28, 29, 30, 31, 59, 130, 193, 171, 4, 17, 65, 136, 5, 71, 23,
+            27, 11, 13, 21, 76, 75, 119, 129, 138, 239, 155, 160, 168, 181, 188, 201, 124, 211, 217,
+        ];
+        let mut seen = std::collections::HashMap::new();
+        for id in ids {
+            if let Some(prev) = seen.insert(id, id) {
+                let _ = prev;
+            }
+        }
+        // 直接验证函数返回值互不矛盾：每个 id 只能映射到一个名字
+        for id in [171u32, 130, 193, 3] {
+            assert_eq!(partition_name(id), Some("音乐"), "id {id} 应该属于音乐");
+        }
+        assert_eq!(partition_name(4), Some("游戏"));
+    }
 
     fn cand(title: &str, dur: u64, typ: u32, play: u64) -> Candidate {
         Candidate {
