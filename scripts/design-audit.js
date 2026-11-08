@@ -109,6 +109,20 @@
   }
   if (lowContrast > 0) add('正文对比度低于 4.5', `${lowContrast} 处`)
 
+  // 8. 控件高度标尺：按钮只允许 24 / 32 / 40 三档（±1px 抗锯齿误差）
+  const ALLOWED_H = [24, 32, 40]
+  const strayH = new Map()
+  for (const n of clickable) {
+    const h = Math.round(n.getBoundingClientRect().height)
+    if (h < 18 || h > 56) continue
+    if (!ALLOWED_H.some((a) => Math.abs(a - h) <= 1)) {
+      strayH.set(h, (strayH.get(h) ?? 0) + 1)
+    }
+  }
+  if (strayH.size > 0) {
+    add('控件高度不在标尺上', [...strayH.entries()].map(([h, c]) => `${h}px×${c}`).join(' '))
+  }
+
   return {
     violations: violations.length,
     detail: violations,
