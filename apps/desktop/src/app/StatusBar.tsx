@@ -14,7 +14,7 @@ export function StatusBar() {
   const queued = queue?.items.length ?? 0
 
   return (
-    <footer className="flex h-[22px] shrink-0 items-center justify-between border-t border-hairline bg-[var(--panel-alt)] px-2 text-[11px] text-[var(--text-3)]">
+    <footer className="flex h-[22px] shrink-0 items-center justify-between border-t border-hairline bg-[var(--panel-alt)] px-2 text-[12px] text-[var(--text-3)]">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Icon name="biliTv" size={12} />

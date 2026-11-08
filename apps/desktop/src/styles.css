@@ -61,7 +61,7 @@ body {
   background: var(--color-ink);
   color: var(--text-1);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;

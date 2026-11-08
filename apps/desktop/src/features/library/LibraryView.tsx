@@ -39,7 +39,7 @@ export function LibraryView() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[12px] text-[var(--text-1)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
+            className="t press flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
           >
             <Icon name="plus" size={14} />
             新建歌单
@@ -63,7 +63,7 @@ export function LibraryView() {
           </div>
         ) : (
           <section className="mt-8">
-            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-2)]">
+            <div className="flex items-center gap-4 border-b border-hairline px-4 pb-2 text-[12px] uppercase tracking-[0.2em] text-[var(--text-2)]">
               <span className="flex-1">歌单</span>
               <span className="num w-16 text-right">曲目</span>
               <span className="w-[68px]" />
@@ -81,10 +81,10 @@ export function LibraryView() {
                     <span className="text-[var(--text-2)] group-hover:text-[var(--text-2)]">
                       <Icon name="library" size={15} />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={playlist.name}>
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={playlist.name}>
                       {playlist.name}
                     </span>
-                    <span className="num w-16 shrink-0 text-right font-mono text-[11px] text-[var(--text-2)]">{count}</span>
+                    <span className="num w-16 shrink-0 text-right font-mono text-[12px] text-[var(--text-2)]">{count}</span>
                   </button>
                   <div className="flex w-[68px] shrink-0 items-center justify-end gap-1">
                     <button

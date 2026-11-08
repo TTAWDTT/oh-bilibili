@@ -57,11 +57,11 @@ export function HotRanking({ onPick }: { onPick: (keyword: string) => void }) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">热门排行</span>
+        <span className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">热门排行</span>
         <button
           type="button"
           onClick={() => onPick('音乐')}
-          className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+          className="text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
         >
           更多 ›
         </button>
@@ -76,19 +76,19 @@ export function HotRanking({ onPick }: { onPick: (keyword: string) => void }) {
               className="bili-nav-item group flex w-full items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-left hover:bg-[var(--panel-raised)]"
             >
               <span
-                className="num w-4 shrink-0 text-center font-mono text-[12px] font-semibold"
+                className="num w-4 shrink-0 text-center font-mono text-[14px] font-semibold"
                 style={{ color: MEDAL[i] ?? 'var(--text-3)' }}
               >
                 {i + 1}
               </span>
               <span className="relative h-8 w-[52px] shrink-0 overflow-hidden rounded-[3px]">
-                <Cover cover={track.cover} title={track.title} className="h-full w-full" glyphClassName="text-[13px] text-white/85" />
+                <Cover cover={track.cover} title={track.title} className="h-full w-full" glyphClassName="text-[14px] text-white/85" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                <span className="block truncate text-[14px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                   {track.title}
                 </span>
-                <span className="num block truncate text-[10.5px] text-[var(--text-3)]">
+                <span className="num block truncate text-[12px] text-[var(--text-3)]">
                   <Icon name="play" size={9} className="mr-0.5 inline" />
                   {formatCount(track.views ?? 0)}
                 </span>

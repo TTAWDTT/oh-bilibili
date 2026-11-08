@@ -54,7 +54,7 @@ export function IconRail() {
             ) : null}
             <Icon name={item.icon} size={17} />
             {badge > 0 ? (
-              <span className="absolute -right-0.5 -toh-6 w-6 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[10px] leading-[14px] text-black">
+              <span className="absolute -right-0.5 -toh-6 w-6 min-w-[14px] rounded-full bg-[var(--accent)] px-1 text-center text-[12px] leading-[14px] text-black">
                 {badge > 99 ? '99' : badge}
               </span>
             ) : null}
@@ -72,7 +72,7 @@ function PlaylistShortcut() {
   const playlists = useLibraryStore((state) => state.playlists)
   return (
     <span
-      className="num flex h-6 w-9 items-center justify-center text-[10px] text-[var(--text-3)]"
+      className="num flex h-6 w-9 items-center justify-center text-[12px] text-[var(--text-3)]"
       title={`${playlists?.length ?? 0} 个歌单`}
     >
       {playlists?.length ?? 0}

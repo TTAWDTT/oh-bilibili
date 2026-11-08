@@ -23,7 +23,7 @@ export function LikedView() {
             <button
               type="button"
               onClick={() => void playContext(keys, 0)}
-              className="bili-press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--accent)] px-4 text-[12px] font-medium text-white hover:opacity-90"
+              className="bili-press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
             >
               <Icon name="play" size={13} />
               播放全部

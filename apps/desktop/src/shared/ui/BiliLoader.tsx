@@ -20,7 +20,7 @@ export function BiliLoader({ label = '正在加载…' }: { label?: string }) {
           <rect x="43" y="32" width="4.5" height="9" rx="2.2" />
         </g>
       </svg>
-      <span className="text-[12px] text-[var(--text-3)]">{label}</span>
+      <span className="text-[14px] text-[var(--text-3)]">{label}</span>
     </div>
   )
 }

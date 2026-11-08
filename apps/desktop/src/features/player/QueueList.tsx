@@ -52,8 +52,8 @@ function QueueRow({
           <Equalizer size="sm" />
         ) : (
           <>
-            <span className="num font-mono text-[10px] text-[var(--text-2)] group-hover:hidden">{index + 1}</span>
-            <span className="hidden cursor-grab text-[11px] text-[var(--text-3)] group-hover:block" aria-hidden>
+            <span className="num font-mono text-[12px] text-[var(--text-2)] group-hover:hidden">{index + 1}</span>
+            <span className="hidden cursor-grab text-[12px] text-[var(--text-3)] group-hover:block" aria-hidden>
               ⠿
             </span>
           </>
@@ -61,16 +61,16 @@ function QueueRow({
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={['block truncate text-[13px]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-white'].join(' ')}
+          className={['block truncate text-[14px]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-white'].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[11px] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
+        <span className="mt-1 block truncate text-[12px] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </span>
       </span>
-      <span className="num shrink-0 font-mono text-[10px] text-[var(--text-2)]">{formatDuration(track.duration_ms)}</span>
+      <span className="num shrink-0 font-mono text-[12px] text-[var(--text-2)]">{formatDuration(track.duration_ms)}</span>
     </button>
   )
 }
@@ -139,7 +139,7 @@ export function QueueList() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between px-5 pb-2 pt-4 text-[10px] tracking-[0.14em] text-[var(--text-2)]">
+      <div className="flex items-center justify-between px-5 pb-2 pt-4 text-[12px] tracking-[0.14em] text-[var(--text-2)]">
         <span>接下来 · {queue.items.length} 首</span>
         {restore ? (
           <span className="num text-[var(--accent)]">

@@ -9,12 +9,12 @@ export function TitleBar() {
         <span className="bili-tv-mark text-[var(--accent)]">
           <Icon name="biliTv" size={15} />
         </span>
-        <span className="text-[12px] text-[var(--text-2)]">BILIMUSIC</span>
-        <span className="rounded-[3px] border border-hairline px-2 text-[10px] text-[var(--text-3)]">
+        <span className="text-[14px] text-[var(--text-2)]">BILIMUSIC</span>
+        <span className="rounded-[3px] border border-hairline px-2 text-[12px] text-[var(--text-3)]">
           ALPHA
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[11px] text-[var(--text-3)]">
+      <div className="flex items-center gap-2 text-[12px] text-[var(--text-3)]">
         <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
         本机直连
       </div>

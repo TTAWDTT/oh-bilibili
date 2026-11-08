@@ -64,12 +64,12 @@ export function QrPanel({ state, url, svg }: QrPanelProps) {
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[13px] font-medium ${status.tone}`}>{status.title}</div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-2)]">{status.detail}</p>
+          <div className={`text-[14px] font-medium ${status.tone}`}>{status.title}</div>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-2)]">{status.detail}</p>
           <button
             type="button"
             onClick={() => void copy()}
-            className="t press mt-3 flex h-8 items-center justify-center gap-2 rounded-[4px] border border-[var(--line)] px-3 text-[11px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
+            className="t press mt-3 flex h-8 items-center justify-center gap-2 rounded-[4px] border border-[var(--line)] px-3 text-[12px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
           >
             <Icon name="copy" size={12} />
             复制登录链接
@@ -86,13 +86,13 @@ export function QrPanel({ state, url, svg }: QrPanelProps) {
             className="rounded-[4px] bg-white p-2"
           />
           {state === 'expired' ? (
-            <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/70 text-[12px] text-[var(--text-1)]">
+            <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/70 text-[14px] text-[var(--text-1)]">
               二维码已过期，点刷新重来
             </div>
           ) : null}
         </div>
       ) : (
-        <div className="selectable mt-4 break-all rounded-[4px] border border-[var(--line)] bg-black/30 px-3 py-2 font-mono text-[10px] leading-relaxed text-[var(--text-2)]">
+        <div className="selectable mt-4 break-all rounded-[4px] border border-[var(--line)] bg-black/30 px-3 py-2 font-mono text-[12px] leading-relaxed text-[var(--text-2)]">
           {url}
         </div>
       )}

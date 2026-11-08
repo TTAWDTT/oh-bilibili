@@ -82,14 +82,14 @@ export function AuthorView({ name }: { name: string }) {
       <header className="mb-6 flex items-center gap-4">
         <Avatar src={avatar} alt={name} size={64} />
         <div className="min-w-0">
-          <h1 className="truncate text-[20px] font-semibold text-[var(--text-1)]" title={name}>
+          <h1 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
             {name}
           </h1>
           <button
             type="button"
             onClick={() => void follow()}
             className={[
-              'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[12px]',
+              'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[14px]',
               followed
                 ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
                 : 'bg-[var(--accent)] text-white',
@@ -98,7 +98,7 @@ export function AuthorView({ name }: { name: string }) {
             {followed ? '已关注' : '+ 关注'}
           </button>
 
-          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[var(--text-3)]">
+          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-3)]">
             <span>{tracks.length} 个投稿</span>
             <span>{formatCount(views)} 累计播放</span>
             <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">

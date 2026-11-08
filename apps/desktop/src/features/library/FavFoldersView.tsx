@@ -76,14 +76,14 @@ export function FavFoldersView() {
         <button
           type="button"
           onClick={() => setPicked(null)}
-          className="mb-4 flex items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+          className="mb-4 flex items-center gap-1 text-[14px] text-[var(--text-3)] hover:text-[var(--accent)]"
         >
           <Icon name="chevronLeft" size={13} />
           收藏夹
         </button>
         <h1 className="mb-4 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
           {picked.title}
-          <span className="num ml-2 text-[12px] font-normal text-[var(--text-3)]">
+          <span className="num ml-2 text-[14px] font-normal text-[var(--text-3)]">
             {picked.count} 个视频
           </span>
         </h1>
@@ -125,10 +125,10 @@ export function FavFoldersView() {
             className="t flex items-center justify-between gap-3 rounded-[4px] border border-[var(--line)] px-3 py-2 text-left hover:border-[var(--accent)]"
           >
             <span className="min-w-0">
-              <span className="block truncate text-[13px] text-[var(--text-1)]" title={folder.title}>
+              <span className="block truncate text-[14px] text-[var(--text-1)]" title={folder.title}>
                 {folder.title}
               </span>
-              <span className="num block text-[11px] text-[var(--text-3)]">{folder.count} 个视频</span>
+              <span className="num block text-[12px] text-[var(--text-3)]">{folder.count} 个视频</span>
             </span>
             <Icon name="chevronRight" size={13} className="shrink-0 text-[var(--text-3)]" />
           </button>

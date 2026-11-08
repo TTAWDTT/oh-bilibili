@@ -22,7 +22,7 @@ export function MascotCorner() {
   return (
     <div className="pointer-events-none fixed bottom-[70px] right-[10px] z-10 hidden select-none opacity-70 transition-opacity hover:opacity-100 lg:block">
       {bubble ? (
-        <div className="bili-mascot-bubble pointer-events-auto absolute bottom-[calc(100%-8px)] right-2 w-max max-w-[220px] rounded-[8px] border border-[var(--line)] bg-white px-3 py-2 text-[12px] leading-snug text-[var(--text-1)] shadow-[0_6px_20px_-8px_rgba(0,0,0,0.25)]">
+        <div className="bili-mascot-bubble pointer-events-auto absolute bottom-[calc(100%-8px)] right-2 w-max max-w-[220px] rounded-[8px] border border-[var(--line)] bg-white px-3 py-2 text-[14px] leading-snug text-[var(--text-1)] shadow-[0_6px_20px_-8px_rgba(0,0,0,0.25)]">
           {bubble}
           <span className="absolute -bottom-[5px] right-6 h-2 w-2 rotate-45 border-b border-r border-[var(--line)] bg-white" />
         </div>

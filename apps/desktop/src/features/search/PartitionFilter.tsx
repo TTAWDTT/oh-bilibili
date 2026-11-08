@@ -41,7 +41,7 @@ export function PartitionFilter({
             onClick={() => onChange(p.label)}
             aria-pressed={on}
             className={[
-              't rounded-[4px] px-2.5 py-1 text-[12px]',
+              't rounded-[4px] px-2.5 py-1 text-[14px]',
               on
                 ? 'bg-[var(--accent)] text-white'
                 : 'bg-[var(--panel-raised)] text-[var(--text-2)] hover:text-[var(--text-1)]',

@@ -28,8 +28,8 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
         <Icon name={tone.icon} size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-[var(--text-1)]">{toast.title}</div>
-        {toast.detail ? <div className="mt-0.5 break-words text-[12px] leading-relaxed text-[var(--text-2)]">{toast.detail}</div> : null}
+        <div className="text-[14px] font-medium text-[var(--text-1)]">{toast.title}</div>
+        {toast.detail ? <div className="mt-0.5 break-words text-[14px] leading-relaxed text-[var(--text-2)]">{toast.detail}</div> : null}
       </div>
       <button
         type="button"

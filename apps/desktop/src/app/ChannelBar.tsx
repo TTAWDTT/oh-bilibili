@@ -35,7 +35,7 @@ export function ChannelBar() {
             onClick={() => navigate(channel.view)}
             aria-current={active ? 'page' : undefined}
             className={[
-              't relative flex items-center gap-1.5 px-3 text-[13px]',
+              't relative flex items-center gap-1.5 px-3 text-[14px]',
               active
                 ? 'text-[var(--accent)]'
                 : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
@@ -68,7 +68,7 @@ function DanmakuToggle() {
       aria-pressed={enabled}
       title={enabled ? '关闭弹幕' : '打开弹幕'}
       className={[
-        'bili-press flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11.5px] transition-colors',
+        'bili-press flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[13px] transition-colors',
         enabled
           ? 'border-[var(--accent)] bg-[color-mix(in_oklab,var(--bili-pink)_10%,white)] text-[var(--accent)]'
           : 'border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-2)]',

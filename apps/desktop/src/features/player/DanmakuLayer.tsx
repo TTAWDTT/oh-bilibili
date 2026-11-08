@@ -35,7 +35,7 @@ export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing:
       {lines.slice(0, 18).map((text, i) => (
         <span
           key={`${i}-${text}`}
-          className="danmaku absolute whitespace-nowrap text-[13px] text-white"
+          className="danmaku absolute whitespace-nowrap text-[14px] text-white"
           style={{
             top: `${8 + (i * 100) / Math.max(1, Math.min(lines.length, 18))}%`,
             // 速度越大，动画时长越短

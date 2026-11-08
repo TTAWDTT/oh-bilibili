@@ -154,7 +154,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 </span>
               ) : null}
               {/* 时长压右下角，和 B 站一致 */}
-              <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[10.5px] leading-[15px] text-white">
+              <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white">
                 {formatDuration(track.duration_ms)}
               </span>
               {/* hover 时封面里飘两条弹幕，B 站的视频预览就是这个样子 */}
@@ -182,7 +182,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             </h3>
 
             {track.views ? (
-              <div className="num mt-1.5 flex items-center gap-2 text-[11.5px] text-[var(--text-3)]">
+              <div className="num mt-1.5 flex items-center gap-2 text-[13px] text-[var(--text-3)]">
                 <span className="flex items-center gap-1">
                   <Icon name="play" size={10} />
                   {formatCount(track.views)}
@@ -199,7 +199,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             <div className="mt-1 flex flex-wrap gap-1">
               {track.tname ? (
                 <span
-                  className="rounded-[3px] px-1.5 text-[11px] leading-[17px] text-white"
+                  className="rounded-[3px] px-1.5 text-[12px] leading-[17px] text-white"
                   style={{ background: partitionColor(track.tname) }}
                 >
                   {track.tname}
@@ -208,7 +208,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               {tagsOf(track.title).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[11px] leading-[17px] text-[var(--text-2)]"
+                  className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-2)]"
                 >
                   #{tag}
                 </span>
@@ -219,7 +219,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               type="button"
               title="点击复制 BV 号"
               onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
-              className="num mt-1 block font-mono text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              className="num mt-1 block font-mono text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
             >
               {track.key}
             </button>
@@ -229,13 +229,13 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               aria-label={`看 ${track.title} 的 MV`}
               title="看 MV"
               onClick={() => setMv({ key: track.key, title: track.title })}
-              className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              className="mt-1.5 flex items-center gap-1 text-[13px] text-[var(--text-3)] hover:text-[var(--accent)]"
             >
               <Icon name="biliTv" size={11} />
               看 MV
             </button>
 
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-[var(--text-3)]">
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[14px] text-[var(--text-3)]">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
                 <button
@@ -295,7 +295,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
             </div>
 
             {confirming === track.key ? (
-              <div className="mt-1 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[11px]">
+              <div className="mt-1 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[12px]">
                 <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
                 <button
                   type="button"

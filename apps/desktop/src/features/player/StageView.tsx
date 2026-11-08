@@ -121,13 +121,13 @@ export function StageView() {
         <h2 className="mt-8 max-w-full truncate text-[26px] font-semibold text-[var(--text-1)]" title={track.title}>
           {track.title}
         </h2>
-        <p className="mt-1 truncate text-[13px] text-[var(--text-2)]" title={track.artist}>
+        <p className="mt-1 truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </p>
 
         <div className="mt-10 flex min-h-[92px] flex-col items-center text-center">
           <p className="stage-line text-[27px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
-          <p className="mt-3 text-[14px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
+          <p className="mt-3 text-[16px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
         </div>
 
         <div className="mt-8 flex items-center gap-6 text-[var(--text-2)]">
@@ -156,7 +156,7 @@ export function StageView() {
 
       {related.length > 0 ? (
         <div className="absolute inset-x-0 bottom-0 border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur">
-          <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
+          <div className="mb-2 text-[12px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {related.map((item) => (
               <button
@@ -171,10 +171,10 @@ export function StageView() {
                     cover={item.cover}
                     title={item.title}
                     className="h-full w-full"
-                    glyphClassName="text-[20px] font-semibold text-white/80"
+                    glyphClassName="text-[26px] font-semibold text-white/80"
                   />
                 </span>
-                <span className="mt-1 line-clamp-1 block text-[11px] text-[var(--text-2)] group-hover:text-[var(--accent)]">
+                <span className="mt-1 line-clamp-1 block text-[12px] text-[var(--text-2)] group-hover:text-[var(--accent)]">
                   {item.title}
                 </span>
               </button>

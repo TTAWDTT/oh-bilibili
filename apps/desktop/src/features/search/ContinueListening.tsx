@@ -32,7 +32,7 @@ export function ContinueListening() {
 
   return (
     <div className="mt-8">
-      <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">继续听</div>
+      <div className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">继续听</div>
       <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
         {tracks.map((track, i) => (
           <button
@@ -50,12 +50,12 @@ export function ContinueListening() {
                 className="h-full w-full"
                 glyphClassName="text-[28px] font-semibold text-white/85"
               />
-              <span className="num absolute bottom-1 right-1 rounded-[3px] bg-black/60 px-1 text-[10px] leading-[14px] text-white">
+              <span className="num absolute bottom-1 right-1 rounded-[3px] bg-black/60 px-1 text-[12px] leading-[14px] text-white">
                 {formatDuration(track.duration_ms)}
               </span>
             </span>
-            <span className="mt-1.5 line-clamp-1 block text-[12px] text-[var(--text-1)]">{track.title}</span>
-            <span className="block truncate text-[10.5px] text-[var(--text-3)]">{track.artist}</span>
+            <span className="mt-1.5 line-clamp-1 block text-[14px] text-[var(--text-1)]">{track.title}</span>
+            <span className="block truncate text-[12px] text-[var(--text-3)]">{track.artist}</span>
           </button>
         ))}
       </div>

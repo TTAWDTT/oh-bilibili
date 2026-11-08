@@ -49,8 +49,8 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
       >
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-3 py-5">
           <div>
-            <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em] text-[var(--text-1)]">{title}</h2>
-            {description ? <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-[var(--text-2)]">{description}</p> : null}
+            <h2 className="font-display text-[26px] font-semibold tracking-[-0.01em] text-[var(--text-1)]">{title}</h2>
+            {description ? <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-[var(--text-2)]">{description}</p> : null}
           </div>
           <button
             type="button"

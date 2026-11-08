@@ -25,7 +25,7 @@ const ENTRIES: Entry[] = [
 export function ChannelGrid({ onPick }: { onPick: (keyword: string) => void }) {
   return (
     <div className="mt-8">
-      <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">逛逛分区</div>
+      <div className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">逛逛分区</div>
       <div className="mt-3 grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(168px,1fr))]">
         {ENTRIES.map((entry, i) => (
           <button
@@ -37,8 +37,8 @@ export function ChannelGrid({ onPick }: { onPick: (keyword: string) => void }) {
           >
             <PartitionIcon kind={entry.kind} size={26} />
             <span className="min-w-0">
-              <span className="block text-[13px] text-[var(--text-1)]">{entry.label}</span>
-              <span className="block truncate text-[10.5px] text-[var(--text-3)]">{entry.hint}</span>
+              <span className="block text-[14px] text-[var(--text-1)]">{entry.label}</span>
+              <span className="block truncate text-[12px] text-[var(--text-3)]">{entry.hint}</span>
             </span>
           </button>
         ))}

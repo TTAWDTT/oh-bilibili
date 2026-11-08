@@ -138,7 +138,7 @@ export function SearchView() {
               }}
               aria-label="搜索歌曲"
               placeholder="歌名、UP 主，或者一句歌词"
-              className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-2)]"
+              className="min-w-0 flex-1 bg-transparent text-[16px] text-[var(--text-1)] placeholder:text-[var(--text-2)]"
             />
             {query ? (
               <button
@@ -169,7 +169,7 @@ export function SearchView() {
         {focused && trimmed.length === 0 ? (
           <div className="bili-suggest relative z-20 -mt-1 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
             <div className="flex items-center gap-2">
-              <span className="bili-tag-blue rounded-[3px] px-1.5 text-[10.5px] leading-[17px]">热门</span>
+              <span className="bili-tag-blue rounded-[3px] px-1.5 text-[12px] leading-[17px]">热门</span>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                 {SUGGESTIONS.map((word) => (
                   <button
@@ -186,7 +186,7 @@ export function SearchView() {
             </div>
             {history.length > 0 ? (
               <div className="mt-2.5 flex items-center gap-2 border-t border-[var(--line)] pt-2.5">
-                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[10.5px] leading-[17px] text-[var(--text-3)]">历史</span>
+                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-3)]">历史</span>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                   {history.slice(0, 6).map((word) => (
                     <button
@@ -210,11 +210,11 @@ export function SearchView() {
             {history.length > 0 ? (
               <div className="mb-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">搜索历史</span>
+                  <span className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">搜索历史</span>
                   <button
                     type="button"
                     onClick={clearHistory}
-                    className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                    className="text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
                   >
                     清空
                   </button>
@@ -225,7 +225,7 @@ export function SearchView() {
                       key={word}
                       type="button"
                       onClick={() => pick(word)}
-                      className="t rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[11.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                      className="t rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
                     >
                       {word}
                     </button>
@@ -236,14 +236,14 @@ export function SearchView() {
 
             <SearchBanner />
 
-            <div className="mt-8 text-[11px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
+            <div className="mt-8 text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => pick(suggestion)}
-                  className="t press text-[13px] text-[var(--text-2)] underline-offset-4 hover:text-white hover:underline"
+                  className="t press text-[14px] text-[var(--text-2)] underline-offset-4 hover:text-white hover:underline"
                 >
                   {suggestion}
                 </button>
@@ -256,11 +256,11 @@ export function SearchView() {
               <HotRanking onPick={(kw) => pick(kw)} />
             </div>
 
-            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[12px] leading-relaxed text-[var(--text-2)]">{HINT}</p>
+            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[14px] leading-relaxed text-[var(--text-2)]">{HINT}</p>
           </div>
         ) : (
           <section className="mt-6">
-            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[11px] tracking-[0.16em] text-[var(--text-2)]">
+            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
               <span>
                 {status === 'error'
                   ? '搜索失败'
@@ -291,7 +291,7 @@ export function SearchView() {
                       onClick={() => setOrder(value)}
                       aria-pressed={order === value}
                       className={[
-                        't rounded-[4px] px-2 py-1 text-[11.5px]',
+                        't rounded-[4px] px-2 py-1 text-[13px]',
                         order === value
                           ? 'text-[var(--accent)]'
                           : 'text-[var(--text-3)] hover:text-[var(--text-1)]',
@@ -337,7 +337,7 @@ export function SearchView() {
             ) : null}
 
             {status === 'ready' && tracks.length > 0 ? (
-              <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[11.5px] text-[var(--text-3)]">
+              <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[13px] text-[var(--text-3)]">
                 {loadingMore ? (
                   <>
                     <span className="bili-tv-mark text-[var(--accent)]">◌</span>

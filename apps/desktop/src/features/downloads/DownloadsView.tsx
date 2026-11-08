@@ -53,7 +53,7 @@ export function DownloadsView() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 border-b border-hairline px-4 pb-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-2)]">
+            <div className="flex items-center gap-2 border-b border-hairline px-4 pb-2 text-[12px] uppercase tracking-[0.2em] text-[var(--text-2)]">
               <span className="flex-1">曲目</span>
               <span className="w-16 text-right">进度</span>
             </div>
@@ -65,14 +65,14 @@ export function DownloadsView() {
                     cover={null}
                     title={item.title}
                     className="h-10 w-10 shrink-0 rounded-[4px] border border-[var(--line)]"
-                    glyphClassName="text-[16px] font-medium text-[var(--text-2)]"
+                    glyphClassName="text-[18px] font-medium text-[var(--text-2)]"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[13px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={item.title}>
+                      <span className="truncate text-[14px] text-[var(--text-2)] group-hover:text-[var(--text-1)]" title={item.title}>
                         {item.title}
                       </span>
-                      <span className={`shrink-0 text-[10px] ${state.tone}`}>{state.label}</span>
+                      <span className={`shrink-0 text-[12px] ${state.tone}`}>{state.label}</span>
                     </div>
                     {item.state === 'running' ? (
                       <div className="mt-2 h-[2px] w-full overflow-hidden bg-white/32">
@@ -90,13 +90,13 @@ export function DownloadsView() {
                         type="button"
                         onClick={() => void copyPath(item.path ?? '')}
                         title="复制文件路径"
-                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[11px] text-[var(--text-2)] hover:text-[var(--text-2)]"
+                        className="t mt-1.5 flex max-w-full items-center gap-1 text-left text-[12px] text-[var(--text-2)] hover:text-[var(--text-2)]"
                       >
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
                       </button>
                     ) : (
-                      <div className="mt-1.5 text-[11px] text-[var(--text-2)]">等待开始</div>
+                      <div className="mt-1.5 text-[12px] text-[var(--text-2)]">等待开始</div>
                     )}
                   </div>
                   <span className="flex w-16 shrink-0 justify-end">
@@ -109,7 +109,7 @@ export function DownloadsView() {
                         <Icon name="alert" size={16} />
                       </span>
                     ) : (
-                      <span className="num font-mono text-[10px] text-[var(--text-2)]">{Math.round(item.progress * 100)}%</span>
+                      <span className="num font-mono text-[12px] text-[var(--text-2)]">{Math.round(item.progress * 100)}%</span>
                     )}
                   </span>
                 </div>

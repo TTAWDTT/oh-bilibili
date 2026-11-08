@@ -62,7 +62,7 @@ export function MvOverlay() {
     >
       <div className="w-full max-w-[960px]" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
-          <span className="truncate text-[13px] text-[var(--text-1)]" title={mv.title}>
+          <span className="truncate text-[14px] text-[var(--text-1)]" title={mv.title}>
             {mv.title}
           </span>
           <button
@@ -76,7 +76,7 @@ export function MvOverlay() {
         </div>
 
         {error ? (
-          <div className="flex h-[300px] items-center justify-center border border-hairline text-[13px] text-white/60">
+          <div className="flex h-[300px] items-center justify-center border border-hairline text-[14px] text-white/60">
             {error}
           </div>
         ) : src ? (
@@ -90,7 +90,7 @@ export function MvOverlay() {
             onError={() => setError('视频加载失败，可能是直链已过期，重新打开一次。')}
           />
         ) : (
-          <div className="flex h-[300px] items-center justify-center border border-hairline text-[13px] text-[var(--text-3)]">
+          <div className="flex h-[300px] items-center justify-center border border-hairline text-[14px] text-[var(--text-3)]">
             正在取流…
           </div>
         )}

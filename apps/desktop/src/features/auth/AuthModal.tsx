@@ -111,18 +111,18 @@ export function AuthModal() {
           {auth.user.avatar ? (
             <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-[var(--line)] object-cover" />
           ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[16px] font-medium text-[var(--text-1)]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[18px] font-medium text-[var(--text-1)]">
               {auth.user.uname.slice(0, 1)}
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] text-[var(--text-1)]">{auth.user.uname}</div>
-            <div className="mt-0.5 font-mono text-[11px] text-[var(--text-2)]">UID {auth.user.mid}</div>
+            <div className="truncate text-[14px] text-[var(--text-1)]">{auth.user.uname}</div>
+            <div className="mt-0.5 font-mono text-[12px] text-[var(--text-2)]">UID {auth.user.mid}</div>
           </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="t press rounded-[4px] bg-white h-8 px-4 text-[12px] font-medium text-black hover:bg-white/85"
+            className="t press rounded-[4px] bg-white h-8 px-4 text-[14px] font-medium text-black hover:bg-white/85"
           >
             完成
           </button>
@@ -149,22 +149,22 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="t press flex items-center justify-center flex items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[12px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
+              className="t press flex items-center justify-center flex items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
             >
               <Icon name="refresh" size={12} />
               重新生成
             </button>
-            <span className="font-mono text-[11px] text-[var(--text-2)]">有效期 {formatTime(remaining)}</span>
+            <span className="font-mono text-[12px] text-[var(--text-2)]">有效期 {formatTime(remaining)}</span>
           </div>
 
-          <ol className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-[var(--text-2)]">
+          <ol className="mt-4 space-y-1.5 text-[14px] leading-relaxed text-[var(--text-2)]">
             <li>1. 打开手机 B 站，进入「扫一扫」。</li>
             <li>2. 扫码，或打开复制的链接，在手机上确认登录。</li>
             <li>3. 确认后这个弹窗会自动关闭。</li>
           </ol>
 
           {isTauri ? null : (
-            <div className="mt-4 flex items-start gap-2 border-t border-hairline pt-4 text-[11px] leading-relaxed text-[#9fe6ff]/70">
+            <div className="mt-4 flex items-start gap-2 border-t border-hairline pt-4 text-[12px] leading-relaxed text-[#9fe6ff]/70">
               <Icon name="info" size={13} className="mt-[1px] shrink-0" />
               浏览器预览没有真实二维码：约 5 秒后自动确认登录，用来把状态机走完。
             </div>

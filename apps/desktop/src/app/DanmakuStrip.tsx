@@ -50,7 +50,7 @@ export function DanmakuStrip() {
       {lines.map(([text, color], i) => (
         <span
           key={`${i}-${text}`}
-          className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[12px]"
+          className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[14px]"
           style={{
             color,
             top: `${(i % 2) * 11}px`,

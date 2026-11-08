@@ -22,8 +22,8 @@ export function ShortcutTable() {
                 ))}
               </span>
             </td>
-            <td className="w-[168px] py-1 pr-4 align-middle text-[12px] text-[var(--text-1)]">{shortcut.label}</td>
-            <td className="py-1 align-middle text-[11px] text-[var(--text-2)]">{shortcut.detail}</td>
+            <td className="w-[168px] py-1 pr-4 align-middle text-[14px] text-[var(--text-1)]">{shortcut.label}</td>
+            <td className="py-1 align-middle text-[12px] text-[var(--text-2)]">{shortcut.detail}</td>
           </tr>
         ))}
       </tbody>

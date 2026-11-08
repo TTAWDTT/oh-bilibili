@@ -63,7 +63,7 @@ export function SearchBanner() {
           <div className="relative flex h-full items-center justify-between gap-6 px-8">
             <div className="min-w-0">
               <div className="text-[24px] font-semibold leading-tight text-[#4c3340]">{slide.title}</div>
-              <p className="mt-2 max-w-[420px] text-[13px] leading-relaxed text-[#7d5a67]">{slide.desc}</p>
+              <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-[#7d5a67]">{slide.desc}</p>
               <div className="mt-4 flex items-center gap-1.5">
                 {SLIDES.map((_, dot) => (
                   <button

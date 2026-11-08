@@ -42,7 +42,7 @@ function RailToggle({
       ].join(' ')}
     >
       <Icon name={tab === 'lyrics' ? 'lyrics' : 'queue'} size={16} />
-      {tab === 'queue' && count > 0 ? <span className="num text-[11px]">{count}</span> : null}
+      {tab === 'queue' && count > 0 ? <span className="num text-[12px]">{count}</span> : null}
     </button>
   )
 }
@@ -62,8 +62,8 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           <Icon name="music" size={20} />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] font-medium text-[var(--text-2)] group-hover:text-[var(--text-1)]">还没有在播放</span>
-          <span className="mt-1 block text-[12px] text-[var(--text-2)] group-hover:text-[var(--text-2)]">去搜索里挑一首 →</span>
+          <span className="block text-[14px] font-medium text-[var(--text-2)] group-hover:text-[var(--text-1)]">还没有在播放</span>
+          <span className="mt-1 block text-[14px] text-[var(--text-2)] group-hover:text-[var(--text-2)]">去搜索里挑一首 →</span>
         </span>
       </button>
     )
@@ -81,7 +81,7 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           cover={track.cover}
           title={track.title}
           className="h-10 w-10"
-          glyphClassName="text-[20px] font-semibold text-[var(--text-2)]"
+          glyphClassName="text-[26px] font-semibold text-[var(--text-2)]"
         />
         {playing ? (
           <span className="bili-playing-bars absolute bottom-0 left-0 right-0 flex items-end justify-center gap-[2px] bg-black/35 pb-[3px] pt-[6px]">
@@ -90,14 +90,14 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         ) : null}
       </button>
       <div className="min-w-0 flex-1">
-        <div className="bili-marquee truncate text-[13px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
+        <div className="bili-marquee truncate text-[14px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
           {track.title}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <span className="truncate text-[12px] text-[var(--text-2)]" title={track.artist}>
+          <span className="truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[10px] text-[var(--text-2)]">
+          <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[12px] text-[var(--text-2)]">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>

@@ -33,7 +33,7 @@ export function VolumeControl() {
           }}
         />
       </div>
-      <span className="num w-7 shrink-0 text-right font-mono text-[10px] text-[var(--text-2)]">
+      <span className="num w-7 shrink-0 text-right font-mono text-[12px] text-[var(--text-2)]">
         {Math.round(shown * 100)}
       </span>
     </div>

@@ -587,7 +587,7 @@
 
 .bili-card:hover {
   transform: translateY(-3px) scale(1.012);
-  box-shadow: 0 10px 26px -12px rgb(0 0 0 / 0.28);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08), 0 8px 20px -10px rgb(0 0 0 / 0.16);
 }
 
 /* 卡片进场：带过冲的弹入 */

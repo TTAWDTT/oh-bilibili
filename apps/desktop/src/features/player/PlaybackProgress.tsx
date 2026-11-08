@@ -70,7 +70,7 @@ export function PlaybackProgress() {
           disabled={duration <= 0}
         />
       </div>
-      <span className="num w-10 shrink-0 font-mono text-[11px] text-[var(--text-2)]">{formatTime(duration)}</span>
+      <span className="num w-10 shrink-0 font-mono text-[12px] text-[var(--text-2)]">{formatTime(duration)}</span>
     </div>
   )
 }

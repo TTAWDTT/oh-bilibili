@@ -25,7 +25,7 @@ export function DanmakuPanel() {
 
       {open ? (
         <div className="mt-2 w-56 rounded-[6px] border border-white/15 bg-black/75 p-3 text-white backdrop-blur">
-          <label className="flex items-center justify-between text-[12px]">
+          <label className="flex items-center justify-between text-[14px]">
             显示弹幕
             <input
               type="checkbox"
@@ -60,7 +60,7 @@ function Slider({
   onChange: (v: number) => void
 }) {
   return (
-    <label className="mt-3 block text-[11.5px] text-white/70">
+    <label className="mt-3 block text-[13px] text-white/70">
       <span className="flex items-center justify-between">
         {label}
         <span className="num text-white/45">{value.toFixed(1)}</span>

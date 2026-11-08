@@ -15,10 +15,10 @@ function playlistColor(id: number): string {
 }
 
 const ROW =
-  'bili-nav-item t mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[12px]'
+  'bili-nav-item t mx-1 flex h-6 items-center gap-2 rounded-[3px] px-2 text-left text-[14px]'
 const ROW_IDLE = 'text-[var(--text-2)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]'
 const ROW_ACTIVE = 'bg-[var(--hover)] text-[var(--text-1)]'
-const SECTION = 'px-3 pb-1 pt-3 text-[11px] font-medium tracking-[0.08em] text-[var(--text-3)]'
+const SECTION = 'px-3 pb-1 pt-3 text-[12px] font-medium tracking-[0.08em] text-[var(--text-3)]'
 
 export function Sidebar() {
   const view = useAppStore((state) => state.view)
@@ -53,7 +53,7 @@ export function Sidebar() {
             <Skeleton className="h-2.5 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="px-3 py-1 text-[12px] leading-relaxed text-[var(--text-3)]">
+          <p className="px-3 py-1 text-[14px] leading-relaxed text-[var(--text-3)]">
             还没有歌单，点上面的加号建一个。
           </p>
         ) : (
@@ -90,10 +90,10 @@ export function Sidebar() {
       >
         <Avatar src={user?.avatar ?? null} alt={user?.uname ?? '未登录'} size={24} />
         <span className="min-w-0">
-          <span className="block truncate text-[12px] text-[var(--text-1)]">
+          <span className="block truncate text-[14px] text-[var(--text-1)]">
             {user?.uname ?? '未登录'}
           </span>
-          <span className="block truncate text-[11px] text-[var(--text-3)]">
+          <span className="block truncate text-[12px] text-[var(--text-3)]">
             {user ? '已连接 B 站' : '登录后同步'}
           </span>
         </span>

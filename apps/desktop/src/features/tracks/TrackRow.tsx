@@ -31,7 +31,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
       className="group flex items-center gap-2 border-b border-hairline px-4"
       data-row="track"
     >
-      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[10px] text-[var(--text-2)]">
+      <span className="num flex w-4 shrink-0 items-center justify-center font-mono text-[12px] text-[var(--text-2)]">
         {active && playing ? <Equalizer size="sm" /> : <span className={active ? 'text-[var(--accent)]' : ''}>{index + 1}</span>}
       </span>
 
@@ -47,26 +47,26 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
           cover={track.cover}
           title={track.title}
           className="h-full w-full"
-          glyphClassName="text-[16px] font-medium text-[var(--text-2)]"
+          glyphClassName="text-[18px] font-medium text-[var(--text-2)]"
         />
       </button>
 
       <button type="button" onClick={onPlay} className="min-w-0 flex-1 text-left">
         <span
           className={[
-            't block truncate text-[13px]',
+            't block truncate text-[14px]',
             active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-white',
           ].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-0 block truncate text-[11px] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
+        <span className="mt-0 block truncate text-[12px] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </span>
       </button>
 
-      <span className="num hidden w-10 shrink-0 text-right font-mono text-[10px] text-[var(--text-2)] sm:block">
+      <span className="num hidden w-10 shrink-0 text-right font-mono text-[12px] text-[var(--text-2)] sm:block">
         {formatDuration(track.duration_ms)}
       </span>
 

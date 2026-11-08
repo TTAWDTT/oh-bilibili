@@ -16,7 +16,7 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
       onClick={onClick}
       aria-pressed={active}
       className={[
-        't flex h-8 items-center border-b-2 text-[12px]',
+        't flex h-8 items-center border-b-2 text-[14px]',
         active
           ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
           : 'border-transparent text-[var(--text-2)] hover:text-[var(--text-1)]',
@@ -41,22 +41,22 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
         />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[10px] tracking-[0.16em] text-[var(--text-2)]">
+        <div className="flex items-center gap-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
           正在播放
           {loading ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] pulse-soft" /> : null}
         </div>
         <div
-          className="mt-2 truncate font-display text-[19px] font-semibold leading-[1.2] tracking-[-0.02em] text-[var(--text-1)]"
+          className="mt-2 truncate font-display text-[22px] font-semibold leading-[1.2] tracking-[-0.02em] text-[var(--text-1)]"
           title={track.title}
         >
           {track.title}
         </div>
-        <div className="mt-1 truncate text-[12px] text-[var(--text-2)]" title={track.artist}>
+        <div className="mt-1 truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ReactionButtons track={track} size={15} />
-          <span className="num rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[10px] text-[var(--text-2)]">
+          <span className="num rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[12px] text-[var(--text-2)]">
             {quality ? `${quality}K` : '——'}
           </span>
         </div>

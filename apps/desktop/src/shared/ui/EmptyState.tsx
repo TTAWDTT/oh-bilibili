@@ -28,15 +28,15 @@ export function EmptyState({ icon, art = false, title, detail, action, compact =
       ) : (
         <Icon name={icon} size={22} className="text-[var(--text-2)]" />
       )}
-      <h3 className="mt-3 text-[14px] font-medium text-[var(--text-1)]" title={title}>
+      <h3 className="mt-3 text-[16px] font-medium text-[var(--text-1)]" title={title}>
         {title}
       </h3>
-      <p className="mt-2 max-w-xs text-[12px] leading-relaxed text-[var(--text-2)]">{detail}</p>
+      <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-[var(--text-2)]">{detail}</p>
       {action ? (
         <button
           type="button"
           onClick={action.onClick}
-          className="t press mt-5 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[12px] text-[var(--text-1)] hover:border-white/45 hover:text-[var(--text-1)]"
+          className="t press mt-5 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-white/45 hover:text-[var(--text-1)]"
         >
           {action.label}
         </button>

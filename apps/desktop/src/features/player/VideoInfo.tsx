@@ -38,7 +38,7 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
 
   return (
     <section className="mt-6 w-full max-w-[560px] rounded-[6px] border border-white/12 bg-black/30 p-4 text-left">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-white/55">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/55">
         <Stat icon="play" value={meta.views} label="播放" />
         <Stat icon="queue" value={meta.danmaku} label="弹幕" />
         <Stat icon="heart" value={meta.likes} label="点赞" />
@@ -62,7 +62,7 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="mt-1 text-[11.5px] text-white/45 hover:text-white"
+              className="mt-1 text-[13px] text-white/45 hover:text-white"
             >
               {expanded ? '收起' : '展开简介'}
             </button>
