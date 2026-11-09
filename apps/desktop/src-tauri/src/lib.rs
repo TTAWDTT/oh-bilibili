@@ -154,14 +154,10 @@ async fn search_q(
         Some("danmaku") => SearchOrder::Danmaku,
         _ => SearchOrder::TotalRank,
     };
-    let ids = partition_ids.unwrap_or_default();
-    if ids.is_empty() {
-        engine.search_ordered(&query, page, order).await
-    } else {
-        engine
-            .search_by_partition(&query, page, order, &ids, 3)
-            .await
-    }
+    // 传一级分区 id 时直接用 B 站的 tids 参数，返回该分区下的全部结果；
+    // 不传则全站搜索。原来拿 4 页再按 typeid 筛的做法已经不需要了。
+    let tid = partition_ids.as_ref().and_then(|ids| ids.first().copied());
+    engine.search_in_partition(&query, page, order, tid).await
 }
 
 #[tauri::command]

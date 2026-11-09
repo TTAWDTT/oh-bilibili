@@ -134,6 +134,24 @@ impl Engine {
     ///
     /// B 站搜索接口已不收 tids，只能靠翻页凑够数量。这里最多翻 `max_pages` 页，
     /// 把命中的都收集起来；频道用不到全量时不至于打爆限速队列。
+    /// 按一级分区搜索。`tid` 为 None 表示全站。
+    pub async fn search_in_partition(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+    ) -> Result<Vec<Track>, WireError> {
+        let q = SearchQuery::parse(query, page)
+            .map_err(|e| WireError::input("query", e.to_string()))?;
+        let tracks = self.source.search_in_partition(&q, order, tid).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
+    }
+
+    #[allow(dead_code)]
     pub async fn search_by_partition(
         &self,
         query: &str,

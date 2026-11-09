@@ -88,12 +88,29 @@ impl Source {
         query: &SearchQuery,
         order: bilimusic_model::SearchOrder,
     ) -> Result<Vec<Track>, BiliError> {
+        self.search_in_partition(query, order, None).await
+    }
+
+    /// 带分区搜索。
+    ///
+    /// `tid` 是 B 站的一级分区 id（音乐 3、动画 1、游戏 4…），交给接口的 `tids` 参数，
+    /// 它会返回该分区下所有子分区的结果。实测有效——之前以为 `tids` 失效，
+    /// 实际是撞上限流返回空列表。
+    pub async fn search_in_partition(
+        &self,
+        query: &SearchQuery,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+    ) -> Result<Vec<Track>, BiliError> {
         let mut params = vec![
             ("search_type", "video".to_string()),
             ("keyword", query.keyword().to_string()),
             ("page", query.page().to_string()),
             ("page_size", "30".to_string()),
         ];
+        if let Some(tid) = tid {
+            params.push(("tids", tid.to_string()));
+        }
         if let Some(order_param) = order.as_param() {
             params.push(("order", order_param.to_string()));
         }

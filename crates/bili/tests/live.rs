@@ -212,3 +212,46 @@ async fn 弹幕带真实颜色() {
     println!("共 {} 条，其中 {} 条有彩色", items.len(), colored);
     assert!(!items.is_empty());
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn tids_参数真的按分区过滤() {
+    use bilimusic_model::SearchOrder;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+
+    let all = source.search_ordered(&q, SearchOrder::TotalRank).await.expect("全站");
+    let music = source
+        .search_in_partition(&q, SearchOrder::TotalRank, Some(3))
+        .await
+        .expect("音乐区");
+    let game = source
+        .search_in_partition(&q, SearchOrder::TotalRank, Some(4))
+        .await
+        .expect("游戏区");
+
+    // 音乐区的结果里不该出现明显属于别的分区的条目。
+    // 允许 tname 为空——B 站偶尔不给 typename（244/267 这类新子分区），
+    // 但只要有名字就不该是游戏/动画/生活/影视/舞蹈。
+    let wrong: Vec<String> = music
+        .iter()
+        .filter_map(|t| t.tname.as_deref())
+        .filter(|name| ["游戏", "动画", "生活", "影视", "舞蹈", "鬼畜", "知识"].contains(name))
+        .map(|s| s.to_string())
+        .collect();
+    let named_music = music
+        .iter()
+        .filter(|t| t.tname.as_deref() == Some("音乐"))
+        .count();
+    println!(
+        "全站 {} 条 / 音乐区 {} 条（其中具名音乐 {} 条，错分区 {:?}）/ 游戏区 {} 条",
+        all.len(),
+        music.len(),
+        named_music,
+        wrong,
+        game.len()
+    );
+    assert!(!music.is_empty(), "音乐区应该有结果");
+    assert!(named_music >= 5, "音乐区里应该大部分是具名音乐条目");
+    assert!(wrong.is_empty(), "tids=3 不该返回其他分区的条目：{wrong:?}");
+}

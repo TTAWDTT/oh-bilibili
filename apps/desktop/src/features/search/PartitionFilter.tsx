@@ -4,18 +4,19 @@
  * B 站的搜索接口已经不接受 tids 参数（实测传了直接返回 0 条），
  * 所以这里改成按返回结果的 typeid 在前端过滤——分区是接口给的真数据。
  */
-export type Partition = { label: string; ids: number[] }
+/** tid 是 B 站的一级分区 id（tids 参数用它）；ids 保留做展示与未来细化。 */
+export type Partition = { label: string; tid?: number; ids: number[] }
 
 export const PARTITIONS: Partition[] = [
   { label: '全部', ids: [] },
   // B 站音乐区用子分区 id，主类目 3 反而很少出现
-  { label: '音乐', ids: [3, 28, 29, 30, 31, 59, 130, 193, 171] },
-  { label: '舞蹈', ids: [129] },
-  { label: '游戏', ids: [4, 17, 65, 136] },
-  { label: '鬼畜', ids: [119] },
-  { label: '动画', ids: [1, 24, 25, 47, 210] },
-  { label: '生活', ids: [21, 76, 75, 160, 211, 217] },
-  { label: '影视', ids: [181, 23, 11, 13] },
+  { label: '音乐', tid: 3, ids: [3, 28, 29, 30, 31, 59, 130, 193, 171] },
+  { label: '舞蹈', tid: 129, ids: [129] },
+  { label: '游戏', tid: 4, ids: [4, 17, 65, 136] },
+  { label: '鬼畜', tid: 119, ids: [119] },
+  { label: '动画', tid: 1, ids: [1, 24, 25, 47, 210] },
+  { label: '生活', tid: 21, ids: [21, 76, 75, 160, 211, 217] },
+  { label: '影视', tid: 181, ids: [181, 23, 11, 13] },
 ]
 
 export function matchesPartition(typeid: number | undefined, partition: Partition): boolean {

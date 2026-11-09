@@ -85,7 +85,10 @@ export function SearchView() {
           trimmed,
           page,
           order,
-          (PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!).ids,
+          (() => {
+            const tid = (PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!).tid
+            return tid ? [tid] : []
+          })(),
         )
         .then((next) => {
           if (seq.current !== ticket) return
