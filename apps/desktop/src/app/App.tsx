@@ -73,6 +73,13 @@ export default function App() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
       style={{ background: 'var(--color-ink)' }}>
+      {/* 键盘用户跳过导航直达内容；不聚焦时不可见 */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[4px] focus:bg-[var(--accent)] focus:px-3 focus:py-1.5 focus:text-[13px] focus:text-white"
+      >
+        跳到主要内容
+      </a>
       <StageGlow />
       <TitleBar />
       <ChannelBar />
@@ -80,7 +87,7 @@ export default function App() {
 
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
-        <main className="block min-w-0 flex-1 overflow-hidden">
+        <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           <div key={view.kind} className="bili-page h-full">
             <CurrentView view={view} />
           </div>

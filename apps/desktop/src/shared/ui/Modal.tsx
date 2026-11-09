@@ -17,14 +17,53 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
 
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+    // 记住打开前的焦点，关闭后还回去，键盘用户不会「跳到页面顶部」
+    const previous = document.activeElement as HTMLElement | null
+
+    const focusables = (): HTMLElement[] => {
+      const panel = panelRef.current
+      if (!panel) return []
+      return [...panel.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
     }
+
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+      // 焦点陷阱：Tab 走到两端就绕回，不会跑到弹窗后面的页面上
+      const list = focusables()
+      if (list.length === 0) {
+        event.preventDefault()
+        panelRef.current?.focus()
+        return
+      }
+      const first = list[0]
+      const last = list[list.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      const inside = panelRef.current?.contains(active) ?? false
+      if (!inside) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first)?.focus()
+        return
+      }
+      if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+
     document.addEventListener('keydown', onKey)
     const timer = window.setTimeout(() => panelRef.current?.focus(), 0)
     return () => {
       document.removeEventListener('keydown', onKey)
       window.clearTimeout(timer)
+      previous?.focus?.()
     }
   }, [open, onClose])
 
