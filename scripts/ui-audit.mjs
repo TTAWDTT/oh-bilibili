@@ -14,10 +14,14 @@ import { join } from 'node:path'
 
 const ROOT = new URL('../apps/desktop/src', import.meta.url).pathname
 
-// 这些文件整体是深色语境（全屏视频浮层），深色写法合法
+// 这些文件整体是深色语境（全屏视频浮层、banner 深色遮罩），浅色字合法
 const DARK_CONTEXT_FILES = [
   'features/player/MvOverlay.tsx',
+  'features/search/SearchBanner.tsx',
 ]
+
+// 封面上的字母字画在图片上，白色是对的，不参与浅色主题检查
+const ON_IMAGE_PROPS = ['glyphClassName']
 
 const RULES = [
   {
@@ -37,6 +41,12 @@ const RULES = [
     re: /bg-\[#0[0-9a-f]{5}\]/,
     skipDarkContext: false,
     hint: '改用 var(--panel)',
+  },
+  {
+    name: '半透明白字（只可能出现在深色底上）',
+    re: /text-white\/\d+/,
+    skipDarkContext: true,
+    hint: '浅色界面上读不到；图片/视频上的文字属于 DARK_CONTEXT 或加 ui-audit-ok',
   },
   {
     name: '白描边（浅色底上看不见）',
@@ -65,9 +75,14 @@ for (const file of walk(ROOT)) {
     if (darkContext && rule.skipDarkContext) continue
     lines.forEach((line, i) => {
       rule.re.lastIndex = 0
-      if (rule.re.test(line)) {
-        findings.push({ file: rel, line: i + 1, rule: rule.name, hint: rule.hint, snippet: line.trim().slice(0, 96) })
-      }
+      if (!rule.re.test(line)) return
+      // 封面上的字母字画在图片上；行内标记可以显式放过
+      const marked =
+        line.includes('ui-audit-ok') ||
+        (i > 0 && lines[i - 1].includes('ui-audit-ok')) ||
+        ON_IMAGE_PROPS.some((prop) => line.includes(prop))
+      if (marked) return
+      findings.push({ file: rel, line: i + 1, rule: rule.name, hint: rule.hint, snippet: line.trim().slice(0, 96) })
     })
   }
 }
