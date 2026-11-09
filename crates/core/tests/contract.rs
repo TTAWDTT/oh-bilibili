@@ -85,6 +85,7 @@ fn 播放快照的字段_ts_侧都有() {
         position_ms: 1000,
         duration_ms: 269_000,
         volume: 0.7,
+        speed: 1.0,
         repeat: "off".into(),
         shuffle: false,
         quality_kbps: Some(192),

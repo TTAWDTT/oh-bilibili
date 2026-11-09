@@ -188,13 +188,29 @@ pub fn decode_all(media: Media) -> Result<DecodedAudio, AudioError> {
 }
 
 /// 播放进度。全应用只有声卡侧写它，UI 拿到的都是这里的投影。
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Clock {
     frames: AtomicU64,
     sample_rate: AtomicU64,
     playing: AtomicBool,
     /// 最近一帧的 RMS 响度（0..1），只有声卡回调写。
     level: AtomicU32,
+    /// 播放倍速的定点表示（×1000）。倍速播时媒体时间走得比真实时间快，
+    /// 时钟推进要按这个比例放大，否则进度条会落后。
+    speed_milli: AtomicU64,
+}
+
+impl Default for Clock {
+    fn default() -> Clock {
+        Clock {
+            frames: Default::default(),
+            sample_rate: Default::default(),
+            playing: Default::default(),
+            level: Default::default(),
+            // 1.0 倍速。写成 0 的话时钟推进会被算成 0。
+            speed_milli: AtomicU64::new(1000),
+        }
+    }
 }
 
 impl Clock {
@@ -209,7 +225,15 @@ impl Clock {
         self.playing.load(Ordering::Relaxed)
     }
     pub fn advance(&self, frames: u64) {
-        self.frames.fetch_add(frames, Ordering::Relaxed);
+        let speed = self.speed_milli.load(Ordering::Relaxed).max(1);
+        self.frames
+            .fetch_add(frames * speed / 1000, Ordering::Relaxed);
+    }
+
+    /// 设置倍速。只影响时钟推进速度，不影响声卡输出。
+    pub fn set_speed(&self, speed: f64) {
+        let milli = (speed.clamp(0.5, 2.0) * 1000.0) as u64;
+        self.speed_milli.store(milli.max(1), Ordering::Relaxed);
     }
     pub fn reset(&self, sample_rate: u32) {
         self.frames.store(0, Ordering::Relaxed);
@@ -282,5 +306,30 @@ mod tests {
         assert_eq!(clock.position_ms(), 1000);
         clock.advance(24_000);
         assert_eq!(clock.position_ms(), 1500);
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::Clock;
+
+    /// 倍速播放时媒体时间要按倍速推进，否则进度条会落后于声音。
+    #[test]
+    fn 倍速下时钟按比例推进() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        // 默认 1.0 倍速
+        clock.advance(48_000);
+        assert_eq!(clock.position_ms(), 1000, "1 秒帧应等于 1000ms");
+
+        clock.reset(48_000);
+        clock.set_speed(2.0);
+        clock.advance(48_000);
+        assert_eq!(clock.position_ms(), 2000, "2 倍速下 1 秒帧等于 2 秒媒体时间");
+
+        clock.reset(48_000);
+        clock.set_speed(0.5);
+        clock.advance(48_000);
+        assert_eq!(clock.position_ms(), 500, "0.5 倍速下 1 秒帧等于 0.5 秒媒体时间");
     }
 }

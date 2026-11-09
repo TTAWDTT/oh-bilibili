@@ -21,6 +21,7 @@ type PlayerStore = {
   prev: () => Promise<void>
   seek: (positionMs: number) => Promise<void>
   setVolume: (volume: number) => Promise<void>
+  setSpeed: (speed: number) => Promise<void>
   cycleRepeat: () => Promise<void>
   setShuffle: (on: boolean) => void
   moveInQueue: (from: string, to: string) => Promise<void>
@@ -95,6 +96,13 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     },
     seek: async (positionMs) => {
       await run('调整进度', () => ipc.playerSeek(positionMs))
+    },
+    setSpeed: async (speed) => {
+      try {
+        apply(await ipc.playerSetSpeed(speed))
+      } catch {
+        // 倍速失败不打断播放
+      }
     },
     setVolume: async (volume) => {
       const current = get().snapshot

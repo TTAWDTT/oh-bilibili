@@ -108,6 +108,8 @@ pub struct PlayerSnapshot {
     pub position_ms: u64,
     pub duration_ms: u64,
     pub volume: f32,
+    /// 播放倍速，0.5..=2.0。
+    pub speed: f32,
     pub repeat: String,
     pub shuffle: bool,
     pub quality_kbps: Option<u16>,

@@ -78,6 +78,11 @@ export function playerSeek(positionMs: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_seek', { position_ms: positionMs })
 }
 
+/** 设置播放倍速 0.5..2.0。 */
+export function playerSetSpeed(speed: number): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('player_speed', { speed })
+}
+
 export function playerVolume(volume: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_volume', { volume })
 }

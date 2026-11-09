@@ -11,6 +11,7 @@ export type MockState = {
   position: number
   duration: number
   volume: number
+  speed: number
   repeat: RepeatMode
   shuffle: boolean
   likes: Set<string>
@@ -28,6 +29,7 @@ export const state: MockState = {
   position: 0,
   duration: 0,
   volume: 0.72,
+  speed: 1,
   repeat: 'off',
   shuffle: false,
   likes: new Set(),
@@ -104,6 +106,7 @@ export function snapshot(): PlayerSnapshot {
     position_ms: Math.round(state.position),
     duration_ms: state.duration,
     volume: state.volume,
+    speed: state.speed ?? 1,
     repeat: state.repeat,
     shuffle: state.shuffle,
     quality_kbps: track ? 192 : null,

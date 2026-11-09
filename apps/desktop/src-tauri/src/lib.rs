@@ -211,6 +211,11 @@ fn player_seek(engine: tauri::State<'_, Arc<Engine>>, position_ms: u64) -> Playe
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn player_speed(engine: tauri::State<'_, Arc<Engine>>, speed: f32) -> PlayerSnapshot {
+    engine.set_speed(speed)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn player_volume(engine: tauri::State<'_, Arc<Engine>>, volume: f32) -> PlayerSnapshot {
     engine.set_volume(volume)
 }
@@ -557,6 +562,7 @@ pub fn run() {
             player_prev,
             player_seek,
             player_volume,
+            player_speed,
             player_repeat,
             player_shuffle,
             queue_state,

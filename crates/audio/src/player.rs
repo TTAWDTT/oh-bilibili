@@ -30,6 +30,8 @@ enum Cmd {
     Play,
     Pause,
     Seek(u64),
+    /// 播放倍速，0.5..=2.0。
+    SetSpeed(f64),
     Stop,
     Shutdown,
 }
@@ -96,6 +98,11 @@ impl Player {
     pub fn seek(&self, position_ms: u64) {
         let _ = self.tx.send(Cmd::Seek(position_ms));
     }
+    /// 设置播放倍速。0.5 到 2.0，超范围会被夹住。
+    pub fn set_speed(&self, speed: f64) {
+        let _ = self.tx.send(Cmd::SetSpeed(speed));
+    }
+
     pub fn set_volume(&self, v: f32) {
         self.volume_bits
             .store(v.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
@@ -231,6 +238,9 @@ fn run_engine(
 
     let mut decoder: Option<Session> = None;
     let mut resampler = LinearResampler::new(device_rate as f64, channels);
+    // 倍速通过缩放重采样率实现：1.5 倍速就是让解码输出按 1.5 倍速被消费。
+    let mut base_rate: f64 = device_rate as f64;
+    let mut speed: f64 = 1.0;
 
     loop {
         while let Ok(cmd) = rx.try_recv() {
@@ -244,7 +254,8 @@ fn run_engine(
                             .find(|t| t.id == d.track_id)
                             .and_then(|t| t.codec_params.sample_rate)
                             .unwrap_or(48_000);
-                        resampler.set_source_rate(rate as f64);
+                        base_rate = rate as f64;
+                        resampler.set_source_rate(base_rate * speed);
                         clock.reset(device_rate);
                         clock.set_playing(true);
                         decoder = Some(d);
@@ -255,6 +266,11 @@ fn run_engine(
                         decoder = None;
                     }
                 },
+                Cmd::SetSpeed(next) => {
+                    // 0.5..=2.0，超出范围夹住；0 或负数会让重采样除零
+                    speed = next.clamp(0.5, 2.0);
+                    resampler.set_source_rate(base_rate * speed);
+                }
                 Cmd::Play => clock.set_playing(true),
                 Cmd::Pause => clock.set_playing(false),
                 Cmd::Seek(ms) => {

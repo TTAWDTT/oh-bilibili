@@ -44,6 +44,7 @@ pub struct Engine {
     lyrics_cache: Mutex<HashMap<String, LyricDoc>>,
     token: AtomicU64,
     volume: Mutex<f32>,
+    speed: Mutex<f32>,
     repeat: Mutex<String>,
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
@@ -77,6 +78,7 @@ impl Engine {
             lyrics_cache: Mutex::new(HashMap::new()),
             token: AtomicU64::new(0),
             volume: Mutex::new(0.7),
+            speed: Mutex::new(1.0),
             repeat: Mutex::new("off".into()),
             events,
             http: reqwest::Client::new(),
@@ -264,6 +266,8 @@ impl Engine {
             let player = lock(&self.player);
             player.load(Media::new(media)).map_err(|e| WireError::internal(e.to_string()))?;
             player.set_volume(*lock(&self.volume));
+            player.set_speed(*lock(&self.speed) as f64);
+            player.clock().set_speed(*lock(&self.speed) as f64);
             // 不要在 load 之后 seek(0)：load 已经重置了时钟，再 seek 一次会在
             // 音频线程刚开始推进时把帧计数打回 0，位置看起来像卡住。
         }
@@ -367,6 +371,18 @@ impl Engine {
         self.snapshot()
     }
 
+    /// 设置播放倍速 0.5..=2.0。
+    pub fn set_speed(&self, speed: f32) -> PlayerSnapshot {
+        let v = speed.clamp(0.5, 2.0);
+        *lock(&self.speed) = v;
+        {
+            let player = lock(&self.player);
+            player.set_speed(v as f64);
+            player.clock().set_speed(v as f64);
+        }
+        self.snapshot()
+    }
+
     pub fn set_repeat(&self, mode: &str) -> PlayerSnapshot {
         let normalized = match mode {
             "all" | "one" => mode,
@@ -397,6 +413,7 @@ impl Engine {
             track,
             position_ms,
             volume: *lock(&self.volume),
+            speed: *lock(&self.speed),
             repeat: lock(&self.repeat).clone(),
             shuffle: lock(&self.queue).shuffle(),
             quality_kbps: quality,

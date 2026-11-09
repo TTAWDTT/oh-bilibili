@@ -23,6 +23,7 @@ export type PlayerSnapshot = {
   position_ms: number
   duration_ms: number
   volume: number
+  speed: number
   repeat: RepeatMode
   shuffle: boolean
   quality_kbps: number | null

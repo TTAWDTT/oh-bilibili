@@ -75,6 +75,9 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       state.repeat = mode
       return snapshot()
     }
+    case 'player_speed':
+      state.speed = Math.min(2, Math.max(0.5, num(args, 'speed') || 1))
+      return snapshot()
     case 'player_shuffle':
       state.shuffle = bool(args, 'on')
       return snapshot()

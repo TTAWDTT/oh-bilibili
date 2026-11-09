@@ -108,6 +108,35 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
   )
 }
 
+/** 播放倍速。点一下在 0.75 / 1.0 / 1.25 / 1.5 / 2.0 之间循环，B 站播放器也有这个。 */
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
+
+function SpeedButton() {
+  const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
+  const setSpeed = usePlayerStore((state) => state.setSpeed)
+  const playable = usePlayerStore((state) => state.snapshot?.track != null)
+  const next = (): void => {
+    const i = SPEEDS.indexOf(speed as (typeof SPEEDS)[number])
+    void setSpeed(SPEEDS[(i + 1) % SPEEDS.length] ?? 1)
+  }
+  return (
+    <button
+      type="button"
+      onClick={next}
+      disabled={!playable}
+      aria-label={`播放倍速 ${speed}x`}
+      title="播放倍速"
+      className={[
+        'num t press flex h-8 shrink-0 items-center rounded-[4px] px-1.5 font-mono text-[12px]',
+        playable ? 'text-[var(--text-2)] hover:text-[var(--accent)]' : 'cursor-default text-[var(--text-3)]',
+        speed !== 1 ? 'text-[var(--accent)]' : '',
+      ].join(' ')}
+    >
+      {speed}x
+    </button>
+  )
+}
+
 export function PlayerBar() {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const rail = useAppStore((state) => state.rail)
@@ -132,6 +161,7 @@ export function PlayerBar() {
       <div className="flex min-w-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
         <LevelBars />
+        <SpeedButton />
         <VolumeControl />
         <span className="h-5 w-px bg-white/32" />
         <button
