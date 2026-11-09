@@ -20,6 +20,9 @@ export function FavFoldersView() {
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<FavFolder | null>(null)
   const [tracks, setTracks] = useState<Track[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [exhausted, setExhausted] = useState(false)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
@@ -45,8 +48,10 @@ export function FavFoldersView() {
     }
     let cancelled = false
     setTracks(null)
+    setPage(1)
+    setExhausted(false)
     void ipc
-      .favTracks(picked.id)
+      .favTracks(picked.id, 1)
       .then((list) => {
         if (!cancelled) setTracks(list)
       })
@@ -57,6 +62,25 @@ export function FavFoldersView() {
       cancelled = true
     }
   }, [picked])
+
+  /** 加载收藏夹的下一页。B 站每页 40 条。 */
+  const loadMore = async (): Promise<void> => {
+    if (!picked || loadingMore || exhausted) return
+    setLoadingMore(true)
+    try {
+      const next = await ipc.favTracks(picked.id, page + 1)
+      if (next.length === 0) {
+        setExhausted(true)
+      } else {
+        setTracks((prev) => [...(prev ?? []), ...next])
+        setPage((p) => p + 1)
+      }
+    } catch {
+      setExhausted(true)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   if (error) {
     return (
@@ -92,11 +116,27 @@ export function FavFoldersView() {
         ) : tracks.length === 0 ? (
           <EmptyState icon="biliTv" title="这个收藏夹是空的" detail="去 B 站收几个视频再来。" action={null} />
         ) : (
-          <TrackGrid
-            tracks={tracks}
-            activeKey={snapshot?.track?.key ?? null}
-            playing={snapshot?.phase === 'playing'}
-          />
+          <>
+            <TrackGrid
+              tracks={tracks}
+              activeKey={snapshot?.track?.key ?? null}
+              playing={snapshot?.phase === 'playing'}
+            />
+            <div className="mt-6 flex justify-center">
+              {exhausted ? (
+                <span className="text-[13px] text-[var(--text-3)]">已经到底了</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                >
+                  {loadingMore ? '加载中…' : '加载更多'}
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     )

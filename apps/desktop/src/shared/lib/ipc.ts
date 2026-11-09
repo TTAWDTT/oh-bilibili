@@ -182,8 +182,8 @@ export function favFolders(): Promise<FavFolder[]> {
 }
 
 /** 某个收藏夹里的曲目。 */
-export function favTracks(folderId: number): Promise<Track[]> {
-  return call<Track[]>('fav_tracks', { folder_id: folderId })
+export function favTracks(folderId: number, page = 1): Promise<Track[]> {
+  return call<Track[]>('fav_tracks', { folder_id: folderId, page })
 }
 
 /** 加入或移出稍后再看。 */

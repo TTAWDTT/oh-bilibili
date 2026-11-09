@@ -194,8 +194,8 @@ impl Source {
     }
 
     /// 收藏夹内容，转成 Track。
-    pub async fn fav_tracks(&self, folder_id: i64) -> Result<Vec<Track>, BiliError> {
-        let keys = self.client.fav_items(folder_id).await?;
+    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, BiliError> {
+        let keys = self.client.fav_items(folder_id, page).await?;
         let mut out = Vec::new();
         for bvid in keys {
             let key = TrackKey::from_provider(bvid);

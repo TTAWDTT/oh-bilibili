@@ -51,6 +51,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = idx >= 0 ? idx : 0
       return Array.from({ length: 6 }, (_, i) => CATALOG[(start + i + 1) % CATALOG.length])
     }
+    case 'fav_folders':
+      // 预览用一个两页的收藏夹，方便验证「加载更多」。
+      return [{ id: 1, title: '默认收藏夹', count: 70 }]
+    case 'fav_tracks': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
+      const size = 40
+      const start = (page - 1) * size
+      return CATALOG.slice(start, start + Math.min(size, CATALOG.length - start))
+    }
     case 'library_history_timed': {
       // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
       const now = Date.now()

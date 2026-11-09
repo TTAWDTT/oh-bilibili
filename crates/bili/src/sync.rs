@@ -96,11 +96,12 @@ impl Client {
     }
 
     /// 某个收藏夹里的视频 bvid 列表。
-    pub async fn fav_items(&self, folder_id: i64) -> Result<Vec<String>, BiliError> {
+    pub async fn fav_items(&self, folder_id: i64, page: u32) -> Result<Vec<String>, BiliError> {
         let v = self
             .get_json(
                 &format!(
-                    "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps=40&pn=1&platform=web"
+                    "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps=40&pn={}&platform=web",
+                    page.max(1)
                 ),
                 std::time::Duration::from_millis(400),
             )
