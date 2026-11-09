@@ -272,3 +272,28 @@ async fn up_名片能拿到粉丝数与签名() {
     assert!(c.level >= 1 && c.level <= 6, "等级应该在 1..6");
     assert!(c.face.starts_with("https://"));
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 选最多播放时结果按播放量递减() {
+    use bilimusic_model::SearchOrder;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let clicks = source
+        .search_in_partition(&q, SearchOrder::Click, Some(129))
+        .await
+        .expect("舞蹈区按播放");
+    let views: Vec<u64> = clicks.iter().map(|t| t.views.unwrap_or(0)).collect();
+    println!("前 6 条播放量：{views:?}");
+    // 允许 API 在同一量级内有微调，但不该出现「40 万排在 95 万前面」这种倒挂
+    let mut inversions = 0;
+    for w in views.windows(2) {
+        if w[0] < w[1] {
+            inversions += 1;
+        }
+    }
+    assert!(
+        inversions <= 2,
+        "按播放量排序时不该有这么多倒挂：{views:?}"
+    );
+}

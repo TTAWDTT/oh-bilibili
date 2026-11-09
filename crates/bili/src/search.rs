@@ -134,13 +134,19 @@ pub fn rank(keyword: &str, mut candidates: Vec<Candidate>) -> Vec<Candidate> {
             .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    dedupe(candidates)
+}
 
+/// 保留接口给的顺序，只去重。
+///
+/// 用户明确选了「最多播放 / 最新发布 / 最多弹幕」时，B 站返回的顺序就是他要的，
+/// 再按标题匹配重排等于把这个选择作废。
+pub fn dedupe(candidates: Vec<Candidate>) -> Vec<Candidate> {
     let mut seen = std::collections::HashSet::new();
-    candidates.retain(|c| {
-        let dedupe_key = format!("{}|{}", c.artist, normalize_title(&c.title));
-        seen.insert(dedupe_key)
-    });
     candidates
+        .into_iter()
+        .filter(|c| seen.insert(format!("{}|{}", c.artist, normalize_title(&c.title))))
+        .collect()
 }
 
 fn normalize_title(title: &str) -> String {

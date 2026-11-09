@@ -124,8 +124,13 @@ impl Source {
             .await?;
 
         let candidates = wire::search_candidates(&value)?;
-        let ranked = search::rank(query.keyword(), candidates);
-        Ok(ranked.iter().map(search::to_track).collect())
+        // 只有当用户没指定排序（综合）时才按标题匹配重排；
+        // 选了「最多播放/最新发布/最多弹幕」就尊重 B 站给的顺序。
+        let ordered = match order {
+            bilimusic_model::SearchOrder::TotalRank => search::rank(query.keyword(), candidates),
+            _ => search::dedupe(candidates),
+        };
+        Ok(ordered.iter().map(search::to_track).collect())
     }
 
     /// 用 TrackKey 换回 cid 与 aid。TrackKey 只在这个 crate 里被解释。
