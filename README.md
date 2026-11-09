@@ -88,6 +88,30 @@ cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
 
 真窗口截图用 `screencapture` 抓取，配合 `agent-desktop` 做点击与输入。
 
+## 移动端
+
+同一个界面在窄屏下会换成手机布局，不需要另打包一份前端：
+
+| 断点 | 变化 |
+|---|---|
+| `< 768px` | 隐藏频道栏、左侧栏、右侧栏、状态栏；底部换成四个标签（发现 / 曲库 / 喜欢 / 我的） |
+| `< 640px` | 顶栏收起 `bilibili` 字样，把宽度让给搜索框；播放条只留播放控制与队列入口 |
+| 全宽 | 全屏播放舞台隐藏「相关推荐」，保证播放键不被压住 |
+
+手势：在播放舞台上左右滑动切歌（横向位移 ≥ 60px 且明显大于纵向；从按钮或输入框起手不算）。
+
+安全区：`viewport-fit=cover` + `env(safe-area-inset-*)`，顶栏与底部标签栏都避开刘海与指示条。桌面上 `env()` 取 0，没有影响。
+
+窗口最小尺寸 380×560（`apps/desktop/src-tauri/tauri.conf.json`），对应 iPhone SE 的 375pt。想支持更窄的设备需要再调小。
+
+**怎么验**：把窗口拖到 380 宽，或
+
+```sh
+osascript -e 'tell application "System Events" to tell process "bilimusic" to set size of window 1 to {380, 760}'
+```
+
+后截屏。真机（iOS / Android）尚未打包，Tauri 2 的移动端目标还没接过。
+
 ## 已知缺口
 
 - **登录系的成功路径没有真账号验证。** 扫码登录、点赞、投币、收藏、关注、稍后再看
@@ -95,6 +119,8 @@ cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
   与「点赞/收藏/投币状态能读回并回滚」。成功路径需要你自己点一遍。
 - **UP 主的全部投稿拿不到。** `space/arc/search` 需要登录会话，未登录返回 -412/-403。
   UP 主页现在展示的是「按作者名搜索」的结果，并明确标注「下方仅显示搜索结果里的 N 个」。
+- **没有移动端安装包。** 窄屏布局已完成并在 380×760 下实测过，但只有桌面壳；
+  Tauri 2 的 iOS / Android 目标需要 Xcode 与 Android SDK，尚未接入。
 - **`cargo public-api` 闸门未接入。** 现在只有依赖方向断言（`crates/core/tests/deps.rs`）
   与 Rust↔TS 字段契约（`crates/core/tests/contract.rs`）。
 
