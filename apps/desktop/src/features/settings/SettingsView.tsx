@@ -7,6 +7,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Health } from '../../shared/lib/ipc'
 import { isTauri } from '../../shared/lib/runtime'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { FramedAvatar } from '../../shared/ui/FramedAvatar'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
 
@@ -90,13 +91,7 @@ export function SettingsView() {
           <Section title="账号">
             {user ? (
               <div className="flex items-center gap-4">
-                {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-[var(--line)] object-cover" />
-                ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[17px] font-medium text-[var(--text-1)]">
-                    {user.uname.slice(0, 1)}
-                  </span>
-                )}
+                <FramedAvatar src={user.avatar} alt={user.uname} size={104} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
                     {user.uname}
