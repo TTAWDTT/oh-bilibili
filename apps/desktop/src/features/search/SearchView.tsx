@@ -32,6 +32,7 @@ export function SearchView() {
   const [partition, setPartition] = useState('全部')
   const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
   const history = useSearchHistory((s) => s.items)
+  const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
   const heroQuery = useAppStore((state) => state.heroQuery)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
@@ -259,13 +260,49 @@ export function SearchView() {
             ) : null}
 
             {status === 'ready' && tracks.length === 0 ? (
-              <div className="flex min-h-[320px] items-center justify-center">
+              <div className="flex min-h-[320px] flex-col items-center justify-center gap-1">
                 <EmptyState
                   icon="search"
-                  title={`没有找到「${trimmed}」`}
-                  detail="换个关键词，或者换个说法试试。"
-                  action={{ label: '清空条件', onClick: () => setQuery('') }}
+                  title={
+                    selectedPartition.tid
+                      ? `「${trimmed}」在这个分区没有结果`
+                      : `没有找到「${trimmed}」`
+                  }
+                  detail={
+                    selectedPartition.tid
+                      ? `这个词在${selectedPartition.label}区搜不到，试试去掉分区限制。`
+                      : '换一个关键词，或者换个说法试试。'
+                  }
+                  action={
+                    selectedPartition.tid
+                      ? { label: '全站搜这个词', onClick: () => setPartition('全部') }
+                      : { label: '清空条件', onClick: () => setQuery('') }
+                  }
                 />
+
+                {/* 给几条可点的替代词：优先用搜过的历史，其次用内置建议 */}
+                {(() => {
+                  const words = [
+                    ...history.filter((w) => w !== trimmed),
+                    ...SUGGESTIONS.filter((w) => w !== trimmed),
+                  ].slice(0, 5)
+                  if (words.length === 0) return null
+                  return (
+                    <div className="-mt-8 flex flex-wrap items-center justify-center gap-1.5">
+                      <span className="text-[12px] text-[var(--text-3)]">试试：</span>
+                      {words.map((word) => (
+                        <button
+                          key={word}
+                          type="button"
+                          onClick={() => pick(word)}
+                          className="rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                        >
+                          {word}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             ) : null}
 
