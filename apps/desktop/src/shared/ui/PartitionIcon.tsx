@@ -1,3 +1,5 @@
+import { Icon } from './Icon'
+import type { IconName } from './Icon'
 /**
  * 分区彩色图标。B 站首页每个分区都有专属的彩色小图标，是它最好认的一处。
  *
@@ -5,17 +7,23 @@
  */
 type Kind = 'music' | 'dance' | 'game' | 'anime' | 'life' | 'film' | 'history' | 'favs' | 'search' | 'settings'
 
-const STYLE: Record<Kind, { bg: string; mark: string }> = {
-  music: { bg: '#ff6699', mark: '♪' },
-  dance: { bg: '#ff8fb3', mark: '♬' },
-  game: { bg: '#53b6ff', mark: '◈' },
-  anime: { bg: '#ffa3b6', mark: '✿' },
-  life: { bg: '#ffb027', mark: '☀' },
-  film: { bg: '#ff8f9c', mark: '▶' },
-  history: { bg: '#00AEEC', mark: '↻' },
-  favs: { bg: '#ffcf5b', mark: '★' },
-  search: { bg: '#fb7299', mark: '⌕' },
-  settings: { bg: '#9499a0', mark: '⚙' },
+/**
+ * 底色沿用 B 站的品牌色，图形用图标组件里的 SVG 路径。
+ *
+ * 早先这里用的是 ♪ ♬ ◈ ✿ 这类 Unicode 字符——同一个符号在不同系统上字形不同，
+ * 而且撑满色块时会显得像凑数。SVG 路径在任何设备上都一样。
+ */
+const STYLE: Record<Kind, { bg: string; icon: IconName }> = {
+  music: { bg: '#ff6699', icon: 'music' },
+  dance: { bg: '#ff8fb3', icon: 'music' },
+  game: { bg: '#53b6ff', icon: 'play' },
+  anime: { bg: '#ffa3b6', icon: 'heart' },
+  life: { bg: '#ffb027', icon: 'thumb' },
+  film: { bg: '#ff8f9c', icon: 'play' },
+  history: { bg: '#00AEEC', icon: 'clock' },
+  favs: { bg: '#ffcf5b', icon: 'bookmarkStar' },
+  search: { bg: '#fb7299', icon: 'search' },
+  settings: { bg: '#9499a0', icon: 'settings' },
 }
 
 export function PartitionIcon({ kind, size = 18 }: { kind: Kind; size?: number }) {
@@ -24,15 +32,9 @@ export function PartitionIcon({ kind, size = 18 }: { kind: Kind; size?: number }
     <span
       aria-hidden
       className="inline-flex items-center justify-center rounded-[4px] text-white"
-      style={{
-        width: size,
-        height: size,
-        background: style.bg,
-        fontSize: Math.round(size * 0.62),
-        lineHeight: 1,
-      }}
+      style={{ width: size, height: size, background: style.bg }}
     >
-      {style.mark}
+      <Icon name={style.icon} size={Math.round(size * 0.62)} />
     </span>
   )
 }
