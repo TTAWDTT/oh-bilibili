@@ -27,16 +27,6 @@ function coverFlags(title: string): string[] {
 }
 
 /** 分区胶囊：从标题推断，没有标签的视频不显示。 */
-function tagsOf(title: string): string[] {
-  const tags: string[] = []
-  if (/翻唱|cover/i.test(title)) tags.push('翻唱')
-  if (/纯音乐|钢琴|吉他|演奏/.test(title)) tags.push('纯音乐')
-  if (/现场|live|演唱会/i.test(title)) tags.push('现场')
-  if (/mv|官方/i.test(title)) tags.push('MV')
-  if (tags.length === 0) tags.push('音乐')
-  return tags.slice(0, 2)
-}
-
 /** B 站的计数写法：一万以上用「万」。 */
 function formatCount(n: number): string {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
@@ -183,6 +173,14 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
 
             {track.views ? (
               <div className="num mt-1.5 flex items-center gap-2 text-[13px] text-[var(--text-3)]">
+                {track.tname ? (
+                  <span
+                    className="rounded-[3px] px-1.5 text-[11.5px] leading-[16px] text-white"
+                    style={{ background: partitionColor(track.tname) }}
+                  >
+                    {track.tname}
+                  </span>
+                ) : null}
                 <span className="flex items-center gap-1">
                   <Icon name="play" size={10} />
                   {formatCount(track.views)}
@@ -196,44 +194,26 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               </div>
             ) : null}
 
-            <div className="mt-1 flex flex-wrap gap-1">
-              {track.tname ? (
-                <span
-                  className="rounded-[3px] px-1.5 text-[12px] leading-[17px] text-white"
-                  style={{ background: partitionColor(track.tname) }}
-                >
-                  {track.tname}
-                </span>
-              ) : null}
-              {tagsOf(track.title).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-2)]"
-                >
-                  #{tag}
-                </span>
-              ))}
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                title="点击复制 BV 号"
+                onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
+                className="num truncate font-mono text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                {track.key}
+              </button>
+              <button
+                type="button"
+                aria-label={`看 ${track.title} 的 MV`}
+                title="看 MV"
+                onClick={() => setMv({ key: track.key, title: track.title })}
+                className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                <Icon name="biliTv" size={11} />
+                MV
+              </button>
             </div>
-
-            <button
-              type="button"
-              title="点击复制 BV 号"
-              onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
-              className="num mt-1 block font-mono text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              {track.key}
-            </button>
-
-            <button
-              type="button"
-              aria-label={`看 ${track.title} 的 MV`}
-              title="看 MV"
-              onClick={() => setMv({ key: track.key, title: track.title })}
-              className="mt-1.5 flex items-center gap-1 text-[13px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              <Icon name="biliTv" size={11} />
-              看 MV
-            </button>
 
             <div className="mt-1.5 flex items-center justify-between gap-2 text-[14px] text-[var(--text-3)]">
               <span className="flex min-w-0 items-center gap-1.5">
