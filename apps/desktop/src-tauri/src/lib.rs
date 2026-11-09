@@ -412,6 +412,17 @@ async fn fav_folders(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn unfav_from(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    folder_id: i64,
+) -> Result<(), WireError> {
+    engine
+        .unfav_from(&TrackKey::from_provider(key), folder_id)
+        .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn fav_tracks(
     engine: tauri::State<'_, Arc<Engine>>,
     folder_id: i64,
@@ -602,6 +613,7 @@ pub fn run() {
             fav_folders,
             author_card,
             fav_tracks,
+            unfav_from,
             fav_set,
             lyrics_get,
             auth_status,

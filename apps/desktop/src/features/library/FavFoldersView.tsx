@@ -1,3 +1,5 @@
+import { toastDone } from '../../app/notice'
+import { reportActionError } from '../../shared/lib/actionError'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
@@ -63,6 +65,18 @@ export function FavFoldersView() {
     }
   }, [picked])
 
+  /** 从当前收藏夹移出一条。成功后从列表里去掉，不用整页刷新。 */
+  const removeOne = async (track: Track): Promise<void> => {
+    if (!picked) return
+    try {
+      await ipc.unfavFrom(track.key, picked.id)
+      setTracks((prev) => (prev ?? []).filter((t) => t.key !== track.key))
+      toastDone('已移出收藏夹')
+    } catch (e) {
+      reportActionError('移出收藏夹', e)
+    }
+  }
+
   /** 加载收藏夹的下一页。B 站每页 40 条。 */
   const loadMore = async (): Promise<void> => {
     if (!picked || loadingMore || exhausted) return
@@ -121,6 +135,17 @@ export function FavFoldersView() {
               tracks={tracks}
               activeKey={snapshot?.track?.key ?? null}
               playing={snapshot?.phase === 'playing'}
+              extraAction={(track) => (
+                <button
+                  type="button"
+                  aria-label={`从收藏夹移出 ${track.title}`}
+                  title="从这个收藏夹移出"
+                  onClick={() => void removeOne(track)}
+                  className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+                >
+                  <Icon name="close" size={12} />
+                </button>
+              )}
             />
             <div className="mt-6 flex justify-center">
               {exhausted ? (

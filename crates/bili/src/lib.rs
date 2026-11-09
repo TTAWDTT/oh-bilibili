@@ -221,6 +221,12 @@ impl Source {
         self.client.fav_folders().await
     }
 
+    /// 把一条视频从指定收藏夹移出。
+    pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        self.client.set_favorite(detail.aid, folder, false).await
+    }
+
     /// 收藏夹内容，转成 Track。
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, BiliError> {
         let keys = self.client.fav_items(folder_id, page).await?;

@@ -754,6 +754,12 @@ impl Engine {
         Ok(self.source.author_card(mid).await?)
     }
 
+    /// 从某个收藏夹移出一条。
+    pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), WireError> {
+        self.source.unfav_from(key, folder).await?;
+        Ok(())
+    }
+
     pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, WireError> {
         Ok(self.source.fav_folders().await?)
     }

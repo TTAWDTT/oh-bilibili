@@ -64,6 +64,8 @@ type TrackGridProps = {
   tracks: Track[]
   activeKey: string | null
   playing: boolean
+  /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
+  extraAction?: (track: Track) => React.ReactNode
 }
 
 /**
@@ -72,7 +74,7 @@ type TrackGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、时长压右下角、标题两行、UP 主一行灰字，hover 时标题变粉。
  */
-export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
+export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const setMv = useAppStore((state) => state.setMv)
   const navigate = useAppStore((state) => state.navigate)
@@ -314,6 +316,12 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <DownloadButton trackKey={track.key} size={12} />
+                {extraAction ? (
+                  <>
+                    <span className="h-2.5 w-px bg-[var(--line)]" />
+                    {extraAction(track)}
+                  </>
+                ) : null}
               </span>
             </div>
 

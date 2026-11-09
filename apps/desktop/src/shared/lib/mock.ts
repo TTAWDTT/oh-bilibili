@@ -132,6 +132,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       else state.likes.delete(key)
       return null
     }
+    case 'unfav_from':
+      return null
     case 'fav_set': {
       const key = str(args, 'key')
       if (bool(args, 'faved')) state.favs.add(key)

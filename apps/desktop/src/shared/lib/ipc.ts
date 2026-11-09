@@ -188,6 +188,11 @@ export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })
 }
 
+/** 从指定收藏夹移出。 */
+export function unfavFrom(key: string, folderId: number): Promise<null> {
+  return call<null>('unfav_from', { key, folder_id: folderId })
+}
+
 /** 加入或移出稍后再看。 */
 export function watchLaterSet(key: string, on: boolean): Promise<null> {
   return call<null>('watch_later_set', { key, on })
