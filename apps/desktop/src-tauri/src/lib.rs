@@ -258,6 +258,26 @@ fn queue_move(
     engine.queue_move(&from, &to)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+struct HistoryEntryView {
+    track: Track,
+    /// 播放时刻，Unix 毫秒。
+    played_at: i64,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn library_history_timed(
+    engine: tauri::State<'_, Arc<Engine>>,
+    limit: u32,
+) -> Result<Vec<HistoryEntryView>, WireError> {
+    Ok(engine
+        .history_with_time(limit)?
+        .into_iter()
+        .map(|(track, played_at)| HistoryEntryView { track, played_at })
+        .collect())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn library_history(
     engine: tauri::State<'_, Arc<Engine>>,
@@ -545,6 +565,7 @@ pub fn run() {
             queue_clear,
             queue_restore_progress,
             library_history,
+            library_history_timed,
             library_playlists,
             library_create,
             library_add,

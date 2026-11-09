@@ -369,6 +369,21 @@ impl Library {
         })
     }
 
+    /// 带播放时间的历史。前端要按「今天 / 昨天 / 更早」分组，得知道每条什么时候播的。
+    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>> {
+        self.with(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, h.played_at
+                 FROM history h JOIN tracks t ON t.id = h.track_id
+                 ORDER BY h.played_at DESC, h.id DESC LIMIT ?1",
+            )?;
+            let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], |row| {
+                Ok((row_to_track(row)?, row.get::<_, i64>(5)?))
+            })?;
+            rows.collect()
+        })
+    }
+
     /// 写入一条同步意图。取消不是删行，是把 want 置 0。
     pub fn set_reaction(
         &self,

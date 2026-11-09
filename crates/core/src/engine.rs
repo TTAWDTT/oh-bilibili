@@ -546,6 +546,11 @@ impl Engine {
         Ok(self.library.history(limit)?)
     }
 
+    /// 带播放时间的历史，用于按日期分组。
+    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>, WireError> {
+        Ok(self.library.history_with_time(limit)?)
+    }
+
     pub fn playlists(&self) -> Result<Vec<bilimusic_store::Playlist>, WireError> {
         Ok(self.library.playlists()?)
     }

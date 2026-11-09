@@ -51,6 +51,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = idx >= 0 ? idx : 0
       return Array.from({ length: 6 }, (_, i) => CATALOG[(start + i + 1) % CATALOG.length])
     }
+    case 'library_history_timed': {
+      // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
+      const now = Date.now()
+      return CATALOG.slice(0, 7).map((track, i) => ({
+        track,
+        played_at: now - i * 9.5 * 3600_000,
+      }))
+    }
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
