@@ -147,12 +147,6 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white">
                 {formatDuration(track.duration_ms)}
               </span>
-              {/* hover 时封面里飘两条弹幕，B 站的视频预览就是这个样子 */}
-              <span className="bili-card-danmaku pointer-events-none absolute inset-x-0 top-1 flex flex-col gap-0.5 px-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                <span className="w-fit rounded-[2px] bg-black/45 px-1 text-[9.5px] leading-[13px] text-white">爷青回</span>
-                <span className="ml-6 w-fit rounded-[2px] bg-black/45 px-1 text-[9.5px] leading-[13px] text-white">这段真的顶</span>
-              </span>
-
               {/* hover 才出现的播放态遮罩 */}
               <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-150 group-hover:bg-black/25 group-hover:opacity-100">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
