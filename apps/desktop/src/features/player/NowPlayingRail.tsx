@@ -64,7 +64,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
   )
 }
 
-export function NowPlayingRail({ tab }: { tab: RailTab }) {
+export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hideHeader?: boolean }) {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const queue = usePlayerStore((state) => state.queue)
   const navigate = useAppStore((state) => state.navigate)
@@ -74,9 +74,9 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
   const queued = queue?.items.length ?? 0
 
   return (
-    <aside aria-label="播放右栏" className="flex h-full w-[var(--rail-w)] flex-col overflow-hidden border-l border-hairline bg-[var(--panel)]">
-      <span className="bili-topline h-[2px] w-full opacity-70" />
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
+    <aside aria-label="播放右栏" className="flex h-full w-full flex-col overflow-hidden border-l border-hairline bg-[var(--panel)] md:w-[var(--rail-w)]">
+      <span className="bili-topline h-[2px] w-full opacity-70" hidden={hideHeader} />
+      <div hidden={hideHeader} className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
         <div className="flex h-full items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />
           <RailTabButton

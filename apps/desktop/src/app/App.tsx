@@ -19,6 +19,7 @@ import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { ChannelBar } from './ChannelBar'
 import { MobileTabBar } from './MobileTabBar'
+import { MobileRailSheet } from './MobileRailSheet'
 import { DanmakuStrip } from './DanmakuStrip'
 import { BackToTop } from '../shared/ui/BackToTop'
 import { Sidebar } from './Sidebar'
@@ -136,6 +137,7 @@ export default function App() {
       <PlayerBar />
       <StatusBar />
       <MobileTabBar />
+      {railOpen ? <MobileRailSheet tab={rail ?? 'lyrics'} /> : null}
       <MvOverlay />
       <StageView />
       <ToastHost />
