@@ -26,35 +26,23 @@ pub struct AuthorCard {
 }
 
 impl Client {
-    /// 读一条视频当前在账号里的互动状态（点赞、投币、收藏）。
+    /// 读一条视频当前在账号里的互动状态（点赞、收藏、投币）。
     ///
-    /// 走 `archive/relation` 与 `fav/video/favoured`，两者都需要登录。
-    pub async fn relation_state(
-        &self,
-        aid: u64,
-        bvid: &str,
-    ) -> Result<(bool, bool, u32), BiliError> {
+    /// 实测响应（登录态下 `archive/relation`）：
+    /// `{ like: bool, coin: int, favorite: bool, attention: bool, dislike: bool }`
+    /// 注意字段是 `like` 不是 `liked`，`favorite` 也在这个接口里，
+    /// 所以不需要再打 `fav/video/favoured`——少一次请求，状态之间也不会不一致。
+    pub async fn relation_state(&self, bvid: &str) -> Result<(bool, bool, u32), BiliError> {
         let rel = self
             .get_json(
                 &format!("{API}/x/web-interface/archive/relation?bvid={bvid}"),
                 std::time::Duration::from_millis(400),
             )
             .await?;
-        let liked = rel["data"]["liked"].as_i64().unwrap_or(0) != 0;
-        let coin = rel["data"]["coin"].as_u64().unwrap_or(0) as u32;
-
-        let faved = match self
-            .get_json(
-                &format!("{API}/x/v2/fav/video/favoured?aid={aid}"),
-                std::time::Duration::from_millis(400),
-            )
-            .await
-        {
-            Ok(v) => v["data"]["favoured"].as_bool().unwrap_or(false),
-            // 收藏状态单独失败不该连累点赞状态
-            Err(BiliError::NeedsLogin(m)) => return Err(BiliError::NeedsLogin(m)),
-            Err(_) => false,
-        };
+        let data = &rel["data"];
+        let liked = data["like"].as_bool().unwrap_or(false);
+        let faved = data["favorite"].as_bool().unwrap_or(false);
+        let coin = data["coin"].as_u64().unwrap_or(0) as u32;
         Ok((liked, faved, coin))
     }
 
@@ -283,5 +271,47 @@ impl Client {
         )
         .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod relation_shape_tests {
+    use serde_json::json;
+
+    /// 这个结构取自真实登录态响应（2025-11 实测）：
+    /// 字段是 `like` / `favorite` / `coin`，前两个是 bool。
+    /// 早先按 `liked` 解析，结果永远是 false——登录了也点不亮。
+    fn parse(v: &serde_json::Value) -> (bool, bool, u32) {
+        let data = &v["data"];
+        (
+            data["like"].as_bool().unwrap_or(false),
+            data["favorite"].as_bool().unwrap_or(false),
+            data["coin"].as_u64().unwrap_or(0) as u32,
+        )
+    }
+
+    #[test]
+    fn 按真实字段解析互动状态() {
+        let v = json!({ "code": 0, "data": {
+            "like": true, "favorite": true, "coin": 2,
+            "attention": false, "dislike": false, "season_fav": false
+        }});
+        assert_eq!(parse(&v), (true, true, 2));
+    }
+
+    #[test]
+    fn 未互动时三项都是假() {
+        let v = json!({ "code": 0, "data": {
+            "like": false, "favorite": false, "coin": 0,
+            "attention": false, "dislike": false, "season_fav": false
+        }});
+        assert_eq!(parse(&v), (false, false, 0));
+    }
+
+    #[test]
+    fn 旧字段名不再被当成有效来源() {
+        // 如果哪天有人改回 liked，这个断言会提醒他字段名不对
+        let v = json!({ "code": 0, "data": { "liked": true, "coin": 1 } });
+        assert_eq!(parse(&v), (false, false, 1), "liked 是错的字段名");
     }
 }

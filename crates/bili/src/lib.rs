@@ -206,9 +206,8 @@ impl Source {
 
     /// 一条视频在当前账号里的点赞/收藏/投币状态。
     pub async fn relation_state(&self, key: &TrackKey) -> Result<(bool, bool, u32), BiliError> {
-        let bvid = key.as_opaque().to_string();
-        let detail = self.detail(key).await?;
-        self.client.relation_state(detail.aid, &bvid).await
+        // 用 bvid 就够，不必先取 detail——省一次请求
+        self.client.relation_state(&key.as_opaque()).await
     }
 
     /// UP 主名片（粉丝数、签名、认证）。
