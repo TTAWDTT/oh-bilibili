@@ -134,7 +134,9 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
   }
 
   return (
-    <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(226px,1fr))]">
+    <>
+      <h2 className="sr-only">曲目</h2>
+        <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(226px,1fr))]">
       {tracks.map((track, index) => {
         const active = track.key === activeKey
         return (
@@ -356,5 +358,6 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
         />
       ) : null}
     </div>
+    </>
   )
 }

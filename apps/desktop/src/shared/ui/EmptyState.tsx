@@ -21,9 +21,9 @@ export function EmptyState({ icon, title, detail, action, compact = false }: Emp
       ) : (
         <Icon name={icon} size={22} className="text-[var(--text-2)]" />
       )}
-      <h3 className="mt-3 text-[16px] font-medium text-[var(--text-1)]" title={title}>
+      <h2 className="mt-3 text-[16px] font-medium text-[var(--text-1)]" title={title}>
         {title}
-      </h3>
+      </h2>
       <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-[var(--text-2)]">{detail}</p>
       {action ? (
         <button

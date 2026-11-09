@@ -110,9 +110,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         <Avatar src={avatar} alt={name} size={64} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
+            <h2 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
               {name}
-            </h1>
+            </h2>
             {card && card.level > 0 ? (
               <span
                 className="shrink-0 rounded-[3px] px-1.5 text-[11.5px] font-semibold leading-[18px] text-white"

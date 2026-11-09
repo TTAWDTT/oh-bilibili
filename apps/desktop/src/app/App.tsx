@@ -27,6 +27,35 @@ import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
 
+/**
+ * 当前页面的标题。
+ *
+ * 视觉上不显示（页面顶部的文字按设计要求尽量少），但屏幕阅读器需要它：
+ * 没有 h1 的页面在标题导航里是空的，用户不知道自己在哪。
+ */
+function viewTitle(view: View): string {
+  switch (view.kind) {
+    case 'search':
+      return '搜索'
+    case 'library':
+      return '曲库'
+    case 'playlist':
+      return `播放列表：${view.name}`
+    case 'liked':
+      return '我喜欢的音乐'
+    case 'downloads':
+      return '已下载'
+    case 'history':
+      return '播放历史'
+    case 'favs':
+      return '收藏夹'
+    case 'author':
+      return `UP 主：${view.name}`
+    case 'settings':
+      return '设置'
+  }
+}
+
 function CurrentView({ view }: { view: View }) {
   switch (view.kind) {
     case 'search':
@@ -89,6 +118,7 @@ export default function App() {
         <Sidebar />
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           <div key={view.kind} className="bili-page h-full">
+            <h1 className="sr-only">{viewTitle(view)}</h1>
             <CurrentView view={view} />
           </div>
         </main>

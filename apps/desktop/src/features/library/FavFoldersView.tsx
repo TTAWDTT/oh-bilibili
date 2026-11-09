@@ -119,12 +119,12 @@ export function FavFoldersView() {
           <Icon name="chevronLeft" size={13} />
           收藏夹
         </button>
-        <h1 className="mb-4 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
+        <h2 className="mb-4 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
           {picked.title}
           <span className="num ml-2 text-[14px] font-normal text-[var(--text-3)]">
             {picked.count} 个视频
           </span>
-        </h1>
+        </h2>
         {tracks === null ? (
           <TrackListSkeleton rows={6} />
         ) : tracks.length === 0 ? (
@@ -180,7 +180,7 @@ export function FavFoldersView() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
-      <h1 className="mb-4 text-[18px] font-semibold text-[var(--text-1)]">B 站收藏夹</h1>
+      <h2 className="mb-4 text-[18px] font-semibold text-[var(--text-1)]">B 站收藏夹</h2>
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
         {folders.map((folder) => (
           <button
