@@ -710,3 +710,21 @@ select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .bili-tv-load { animation: none; opacity: 1; }
 }
+
+/* ── 移动端安全区 ───────────────────────────────────────────────
+   真机的刘海、圆角与底部指示条会盖住内容。viewport-fit=cover 让页面铺满，
+   再由这几个内边距把控件推回安全区。桌面上 env() 取不到值，全部为 0，
+   所以这一段对桌面没有任何影响。 */
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 底部标签栏与播放条要同时避开指示条 */
+.safe-bottom-bar {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.5);
+}

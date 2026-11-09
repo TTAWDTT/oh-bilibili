@@ -25,7 +25,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="主要导航"
-      className="flex shrink-0 items-stretch border-t border-[var(--line)] bg-[var(--panel)] md:hidden"
+      className="safe-bottom flex shrink-0 items-stretch border-t border-[var(--line)] bg-[var(--panel)] md:hidden"
     >
       {TABS.map((tab) => {
         const active = view.kind === tab.kind

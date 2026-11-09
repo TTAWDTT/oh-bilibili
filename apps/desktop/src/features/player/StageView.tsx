@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
+import { useSwipe } from '../../shared/lib/useSwipe'
 import type { Track } from '../../shared/lib/contract'
 import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
@@ -70,6 +71,13 @@ export function StageView() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, setStage])
 
+  // 必须在提前 return 之前调用：放在之后会让两次渲染的 hook 数量不一致，
+  // React 会直接抛「Rendered more hooks than during the previous render」。
+  const swipe = useSwipe({
+    onLeft: () => void next(),
+    onRight: () => void prev(),
+  })
+
   if (!open || !track) return null
 
   const lines = doc?.lines ?? []
@@ -83,6 +91,7 @@ export function StageView() {
 
   return (
     <div
+      {...swipe}
       className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden"
       style={{ background: 'var(--ga0)' }}
     >
