@@ -99,7 +99,10 @@ impl Client {
 
     pub fn clear_cookies(&self) {
         if let Ok(mut jar) = self.jar.write() {
-            jar.clear();
+            // 只清登录态。buvid3/buvid4/b_nut 是设备指纹，属于这台机器而不是账号，
+            // 退出登录后保留它们——否则本会话内所有需要指纹的接口都会变成 -412。
+            let keep = ["buvid3", "buvid4", "b_nut", "buvid_fp"];
+            jar.retain(|k, _| keep.contains(&k.as_str()));
         }
         if let Ok(mut nav) = self.nav.write() {
             *nav = NavState::default();
@@ -387,5 +390,32 @@ impl Client {
     async fn set_cooldown(&self, dur: Duration) {
         let mut guard = self.cooldown.lock().await;
         *guard = Some(Instant::now() + dur);
+    }
+}
+
+#[cfg(test)]
+mod logout_tests {
+    use super::Client;
+
+    /// 退出登录只该清账号凭据，设备指纹要留着。
+    #[test]
+    fn 退出登录保留设备指纹() {
+        let client = Client::new().expect("client");
+        client.import_cookies(&[
+            ("buvid3".into(), "DEVICE-3".into()),
+            ("buvid4".into(), "DEVICE-4".into()),
+            ("b_nut".into(), "1700000000".into()),
+            ("SESSDATA".into(), "session".into()),
+            ("bili_jct".into(), "csrf".into()),
+            ("DedeUserID".into(), "123".into()),
+        ]);
+        client.clear_cookies();
+
+        assert_eq!(client.cookie_value("buvid3").as_deref(), Some("DEVICE-3"));
+        assert_eq!(client.cookie_value("buvid4").as_deref(), Some("DEVICE-4"));
+        assert_eq!(client.cookie_value("b_nut").as_deref(), Some("1700000000"));
+        assert!(client.cookie_value("SESSDATA").is_none(), "登录凭据必须清掉");
+        assert!(client.cookie_value("bili_jct").is_none(), "csrf 必须清掉");
+        assert!(client.cookie_value("DedeUserID").is_none());
     }
 }
