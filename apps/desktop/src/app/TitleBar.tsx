@@ -16,13 +16,19 @@ export function TitleBar() {
   const navigate = useAppStore((state) => state.navigate)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const auth = useAuthStore((state) => state.auth)
-  const [text, setText] = useState('')
+  const currentQuery = useAppStore((state) => state.currentQuery)
+  const [text, setText] = useState(currentQuery)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   // ⌘K / 左侧栏点击都会递增 nonce，这里跟着聚焦
   useEffect(() => {
     if (focusNonce > 0) inputRef.current?.focus()
   }, [focusNonce])
+
+  // 结果页换了搜索词（点历史、点分区、点作者）时，输入框跟着变
+  useEffect(() => {
+    setText(currentQuery)
+  }, [currentQuery])
 
   const submit = (): void => {
     setQuery(text.trim())

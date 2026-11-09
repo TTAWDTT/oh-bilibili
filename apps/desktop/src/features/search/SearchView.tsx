@@ -36,8 +36,14 @@ export function SearchView() {
   const pushHistory = useSearchHistory((s) => s.push)
   const heroQuery = useAppStore((state) => state.heroQuery)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
+  const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
   const authorQuery = useAppStore((state) => state.authorQuery)
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+
+  // 把实际在搜的词同步给顶栏，避免输入框和结果各说各话。
+  useEffect(() => {
+    setCurrentQuery(query)
+  }, [query, setCurrentQuery])
 
   // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
   useEffect(() => {

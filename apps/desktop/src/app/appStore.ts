@@ -22,6 +22,8 @@ type AppStore = {
   searchFocus: number
   /** 顶栏搜索框提交的关键词，搜索页消费一次后清空。 */
   heroQuery: string | null
+  /** 搜索页当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
+  currentQuery: string
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
@@ -34,6 +36,7 @@ type AppStore = {
   closeRail: () => void
   focusSearch: () => void
   setHeroQuery: (q: string | null) => void
+  setCurrentQuery: (q: string) => void
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
@@ -48,6 +51,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   rail: null,
   searchFocus: 0,
   heroQuery: null,
+  currentQuery: '',
   authOpen: false,
   mv: null,
   stage: false,
@@ -59,6 +63,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
+  setCurrentQuery: (q) => set({ currentQuery: q }),
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),
