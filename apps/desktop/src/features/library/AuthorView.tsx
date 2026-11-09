@@ -31,6 +31,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const navigate = useAppStore((state) => state.navigate)
+  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
   const [followed, setFollowed] = useState(false)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
 
@@ -152,6 +153,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 <span>{formatCount(card.fans)} 粉丝</span>
                 <span>{formatCount(card.videos)} 投稿</span>
                 <span>{formatCount(card.likes)} 获赞</span>
+                <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
+                  下方仅显示搜索结果里的 {tracks.length} 个
+                </span>
               </>
             ) : (
               <>
@@ -171,6 +175,16 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         activeKey={snapshot?.track?.key ?? null}
         playing={snapshot?.phase === 'playing'}
       />
+
+      <div className="mt-6 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setAuthorQuery(name)}
+          className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          在搜索里找他更多的投稿 →
+        </button>
+      </div>
     </div>
   )
 }
