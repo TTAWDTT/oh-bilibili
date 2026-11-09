@@ -689,3 +689,23 @@ select:focus-visible {
   animation-delay: 0.3s;
   height: 6px;
 }
+
+/* 2233 娘贴纸的轻微浮动。B 站把自己的站娘用在 404 与活动页时也是会动的，
+   一个完全静止的空态显得像挂了。幅度压到 3px 以内，不抢注意力。 */
+@keyframes bili-mascot-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(-1.2deg); }
+}
+
+.bili-mascot {
+  animation: bili-mascot-bob 3.6s ease-in-out infinite;
+  transform-origin: 50% 85%;
+  will-change: transform;
+}
+
+/* 尊重系统的「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .bili-mascot {
+    animation: none;
+  }
+}

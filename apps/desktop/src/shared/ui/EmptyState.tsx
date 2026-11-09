@@ -33,7 +33,7 @@ export function EmptyState({ icon, mascot, title, detail, action, compact = fals
           src={MASCOT_SRC[mascot]}
           alt=""
           aria-hidden
-          className="h-[88px] w-[88px] select-none object-contain"
+          className="bili-mascot h-[88px] w-[88px] select-none object-contain"
           draggable={false}
         />
       ) : icon === 'biliTv' ? (
