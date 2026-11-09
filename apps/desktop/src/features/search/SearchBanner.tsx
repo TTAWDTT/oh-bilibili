@@ -78,9 +78,9 @@ export function SearchBanner() {
             className="pointer-events-none absolute -right-12 -top-20 h-72 w-72 rounded-full"
             style={{ background: 'radial-gradient(circle, rgb(255 255 255 / 0.9), transparent 70%)' }}
           />
-          <div className="relative flex h-full items-center justify-between gap-6 px-8">
+          <div className="relative flex h-full items-center justify-between gap-4 px-4 md:gap-6 md:px-8">
             <div className="min-w-0">
-              <div className="text-[24px] font-semibold leading-tight text-white">{slide.title}</div>
+              <div className="text-[19px] font-semibold leading-tight text-white md:text-[24px]">{slide.title}</div>
               <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-white/85">{slide.desc}</p>
               <div className="mt-4 flex items-center gap-1.5">
                 {SLIDES.map((_, dot) => (
