@@ -82,11 +82,13 @@ export function SettingsView() {
     <div className="flex h-full flex-col">
       
 
-      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-2">
+      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-2 md:px-8">
         <div className="mx-auto flex max-w-[720px] flex-col gap-3 py-4">
-          <Section title="快捷键">
-            <ShortcutTable />
-          </Section>
+          <div className="hidden md:block">
+            <Section title="快捷键">
+              <ShortcutTable />
+            </Section>
+          </div>
 
           <Section title="账号">
             {user ? (
@@ -145,10 +147,10 @@ export function SettingsView() {
           <Section title="音质">
             <div className="text-[14px] text-[var(--text-1)]">如实显示，不承诺无损</div>
             <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-              B 站音轨档位最高约 192K。播放条与右栏显示实际码率，取不到时显示 ——。
+              普通账号能拿到 64 / 132 / 192K 三档；大会员账号还会出现杜比全景声与 Hi-Res（30250 / 30251）。播放条与右栏显示实际码率，取不到时显示 ——。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Chip label="档位" value="64 / 132 / 192K" />
+              <Chip label="档位" value="64 · 132 · 192K · 杜比 · Hi-Res" />
               <Chip label="引擎" value={health?.engine ?? (healthFailed ? '不可用' : '…')} />
             </div>
           </Section>
