@@ -9,6 +9,8 @@ type ReactionStore = {
   faved: Record<string, boolean>
   /** 已经投出去的币数（0/1/2）。B 站上限 2 枚。 */
   coins: Record<string, number>
+  /** 已经从账号查过的 key，滚动时不再重复请求。 */
+  known: Record<string, true>
   likedTracks: Track[]
   /** 从账号拉一次真实互动状态，把心/星点亮。未登录会抛 needs_login。 */
   hydrate: (keys: string[]) => Promise<void>
@@ -24,20 +26,25 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
   liked: {},
   faved: {},
   coins: {},
+  known: {},
   likedTracks: [],
   hydrate: async (keys) => {
-    if (keys.length === 0) return
-    const rows = await ipc.relationStates(keys)
+    // 只查没查过的：列表越滚越长时，总请求数等于「看过的视频数」而不是「渲染次数」
+    const fresh = keys.filter((k) => !get().known[k])
+    if (fresh.length === 0) return
+    const rows = await ipc.relationStates(fresh)
     set((state) => {
       const liked = { ...state.liked }
       const faved = { ...state.faved }
       const coins = { ...state.coins }
+      const known = { ...state.known }
       for (const [key, isLiked, isFaved, coin] of rows) {
         liked[key] = isLiked
         faved[key] = isFaved
         coins[key] = coin
+        known[key] = true
       }
-      return { liked, faved, coins }
+      return { liked, faved, coins, known }
     })
   },
   toggleLike: async (track) => {

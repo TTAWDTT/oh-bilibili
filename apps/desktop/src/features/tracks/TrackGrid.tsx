@@ -87,9 +87,13 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
   const addCoin = useReactionStore((state) => state.addCoin)
   const favToStore = useReactionStore((state) => state.favTo)
 
-  // 进到一屏结果就把这一屏的真实点赞/收藏状态拉回来，心与星不会再是「重置后全空」。
+  // 把当前列表的真实点赞/收藏状态拉回来。
+  //
+  // 不截断：只查前 20 条时，第 21 条之后的卡片即使已点赞也会显示成未点赞——
+  // 这是实测发现的（滚到后面看到的全是灰心）。重复请求由 store 的 known 集合挡住，
+  // 所以总请求数等于「看过的视频数」，不随滚动次数增长。
   useEffect(() => {
-    const keys = tracks.slice(0, 20).map((t) => t.key)
+    const keys = tracks.map((t) => t.key)
     if (keys.length === 0) return
     void hydrate(keys).catch(() => {
       // 未登录或限流时保持现状，不打扰用户
