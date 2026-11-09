@@ -115,6 +115,8 @@ pub fn clean_title(raw: &str) -> String {
     let mut depth = 0i32;
     for ch in raw.chars() {
         match ch {
+            // 书名号里是歌名，要保留内容，只把符号本身换成空格。
+            '《' | '》' => out.push(' '),
             '【' | '[' | '（' | '(' => depth += 1,
             '】' | ']' | '）' | ')' => depth = (depth - 1).max(0),
             _ if depth == 0 => out.push(ch),
@@ -128,7 +130,7 @@ pub fn clean_title(raw: &str) -> String {
     ] {
         cleaned = cleaned.replace(noise, " ");
     }
-    cleaned = cleaned.replace(['-', '｜', '|', '/'], " ");
+    cleaned = cleaned.replace(['-', '｜', '|', '/', '·', '・', '—', '~'], " ");
     cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -138,14 +140,27 @@ pub fn clean_title(raw: &str) -> String {
 pub fn lyric_queries(raw: &str) -> Vec<String> {
     let whole = clean_title(raw);
     let mut out = Vec::new();
-    if !whole.is_empty() {
-        out.push(whole.clone());
+    if whole.is_empty() {
+        return out;
     }
-    // 「周杰伦 晴天」这种整串没命中时，只留最后两个词再试一次。
+    out.push(whole.clone());
+
     let words: Vec<&str> = whole.split_whitespace().collect();
-    if words.len() > 2 {
-        out.push(words[words.len().saturating_sub(2)..].join(" "));
+    if words.len() > 1 {
+        // 歌名和歌手通常在前面，取前两个词命中率最高。
+        out.push(words[..2.min(words.len())].join(" "));
+        // 有些标题是「歌手 - 歌名」，尾部两个词也要试。
+        if words.len() > 2 {
+            out.push(words[words.len().saturating_sub(2)..].join(" "));
+        }
+        // 最后退到单个词：只要有一个能命中就行。
+        for w in words.iter().filter(|w| w.chars().count() >= 2).take(3) {
+            out.push((*w).to_string());
+        }
     }
+    // 去重且保序，避免重复打同一个查询。
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|q| seen.insert(q.clone()));
     out
 }
 
@@ -295,3 +310,22 @@ mod tests {
         assert_eq!(doc.current_index(Millis(1000)), None);
     }
 }
+
+#[cfg(test)]
+mod clean_tests {
+    use super::{clean_title, lyric_queries};
+
+    #[test]
+    fn 中文书名号也要去掉() {
+        // 实测拿不到歌词的那几条标题，都带《》而且没被清理
+        assert_eq!(clean_title("【杜比音效】周杰伦《晴天》4K"), "周杰伦 晴天");
+        assert_eq!(clean_title("【𝐇𝐢-𝐑𝐞𝐬无损音质】｜《晴天》-周杰伦"), "晴天 周杰伦");
+    }
+
+    #[test]
+    fn 候选查询覆盖整串与尾部() {
+        let q = lyric_queries("【4K】周杰伦 晴天 完整版");
+        assert!(q.contains(&"周杰伦 晴天".to_string()), "整串候选: {q:?}");
+    }
+}
+

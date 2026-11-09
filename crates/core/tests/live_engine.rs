@@ -84,3 +84,39 @@ async fn 能把一首歌下载到本地并落到磁盘() {
     println!("落盘 {size} 字节");
     assert!(size > 100_000, "音频文件不该这么小");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 歌词三级回退的实际命中情况() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-lrc-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(dir.clone());
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
+    let mut stats = std::collections::BTreeMap::new();
+    for track in tracks.iter().take(6) {
+        let doc = engine.lyrics_get(&track.key).await.expect("歌词");
+        let n = doc.lines.len();
+        *stats.entry(doc.source.clone()).or_insert(0) += 1;
+        println!(
+            "{:28} 来源 {:18} {} 行  首行: {}",
+            track.title.chars().take(14).collect::<String>(),
+            doc.source,
+            n,
+            doc.lines
+                .first()
+                .map(|l| format!("{}ms {}", l.at_ms, l.text.chars().take(16).collect::<String>()))
+                .unwrap_or_else(|| "（空）".into())
+        );
+    }
+    println!("来源统计: {stats:?}");
+    // 至少有一首能拿到歌词，否则说明整条链路都是断的
+    assert!(!stats.is_empty());
+}
