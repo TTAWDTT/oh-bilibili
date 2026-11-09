@@ -10,7 +10,10 @@ import { Skeleton } from '../../shared/ui/Skeleton'
 import { VirtualList } from '../../shared/ui/VirtualList'
 import { usePlayerStore } from './playerStore'
 
-const QUEUE_ROW_HEIGHT = 40
+// 虚拟列表要求固定行高，所以这个值就是行的实际高度。
+// 40px 装两行字（14px 标题 + 12px 副行）只剩 2px 留白，读起来很挤；
+// 60px 给每边约 9px，接近 B 站列表的节奏。
+const QUEUE_ROW_HEIGHT = 60
 const VIRTUAL_THRESHOLD = 100
 
 function QueueRow({
@@ -48,7 +51,7 @@ function QueueRow({
         const from = event.dataTransfer.getData('text/plain')
         if (from && from !== track.key) onMove(from, track.key)
       }}
-      className="t group flex w-full items-center gap-2 border-b border-hairline px-4 text-left"
+      className="t group flex w-full items-center gap-2.5 border-b border-hairline px-4 py-2.5 text-left"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
         {active ? (
@@ -64,12 +67,12 @@ function QueueRow({
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={['block truncate text-[14px]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-[var(--text-1)]'].join(' ')}
+          className={['block truncate text-[14px] leading-[1.5]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-[var(--text-1)]'].join(' ')}
           title={track.title}
         >
           {track.title}
         </span>
-        <span className="mt-1 block truncate text-[12px] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
+        <span className="mt-[3px] block truncate text-[12px] leading-[1.45] text-[var(--text-2)] group-hover:text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </span>
       </span>
@@ -123,7 +126,7 @@ export function QueueList() {
     return (
       <div aria-hidden>
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="flex h-12 items-center gap-2 border-b border-hairline px-4">
+          <div key={index} className="flex h-[60px] items-center gap-2.5 border-b border-hairline px-4">
             <Skeleton className="h-2.5 w-3" />
             <Skeleton className="h-3 w-2/3" />
           </div>
