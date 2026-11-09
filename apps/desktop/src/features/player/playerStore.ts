@@ -24,6 +24,8 @@ type PlayerStore = {
   cycleRepeat: () => Promise<void>
   setShuffle: (on: boolean) => void
   moveInQueue: (from: string, to: string) => Promise<void>
+  removeFromQueue: (key: string) => Promise<void>
+  clearQueue: () => Promise<void>
   applyProgress: (positionMs: number, durationMs: number, level?: number) => void
   applyTrack: (track: Track) => void
   applyBuffering: (track: Track) => void
@@ -124,6 +126,20 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
         set({ queue: await ipc.queueMove(from, to) })
       } catch {
         set({ queue: current })
+      }
+    },
+    removeFromQueue: async (key) => {
+      try {
+        set({ queue: await ipc.queueRemove(key) })
+      } catch {
+        // 移除失败就保持原样，界面不动比乱动好
+      }
+    },
+    clearQueue: async () => {
+      try {
+        set({ queue: await ipc.queueClear() })
+      } catch {
+        // 同上
       }
     },
     applyProgress: (positionMs, durationMs, level = 0) => {

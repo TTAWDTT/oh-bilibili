@@ -1,4 +1,5 @@
 import * as ipc from '../../shared/lib/ipc'
+import { Icon } from '../../shared/ui/Icon'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { formatDuration } from '../../shared/lib/format'
@@ -18,12 +19,14 @@ function QueueRow({
   active,
   onPlay,
   onMove,
+  onRemove,
 }: {
   track: Track
   index: number
   active: boolean
   onPlay: () => void
   onMove: (from: string, to: string) => void
+  onRemove: (key: string) => void
 }) {
   return (
     <button
@@ -71,6 +74,19 @@ function QueueRow({
         </span>
       </span>
       <span className="num shrink-0 font-mono text-[12px] text-[var(--text-2)]">{formatDuration(track.duration_ms)}</span>
+      <span
+        role="button"
+        tabIndex={-1}
+        aria-label={`从队列移除 ${track.title}`}
+        title="从队列移除"
+        onClick={(event) => {
+          event.stopPropagation()
+          onRemove(track.key)
+        }}
+        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] group-hover:opacity-100"
+      >
+        <Icon name="close" size={11} />
+      </span>
     </button>
   )
 }
@@ -79,6 +95,8 @@ export function QueueList() {
   const queue = usePlayerStore((state) => state.queue)
   const playContext = usePlayerStore((state) => state.playContext)
   const moveInQueue = usePlayerStore((state) => state.moveInQueue)
+  const removeFromQueue = usePlayerStore((state) => state.removeFromQueue)
+  const clearQueue = usePlayerStore((state) => state.clearQueue)
   const [restore, setRestore] = useState<[number, number] | null>(null)
 
   // 队列在后台补齐时每两秒问一次进度，补完就停。
@@ -134,13 +152,24 @@ export function QueueList() {
       active={queue.index === index}
       onPlay={() => void playContext(keys, index)}
       onMove={(from, to) => void moveInQueue(from, to)}
+      onRemove={(key) => void removeFromQueue(key)}
     />
   )
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between px-5 pb-2 pt-4 text-[12px] tracking-[0.14em] text-[var(--text-2)]">
-        <span>接下来 · {queue.items.length} 首</span>
+        <span className="flex items-center gap-2">
+          接下来 · {queue.items.length} 首
+          <button
+            type="button"
+            onClick={() => void clearQueue()}
+            title="清空队列"
+            className="text-[11px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+          >
+            清空
+          </button>
+        </span>
         {restore ? (
           <span className="num text-[var(--accent)]">
             恢复中 {restore[0]}/{restore[1]}

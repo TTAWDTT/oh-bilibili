@@ -480,6 +480,35 @@ impl Engine {
         keys.iter().filter_map(|k| known.get(k).cloned()).collect()
     }
 
+    /// 从队列里移除一首。移除的是当前项时，光标落到原位置的下一首。
+    pub fn queue_remove(&self, key: &str) -> Result<QueueView, WireError> {
+        let mut queue = lock(&self.queue);
+        let id = queue
+            .entry_id_of(key)
+            .ok_or_else(|| WireError::input("key", "这一项不在队列里"))?;
+        queue.remove(id);
+        drop(queue);
+        self.persist_queue();
+        let queue = lock(&self.queue);
+        Ok(QueueView {
+            items: queue.items(),
+            index: queue.index(),
+        })
+    }
+
+    /// 清空队列。
+    pub fn queue_clear(&self) -> Result<QueueView, WireError> {
+        {
+            let mut queue = lock(&self.queue);
+            *queue = Queue::from_tracks(&[], 0);
+        }
+        self.persist_queue();
+        Ok(QueueView {
+            items: Vec::new(),
+            index: None,
+        })
+    }
+
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
     pub fn queue_move(&self, from: &str, to: &str) -> Result<QueueView, WireError> {
         let mut queue = lock(&self.queue);

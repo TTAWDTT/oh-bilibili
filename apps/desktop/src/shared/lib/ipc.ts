@@ -94,6 +94,16 @@ export function queueState(): Promise<QueueView> {
   return call<QueueView>('queue_state', {})
 }
 
+/** 从队列移除一首。 */
+export function queueRemove(key: string): Promise<QueueView> {
+  return call<QueueView>('queue_remove', { key })
+}
+
+/** 清空队列。 */
+export function queueClear(): Promise<QueueView> {
+  return call<QueueView>('queue_clear', {})
+}
+
 /** 队列恢复进度 (已补, 总数)；没有在恢复时为 null。 */
 export function queueRestoreProgress(): Promise<[number, number] | null> {
   return call<[number, number] | null>('queue_restore_progress', {})

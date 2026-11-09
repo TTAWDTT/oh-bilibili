@@ -232,6 +232,19 @@ fn queue_state(engine: tauri::State<'_, Arc<Engine>>) -> QueueView {
 
 /// 队列恢复进度 (已补, 总数)。没有在恢复时返回 null。
 #[tauri::command(rename_all = "snake_case")]
+fn queue_remove(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<QueueView, WireError> {
+    engine.queue_remove(&key)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn queue_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<QueueView, WireError> {
+    engine.queue_clear()
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn queue_restore_progress(engine: tauri::State<'_, Arc<Engine>>) -> Option<(usize, usize)> {
     engine.queue_restore_progress()
 }
@@ -528,6 +541,8 @@ pub fn run() {
             player_shuffle,
             queue_state,
             queue_move,
+            queue_remove,
+            queue_clear,
             queue_restore_progress,
             library_history,
             library_playlists,

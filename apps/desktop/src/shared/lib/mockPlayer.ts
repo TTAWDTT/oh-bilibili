@@ -80,6 +80,25 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       return snapshot()
     case 'queue_state':
       return queueView()
+    case 'queue_move': {
+      const from = str(args, 'from')
+      const to = str(args, 'to')
+      const i = state.keys.indexOf(from)
+      const j = state.keys.indexOf(to)
+      if (i >= 0 && j >= 0 && i !== j) {
+        const [moved] = state.keys.splice(i, 1)
+        if (moved) state.keys.splice(j, 0, moved)
+      }
+      return queueView()
+    }
+    case 'queue_remove': {
+      const key = str(args, 'key')
+      state.keys = state.keys.filter((k) => k !== key)
+      return queueView()
+    }
+    case 'queue_clear':
+      state.keys = []
+      return queueView()
     default:
       throw fail('internal', `浏览器 mock 还没有实现 ${command}`)
   }

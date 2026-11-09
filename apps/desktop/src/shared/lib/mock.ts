@@ -8,7 +8,8 @@ export { mockSubscribe } from './mockEngine'
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
-  if (command === 'queue_state' || command.startsWith('player_')) {
+  // 队列相关命令都在 player 侧实现
+  if (command.startsWith('queue_') || command.startsWith('player_')) {
     return playerCommand(command, args)
   }
 
