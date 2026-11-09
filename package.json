@@ -11,7 +11,8 @@
     "web": "npm run dev -w @bilimusic/desktop",
     "build": "npm run build -w @bilimusic/desktop",
     "bundle": "npm run tauri:build -w @bilimusic/desktop",
-    "typecheck": "npm run typecheck -w @bilimusic/desktop"
+    "typecheck": "npm run typecheck -w @bilimusic/desktop",
+    "ui:audit": "node scripts/ui-audit.mjs"
   },
   "devDependencies": {
     "lxgw-wenkai-lite-webfont": "^1.7.0"
