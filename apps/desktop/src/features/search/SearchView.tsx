@@ -105,7 +105,7 @@ export function SearchView() {
         })
     }, 320)
     return () => window.clearTimeout(handle)
-  }, [trimmed, page, nonce, order])
+  }, [trimmed, page, nonce, order, partition])
 
   const pick = (value: string): void => {
     setQuery(value)
@@ -219,7 +219,14 @@ export function SearchView() {
 
             {tracks.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <PartitionFilter active={partition} onChange={setPartition} />
+                <PartitionFilter
+                  active={partition}
+                  onChange={(label) => {
+                    setPartition(label)
+                    // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
+                    setPage(1)
+                  }}
+                />
                 <div className="mb-3 flex items-center gap-1">
                   {([
                     ['totalrank', '综合'],

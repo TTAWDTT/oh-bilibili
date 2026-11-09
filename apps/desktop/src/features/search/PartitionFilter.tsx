@@ -19,11 +19,6 @@ export const PARTITIONS: Partition[] = [
   { label: '影视', tid: 181, ids: [181, 23, 11, 13] },
 ]
 
-export function matchesPartition(typeid: number | undefined, partition: Partition): boolean {
-  if (partition.ids.length === 0) return true
-  return typeid !== undefined && partition.ids.includes(typeid)
-}
-
 export function PartitionFilter({
   active,
   onChange,
