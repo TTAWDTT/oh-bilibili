@@ -1,4 +1,5 @@
 import { DownloadButton } from '../downloads/DownloadButton'
+import { useReactionStore } from '../reactions/reactionStore'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { useState } from 'react'
@@ -74,17 +75,10 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const setMv = useAppStore((state) => state.setMv)
   const navigate = useAppStore((state) => state.navigate)
-
-  /** 三连动作统一入口：失败走同一套提示，不静默。 */
-  const act = async (kind: 'like' | 'fav', track: Track): Promise<void> => {
-    try {
-      if (kind === 'like') await ipc.likeSet(track.key, true)
-      else await ipc.favSet(track.key, true)
-      toastDone(kind === 'like' ? '已点赞' : '已收藏')
-    } catch (e) {
-      reportActionError('三连', e)
-    }
-  }
+  const liked = useReactionStore((state) => state.liked)
+  const faved = useReactionStore((state) => state.faved)
+  const toggleLike = useReactionStore((state) => state.toggleLike)
+  const toggleFav = useReactionStore((state) => state.toggleFav)
 
   /** 稍后再看：写进 B 站账号的待看列表。 */
   const later = async (track: Track): Promise<void> => {
@@ -229,12 +223,16 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
                   type="button"
-                  aria-label="点赞"
-                  title="点赞"
-                  onClick={() => void act('like', track)}
-                  className="bili-icon-hover hover:text-[var(--accent)]"
+                  aria-label={(liked[track.key] ?? false) ? '取消点赞' : '点赞'}
+                  aria-pressed={liked[track.key] ?? false}
+                  title={(liked[track.key] ?? false) ? '取消点赞' : '点赞'}
+                  onClick={() => void toggleLike(track)}
+                  className={[
+                    'bili-icon-hover',
+                    liked[track.key] ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]',
+                  ].join(' ')}
                 >
-                  <Icon name="thumb" size={12} />
+                  <Icon name={(liked[track.key] ?? false) ? 'thumbFilled' : 'thumb'} size={12} />
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
@@ -249,10 +247,14 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
                   type="button"
-                  aria-label="收藏"
-                  title="收藏"
-                  onClick={() => void act('fav', track)}
-                  className="bili-icon-hover hover:text-[var(--accent)]"
+                  aria-label={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
+                  aria-pressed={faved[track.key] ?? false}
+                  title={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
+                  onClick={() => void toggleFav(track)}
+                  className={[
+                    'bili-icon-hover',
+                    faved[track.key] ? 'text-[#ffc46b]' : 'hover:text-[var(--accent)]',
+                  ].join(' ')}
                 >
                   <Icon name="bookmarkStar" size={12} />
                 </button>
