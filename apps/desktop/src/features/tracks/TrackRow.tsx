@@ -55,7 +55,7 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         <span
           className={[
             't block truncate text-[14px]',
-            active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-white',
+            active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-[var(--text-1)]',
           ].join(' ')}
           title={track.title}
         >

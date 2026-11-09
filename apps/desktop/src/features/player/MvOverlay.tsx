@@ -69,7 +69,7 @@ export function MvOverlay() {
             type="button"
             onClick={() => setMv(null)}
             aria-label="关闭"
-            className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-white/60 hover:text-[var(--text-1)]"
+            className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-white/60 hover:text-white"
           >
             <Icon name="close" size={14} />
           </button>

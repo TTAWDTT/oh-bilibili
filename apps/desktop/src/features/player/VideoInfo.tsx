@@ -37,7 +37,7 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
   const date = meta.pubdate ? new Date(meta.pubdate * 1000).toLocaleDateString('zh-CN') : ''
 
   return (
-    <section className="mt-6 w-full max-w-[560px] rounded-[6px] border border-white/12 bg-black/30 p-4 text-left">
+    <section className="mt-6 w-full max-w-[560px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-4 text-left">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/55">
         <Stat icon="play" value={meta.views} label="播放" />
         <Stat icon="queue" value={meta.danmaku} label="弹幕" />
@@ -45,14 +45,14 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
         <Stat icon="coin" value={meta.coins} label="投币" />
         <Stat icon="bookmark" value={meta.favorites} label="收藏" />
         <Stat icon="copy" value={meta.shares} label="分享" />
-        {date ? <span className="num text-white/40">{date}</span> : null}
+        {date ? <span className="num text-[var(--text-3)]">{date}</span> : null}
       </div>
 
       {meta.desc ? (
         <>
           <p
             className={[
-              'mt-3 whitespace-pre-wrap text-[12.5px] leading-relaxed text-white/70',
+              'mt-3 whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--text-2)]',
               expanded ? '' : 'line-clamp-2',
             ].join(' ')}
           >
@@ -62,7 +62,7 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="mt-1 text-[13px] text-white/45 hover:text-white"
+              className="mt-1 text-[13px] text-[var(--text-3)] hover:text-[var(--text-1)]"
             >
               {expanded ? '收起' : '展开简介'}
             </button>

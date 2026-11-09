@@ -17,7 +17,7 @@ export function DanmakuPanel() {
         aria-expanded={open}
         className={[
           't press flex h-8 w-8 items-center justify-center rounded-[4px]',
-          open ? 'bg-white/20 text-white' : 'text-white/55 hover:bg-white/10 hover:text-white',
+          open ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
         <Icon name="settings" size={15} />

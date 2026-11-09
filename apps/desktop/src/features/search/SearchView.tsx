@@ -184,7 +184,7 @@ export function SearchView() {
                   key={suggestion}
                   type="button"
                   onClick={() => pick(suggestion)}
-                  className="t press text-[14px] text-[var(--text-2)] underline-offset-4 hover:text-white hover:underline"
+                  className="t press text-[14px] text-[var(--text-2)] underline-offset-4 hover:text-[var(--text-1)] hover:underline"
                 >
                   {suggestion}
                 </button>

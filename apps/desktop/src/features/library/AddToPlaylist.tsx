@@ -64,7 +64,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
               type="button"
               disabled={busy}
               onClick={() => void choose(playlist.id)}
-              className="t group flex items-center gap-2 border-b border-hairline px-1 py-1 text-left text-[14px] text-[var(--text-2)] hover:text-white disabled:opacity-40"
+              className="t group flex items-center gap-2 border-b border-hairline px-1 py-1 text-left text-[14px] text-[var(--text-2)] hover:text-[var(--text-1)] disabled:opacity-40"
             >
               <Icon name="library" size={15} className="text-[var(--text-2)] group-hover:text-[var(--text-2)]" />
               <span className="min-w-0 flex-1 truncate">{playlist.name}</span>

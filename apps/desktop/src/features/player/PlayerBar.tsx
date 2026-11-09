@@ -39,7 +39,7 @@ function RailToggle({
         enabled
           ? active
             ? 'text-[var(--accent)]'
-            : 'text-[var(--text-2)] hover:text-white'
+            : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
           : 'cursor-default text-[var(--text-2)]',
       ].join(' ')}
     >

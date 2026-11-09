@@ -61,7 +61,7 @@ function QueueRow({
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={['block truncate text-[14px]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-white'].join(' ')}
+          className={['block truncate text-[14px]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-[var(--text-1)]'].join(' ')}
           title={track.title}
         >
           {track.title}
