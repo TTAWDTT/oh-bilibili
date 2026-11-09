@@ -1,6 +1,7 @@
 import type { Track } from '../lib/contract'
 import { useReactionStore } from '../../features/reactions/reactionStore'
 import { Icon } from './Icon'
+import { BiliStar, BiliThumb } from './BiliTri'
 
 type ReactionButtonsProps = {
   track: Track
@@ -30,7 +31,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           liked ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <Icon name={liked ? 'heartFilled' : 'heart'} size={size} />
+        {liked ? <BiliThumb size={size} /> : <Icon name="heart" size={size} />}
       </button>
       <button
         type="button"
@@ -46,7 +47,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           faved ? 'text-[#ffc46b]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={size} />
+        {faved ? <BiliStar size={size} /> : <Icon name="bookmark" size={size} />}
       </button>
     </div>
   )

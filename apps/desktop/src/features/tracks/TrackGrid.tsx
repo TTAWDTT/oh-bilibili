@@ -14,6 +14,7 @@ import { formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { usePlayerStore } from '../player/playerStore'
 
 /** 从标题里认出分辨率与音质角标。B 站自己在封面右上角标这些。 */
@@ -271,7 +272,7 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
                     liked[track.key] ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]',
                   ].join(' ')}
                 >
-                  <Icon name={(liked[track.key] ?? false) ? 'thumbFilled' : 'thumb'} size={12} />
+                  {(liked[track.key] ?? false) ? <BiliThumb size={12} /> : <Icon name="thumb" size={12} />}
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
@@ -294,7 +295,7 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
                     (coins[track.key] ?? 0) >= 2 ? 'cursor-default opacity-50' : '',
                   ].join(' ')}
                 >
-                  <Icon name="coin" size={12} />
+                  <BiliCoin size={12} />
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
@@ -311,7 +312,7 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
                     faved[track.key] ? 'text-[#ffc46b]' : 'hover:text-[var(--accent)]',
                   ].join(' ')}
                 >
-                  <Icon name="bookmarkStar" size={12} />
+                  <BiliStar size={12} />
                 </button>
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
