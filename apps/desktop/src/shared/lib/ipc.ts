@@ -152,8 +152,8 @@ export function likeSet(key: string, liked: boolean): Promise<null> {
   return call<null>('like_set', { key, liked })
 }
 
-export function favSet(key: string, faved: boolean): Promise<null> {
-  return call<null>('fav_set', { key, faved })
+export function favSet(key: string, faved: boolean, folderId?: number | null): Promise<null> {
+  return call<null>('fav_set', { key, faved, folder_id: folderId ?? null })
 }
 
 export function lyricsGet(key: string): Promise<LyricDoc> {

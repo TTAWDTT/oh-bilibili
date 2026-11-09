@@ -16,6 +16,8 @@ type ReactionStore = {
   toggleFav: (track: Track) => Promise<void>
   /** 投币。成功后本地计数 +count，与账号一致。 */
   addCoin: (track: Track, count: number) => Promise<void>
+  /** 收进指定收藏夹后把本地状态点亮点。 */
+  favTo: (track: Track, folderId: number | null) => Promise<void>
 }
 
 export const useReactionStore = create<ReactionStore>()((set, get) => ({
@@ -66,6 +68,15 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
       }))
     } catch (cause) {
       reportActionError('投币', cause)
+    }
+  },
+  favTo: async (track, folderId) => {
+    try {
+      await ipc.favSet(track.key, true, folderId)
+      set((state) => ({ faved: { ...state.faved, [track.key]: true } }))
+    } catch (cause) {
+      reportActionError('收藏', cause)
+      throw cause
     }
   },
   toggleFav: async (track) => {

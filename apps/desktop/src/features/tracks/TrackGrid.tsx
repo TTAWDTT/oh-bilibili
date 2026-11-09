@@ -1,4 +1,5 @@
 import { DownloadButton } from '../downloads/DownloadButton'
+import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
@@ -82,6 +83,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const hydrate = useReactionStore((state) => state.hydrate)
   const coins = useReactionStore((state) => state.coins)
   const addCoin = useReactionStore((state) => state.addCoin)
+  const favToStore = useReactionStore((state) => state.favTo)
 
   // 进到一屏结果就把这一屏的真实点赞/收藏状态拉回来，心与星不会再是「重置后全空」。
   useEffect(() => {
@@ -102,8 +104,27 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
     }
   }
 
+  /** 收进选定收藏夹。folderId 为 null 表示默认夹。 */
+  const favTo = async (folderId: number | null): Promise<void> => {
+    const track = picking
+    if (!track) return
+    setFavBusy(true)
+    try {
+      await favToStore(track, folderId)
+      toastDone('已收藏', folderId === null ? '收进了默认收藏夹' : '已收进所选收藏夹')
+      setPicking(null)
+    } catch {
+      // store 里已经提示过，这里只负责收尾
+    } finally {
+      setFavBusy(false)
+    }
+  }
+
   /** 投币不可撤销，B 站硬币还是稀缺资源，所以必须二次确认。 */
   const [confirming, setConfirming] = useState<string | null>(null)
+  // 收藏前先选收藏夹；未收藏 → 弹选择；已收藏 → 直接取消
+  const [picking, setPicking] = useState<Track | null>(null)
+  const [favBusy, setFavBusy] = useState(false)
 
   const doCoin = async (track: Track): Promise<void> => {
     setConfirming(null)
@@ -270,7 +291,10 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   aria-label={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
                   aria-pressed={faved[track.key] ?? false}
                   title={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
-                  onClick={() => void toggleFav(track)}
+                  onClick={() => {
+                    if (faved[track.key]) void toggleFav(track)
+                    else setPicking(track)
+                  }}
                   className={[
                     'bili-icon-hover',
                     faved[track.key] ? 'text-[#ffc46b]' : 'hover:text-[var(--accent)]',
@@ -293,7 +317,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
               </span>
             </div>
 
-            {confirming === track.key ? (
+      {confirming === track.key ? (
               <div className="mt-1 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[12px]">
                 <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
                 <button
@@ -315,6 +339,14 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
           </article>
         )
       })}
+      {picking ? (
+        <FavPicker
+          open
+          busy={favBusy}
+          onClose={() => setPicking(null)}
+          onPick={(folderId) => void favTo(folderId)}
+        />
+      ) : null}
     </div>
   )
 }

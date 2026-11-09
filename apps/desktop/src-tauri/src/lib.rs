@@ -445,8 +445,11 @@ async fn fav_set(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     faved: bool,
+    folder_id: Option<i64>,
 ) -> Result<(), WireError> {
-    engine.fav_set(&TrackKey::from_provider(key), faved).await
+    engine
+        .fav_set(&TrackKey::from_provider(key), faved, folder_id)
+        .await
 }
 
 #[tauri::command(rename_all = "snake_case")]

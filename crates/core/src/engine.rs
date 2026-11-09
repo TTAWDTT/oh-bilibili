@@ -776,8 +776,13 @@ impl Engine {
         Ok(())
     }
 
-    pub async fn fav_set(&self, key: &TrackKey, faved: bool) -> Result<(), WireError> {
-        self.source.set_favorite(key, faved).await?;
+    pub async fn fav_set(
+        &self,
+        key: &TrackKey,
+        faved: bool,
+        folder: Option<i64>,
+    ) -> Result<(), WireError> {
+        self.source.set_favorite(key, faved, folder).await?;
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
             let id = self.library.upsert_track(&t)?;
             if let Some(mid) = self.source.nav().mid {
@@ -996,7 +1001,10 @@ impl Engine {
             };
             let result = match reaction.kind {
                 ReactionKind::Like => self.source.set_like(&track.key, reaction.want).await,
-                ReactionKind::Fav => self.source.set_favorite(&track.key, reaction.want).await,
+                // 离线重试时不知道当初选的是哪个夹子，退回默认收藏夹
+                ReactionKind::Fav => {
+                    self.source.set_favorite(&track.key, reaction.want, None).await
+                }
             };
             let state = if result.is_ok() {
                 ReactionState::Synced

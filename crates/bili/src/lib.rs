@@ -262,12 +262,18 @@ impl Source {
     }
 
     /// 收藏：落到固定名字的收藏夹，没有就建。
-    pub async fn set_favorite(&self, key: &TrackKey, on: bool) -> Result<(), BiliError> {
+    /// 收藏。`folder` 为 None 时收进默认收藏夹「哔哩哔哩 music」。
+    pub async fn set_favorite(
+        &self,
+        key: &TrackKey,
+        on: bool,
+        folder: Option<i64>,
+    ) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;
-        let folder = self
-            .client
-            .ensure_fav_folder(sync::DEFAULT_FOLDER)
-            .await?;
+        let folder = match folder {
+            Some(id) => id,
+            None => self.client.ensure_fav_folder(sync::DEFAULT_FOLDER).await?,
+        };
         self.client.set_favorite(detail.aid, folder, on).await
     }
 
@@ -779,7 +785,7 @@ mod auth_tests {
         let source = Source::open().await.expect("Source 能开");
         source.logout().await;
         let key = TrackKey::from_provider("BV1d4411N7zD");
-        match source.set_favorite(&key, true).await {
+        match source.set_favorite(&key, true, None).await {
             Err(BiliError::NeedsLogin(_)) => {}
             other => panic!("预期 NeedsLogin，实际 {other:?}"),
         }
