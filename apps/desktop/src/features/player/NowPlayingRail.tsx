@@ -8,6 +8,7 @@ import { ReactionButtons } from '../../shared/ui/ReactionButtons'
 import { LyricsView } from './LyricsView'
 import { usePlayerStore } from './playerStore'
 import { QueueList } from './QueueList'
+import { RelatedList } from './RelatedList'
 
 function RailTabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
@@ -101,7 +102,14 @@ export function NowPlayingRail({ tab }: { tab: RailTab }) {
         {tab === 'queue' ? (
           <QueueList />
         ) : track ? (
-          <LyricsView track={track} />
+          <>
+            <div className="min-h-0 flex-1">
+              <LyricsView track={track} />
+            </div>
+            <div className="shrink-0 overflow-y-auto" style={{ maxHeight: '46%' }}>
+              <RelatedList trackKey={track.key} />
+            </div>
+          </>
         ) : (
           <EmptyState
             icon="biliTv"

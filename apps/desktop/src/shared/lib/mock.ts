@@ -27,6 +27,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
       return matched.slice((page - 1) * 8, page * 8)
     }
+    case 'related': {
+      // 预览模式给同目录里的相邻几首，够看清右栏推荐的样子。
+      const key = str(args, 'key')
+      const idx = CATALOG.findIndex((t) => t.key === key)
+      const start = idx >= 0 ? idx : 0
+      return Array.from({ length: 6 }, (_, i) => CATALOG[(start + i + 1) % CATALOG.length])
+    }
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
