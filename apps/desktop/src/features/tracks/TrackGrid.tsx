@@ -2,7 +2,7 @@ import { DownloadButton } from '../downloads/DownloadButton'
 import { useReactionStore } from '../reactions/reactionStore'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
@@ -79,6 +79,16 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const faved = useReactionStore((state) => state.faved)
   const toggleLike = useReactionStore((state) => state.toggleLike)
   const toggleFav = useReactionStore((state) => state.toggleFav)
+  const hydrate = useReactionStore((state) => state.hydrate)
+
+  // 进到一屏结果就把这一屏的真实点赞/收藏状态拉回来，心与星不会再是「重置后全空」。
+  useEffect(() => {
+    const keys = tracks.slice(0, 20).map((t) => t.key)
+    if (keys.length === 0) return
+    void hydrate(keys).catch(() => {
+      // 未登录或限流时保持现状，不打扰用户
+    })
+  }, [tracks, hydrate])
 
   /** 稍后再看：写进 B 站账号的待看列表。 */
   const later = async (track: Track): Promise<void> => {

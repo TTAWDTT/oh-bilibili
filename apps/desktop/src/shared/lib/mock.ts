@@ -119,6 +119,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         return track ? [track] : []
       })
     }
+    case 'relation_states': {
+      // 预览：把前两条标成已赞/已藏，用来验证进页面时状态会被点亮。
+      const keys = Array.isArray(args.keys) ? (args.keys as string[]) : []
+      return keys.map((key, i) => [key, i === 0, i === 0, i === 0 ? 1 : 0])
+    }
     case 'like_set': {
       const key = str(args, 'key')
       if (bool(args, 'liked')) state.likes.add(key)

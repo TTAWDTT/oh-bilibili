@@ -719,6 +719,29 @@ impl Engine {
     }
 
     /// 投币。真实写进 B 站账号，失败会返回可读的错误。
+    /// 批量读互动状态，用于把界面上的心/星点亮成账号里的真实状态。
+    pub async fn relation_states(
+        &self,
+        keys: Vec<String>,
+    ) -> Result<Vec<(String, bool, bool, u32)>, WireError> {
+        let mut out = Vec::new();
+        for key in keys {
+            let track_key = TrackKey::from_provider(key.clone());
+            match self.source.relation_state(&track_key).await {
+                Ok((liked, faved, coin)) => out.push((key, liked, faved, coin)),
+                // 未登录时整批都不会成功，直接返回错误让界面提示登录
+                Err(bilimusic_bili::error::BiliError::NeedsLogin(m)) => {
+                    return Err(WireError::needs_login(m))
+                }
+                // 单条失败跳过，不拖垮整批
+                Err(_) => {}
+            }
+            // 接口有频率限制，逐条之间留间隔
+            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+        }
+        Ok(out)
+    }
+
     pub async fn coin_set(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), WireError> {
         self.source.add_coin(key, count, also_like).await?;
         Ok(())

@@ -204,6 +204,13 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// 一条视频在当前账号里的点赞/收藏/投币状态。
+    pub async fn relation_state(&self, key: &TrackKey) -> Result<(bool, bool, u32), BiliError> {
+        let bvid = key.as_opaque().to_string();
+        let detail = self.detail(key).await?;
+        self.client.relation_state(detail.aid, &bvid).await
+    }
+
     /// UP 主名片（粉丝数、签名、认证）。
     pub async fn author_card(&self, mid: u64) -> Result<crate::sync::AuthorCard, BiliError> {
         self.client.author_card(mid).await

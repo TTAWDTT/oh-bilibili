@@ -199,6 +199,11 @@ export function followSet(mid: number, on: boolean): Promise<null> {
 }
 
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
+/** 批量读互动状态：[key, liked, faved, coin][]。 */
+export function relationStates(keys: string[]): Promise<[string, boolean, boolean, number][]> {
+  return call<[string, boolean, boolean, number][]>('relation_states', { keys })
+}
+
 export function coinAdd(key: string, count: number, alsoLike: boolean): Promise<null> {
   return call<null>('coin_set', { key, count, also_like: alsoLike })
 }

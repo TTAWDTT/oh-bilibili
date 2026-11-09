@@ -26,6 +26,38 @@ pub struct AuthorCard {
 }
 
 impl Client {
+    /// 读一条视频当前在账号里的互动状态（点赞、投币、收藏）。
+    ///
+    /// 走 `archive/relation` 与 `fav/video/favoured`，两者都需要登录。
+    pub async fn relation_state(
+        &self,
+        aid: u64,
+        bvid: &str,
+    ) -> Result<(bool, bool, u32), BiliError> {
+        let rel = self
+            .get_json(
+                &format!("{API}/x/web-interface/archive/relation?bvid={bvid}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let liked = rel["data"]["liked"].as_i64().unwrap_or(0) != 0;
+        let coin = rel["data"]["coin"].as_u64().unwrap_or(0) as u32;
+
+        let faved = match self
+            .get_json(
+                &format!("{API}/x/v2/fav/video/favoured?aid={aid}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await
+        {
+            Ok(v) => v["data"]["favoured"].as_bool().unwrap_or(false),
+            // 收藏状态单独失败不该连累点赞状态
+            Err(BiliError::NeedsLogin(m)) => return Err(BiliError::NeedsLogin(m)),
+            Err(_) => false,
+        };
+        Ok((liked, faved, coin))
+    }
+
     /// 点赞 / 取消点赞。
     pub async fn like_video(&self, aid: u64, on: bool) -> Result<(), BiliError> {
         let csrf = self

@@ -342,6 +342,14 @@ async fn like_set(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn relation_states(
+    engine: tauri::State<'_, Arc<Engine>>,
+    keys: Vec<String>,
+) -> Result<Vec<(String, bool, bool, u32)>, WireError> {
+    engine.relation_states(keys).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn coin_set(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -585,6 +593,7 @@ pub fn run() {
             library_tracks,
             like_set,
             coin_set,
+            relation_states,
             follow_set,
             watch_later_set,
             fav_folders,
