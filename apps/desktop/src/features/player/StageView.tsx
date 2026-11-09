@@ -118,7 +118,7 @@ export function StageView() {
           <Cover
             cover={track.cover}
             title={track.title}
-            className="h-[188px] w-[188px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)]"
+            className="h-[148px] w-[148px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)] md:h-[188px] md:w-[188px]"
             glyphClassName="text-[64px] font-semibold text-[var(--text-1)]"
           />
         </div>
@@ -166,7 +166,7 @@ export function StageView() {
       </div>
 
       {related.length > 0 ? (
-        <div className="absolute inset-x-0 bottom-0 border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur">
+        <div className="absolute inset-x-0 bottom-0 hidden border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur md:block">
           <div className="mb-2 text-[12px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {related.map((item) => (
