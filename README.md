@@ -68,8 +68,9 @@ npm run bundle        # 产出 target/release/bundle/macos/BiliMusic.app，约 8
 ## 验证
 
 ```sh
-cargo test --workspace                 # 离线测试
+cargo test --workspace                 # 离线测试，18 个测试二进制
 npm run typecheck -w @bilimusic/desktop
+npm run ui:audit                       # 浅色主题一致性检查（深底深字、悬停隐字等）
 
 # 需要网络与声卡的真实接口验证
 cargo test -p bilimusic-bili --test live -- --ignored --nocapture
@@ -78,18 +79,35 @@ cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
 
 ## 关于截图
 
-`docs/assets/` 下的界面截图是在浏览器里用内存 mock 数据渲染的，不是 Tauri 真窗口，
-所以图里的码率、时长、歌词都来自 `apps/desktop/src/shared/lib/mock*.ts`。
-真窗口的视觉效果一致，但数据来源不同。这台机器没有录屏权限，拿不到真窗口截图。
+`docs/assets/` 下有两类图：
+
+- `ui-real-*.png`、`ui-mv-playing.png`、`ui-download-*.png` 等是 **Tauri 真窗口截图**，
+  数据来自 B 站真实接口（例如真机搜索「周杰伦」返回 29 条、播放页显示真实弹幕与歌词）。
+- 其余多在浏览器里用内存 mock 渲染，图里的码率、时长、歌词来自
+  `apps/desktop/src/shared/lib/mock*.ts`。
+
+真窗口截图用 `screencapture` 抓取，配合 `agent-desktop` 做点击与输入。
 
 ## 已知缺口
 
-- **登录系功能没有真机验证。** 二维码登录、点赞、收藏三条路径写完了，离线测试只覆盖「未登录时被正确挡住」与「二维码能生成」。真账号下的成功路径需要你自己点一遍。
-- **内存超预算。** 预算写的 120MB，实测 release 主进程 112MB，加上 WKWebView 的子进程会更高。webview 的基线压不下去，要么调预算，要么换成原生绘制。
-- **播放队列不跨重启恢复。** v1 明确的非目标。
-- **歌词只有两级。** 本地 `.lrc`（放 `~/Music/BiliMusic/<歌名>.lrc`）与 lrclib。
-  计划里的第三级「B 站字幕」没接，`lyrics` 表建了但没写入。
-- **`cargo public-api` 闸门未接入。** 现在只有依赖方向断言。
+- **登录系的成功路径没有真账号验证。** 扫码登录、点赞、投币、收藏、关注、稍后再看
+  六条写入路径的代码与错误分支都完成了，离线测试覆盖「未登录时正确报 NeedsLogin」
+  与「点赞/收藏/投币状态能读回并回滚」。成功路径需要你自己点一遍。
+- **UP 主的全部投稿拿不到。** `space/arc/search` 需要登录会话，未登录返回 -412/-403。
+  UP 主页现在展示的是「按作者名搜索」的结果，并明确标注「下方仅显示搜索结果里的 N 个」。
+- **`cargo public-api` 闸门未接入。** 现在只有依赖方向断言（`crates/core/tests/deps.rs`）
+  与 Rust↔TS 字段契约（`crates/core/tests/contract.rs`）。
+
+## 已完成的验证（这些曾经是缺口）
+
+| 项 | 状态 |
+|---|---|
+| 队列与播放位置跨重启恢复 | ✓ 快照存完整曲目 + 下标 + 位置，播放中每 5 秒落盘；重启后点播放从原位置续 |
+| 歌词三级回退 | ✓ 本地 `.lrc` → lrclib → B 站字幕；同歌 6 条不同标题实测命中 6/6 |
+| MV 播放 | ✓ 真机播出官方 MV（曾因 CSP 的 `media-src` 未放行本地代理而失败） |
+| 内存 | ✓ 主进程空闲 76MB、播放中 91–93MB，低于 120MB 预算；切歌 5 次后 100MB |
+| 下载端到端 | ✓ 真机点卡片下载 → yt-dlp → 落盘约 6.4MB m4a |
+| 键盘可达性 | ✓ 焦点环、弹窗焦点陷阱、跳到主内容、页面 h1 与不跳级的标题层级 |
 
 ## 架构
 
