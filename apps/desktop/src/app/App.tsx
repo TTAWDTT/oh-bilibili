@@ -44,7 +44,7 @@ function CurrentView({ view }: { view: View }) {
     case 'favs':
       return <FavFoldersView />
     case 'author':
-      return <AuthorView name={view.name} />
+      return <AuthorView name={view.name} mid={view.mid ?? null} />
     case 'settings':
       return <SettingsView />
   }

@@ -22,7 +22,7 @@ function formatCount(n: number): string {
  * B 站的用户空间接口被风控（-352），所以这里用「按作者名搜索」的结果聚合：
  * 头像取他最近一条投稿的 upic，统计是当前结果集内的，界面上如实标注。
  */
-export function AuthorView({ name }: { name: string }) {
+export function AuthorView({ name, mid }: { name: string; mid?: number | null }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const navigate = useAppStore((state) => state.navigate)
@@ -52,7 +52,12 @@ export function AuthorView({ name }: { name: string }) {
     void ipc
       .searchQ(name, 1)
       .then((list) => {
-        if (!cancelled) setTracks(list.filter((t) => t.artist === name))
+        if (cancelled) return
+        // 有 mid 就按 mid 精确匹配——同名 UP 主不会混进来；没有才退回按名字匹配。
+        const exact = mid
+          ? list.filter((t) => t.up_mid === mid)
+          : list.filter((t) => t.artist === name)
+        setTracks(exact)
       })
       .catch(() => {
         if (!cancelled) setTracks([])
@@ -60,7 +65,7 @@ export function AuthorView({ name }: { name: string }) {
     return () => {
       cancelled = true
     }
-  }, [name])
+  }, [name, mid])
 
   if (tracks === null) return <TrackListSkeleton rows={6} />
   if (tracks.length === 0) {

@@ -223,7 +223,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                   title={`看 ${track.artist} 的更多视频`}
                   onClick={(event) => {
                     event.stopPropagation()
-                    navigate({ kind: 'author', name: track.artist })
+                    navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })
                   }}
                   className="truncate hover:text-[var(--accent)] hover:underline"
                 >

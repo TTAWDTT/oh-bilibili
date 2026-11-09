@@ -96,6 +96,11 @@ function coverArt(title: string, hue: number, variant: number): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
+// 同一个 UP 主的 mid 必须一致，否则「点 UP 主看他的更多视频」只能查到一条。
+const MID_BY_ARTIST = new Map<string, number>(
+  Array.from(new Set(SEEDS.map((s) => s.artist))).map((artist, i) => [artist, 900000 + i]),
+)
+
 export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
   const key = `BV1Mk4y1${String(1000 + index * 37)}`
   return {
@@ -112,7 +117,7 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     danmaku: 42_000 - index * 1_800,
     tname: '音乐',
     typeid: 3,
-    up_mid: 900000 + index,
+    up_mid: MID_BY_ARTIST.get(seed.artist) ?? 900000 + index,
   }
 })
 
