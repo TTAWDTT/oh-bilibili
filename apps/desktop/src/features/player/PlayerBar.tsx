@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { WaveRibbon } from './WaveRibbon'
 import { LevelBars } from './LevelBars'
 import { useAppStore } from '../../app/appStore'
+import { AddToPlaylistModal } from '../library/AddToPlaylist'
 import type { RailTab } from '../../app/appStore'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
@@ -109,12 +111,14 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
 export function PlayerBar() {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const rail = useAppStore((state) => state.rail)
+  const [adding, setAdding] = useState(false)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
   const track = snapshot?.track ?? null
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
     <section className="relative z-20 grid h-14 shrink-0 overflow-hidden grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-[var(--panel)] px-3">
+      <AddToPlaylistModal track={track} open={adding} onClose={() => setAdding(false)} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 opacity-45">
         <WaveRibbon />
       </div>
@@ -130,9 +134,23 @@ export function PlayerBar() {
         <LevelBars />
         <VolumeControl />
         <span className="h-5 w-px bg-white/32" />
+        <button
+          type="button"
+          aria-label="加入歌单"
+          title={track ? '加入歌单' : '播放一首歌后可加入歌单'}
+          disabled={!track}
+          onClick={() => setAdding(true)}
+          className={[
+            't press flex h-8 w-8 items-center justify-center rounded-[4px]',
+            track ? 'text-[var(--text-2)] hover:text-[var(--accent)]' : 'cursor-default text-[var(--text-2)]',
+          ].join(' ')}
+        >
+          <Icon name="plus" size={16} />
+        </button>
         <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
         <RailToggle tab="queue" active={rail === 'queue'} count={queued} enabled={queued > 0} />
       </div>
     </section>
   )
 }
+

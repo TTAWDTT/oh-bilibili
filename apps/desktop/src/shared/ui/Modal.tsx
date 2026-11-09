@@ -37,7 +37,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         aria-label="关闭遮罩"
         tabIndex={-1}
         onClick={onClose}
-        className="t absolute inset-0 cursor-default bg-black/65 hover:bg-black/70 backdrop-blur-[6px]"
+        className="t absolute inset-0 cursor-default bg-black/35 backdrop-blur-[3px]"
       />
       <div
         ref={panelRef}
@@ -45,19 +45,19 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`modal-panel relative w-full ${width} border border-[var(--line)] bg-[#0b0b10]`}
+        className={`modal-panel relative w-full ${width} rounded-[10px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_18px_50px_-16px_rgba(0,0,0,0.35)]`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-3 py-5">
           <div>
-            <h2 className="font-display text-[26px] font-semibold tracking-[-0.01em] text-[var(--text-1)]">{title}</h2>
-            {description ? <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-[var(--text-2)]">{description}</p> : null}
+            <h2 className="text-[18px] font-semibold text-[var(--text-1)]">{title}</h2>
+            {description ? <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-[var(--text-3)]">{description}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="关闭"
             title="关闭（Esc）"
-            className="t press rounded-[4px] p-2 text-[var(--text-2)] hover:text-[var(--text-1)]"
+            className="t press -mr-1 rounded-[4px] p-1.5 text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]"
           >
             <Icon name="close" size={16} />
           </button>
