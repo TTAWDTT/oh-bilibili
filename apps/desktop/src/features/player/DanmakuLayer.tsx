@@ -35,11 +35,15 @@ export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing:
       {lines.slice(0, 18).map((text, i) => (
         <span
           key={`${i}-${text}`}
-          className="danmaku absolute whitespace-nowrap text-[14px] text-white"
+          className="danmaku absolute whitespace-nowrap text-[14px]"
           style={{
-            top: `${8 + (i * 100) / Math.max(1, Math.min(lines.length, 18))}%`,
+            // 只占上半部：下半部是标题和歌词，弹幕压上去会读不清
+            top: `${5 + (i * 46) / Math.max(1, Math.min(lines.length, 12))}%`,
             // 速度越大，动画时长越短
             animationDuration: `${(11 + (i % 5) * 2) / speed}s`,
+            // 舞台是浅色底，白字会看不见；用深色 + 白色描边保证在任何封面上都读得清
+            color: 'var(--text-1)',
+            textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
             opacity,
             fontSize: `${size}px`,
             animationDelay: `${i * 0.9}s`,
