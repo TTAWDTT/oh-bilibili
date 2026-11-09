@@ -48,6 +48,14 @@ async fn 引擎能搜到歌并真的开始播放() {
 async fn 能把一首歌下载到本地并落到磁盘() {
     let dir = std::env::temp_dir().join(format!("bilimusic-dl-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("临时目录");
+    // 测试跑完要自己收干净：之前的版本每次跑都留一个 160KB 的目录。
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(dir.clone());
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
