@@ -163,7 +163,7 @@ export function PlayerBar() {
         <LevelBars />
         <SpeedButton />
         <VolumeControl />
-        <span className="h-5 w-px bg-white/32" />
+        <span className="h-5 w-px bg-[var(--line)]" />
         <button
           type="button"
           aria-label="加入歌单"

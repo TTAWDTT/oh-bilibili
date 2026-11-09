@@ -60,10 +60,10 @@ function Slider({
   onChange: (v: number) => void
 }) {
   return (
-    <label className="mt-3 block text-[13px] text-white/70">
+    <label className="mt-3 block text-[13px] text-[var(--text-2)]">
       <span className="flex items-center justify-between">
         {label}
-        <span className="num text-white/45">{value.toFixed(1)}</span>
+        <span className="num text-[var(--text-3)]">{value.toFixed(1)}</span>
       </span>
       <input
         type="range"

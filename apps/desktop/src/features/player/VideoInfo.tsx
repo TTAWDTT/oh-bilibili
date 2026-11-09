@@ -38,7 +38,7 @@ export function VideoInfo({ trackKey }: { trackKey: string }) {
 
   return (
     <section className="mt-6 w-full max-w-[560px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-4 text-left">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/55">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-3)]">
         <Stat icon="play" value={meta.views} label="播放" />
         <Stat icon="queue" value={meta.danmaku} label="弹幕" />
         <Stat icon="heart" value={meta.likes} label="点赞" />
