@@ -1,3 +1,4 @@
+import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { useAppStore } from '../../app/appStore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
@@ -35,12 +36,15 @@ export function LikedView() {
       <div className="bili-canvas flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-8 pt-2">
         {tracks.length === 0 ? (
           <div className="flex min-h-[320px] flex-1 items-center justify-center">
+            <div className="flex flex-col items-center gap-1">
+            <Mascot2233 height={180} />
             <EmptyState
               icon="heart"
               title="一个红心都没点，下次一定？"
               detail="在任意歌曲上点一下红心，它会出现在这里。"
               action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
             />
+            </div>
           </div>
         ) : (
           <TrackList

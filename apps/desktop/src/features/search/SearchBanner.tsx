@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Mascot2233 } from '../../shared/ui/Mascot2233'
 
 type Slide = {
   image: string | undefined
@@ -95,6 +96,9 @@ export function SearchBanner() {
                   />
                 ))}
               </div>
+            </div>
+            <div className="shrink-0 translate-y-3">
+              <Mascot2233 height={296} className="drop-shadow-[0_12px_28px_rgba(0,0,0,0.55)]" />
             </div>
           </div>
         </div>

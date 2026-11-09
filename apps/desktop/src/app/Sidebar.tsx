@@ -1,3 +1,4 @@
+import { Mascot2233 } from '../shared/ui/Mascot2233'
 import { useState } from 'react'
 import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
@@ -79,9 +80,12 @@ export function Sidebar() {
             <Skeleton className="h-2.5 w-4/5" />
           </div>
         ) : playlists.length === 0 ? (
-          <p className="px-3 py-1 text-[13px] leading-relaxed text-[var(--text-3)]">
-            还没有歌单，点上面的加号建一个。
-          </p>
+          <div className="flex flex-col items-center px-3 py-2">
+            <Mascot2233 height={104} />
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-3)]">
+              还没有歌单，点上面的加号建一个。
+            </p>
+          </div>
         ) : (
           playlists.map((playlist) => {
             const active = view.kind === 'playlist' && view.id === playlist.id
