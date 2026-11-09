@@ -39,6 +39,7 @@ export async function searchQ(
   page: number,
   order?: string,
   partitionIds?: number[],
+  duration?: number,
 ): Promise<Track[]> {
   const result = await call<Track[] | SearchPage>('search_q', {
     query,
@@ -46,6 +47,7 @@ export async function searchQ(
     order,
     // 只取第一个当作一级分区 id（B 站 tids 的含义），空数组表示全站
     partition_ids: partitionIds && partitionIds.length > 0 ? [partitionIds[0]] : [],
+    duration: duration === undefined ? null : duration,
   })
   return Array.isArray(result) ? result : result.tracks
 }

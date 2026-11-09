@@ -27,6 +27,8 @@ type AppStore = {
   /** 搜索页上次用的分区与排序，切走再回来要恢复。 */
   currentPartition: string
   currentOrder: string
+  /** 时长筛选：0 不限，1~4 对应 B 站的 duration 参数。 */
+  currentDuration: number
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
@@ -40,7 +42,7 @@ type AppStore = {
   focusSearch: () => void
   setHeroQuery: (q: string | null) => void
   setCurrentQuery: (q: string) => void
-  setSearchFilters: (partition: string, order: string) => void
+  setSearchFilters: (partition: string, order: string, duration?: number) => void
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
@@ -58,6 +60,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   currentQuery: '',
   currentPartition: '全部',
   currentOrder: 'totalrank',
+  currentDuration: 0,
   authOpen: false,
   mv: null,
   stage: false,
@@ -70,7 +73,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
-  setSearchFilters: (partition, order) => set({ currentPartition: partition, currentOrder: order }),
+  setSearchFilters: (partition, order, duration = 0) =>
+    set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),

@@ -102,6 +102,19 @@ impl Source {
         order: bilimusic_model::SearchOrder,
         tid: Option<u32>,
     ) -> Result<Vec<Track>, BiliError> {
+        self.search_scoped(query, order, tid, None).await
+    }
+
+    /// 带分区与时长的搜索。
+    ///
+    /// `duration`：1 = 10 分钟以下，2 = 10~30 分钟，3 = 30~60 分钟，4 = 60 分钟以上。
+    pub async fn search_scoped(
+        &self,
+        query: &SearchQuery,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+        duration: Option<u32>,
+    ) -> Result<Vec<Track>, BiliError> {
         let mut params = vec![
             ("search_type", "video".to_string()),
             ("keyword", query.keyword().to_string()),
@@ -110,6 +123,9 @@ impl Source {
         ];
         if let Some(tid) = tid {
             params.push(("tids", tid.to_string()));
+        }
+        if let Some(d) = duration.filter(|d| (1..=4).contains(d)) {
+            params.push(("duration", d.to_string()));
         }
         if let Some(order_param) = order.as_param() {
             params.push(("order", order_param.to_string()));

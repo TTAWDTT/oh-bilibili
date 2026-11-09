@@ -144,9 +144,21 @@ impl Engine {
         order: bilimusic_model::SearchOrder,
         tid: Option<u32>,
     ) -> Result<Vec<Track>, WireError> {
+        self.search_scoped(query, page, order, tid, None).await
+    }
+
+    /// 带分区与时长的搜索。
+    pub async fn search_scoped(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+        duration: Option<u32>,
+    ) -> Result<Vec<Track>, WireError> {
         let q = SearchQuery::parse(query, page)
             .map_err(|e| WireError::input("query", e.to_string()))?;
-        let tracks = self.source.search_in_partition(&q, order, tid).await?;
+        let tracks = self.source.search_scoped(&q, order, tid, duration).await?;
         for t in &tracks {
             self.remember(t);
         }

@@ -146,6 +146,7 @@ async fn search_q(
     page: u32,
     order: Option<String>,
     partition_ids: Option<Vec<u32>>,
+    duration: Option<u32>,
 ) -> Result<Vec<Track>, WireError> {
     use bilimusic_model::SearchOrder;
     let order = match order.as_deref() {
@@ -157,7 +158,9 @@ async fn search_q(
     // 传一级分区 id 时直接用 B 站的 tids 参数，返回该分区下的全部结果；
     // 不传则全站搜索。原来拿 4 页再按 typeid 筛的做法已经不需要了。
     let tid = partition_ids.as_ref().and_then(|ids| ids.first().copied());
-    engine.search_in_partition(&query, page, order, tid).await
+    engine
+        .search_scoped(&query, page, order, tid, duration)
+        .await
 }
 
 #[tauri::command]

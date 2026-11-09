@@ -18,7 +18,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const query = str(args, 'query').trim()
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       await sleep(140)
+      // 时长筛选：mock 的曲目都在 30 秒内，只做「10 分钟以下」这一档的语义
+      const dur = num(args, 'duration')
       const matched = CATALOG.filter((track) => {
+        const ms = track.duration_ms ?? 0
+        if (dur === 1 && ms >= 600_000) return false
+        if (dur === 2 && (ms < 600_000 || ms > 1_800_000)) return false
+        if (dur === 3 && (ms < 1_800_000 || ms > 3_600_000)) return false
+        if (dur === 4 && ms <= 3_600_000) return false
         if (query.length === 0) return true
         return track.title.includes(query) || track.artist.toLowerCase().includes(query.toLowerCase())
       }).sort((left, right) => {

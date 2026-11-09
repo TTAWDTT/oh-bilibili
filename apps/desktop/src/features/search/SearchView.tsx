@@ -12,6 +12,7 @@ import { ChannelGrid } from './ChannelGrid'
 import { ContinueListening } from './ContinueListening'
 import { HotRanking } from './HotRanking'
 import { SearchBanner } from './SearchBanner'
+import { DurationFilter, type DurationKey } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -32,6 +33,7 @@ export function SearchView() {
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
   const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
+  const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
   const history = useSearchHistory((s) => s.items)
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
@@ -46,8 +48,8 @@ export function SearchView() {
   // 顶栏跟着它走，切走再回来也能恢复。
   useEffect(() => {
     setCurrentQuery(query)
-    setSearchFilters(partition, order)
-  }, [query, partition, order, setCurrentQuery, setSearchFilters])
+    setSearchFilters(partition, order, duration)
+  }, [query, partition, order, duration, setCurrentQuery, setSearchFilters])
 
   // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
   useEffect(() => {
@@ -100,6 +102,7 @@ export function SearchView() {
             const tid = (PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!).tid
             return tid ? [tid] : []
           })(),
+          duration === 0 ? undefined : duration,
         )
         .then((next) => {
           if (seq.current !== ticket) return
@@ -115,7 +118,7 @@ export function SearchView() {
         })
     }, 320)
     return () => window.clearTimeout(handle)
-  }, [trimmed, page, nonce, order, partition])
+  }, [trimmed, page, nonce, order, partition, duration])
 
   const pick = (value: string): void => {
     setQuery(value)
@@ -229,6 +232,14 @@ export function SearchView() {
 
             {tracks.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
+                <DurationFilter
+                  active={duration}
+                  onChange={(key) => {
+                    setDuration(key)
+                    setPage(1)
+                  }}
+                />
+
                 <PartitionFilter
                   active={partition}
                   onChange={(label) => {
