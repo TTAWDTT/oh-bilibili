@@ -9,6 +9,22 @@ use crate::error::BiliError;
 /// 收藏夹名。产品要求固定这个名字，用户 B 站里能看到同一个夹子。
 pub const DEFAULT_FOLDER: &str = "哔哩哔哩 music";
 
+/// UP 主名片。
+#[derive(Debug, Clone)]
+pub struct AuthorCard {
+    pub name: String,
+    pub face: String,
+    pub fans: u64,
+    pub sign: String,
+    pub official: Option<String>,
+    /// 用户等级 0..6。就在 card 接口里，不用另调 acc/info（那条会被限流成 -799）。
+    pub level: u8,
+    /// 投稿总数。
+    pub videos: u64,
+    /// 累计获赞。
+    pub likes: u64,
+}
+
 impl Client {
     /// 点赞 / 取消点赞。
     pub async fn like_video(&self, aid: u64, on: bool) -> Result<(), BiliError> {
@@ -29,10 +45,7 @@ impl Client {
     ///
     /// 走的是老接口 `x/web-interface/card`，它不要求登录也不要求 wbi；
     /// `space/wbi/acc/info` 那条会被限流成 -799，用它拿不到。
-    pub async fn author_card(
-        &self,
-        mid: u64,
-    ) -> Result<(String, String, u64, String, Option<String>), BiliError> {
+    pub async fn author_card(&self, mid: u64) -> Result<AuthorCard, BiliError> {
         let v = self
             .get_json_allowing_guest(
                 &format!("{API}/x/web-interface/card?mid={mid}"),
@@ -40,15 +53,20 @@ impl Client {
             )
             .await?;
         let card = &v["data"]["card"];
-        let name = card["name"].as_str().unwrap_or_default().to_string();
-        let face = card["face"]
-            .as_str()
-            .map(|f| f.replacen("http://", "https://", 1))
-            .unwrap_or_default();
-        let fans = v["data"]["follower"].as_u64().unwrap_or(0);
-        let sign = card["sign"].as_str().unwrap_or_default().to_string();
-        let official = card["Official"]["title"].as_str().map(|s| s.to_string());
-        Ok((name, face, fans, sign, official))
+        Ok(AuthorCard {
+            name: card["name"].as_str().unwrap_or_default().to_string(),
+            face: card["face"]
+                .as_str()
+                .map(|f| f.replacen("http://", "https://", 1))
+                .unwrap_or_default(),
+            fans: v["data"]["follower"].as_u64().unwrap_or(0),
+            sign: card["sign"].as_str().unwrap_or_default().to_string(),
+            official: card["Official"]["title"].as_str().map(|s| s.to_string()),
+            // 等级就在 card 里，不需要另调 acc/info（那条会被限流成 -799）。
+            level: card["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
+            videos: v["data"]["archive_count"].as_u64().unwrap_or(0),
+            likes: v["data"]["like_num"].as_u64().unwrap_or(0),
+        })
     }
 
     /// 当前账号的收藏夹列表。返回 (media_id, 名字, 条目数)。

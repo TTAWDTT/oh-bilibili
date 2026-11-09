@@ -317,6 +317,9 @@ struct AuthorCardView {
     fans: u64,
     sign: String,
     official: Option<String>,
+    level: u8,
+    videos: u64,
+    likes: u64,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -324,8 +327,17 @@ async fn author_card(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
 ) -> Result<AuthorCardView, WireError> {
-    let (name, face, fans, sign, official) = engine.author_card(mid).await?;
-    Ok(AuthorCardView { name, face, fans, sign, official })
+    let c = engine.author_card(mid).await?;
+    Ok(AuthorCardView {
+        name: c.name,
+        face: c.face,
+        fans: c.fans,
+        sign: c.sign,
+        official: c.official,
+        level: c.level,
+        videos: c.videos,
+        likes: c.likes,
+    })
 }
 
 #[derive(Serialize)]

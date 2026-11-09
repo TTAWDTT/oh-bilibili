@@ -142,6 +142,9 @@ export type AuthorCard = {
   fans: number
   sign: string
   official: string | null
+  level: number
+  videos: number
+  likes: number
 }
 
 /** UP 主名片：粉丝数、签名、认证。 */

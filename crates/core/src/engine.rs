@@ -561,7 +561,7 @@ impl Engine {
     pub async fn author_card(
         &self,
         mid: u64,
-    ) -> Result<(String, String, u64, String, Option<String>), WireError> {
+    ) -> Result<bilimusic_bili::sync::AuthorCard, WireError> {
         Ok(self.source.author_card(mid).await?)
     }
 

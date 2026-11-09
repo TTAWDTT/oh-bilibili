@@ -184,10 +184,7 @@ impl Source {
     }
 
     /// UP 主名片（粉丝数、签名、认证）。
-    pub async fn author_card(
-        &self,
-        mid: u64,
-    ) -> Result<(String, String, u64, String, Option<String>), BiliError> {
+    pub async fn author_card(&self, mid: u64) -> Result<crate::sync::AuthorCard, BiliError> {
         self.client.author_card(mid).await
     }
 

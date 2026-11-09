@@ -22,6 +22,11 @@ function formatCount(n: number): string {
  * B 站的用户空间接口被风控（-352），所以这里用「按作者名搜索」的结果聚合：
  * 头像取他最近一条投稿的 upic，统计是当前结果集内的，界面上如实标注。
  */
+/** 等级徽章配色。B 站 LV1 灰、LV2 绿、LV3 蓝、LV4 青、LV5 紫、LV6 红。 */
+function levelColor(level: number): string {
+  return ['#9499a0', '#9499a0', '#7fa93b', '#3fa8d6', '#2fb3a8', '#a674d9', '#e23a5e'][level] ?? '#9499a0'
+}
+
 export function AuthorView({ name, mid }: { name: string; mid?: number | null }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
@@ -103,9 +108,20 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       <header className="mb-6 flex items-center gap-4">
         <Avatar src={avatar} alt={name} size={64} />
         <div className="min-w-0">
-          <h1 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
-            {name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
+              {name}
+            </h1>
+            {card && card.level > 0 ? (
+              <span
+                className="shrink-0 rounded-[3px] px-1.5 text-[11.5px] font-semibold leading-[18px] text-white"
+                style={{ background: levelColor(card.level) }}
+                title={`LV${card.level}`}
+              >
+                LV{card.level}
+              </span>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => void follow()}
@@ -134,7 +150,8 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
             {card ? (
               <>
                 <span>{formatCount(card.fans)} 粉丝</span>
-                <span>{tracks.length} 个投稿</span>
+                <span>{formatCount(card.videos)} 投稿</span>
+                <span>{formatCount(card.likes)} 获赞</span>
               </>
             ) : (
               <>

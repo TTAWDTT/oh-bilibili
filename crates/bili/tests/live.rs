@@ -261,10 +261,14 @@ async fn tids_参数真的按分区过滤() {
 async fn up_名片能拿到粉丝数与签名() {
     let source = Source::open().await.expect("Source");
     // 影视飓风
-    let (name, face, fans, sign, official) = source.author_card(946974).await.expect("名片");
-    println!("{name} / 粉丝 {fans} / 认证 {official:?} / 签名 {}", sign.chars().take(20).collect::<String>());
-    println!("头像 {}", &face[..face.len().min(50)]);
-    assert!(!name.is_empty());
-    assert!(fans > 1000, "粉丝数应该是真实值");
-    assert!(face.starts_with("https://"));
+    let c = source.author_card(946974).await.expect("名片");
+    println!(
+        "{} / LV{} / 粉丝 {} / 投稿 {} / 获赞 {} / 认证 {:?}",
+        c.name, c.level, c.fans, c.videos, c.likes, c.official
+    );
+    assert!(!c.name.is_empty());
+    assert!(c.fans > 1000, "粉丝数应该是真实值");
+    assert!(c.videos > 0, "投稿总数应该是真实值");
+    assert!(c.level >= 1 && c.level <= 6, "等级应该在 1..6");
+    assert!(c.face.starts_with("https://"));
 }
