@@ -282,6 +282,19 @@ impl Source {
         self.client.set_favorite(detail.aid, folder, on).await
     }
 
+    /// 发一条弹幕。`progress_ms` 是它出现在视频里的时刻。
+    pub async fn send_danmaku(
+        &self,
+        key: &TrackKey,
+        text: &str,
+        progress_ms: u64,
+    ) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        self.client
+            .send_danmaku(detail.cid, &key.as_opaque(), text, progress_ms)
+            .await
+    }
+
     /// B 站字幕。作为歌词的第三级来源：视频没挂字幕就返回空。
     pub async fn subtitles(&self, key: &TrackKey) -> Result<Vec<(u64, String)>, BiliError> {
         let detail = self.detail(key).await?;

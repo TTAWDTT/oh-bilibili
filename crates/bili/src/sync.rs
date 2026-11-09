@@ -46,6 +46,36 @@ impl Client {
         Ok((liked, faved, coin))
     }
 
+    /// 发一条弹幕。`progress_ms` 决定它落在视频的哪一刻。
+    ///
+    /// 走 `x/v2/dm/post`，需要 bili_jct 当 csrf。B 站对弹幕有审核与频率限制，
+    /// 失败时把它的原话透出来，不要自己编一个「发送失败」盖掉原因。
+    pub async fn send_danmaku(
+        &self,
+        cid: u64,
+        bvid: &str,
+        text: &str,
+        progress_ms: u64,
+    ) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("发弹幕需要登录".into()))?;
+        let body = vec![
+            ("type", "1".to_string()),
+            ("oid", cid.to_string()),
+            ("msg", text.to_string()),
+            ("bvid", bvid.to_string()),
+            ("progress", progress_ms.to_string()),
+            ("mode", "1".to_string()),
+            ("fontsize", "25".to_string()),
+            ("color", "16777215".to_string()),
+            ("pool", "0".to_string()),
+            ("csrf", csrf),
+        ];
+        self.post_form(&format!("{API}/x/v2/dm/post"), body).await?;
+        Ok(())
+    }
+
     /// 点赞 / 取消点赞。
     pub async fn like_video(&self, aid: u64, on: bool) -> Result<(), BiliError> {
         let csrf = self

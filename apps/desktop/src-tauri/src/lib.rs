@@ -507,6 +507,18 @@ async fn auth_logout(engine: tauri::State<'_, Arc<Engine>>) -> Result<AuthSnapsh
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn danmaku_send(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    text: String,
+    progress_ms: u64,
+) -> Result<(), WireError> {
+    engine
+        .danmaku_send(&TrackKey::from_provider(key), &text, progress_ms)
+        .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn download_remove(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -656,6 +668,7 @@ pub fn run() {
             auth_poll,
             auth_logout,
             downloads_list,
+            danmaku_send,
             download_remove,
             download_reveal,
             download_enqueue,

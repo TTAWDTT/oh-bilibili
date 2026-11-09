@@ -959,6 +959,25 @@ impl Engine {
         Ok(lock(&self.downloads).clone())
     }
 
+    /// 发一条弹幕，落在 `progress_ms` 这一刻。
+    pub async fn danmaku_send(
+        &self,
+        key: &TrackKey,
+        text: &str,
+        progress_ms: u64,
+    ) -> Result<(), WireError> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Err(WireError::input("text", "弹幕不能是空的"));
+        }
+        // B 站单条弹幕上限 100 字
+        if trimmed.chars().count() > 100 {
+            return Err(WireError::input("text", "弹幕最多 100 字"));
+        }
+        self.source.send_danmaku(key, trimmed, progress_ms).await?;
+        Ok(())
+    }
+
     pub fn downloads(&self) -> Vec<DownloadView> {
         lock(&self.downloads).clone()
     }

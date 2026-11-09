@@ -5,6 +5,7 @@ import type { Track } from '../../shared/lib/contract'
 import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { DanmakuComposer } from './DanmakuComposer'
 import { DanmakuLayer } from './DanmakuLayer'
 import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
@@ -117,24 +118,30 @@ export function StageView() {
           <Cover
             cover={track.cover}
             title={track.title}
-            className="h-[240px] w-[240px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)]"
+            className="h-[188px] w-[188px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)]"
             glyphClassName="text-[64px] font-semibold text-[var(--text-1)]"
           />
         </div>
 
-        <h2 className="mt-8 max-w-full truncate text-[26px] font-semibold text-[var(--text-1)]" title={track.title}>
+        <h2 className="mt-5 max-w-full truncate text-[24px] font-semibold text-[var(--text-1)]" title={track.title}>
           {track.title}
         </h2>
         <p className="mt-1 truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
           {track.artist}
         </p>
 
-        <div className="mt-10 flex min-h-[92px] flex-col items-center text-center">
-          <p className="stage-line text-[27px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
+        <div className="mt-4 flex min-h-[62px] flex-col items-center text-center">
+          <p className="stage-line text-[24px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
           <p className="mt-3 text-[16px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
         </div>
 
-        <div className="mt-8 flex items-center gap-6 text-[var(--text-2)]">
+        {/* 弹幕输入框放在播放键上方：真机窗口比网页矮，放下面会被底部的
+            「相关推荐」压住，实测看不到。 */}
+        <div className="mt-4 flex w-full justify-center px-8">
+          <DanmakuComposer trackKey={track.key} position={snapshot?.position_ms ?? 0} />
+        </div>
+
+        <div className="mt-4 flex items-center gap-6 text-[var(--text-2)]">
           <button type="button" aria-label="上一首" onClick={() => void prev()} className="t press hover:text-[var(--text-1)]">
             <Icon name="prev" size={22} />
           </button>
@@ -142,7 +149,7 @@ export function StageView() {
             type="button"
             aria-label={snapshot?.phase === 'playing' ? '暂停' : '播放'}
             onClick={() => void toggle()}
-            className="bili-press flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
+            className="bili-press flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
           >
             <Icon name={snapshot?.phase === 'playing' ? 'pause' : 'play'} size={22} />
           </button>
@@ -151,7 +158,7 @@ export function StageView() {
           </button>
         </div>
 
-        <div className="mt-6 text-[var(--accent)]">
+        <div className="mt-3 text-[var(--accent)]">
           <LevelBars />
         </div>
 

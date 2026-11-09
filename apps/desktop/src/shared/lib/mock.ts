@@ -87,6 +87,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
+    case 'danmaku_send':
+      return null
     case 'danmaku_colored': {
       // 造 12 条带时间点的弹幕（第 1~24 秒），用来验证「按时间轴出现」。
       const texts = [
