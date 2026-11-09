@@ -159,22 +159,6 @@
     stage-breath 4s ease-in-out infinite;
 }
 
-/* 空态插画眨眼：每 6 秒眨一次，够慢才不像闪烁。 */
-@keyframes bili-tv-blink {
-  0%,
-  92%,
-  100% {
-    transform: scaleY(1);
-  }
-  95% {
-    transform: scaleY(0.1);
-  }
-}
-
-.bili-tv__eyes {
-  transform-origin: 48px 55px;
-  animation: bili-tv-blink 6s ease-in-out infinite;
-}
 
 /* 舞台：封面像一张唱片在转，转速比真实 33 转慢，避免眩晕。 */
 .stage-disc {
@@ -711,4 +695,18 @@ select:focus-visible {
     right: auto;
     left: 6px;
   }
+}
+
+/* 小电视加载：轻微起伏 + 极短的高光呼吸，幅度小到不打扰 */
+@keyframes bili-tv-load-bob {
+  0%, 100% { transform: translateY(0); opacity: .85; }
+  50% { transform: translateY(-5px); opacity: 1; }
+}
+
+.bili-tv-load {
+  animation: bili-tv-load-bob 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bili-tv-load { animation: none; opacity: 1; }
 }

@@ -1,4 +1,4 @@
-import { BiliTvArt } from './BiliTvArt'
+import { BiliTvMark } from './BiliTvMark'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
@@ -30,7 +30,7 @@ export function EmptyState({ icon, mascot, title, detail, action, compact = fals
     <div className={compact ? 'flex flex-col items-center px-4 py-10 text-center' : 'flex flex-col items-center px-3 py-16 text-center'}>
       {mascot ? null : icon === 'biliTv' ? (
         <span className="text-[var(--accent)]">
-          <BiliTvArt />
+          <BiliTvMark size={48} />
         </span>
       ) : (
         <Icon name={icon} size={22} className="text-[var(--text-2)]" />

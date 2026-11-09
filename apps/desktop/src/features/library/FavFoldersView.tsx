@@ -7,6 +7,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import type { FavFolder } from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { TrackGrid } from '../tracks/TrackGrid'
@@ -106,7 +107,7 @@ export function FavFoldersView() {
       />
     )
   }
-  if (folders === null) return <TrackListSkeleton rows={6} />
+  if (folders === null) return <BiliTvLoading label="正在读 B 站收藏夹" />
 
   if (picked) {
     return (
