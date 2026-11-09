@@ -80,6 +80,8 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
   const toggleLike = useReactionStore((state) => state.toggleLike)
   const toggleFav = useReactionStore((state) => state.toggleFav)
   const hydrate = useReactionStore((state) => state.hydrate)
+  const coins = useReactionStore((state) => state.coins)
+  const addCoin = useReactionStore((state) => state.addCoin)
 
   // 进到一屏结果就把这一屏的真实点赞/收藏状态拉回来，心与星不会再是「重置后全空」。
   useEffect(() => {
@@ -105,12 +107,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
 
   const doCoin = async (track: Track): Promise<void> => {
     setConfirming(null)
-    try {
-      await ipc.coinAdd(track.key, 1, true)
-      toastDone('已投 1 枚币并点赞')
-    } catch (e) {
-      reportActionError('投币', e)
-    }
+    await addCoin(track, 1)
   }
 
   return (
@@ -247,10 +244,23 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 <span className="h-2.5 w-px bg-[var(--line)]" />
                 <button
                   type="button"
-                  aria-label="投币"
-                  title="投币"
+                  aria-label={(coins[track.key] ?? 0) > 0 ? `已投 ${coins[track.key]} 枚币` : '投币'}
+                  title={
+                    (coins[track.key] ?? 0) >= 2
+                      ? '已经投满 2 枚'
+                      : (coins[track.key] ?? 0) > 0
+                        ? `已投 ${coins[track.key]} 枚，还能投 ${2 - (coins[track.key] ?? 0)} 枚`
+                        : '投币'
+                  }
+                  disabled={(coins[track.key] ?? 0) >= 2}
                   onClick={() => setConfirming(track.key)}
-                  className="bili-icon-hover hover:text-[var(--accent)]"
+                  className={[
+                    'bili-icon-hover',
+                    (coins[track.key] ?? 0) > 0
+                      ? 'text-[#ffc46b]'
+                      : 'hover:text-[var(--accent)]',
+                    (coins[track.key] ?? 0) >= 2 ? 'cursor-default opacity-50' : '',
+                  ].join(' ')}
                 >
                   <Icon name="coin" size={12} />
                 </button>

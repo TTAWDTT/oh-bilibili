@@ -2,20 +2,26 @@ import { create } from 'zustand'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { toastFailure } from '../../app/notice'
+import { reportActionError } from '../../shared/lib/actionError'
 
 type ReactionStore = {
   liked: Record<string, boolean>
   faved: Record<string, boolean>
+  /** 已经投出去的币数（0/1/2）。B 站上限 2 枚。 */
+  coins: Record<string, number>
   likedTracks: Track[]
   /** 从账号拉一次真实互动状态，把心/星点亮。未登录会抛 needs_login。 */
   hydrate: (keys: string[]) => Promise<void>
   toggleLike: (track: Track) => Promise<void>
   toggleFav: (track: Track) => Promise<void>
+  /** 投币。成功后本地计数 +count，与账号一致。 */
+  addCoin: (track: Track, count: number) => Promise<void>
 }
 
 export const useReactionStore = create<ReactionStore>()((set, get) => ({
   liked: {},
   faved: {},
+  coins: {},
   likedTracks: [],
   hydrate: async (keys) => {
     if (keys.length === 0) return
@@ -23,11 +29,13 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
     set((state) => {
       const liked = { ...state.liked }
       const faved = { ...state.faved }
-      for (const [key, isLiked, isFaved] of rows) {
+      const coins = { ...state.coins }
+      for (const [key, isLiked, isFaved, coin] of rows) {
         liked[key] = isLiked
         faved[key] = isFaved
+        coins[key] = coin
       }
-      return { liked, faved }
+      return { liked, faved, coins }
     })
   },
   toggleLike: async (track) => {
@@ -45,6 +53,19 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
     } catch (cause) {
       set((state) => ({ liked: { ...state.liked, [track.key]: previous }, likedTracks: previousTracks }))
       toastFailure(next ? '喜欢' : '取消喜欢', cause)
+    }
+  },
+  addCoin: async (track, count) => {
+    const previous = get().coins[track.key] ?? 0
+    try {
+      await ipc.coinAdd(track.key, count, true)
+      // 投币不可撤销，只有成功才改本地
+      set((state) => ({
+        coins: { ...state.coins, [track.key]: Math.min(2, previous + count) },
+        liked: { ...state.liked, [track.key]: true },
+      }))
+    } catch (cause) {
+      reportActionError('投币', cause)
     }
   },
   toggleFav: async (track) => {
