@@ -297,3 +297,28 @@ async fn 选最多播放时结果按播放量递减() {
         "按播放量排序时不该有这么多倒挂：{views:?}"
     );
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 音质标签与实际档位一致() {
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let first = tracks.first().expect("有结果");
+    let detail = source.detail(&first.key).await.expect("详情");
+    let streams = source.streams(&detail).await.expect("音轨");
+    let top = streams.first().expect("至少一档");
+    println!(
+        "标签 {}K / 标称带宽 {} kbps / 档位数 {}",
+        top.quality.kbps(),
+        top.bandwidth / 1000,
+        streams.len()
+    );
+    // 标签不能高于实际带宽太多：192K 的档位带宽不该低于 150kbps
+    assert!(
+        (top.bandwidth / 1000) as u16 >= top.quality.kbps().saturating_sub(50),
+        "标签 {}K 与实际 {} kbps 不符",
+        top.quality.kbps(),
+        top.bandwidth / 1000
+    );
+}

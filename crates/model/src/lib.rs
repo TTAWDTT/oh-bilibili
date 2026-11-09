@@ -64,15 +64,21 @@ pub enum Quality {
     K64,
     K132,
     K192,
+    /// 杜比全景声（B 站 id 30250）。需要大会员，未登录时不会出现。
+    Dolby,
+    /// Hi-Res 无损（B 站 id 30251）。
+    HiRes,
 }
 
 impl Quality {
-    pub const BEST: Quality = Quality::K192;
+    pub const BEST: Quality = Quality::HiRes;
 
     pub fn kbps(self) -> u16 {
         match self {
             Quality::K64 => 64,
             Quality::K132 => 132,
+            Quality::Dolby => 192,
+            Quality::HiRes => 192,
             Quality::K192 => 192,
         }
     }
@@ -83,6 +89,8 @@ impl Quality {
             30216 => Some(Quality::K64),
             30232 => Some(Quality::K132),
             30280 => Some(Quality::K192),
+            30250 => Some(Quality::Dolby),
+            30251 => Some(Quality::HiRes),
             _ => None,
         }
     }
@@ -251,15 +259,20 @@ mod tests {
     }
 
     #[test]
-    fn 档位按码率有序() {
+    fn 档位按音质有序() {
         assert!(Quality::K192 > Quality::K132);
         assert!(Quality::K132 > Quality::K64);
-        assert_eq!(Quality::BEST, Quality::K192);
+        // 会员档位排在普通档之上
+        assert!(Quality::HiRes > Quality::Dolby);
+        assert!(Quality::Dolby > Quality::K192);
+        assert_eq!(Quality::BEST, Quality::HiRes);
     }
 
     #[test]
     fn 未知档位不猜() {
         assert_eq!(Quality::from_bili_id(30280), Some(Quality::K192));
+        assert_eq!(Quality::from_bili_id(30250), Some(Quality::Dolby));
+        assert_eq!(Quality::from_bili_id(30251), Some(Quality::HiRes));
         assert_eq!(Quality::from_bili_id(99999), None);
     }
 

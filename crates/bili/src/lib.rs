@@ -667,7 +667,25 @@ mod wire {
 
         out.sort_by(|a, b| b.quality.cmp(&a.quality));
         if out.is_empty() {
-            return Err(BiliError::Parse("没有可用的音轨档位".into()));
+            // 全部是未知 id（B 站以后加新档位时会这样）：退到第一档，不要直接失败。
+            // 界面显示的码率会按实际带宽算，不会撒谎。
+            let first = audio.first().ok_or_else(|| BiliError::Parse("没有可用音轨".into()))?;
+            let url = first["baseUrl"]
+                .as_str()
+                .or_else(|| first["base_url"].as_str())
+                .ok_or_else(|| BiliError::Parse("音轨没有 url".into()))?;
+            // 按实测带宽推断档位，而不是硬写一个可能错的标签。
+            let bandwidth = first["bandwidth"].as_u64().unwrap_or(0);
+            let quality = match bandwidth {
+                b if b >= 900_000 => Quality::HiRes,
+                b if b >= 400_000 => Quality::Dolby,
+                _ => Quality::K192,
+            };
+            return Ok(vec![AudioStream {
+                quality,
+                url: url.to_string(),
+                bandwidth,
+            }]);
         }
         Ok(out)
     }
