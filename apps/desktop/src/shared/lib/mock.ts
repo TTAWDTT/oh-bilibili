@@ -27,6 +27,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
       return matched.slice((page - 1) * 8, page * 8)
     }
+    case 'author_card': {
+      const mid = num(args, 'mid')
+      const owner = CATALOG.find((t) => t.up_mid === mid)
+      if (!owner) throw fail('input', '这个 UP 主不在目录里')
+      return {
+        name: owner.artist,
+        face: owner.up_avatar ?? '',
+        // 按 mid 造一个稳定的粉丝数，同一个 UP 每次一样
+        fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
+        sign: '这里是 B 站的占位签名，真机走真实接口。',
+        official: null,
+      }
+    }
     case 'related': {
       // 预览模式给同目录里的相邻几首，够看清右栏推荐的样子。
       const key = str(args, 'key')

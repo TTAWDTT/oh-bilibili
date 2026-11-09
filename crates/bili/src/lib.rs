@@ -183,6 +183,14 @@ impl Source {
         self.client.like_video(detail.aid, on).await
     }
 
+    /// UP 主名片（粉丝数、签名、认证）。
+    pub async fn author_card(
+        &self,
+        mid: u64,
+    ) -> Result<(String, String, u64, String, Option<String>), BiliError> {
+        self.client.author_card(mid).await
+    }
+
     /// 收藏夹列表。
     pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
         self.client.fav_folders().await

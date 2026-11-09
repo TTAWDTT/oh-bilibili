@@ -558,6 +558,13 @@ impl Engine {
         Ok(())
     }
 
+    pub async fn author_card(
+        &self,
+        mid: u64,
+    ) -> Result<(String, String, u64, String, Option<String>), WireError> {
+        Ok(self.source.author_card(mid).await?)
+    }
+
     pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, WireError> {
         Ok(self.source.fav_folders().await?)
     }

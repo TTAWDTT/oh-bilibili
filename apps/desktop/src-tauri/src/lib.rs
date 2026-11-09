@@ -310,6 +310,25 @@ async fn coin_set(
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+struct AuthorCardView {
+    name: String,
+    face: String,
+    fans: u64,
+    sign: String,
+    official: Option<String>,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn author_card(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<AuthorCardView, WireError> {
+    let (name, face, fans, sign, official) = engine.author_card(mid).await?;
+    Ok(AuthorCardView { name, face, fans, sign, official })
+}
+
+#[derive(Serialize)]
 struct FavFolderView {
     id: i64,
     title: String,
@@ -508,6 +527,7 @@ pub fn run() {
             follow_set,
             watch_later_set,
             fav_folders,
+            author_card,
             fav_tracks,
             fav_set,
             lyrics_get,

@@ -25,6 +25,32 @@ impl Client {
         Ok(())
     }
 
+    /// UP 主名片：粉丝数、签名、头像、认证。
+    ///
+    /// 走的是老接口 `x/web-interface/card`，它不要求登录也不要求 wbi；
+    /// `space/wbi/acc/info` 那条会被限流成 -799，用它拿不到。
+    pub async fn author_card(
+        &self,
+        mid: u64,
+    ) -> Result<(String, String, u64, String, Option<String>), BiliError> {
+        let v = self
+            .get_json_allowing_guest(
+                &format!("{API}/x/web-interface/card?mid={mid}"),
+                std::time::Duration::from_millis(600),
+            )
+            .await?;
+        let card = &v["data"]["card"];
+        let name = card["name"].as_str().unwrap_or_default().to_string();
+        let face = card["face"]
+            .as_str()
+            .map(|f| f.replacen("http://", "https://", 1))
+            .unwrap_or_default();
+        let fans = v["data"]["follower"].as_u64().unwrap_or(0);
+        let sign = card["sign"].as_str().unwrap_or_default().to_string();
+        let official = card["Official"]["title"].as_str().map(|s| s.to_string());
+        Ok((name, face, fans, sign, official))
+    }
+
     /// 当前账号的收藏夹列表。返回 (media_id, 名字, 条目数)。
     pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
         let mid = self

@@ -255,3 +255,16 @@ async fn tids_参数真的按分区过滤() {
     assert!(named_music >= 5, "音乐区里应该大部分是具名音乐条目");
     assert!(wrong.is_empty(), "tids=3 不该返回其他分区的条目：{wrong:?}");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn up_名片能拿到粉丝数与签名() {
+    let source = Source::open().await.expect("Source");
+    // 影视飓风
+    let (name, face, fans, sign, official) = source.author_card(946974).await.expect("名片");
+    println!("{name} / 粉丝 {fans} / 认证 {official:?} / 签名 {}", sign.chars().take(20).collect::<String>());
+    println!("头像 {}", &face[..face.len().min(50)]);
+    assert!(!name.is_empty());
+    assert!(fans > 1000, "粉丝数应该是真实值");
+    assert!(face.starts_with("https://"));
+}

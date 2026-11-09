@@ -136,6 +136,19 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
   return call<LyricDoc>('lyrics_get', { key })
 }
 
+export type AuthorCard = {
+  name: string
+  face: string
+  fans: number
+  sign: string
+  official: string | null
+}
+
+/** UP 主名片：粉丝数、签名、认证。 */
+export function authorCard(mid: number): Promise<AuthorCard> {
+  return call<AuthorCard>('author_card', { mid })
+}
+
 export type FavFolder = { id: number; title: string; count: number }
 
 /** 当前账号的收藏夹。 */

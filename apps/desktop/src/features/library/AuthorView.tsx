@@ -27,6 +27,22 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const snapshot = usePlayerStore((state) => state.snapshot)
   const navigate = useAppStore((state) => state.navigate)
   const [followed, setFollowed] = useState(false)
+  const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
+
+  // 粉丝数与签名走 card 接口，公开可见。
+  useEffect(() => {
+    if (!mid) return
+    let cancelled = false
+    void ipc
+      .authorCard(mid)
+      .then((c) => {
+        if (!cancelled) setCard(c)
+      })
+      .catch(() => setCard(null))
+    return () => {
+      cancelled = true
+    }
+  }, [mid])
 
   /** 关注是真接口：写进你的 B 站关注列表，取关同理。 */
   const follow = async (): Promise<void> => {
@@ -79,7 +95,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     )
   }
 
-  const avatar = tracks.find((t) => t.up_avatar)?.up_avatar ?? null
+  const avatar = card?.face || tracks.find((t) => t.up_avatar)?.up_avatar || null
   const views = tracks.reduce((sum, t) => sum + (t.views ?? 0), 0)
 
   return (
@@ -103,12 +119,32 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
             {followed ? '已关注' : '+ 关注'}
           </button>
 
-          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-3)]">
-            <span>{tracks.length} 个投稿</span>
-            <span>{formatCount(views)} 累计播放</span>
-            <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
-              来自搜索结果
+          {card?.official ? (
+            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
+              {card.official}
             </span>
+          ) : null}
+          {card?.sign ? (
+            <p className="mt-1.5 line-clamp-1 text-[13px] text-[var(--text-2)]" title={card.sign}>
+              {card.sign}
+            </p>
+          ) : null}
+
+          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-3)]">
+            {card ? (
+              <>
+                <span>{formatCount(card.fans)} 粉丝</span>
+                <span>{tracks.length} 个投稿</span>
+              </>
+            ) : (
+              <>
+                <span>{tracks.length} 个投稿</span>
+                <span>{formatCount(views)} 累计播放</span>
+                <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
+                  来自搜索结果
+                </span>
+              </>
+            )}
           </div>
         </div>
       </header>
