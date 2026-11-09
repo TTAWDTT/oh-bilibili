@@ -1,27 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePlayerStore } from '../features/player/playerStore'
 import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import * as ipc from '../shared/lib/ipc'
 
+/** 弹幕一条：出现时刻（毫秒）、文本、颜色。 */
+type Item = { at: number; text: string; color: string }
+
+/** 一条弹幕在带上停留的时长。 */
+const LIFE_MS = 12000
+
 /**
- * 全局弹幕带。播放时在当前曲目的真实弹幕里取几条，从右向左飘过顶部。
+ * 全局弹幕带。播放时把当前时刻的真实弹幕送过顶部。
  *
- * 弹幕是 B 站最基础的语言。它不该只存在于播放页——B 站首页的视频预览、
- * 列表页的悬停预览里都有弹幕在动，这是「活着」的来源。
- *
- * 数据是真的：取当前曲目 cid 的弹幕接口，不是造的词库。
+ * 和舞台里的弹幕层用同一份数据、同一个时间轴：
+ * 播放到第 30 秒，带的也是第 30 秒前后的弹幕。
  */
 export function DanmakuStrip() {
   const trackKey = usePlayerStore((state) => state.snapshot?.track?.key ?? null)
+  const position = usePlayerStore((state) => state.snapshot?.position_ms ?? 0)
   const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
   const enabled = useDanmakuSettings((s) => s.enabled)
   const opacity = useDanmakuSettings((s) => s.opacity)
   const speed = useDanmakuSettings((s) => s.speed)
-  const [lines, setLines] = useState<[string, string][]>([])
+  const [items, setItems] = useState<Item[]>([])
 
   useEffect(() => {
     if (!trackKey) {
-      setLines([])
+      setItems([])
       return
     }
     let cancelled = false
@@ -29,38 +34,50 @@ export function DanmakuStrip() {
       .danmakuColored(trackKey)
       .then((list) => {
         if (cancelled) return
-        // B 站默认白字（0xFFFFFF），在浅色底上改用深色；其余彩色照原样用。
-        setLines(
-          list.slice(0, 10).map(([, text, rgb]) => {
-            const hex = `#${rgb.toString(16).padStart(6, '0')}`
-            return [text, rgb === 0xffffff ? 'var(--text-1)' : hex] as [string, string]
-          }),
+        setItems(
+          list
+            .map(([secs, text, rgb]) => ({
+              at: Math.round(secs * 1000),
+              text,
+              // B 站默认白字在浅色底上改用深色；其余是用户选的颜色，原样保留。
+              color: rgb === 0xffffff ? 'var(--text-1)' : `#${rgb.toString(16).padStart(6, '0')}`,
+            }))
+            .sort((a, b) => a.at - b.at),
         )
       })
-      .catch(() => setLines([]))
+      .catch(() => setItems([]))
     return () => {
       cancelled = true
     }
   }, [trackKey])
 
-  if (!enabled || !playing || lines.length === 0) return null
+  // 只带「刚出现过」的那几条，和舞台用的是同一套窗口逻辑。
+  const visible = useMemo(() => {
+    if (items.length === 0) return []
+    const from = position - LIFE_MS
+    return items.filter((d) => d.at <= position && d.at > from).slice(-8)
+  }, [items, position])
+
+  if (!enabled || !playing || visible.length === 0) return null
 
   return (
     <div className="pointer-events-none relative h-6 shrink-0 overflow-hidden border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bili-pink)_5%,white)]" aria-hidden>
-      {lines.map(([text, color], i) => (
+      {visible.map((item, i) => (
         <span
-          key={`${i}-${text}`}
+          key={`${item.at}-${item.text}-${i}`}
           className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[14px]"
           style={{
-            color,
+            color: item.color,
             top: `${(i % 2) * 11}px`,
-            animationDuration: `${(14 + (i % 4) * 3) / speed}s`,
-            animationDelay: `${i * 1.6}s`,
+            animationDuration: `${LIFE_MS / speed / 1000}s`,
+            // 负延迟让它落在已经飘过的那一段，而不是从右边缘重新开始
+            animationDelay: `-${(position - item.at) / 1000}s`,
+            animationPlayState: 'paused',
             opacity: opacity * 0.85,
             background: 'color-mix(in oklab, var(--bili-pink) 10%, white)',
           }}
         >
-          {text}
+          {item.text}
         </span>
       ))}
     </div>
