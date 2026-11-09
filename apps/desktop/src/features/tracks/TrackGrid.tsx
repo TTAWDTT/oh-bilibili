@@ -1,6 +1,7 @@
 import { DownloadButton } from '../downloads/DownloadButton'
 import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
+import { CardDanmaku } from './CardDanmaku'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { useEffect, useState } from 'react'
@@ -146,6 +147,7 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
         return (
           <article
             key={track.key}
+            data-track-card
             className="bili-card bili-card-enter group"
             style={{ '--i': Math.min(index, 12) } as React.CSSProperties}
           >
@@ -174,6 +176,7 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
                   ))}
                 </span>
               ) : null}
+              <CardDanmaku trackKey={track.key} />
               {/* 时长压右下角，和 B 站一致 */}
               <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white">
                 {formatDuration(track.duration_ms)}
