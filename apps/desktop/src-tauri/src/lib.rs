@@ -188,8 +188,11 @@ async fn player_play_context(
 }
 
 #[tauri::command]
-fn player_toggle(engine: tauri::State<'_, Arc<Engine>>) -> PlayerSnapshot {
-    engine.toggle()
+async fn player_toggle(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<PlayerSnapshot, WireError> {
+    let arc = engine.inner().clone();
+    arc.toggle_or_load().await
 }
 
 #[tauri::command(rename_all = "snake_case")]

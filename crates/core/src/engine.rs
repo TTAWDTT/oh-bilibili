@@ -330,6 +330,28 @@ impl Engine {
         self.play_key(&key).await
     }
 
+    /// 空闲但队列里有当前项时，把它真正加载起来。
+    ///
+    /// 队列是从快照恢复的，音频从未加载过；这种状态下 `player.play()` 是空操作，
+    /// 用户点了播放键会觉得「点了没反应」。
+    pub async fn toggle_or_load(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        // 先取出 key 再 await：MutexGuard 不能跨 await 存活。
+        let idle_key = {
+            let idle = lock(&self.state).phase() == "idle";
+            if idle {
+                lock(&self.queue)
+                    .current()
+                    .map(|entry| entry.track.key.clone())
+            } else {
+                None
+            }
+        };
+        if let Some(key) = idle_key {
+            return self.play_key(&key).await;
+        }
+        Ok(self.toggle())
+    }
+
     pub fn toggle(&self) -> PlayerSnapshot {
         let is_playing = lock(&self.player).clock().is_playing();
         {
