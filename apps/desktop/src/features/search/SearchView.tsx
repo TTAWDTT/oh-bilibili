@@ -290,6 +290,7 @@ export function SearchView() {
             {status === 'ready' && tracks.length === 0 ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center gap-1">
                 <EmptyState
+                  mascot="missYou"
                   icon="search"
                   title={
                     selectedPartition.tid

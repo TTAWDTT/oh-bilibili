@@ -128,7 +128,7 @@ export function FavFoldersView() {
         {tracks === null ? (
           <TrackListSkeleton rows={6} />
         ) : tracks.length === 0 ? (
-          <EmptyState icon="biliTv" title="这个收藏夹是空的" detail="去 B 站收几个视频再来。" action={null} />
+          <EmptyState mascot="hug" icon="biliTv" title="这个收藏夹是空的" detail="去 B 站收几个视频再来。" action={null} />
         ) : (
           <>
             <TrackGrid
@@ -170,6 +170,7 @@ export function FavFoldersView() {
   if (folders.length === 0) {
     return (
       <EmptyState
+        mascot="hug"
         icon="biliTv"
         title="还没有收藏夹"
         detail="在 B 站建一个收藏夹，这里就能读到。"

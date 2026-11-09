@@ -68,6 +68,7 @@ export function DownloadsView() {
         ) : items.length === 0 ? (
           <div className="flex min-h-[320px] items-center justify-center">
             <EmptyState
+              mascot="coin"
               icon="download"
               title="还没有下载，离线听要趁早"
               detail="在任意歌曲上点下载箭头，音轨会存到本机，断网也能听。"

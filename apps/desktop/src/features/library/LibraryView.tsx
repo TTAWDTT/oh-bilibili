@@ -53,6 +53,7 @@ export function LibraryView() {
         ) : playlists.length === 0 ? (
           <div className="flex min-h-[320px] items-center justify-center">
             <EmptyState
+              mascot="cheer"
               icon="library"
               title="还没有歌单"
               detail="建一个歌单，把歌按自己的顺序收起来。"

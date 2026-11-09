@@ -104,6 +104,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
           {tracks !== null && !error && tracks.length === 0 ? (
             <div className="flex min-h-[320px] items-center justify-center">
               <EmptyState
+                mascot="cheer"
                 icon="music"
                 title="这张歌单还是空的"
                 detail="去搜索里找到喜欢的歌，点加号就能收进来。"

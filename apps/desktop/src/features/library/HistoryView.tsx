@@ -84,6 +84,7 @@ export function HistoryView() {
   if (entries.length === 0) {
     return (
       <EmptyState
+        mascot="heart"
         icon="clock"
         title="还没有播放记录"
         detail="播过的歌会自动出现在这里，下次一定。"
