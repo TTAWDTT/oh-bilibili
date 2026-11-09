@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { useDanmakuSettings } from './danmakuSettings'
+import { useSentDanmaku } from './sentDanmaku'
+
+const EMPTY: never[] = []
 
 /** 一条弹幕：出现时刻（毫秒）、文本、颜色。 */
 type Item = { at: number; text: string; color: string }
@@ -46,12 +49,20 @@ export function DanmakuLayer({ trackKey, position }: { trackKey: string; positio
     }
   }, [trackKey])
 
+  const sent = useSentDanmaku((s) => s.byTrack[trackKey] ?? EMPTY)
+  const merged = useMemo(() => {
+    if (sent.length === 0) return items
+    const seen = new Set(items.map((i) => `${i.at}-${i.text}`))
+    const extra = sent.filter((i) => !seen.has(`${i.at}-${i.text}`))
+    return [...items, ...extra].sort((a, b) => a.at - b.at)
+  }, [items, sent])
+
   // 只取「已经开始、还没飘完」的那一段。位置一变就重算，弹幕于是跟着时间出现。
   const onScreen = useMemo(() => {
-    if (items.length === 0) return []
+    if (merged.length === 0) return []
     const from = position - LIFE_MS
-    return items.filter((d) => d.at <= position && d.at > from).slice(0, MAX_ON_SCREEN)
-  }, [items, position])
+    return merged.filter((d) => d.at <= position && d.at > from).slice(0, MAX_ON_SCREEN)
+  }, [merged, position])
 
   if (!enabled || onScreen.length === 0) return null
 

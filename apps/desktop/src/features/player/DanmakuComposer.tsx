@@ -3,6 +3,7 @@ import { reportActionError } from '../../shared/lib/actionError'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
 import { Icon } from '../../shared/ui/Icon'
+import { useSentDanmaku } from './sentDanmaku'
 
 /**
  * B 站播放器底部那条弹幕输入框。
@@ -21,6 +22,7 @@ export function DanmakuComposer({
 }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const append = useSentDanmaku((s) => s.append)
 
   const submit = async (): Promise<void> => {
     const value = text.trim()
@@ -28,6 +30,7 @@ export function DanmakuComposer({
     setBusy(true)
     try {
       await ipc.danmakuSend(trackKey, value, Math.max(0, Math.round(position)))
+      append(trackKey, { at: Math.max(0, Math.round(position)), text: value, color: 'var(--text-1)' })
       setText('')
       toastDone('弹幕已发出', `${Math.floor(position / 1000)} 秒处`)
       onSent?.()
