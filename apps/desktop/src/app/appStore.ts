@@ -24,6 +24,9 @@ type AppStore = {
   heroQuery: string | null
   /** 搜索页当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
   currentQuery: string
+  /** 搜索页上次用的分区与排序，切走再回来要恢复。 */
+  currentPartition: string
+  currentOrder: string
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
@@ -37,6 +40,7 @@ type AppStore = {
   focusSearch: () => void
   setHeroQuery: (q: string | null) => void
   setCurrentQuery: (q: string) => void
+  setSearchFilters: (partition: string, order: string) => void
   setAuthOpen: (open: boolean) => void
   setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
@@ -52,6 +56,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   searchFocus: 0,
   heroQuery: null,
   currentQuery: '',
+  currentPartition: '全部',
+  currentOrder: 'totalrank',
   authOpen: false,
   mv: null,
   stage: false,
@@ -64,6 +70,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
   setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
+  setSearchFilters: (partition, order) => set({ currentPartition: partition, currentOrder: order }),
   setAuthOpen: (open) => set({ authOpen: open }),
   setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),

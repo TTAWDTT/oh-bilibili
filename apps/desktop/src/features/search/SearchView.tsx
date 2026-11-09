@@ -22,28 +22,32 @@ type Status = 'idle' | 'loading' | 'ready' | 'error'
 
 
 export function SearchView() {
-  const [query, setQuery] = useState('')
+  const storeQuery = useAppStore((state) => state.currentQuery)
+  const [query, setQuery] = useState(storeQuery)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
   const [status, setStatus] = useState<Status>('idle')
-  const [partition, setPartition] = useState('全部')
-  const [order, setOrder] = useState<'totalrank' | 'click' | 'pubdate' | 'danmaku'>('totalrank')
+  const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
+  const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
   const history = useSearchHistory((s) => s.items)
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
   const heroQuery = useAppStore((state) => state.heroQuery)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
+  const setSearchFilters = useAppStore((state) => state.setSearchFilters)
   const authorQuery = useAppStore((state) => state.authorQuery)
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
 
-  // 把实际在搜的词同步给顶栏，避免输入框和结果各说各话。
+  // 把实际在搜的词与筛选条件同步给 store：
+  // 顶栏跟着它走，切走再回来也能恢复。
   useEffect(() => {
     setCurrentQuery(query)
-  }, [query, setCurrentQuery])
+    setSearchFilters(partition, order)
+  }, [query, partition, order, setCurrentQuery, setSearchFilters])
 
   // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
   useEffect(() => {
