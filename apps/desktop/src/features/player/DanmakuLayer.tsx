@@ -1,15 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { useDanmakuSettings } from './danmakuSettings'
 
+/** 一条弹幕：出现时刻（毫秒）、文本、颜色。 */
+type Item = { at: number; text: string; color: string }
+
+/** 弹幕在屏幕上停留的时长，和 B 站默认速度接近。 */
+const LIFE_MS = 9000
+/** 同时最多几条，超出的丢掉——真实弹幕池一秒钟可能几十条。 */
+const MAX_ON_SCREEN = 12
+
 /**
- * 弹幕层。取这条视频的真实弹幕，按固定节奏从右向左飘过。
+ * 弹幕层。按视频时间轴显示——第 30 秒的弹幕在第 30 秒出现，不是随机排队飘过。
  *
- * 这一层是 B 站的文化标识，不是装饰：文本来自视频本身。
- * 只取前 60 条，避免把接口当弹幕池用。
+ * 这一层是 B 站的文化标识，不是装饰：时刻与文本都来自这条视频的真实弹幕。
  */
-export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing: boolean }) {
-  const [lines, setLines] = useState<string[]>([])
+export function DanmakuLayer({ trackKey, position }: { trackKey: string; position: number }) {
+  const [items, setItems] = useState<Item[]>([])
   const enabled = useDanmakuSettings((s) => s.enabled)
   const opacity = useDanmakuSettings((s) => s.opacity)
   const size = useDanmakuSettings((s) => s.size)
@@ -17,40 +24,57 @@ export function DanmakuLayer({ trackKey, playing }: { trackKey: string; playing:
 
   useEffect(() => {
     let cancelled = false
+    setItems([])
     void ipc
-      .danmaku(trackKey)
+      .danmakuColored(trackKey)
       .then((list) => {
-        if (!cancelled) setLines(list)
+        if (cancelled) return
+        setItems(
+          list
+            .map(([secs, text, rgb]) => ({
+              at: Math.round(secs * 1000),
+              text,
+              // B 站默认白字，浅色底上换成深色；其余颜色是用户自己选的，原样保留。
+              color: rgb === 0xffffff ? 'var(--text-1)' : `#${rgb.toString(16).padStart(6, '0')}`,
+            }))
+            .sort((a, b) => a.at - b.at),
+        )
       })
-      .catch(() => setLines([]))
+      .catch(() => setItems([]))
     return () => {
       cancelled = true
     }
   }, [trackKey])
 
-  if (!enabled || lines.length === 0) return null
+  // 只取「已经开始、还没飘完」的那一段。位置一变就重算，弹幕于是跟着时间出现。
+  const onScreen = useMemo(() => {
+    if (items.length === 0) return []
+    const from = position - LIFE_MS
+    return items.filter((d) => d.at <= position && d.at > from).slice(0, MAX_ON_SCREEN)
+  }, [items, position])
+
+  if (!enabled || onScreen.length === 0) return null
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
-      {lines.slice(0, 18).map((text, i) => (
+      {onScreen.map((item, i) => (
         <span
-          key={`${i}-${text}`}
+          key={`${item.at}-${item.text}-${i}`}
           className="danmaku absolute whitespace-nowrap text-[14px]"
           style={{
             // 只占上半部：下半部是标题和歌词，弹幕压上去会读不清
-            top: `${5 + (i * 46) / Math.max(1, Math.min(lines.length, 12))}%`,
-            // 速度越大，动画时长越短
-            animationDuration: `${(11 + (i % 5) * 2) / speed}s`,
-            // 舞台是浅色底，白字会看不见；用深色 + 白色描边保证在任何封面上都读得清
-            color: 'var(--text-1)',
+            top: `${5 + (i * 44) / MAX_ON_SCREEN}%`,
+            // 已经飘了多久决定它现在到哪：位置越靠后，越接近左边缘
+            animationDuration: `${LIFE_MS / speed / 1000}s`,
+            animationDelay: `-${(position - item.at) / 1000}s`,
+            animationPlayState: 'paused',
+            color: item.color,
             textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
             opacity,
             fontSize: `${size}px`,
-            animationDelay: `${i * 0.9}s`,
-            animationPlayState: playing ? 'running' : 'paused',
           }}
         >
-          {text}
+          {item.text}
         </span>
       ))}
     </div>

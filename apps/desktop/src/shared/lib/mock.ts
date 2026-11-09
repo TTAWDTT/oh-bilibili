@@ -19,7 +19,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       await sleep(140)
       // 时长筛选：mock 的曲目都在 30 秒内，只做「10 分钟以下」这一档的语义
-      const dur = num(args, 'duration')
+      // duration 是可选参数，未选时传 null，不能走会抛错的 num()
+      const dur = typeof args.duration === 'number' ? args.duration : 0
       const matched = CATALOG.filter((track) => {
         const ms = track.duration_ms ?? 0
         if (dur === 1 && ms >= 600_000) return false
@@ -78,6 +79,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
+    case 'danmaku_colored': {
+      // 造 12 条带时间点的弹幕（第 1~24 秒），用来验证「按时间轴出现」。
+      const texts = [
+        '爷青回', '这段真的顶', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站',
+        '前奏一响 青春就回来了', '谁 2026 年还在听', '音量调大', '泪目',
+        '这个转场绝了', '单曲循环中', '干杯',
+      ]
+      return texts.map((text, i) => [1 + i * 2, text, i % 4 === 0 ? 0xff6699 : 0xffffff])
+    }
     case 'danmaku':
       return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']
     case 'library_playlists':

@@ -99,7 +99,7 @@ export function StageView() {
       <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--ga0)' }} />
       <div className="pointer-events-none absolute inset-0 bg-white/55" />
       <div className="bili-canvas pointer-events-none absolute inset-0 opacity-60" />
-      <DanmakuLayer trackKey={track.key} playing={snapshot?.phase === 'playing'} />
+      <DanmakuLayer trackKey={track.key} position={snapshot?.position_ms ?? 0} />
 
       <button
         type="button"
