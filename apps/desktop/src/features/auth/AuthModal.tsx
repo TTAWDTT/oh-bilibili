@@ -164,7 +164,7 @@ export function AuthModal() {
           </ol>
 
           {isTauri ? null : (
-            <div className="mt-4 flex items-start gap-2 border-t border-hairline pt-4 text-[12px] leading-relaxed text-[#9fe6ff]/70">
+            <div className="mt-4 flex items-start gap-2 border-t border-hairline pt-4 text-[12px] leading-relaxed text-[var(--accent)]">
               <Icon name="info" size={13} className="mt-[1px] shrink-0" />
               浏览器预览没有真实二维码：约 5 秒后自动确认登录，用来把状态机走完。
             </div>

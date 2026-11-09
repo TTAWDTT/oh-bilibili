@@ -29,7 +29,7 @@ export function EmptyState({ icon, title, detail, action, compact = false }: Emp
         <button
           type="button"
           onClick={action.onClick}
-          className="t press mt-5 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-white/45 hover:text-[var(--text-1)]"
+          className="t press mt-5 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--text-1)]"
         >
           {action.label}
         </button>

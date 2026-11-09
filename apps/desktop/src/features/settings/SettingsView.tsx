@@ -105,7 +105,7 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => void logout()}
-                  className="t press flex items-center justify-center flex shrink-0 items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[#ff6b8a]/40 hover:text-[#ff9bb0]"
+                  className="t press flex items-center justify-center flex shrink-0 items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--bili-pink)] hover:text-[var(--bili-pink)]"
                 >
                   <Icon name="logout" size={13} />
                   退出
@@ -166,7 +166,7 @@ export function SettingsView() {
               <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
             </div>
             {isTauri ? null : (
-              <div className="mt-4 flex items-start gap-2 text-[12px] leading-relaxed text-[#9fe6ff]/70">
+              <div className="mt-4 flex items-start gap-2 text-[12px] leading-relaxed text-[var(--accent)]">
                 <Icon name="info" size={13} className="mt-[2px] shrink-0" />
                 当前跑在浏览器预览：音源是 30 秒假音频，登录会在约 5 秒后自动成功。
               </div>

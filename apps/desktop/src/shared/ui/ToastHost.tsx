@@ -6,10 +6,10 @@ import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
 const TONE: Record<ToastTone, { icon: IconName; tint: string; edge: string }> = {
-  error: { icon: 'alert', tint: 'text-[#ff6b8a]', edge: 'border-[#ff6b8a]/22' },
-  warn: { icon: 'alert', tint: 'text-[#ffc46b]', edge: 'border-[#ffc46b]/22' },
-  info: { icon: 'info', tint: 'text-[#7bf0ff]', edge: 'border-[#7bf0ff]/22' },
-  success: { icon: 'check', tint: 'text-[#7bf0a0]', edge: 'border-[#7bf0a0]/22' },
+  error: { icon: 'alert', tint: 'text-[#e23a5e]', edge: 'border-[#e23a5e]/30' },
+  warn: { icon: 'alert', tint: 'text-[#c97a17]', edge: 'border-[#c97a17]/30' },
+  info: { icon: 'info', tint: 'text-[var(--accent)]', edge: 'border-[var(--accent)]/30' },
+  success: { icon: 'check', tint: 'text-[#1a9e57]', edge: 'border-[#1a9e57]/30' },
 }
 
 function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
@@ -21,7 +21,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
   const tone = TONE[toast.tone]
   return (
     <div
-      className={`toast-in pointer-events-auto flex items-start gap-2 rounded-[4px] border ${tone.edge} bg-[#0a0a10]/92 px-4 py-3 shadow-[0_18px_48px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
+      className={`toast-in pointer-events-auto flex items-start gap-2 rounded-[8px] border ${tone.edge} bg-[var(--panel)] px-4 py-3 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.28)]`}
       role="status"
     >
       <span className={`mt-[1px] shrink-0 ${tone.tint}`}>

@@ -24,7 +24,7 @@ export function DanmakuPanel() {
       </button>
 
       {open ? (
-        <div className="mt-2 w-56 rounded-[6px] border border-white/15 bg-black/75 p-3 text-white backdrop-blur">
+        <div className="mt-2 w-56 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 text-[var(--text-1)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
           <label className="flex items-center justify-between text-[14px]">
             显示弹幕
             <input

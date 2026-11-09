@@ -20,13 +20,13 @@ const STATUS: Record<QrStatus['state'], { title: string; detail: string; tone: s
   confirmed: {
     title: '登录成功',
     detail: '喜欢与收藏现在会同步到这个账号。',
-    tone: 'text-[#7bf0a0]',
+    tone: 'text-[#1a9e57]',
     icon: 'check',
   },
   expired: {
     title: '二维码已过期',
     detail: '链接已经失效，点下面的刷新重新生成一个。',
-    tone: 'text-[#ffc46b]',
+    tone: 'text-[#c97a17]',
     icon: 'refresh',
   },
 }
@@ -86,13 +86,13 @@ export function QrPanel({ state, url, svg }: QrPanelProps) {
             className="rounded-[4px] bg-white p-2"
           />
           {state === 'expired' ? (
-            <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/70 text-[14px] text-[var(--text-1)]">
+            <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-black/70 text-[14px] text-white">
               二维码已过期，点刷新重来
             </div>
           ) : null}
         </div>
       ) : (
-        <div className="selectable mt-4 break-all rounded-[4px] border border-[var(--line)] bg-black/30 px-3 py-2 font-mono text-[12px] leading-relaxed text-[var(--text-2)]">
+        <div className="selectable mt-4 break-all rounded-[4px] border border-[var(--line)] bg-[var(--ga1)] px-3 py-2 font-mono text-[12px] leading-relaxed text-[var(--text-2)]">
           {url}
         </div>
       )}
