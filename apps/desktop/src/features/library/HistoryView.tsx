@@ -1,3 +1,6 @@
+import { Icon } from '../../shared/ui/Icon'
+import { reportActionError } from '../../shared/lib/actionError'
+import { toastDone } from '../../app/notice'
 import { useEffect, useState } from 'react'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
@@ -32,6 +35,27 @@ export function HistoryView() {
   }, [])
 
   // 按自然日分组：今天 / 昨天 / 更早。B 站的历史就是这么分的。
+  /** 删掉一首歌的全部历史。 */
+  const removeOne = async (key: string): Promise<void> => {
+    try {
+      await ipc.historyDelete(key)
+      setEntries((prev) => (prev ?? []).filter((e) => e.track.key !== key))
+    } catch (e) {
+      reportActionError('删除记录', e)
+    }
+  }
+
+  /** 清空全部历史。 */
+  const clearAll = async (): Promise<void> => {
+    try {
+      await ipc.historyClear()
+      setEntries([])
+      toastDone('历史已清空')
+    } catch (e) {
+      reportActionError('清空历史', e)
+    }
+  }
+
   type Entry = import('../../shared/lib/ipc').HistoryEntry
   const groups = (() => {
     if (entries === null) return [] as { label: string; items: Entry[] }[]
@@ -70,6 +94,19 @@ export function HistoryView() {
 
   return (
     <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-[14px] text-[var(--text-3)]">
+          共 {entries.length} 条记录
+        </span>
+        <button
+          type="button"
+          onClick={() => void clearAll()}
+          className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--bili-pink)] hover:text-[var(--bili-pink)]"
+        >
+          清空历史
+        </button>
+      </div>
+
       {groups.map((group) => (
         <section key={group.label} className="mb-8">
           <div className="mb-3 flex items-baseline gap-2">
@@ -80,6 +117,17 @@ export function HistoryView() {
             tracks={group.items.map((e) => e.track)}
             activeKey={snapshot?.track?.key ?? null}
             playing={snapshot?.phase === 'playing'}
+            extraAction={(track) => (
+              <button
+                type="button"
+                aria-label={`删除 ${track.title} 的播放记录`}
+                title="删除这条记录"
+                onClick={() => void removeOne(track.key)}
+                className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            )}
           />
         </section>
       ))}

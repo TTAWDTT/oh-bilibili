@@ -278,6 +278,19 @@ struct HistoryEntryView {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn history_delete(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<(), WireError> {
+    engine.history_delete(&key)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn history_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError> {
+    engine.history_clear()
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn library_history_timed(
     engine: tauri::State<'_, Arc<Engine>>,
     limit: u32,
@@ -601,6 +614,8 @@ pub fn run() {
             queue_restore_progress,
             library_history,
             library_history_timed,
+            history_delete,
+            history_clear,
             library_playlists,
             library_create,
             library_add,

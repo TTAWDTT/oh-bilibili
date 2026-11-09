@@ -18,6 +18,9 @@ export type MockState = {
   favs: Set<string>
   playlists: MockPlaylist[]
   downloads: DownloadView[]
+  /** 被删掉的历史条目 key。 */
+  historyHidden: Set<string>
+  historyCleared: boolean
   auth: AuthSnapshot
   qr: { key: string; url: string; startedAt: number; expiresIn: number; confirmed: boolean } | null
 }
@@ -58,6 +61,8 @@ export const state: MockState = {
       path: null,
     },
   ],
+  historyHidden: new Set<string>(),
+  historyCleared: false,
   auth: { logged_in: false, user: null },
   qr: null,
 }

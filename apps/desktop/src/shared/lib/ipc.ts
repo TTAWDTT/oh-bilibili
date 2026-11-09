@@ -140,6 +140,16 @@ export function libraryHistoryTimed(limit: number): Promise<HistoryEntry[]> {
   return call<HistoryEntry[]>('library_history_timed', { limit })
 }
 
+/** 删掉某首歌的历史。 */
+export function historyDelete(key: string): Promise<null> {
+  return call<null>('history_delete', { key })
+}
+
+/** 清空历史。 */
+export function historyClear(): Promise<null> {
+  return call<null>('history_clear', {})
+}
+
 export function libraryHistory(limit: number): Promise<Track[]> {
   return call<Track[]>('library_history', { limit })
 }

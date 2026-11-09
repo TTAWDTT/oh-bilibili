@@ -369,6 +369,22 @@ impl Library {
         })
     }
 
+    /// 删掉某首歌的全部历史记录。
+    pub fn delete_history(&self, provider_key: &str) -> Result<usize> {
+        self.with(|conn| {
+            let n = conn.execute(
+                "DELETE FROM history WHERE track_id IN (SELECT id FROM tracks WHERE provider_key = ?1)",
+                params![provider_key],
+            )?;
+            Ok(n)
+        })
+    }
+
+    /// 清空全部历史。
+    pub fn clear_history(&self) -> Result<usize> {
+        self.with(|conn| Ok(conn.execute("DELETE FROM history", [])?))
+    }
+
     /// 带播放时间的历史。前端要按「今天 / 昨天 / 更早」分组，得知道每条什么时候播的。
     pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>> {
         self.with(|conn| {
@@ -735,6 +751,25 @@ mod tests {
         l.save_queue(r#"["BV1","BV2"]"#).unwrap();
         l.save_queue(r#"["BV3"]"#).unwrap();
         assert_eq!(l.load_queue().unwrap().as_deref(), Some(r#"["BV3"]"#));
+    }
+
+    #[test]
+    fn 历史可以删单条与清空() {
+        let l = lib();
+        let a = l.upsert_track(&track("BV1a")).unwrap();
+        let b = l.upsert_track(&track("BV1b")).unwrap();
+        l.push_history(a).unwrap();
+        l.push_history(b).unwrap();
+        l.push_history(a).unwrap();
+        assert_eq!(l.history(10).unwrap().len(), 3);
+
+        let key = track("BV1a").key.as_opaque().to_string();
+        let n = l.delete_history(&key).unwrap();
+        assert!(n >= 1, "BV1a 至少删掉一条，实际 {n}");
+        assert_eq!(l.history(10).unwrap().len(), 3 - n);
+
+        l.clear_history().unwrap();
+        assert_eq!(l.history(10).unwrap().len(), 0);
     }
 
     #[test]

@@ -68,13 +68,21 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = (page - 1) * size
       return CATALOG.slice(start, start + Math.min(size, CATALOG.length - start))
     }
+    case 'history_delete': {
+      const key = str(args, 'key')
+      state.historyHidden.add(key)
+      return null
+    }
+    case 'history_clear':
+      state.historyCleared = true
+      return null
     case 'library_history_timed': {
       // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
+      if (state.historyCleared) return []
       const now = Date.now()
-      return CATALOG.slice(0, 7).map((track, i) => ({
-        track,
-        played_at: now - i * 9.5 * 3600_000,
-      }))
+      return CATALOG.slice(0, 7)
+        .filter((t) => !state.historyHidden.has(t.key))
+        .map((track, i) => ({ track, played_at: now - i * 9.5 * 3600_000 }))
     }
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。

@@ -678,6 +678,20 @@ impl Engine {
         Ok(self.library.history(limit)?)
     }
 
+    /// 删掉某首歌的历史。
+    pub fn history_delete(&self, key: &str) -> Result<(), WireError> {
+        self.library.delete_history(key)?;
+        self.emit(AppEvent::LibraryChanged);
+        Ok(())
+    }
+
+    /// 清空历史。
+    pub fn history_clear(&self) -> Result<(), WireError> {
+        self.library.clear_history()?;
+        self.emit(AppEvent::LibraryChanged);
+        Ok(())
+    }
+
     /// 带播放时间的历史，用于按日期分组。
     pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>, WireError> {
         Ok(self.library.history_with_time(limit)?)
