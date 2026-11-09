@@ -2,12 +2,19 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * 时长格式化。一小时以内是 `m:ss`；超过一小时补成 `h:mm:ss`，
+ * 和 B 站一致——长视频显示成 `6435:51` 那种分钟数读不出长度。
+ */
 export function formatTime(ms: number): string {
   if (!Number.isFinite(ms)) return '0:00'
   const total = Math.max(0, Math.round(ms / 1000))
-  const minutes = Math.floor(total / 60)
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
   const seconds = total % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
+  const ss = String(seconds).padStart(2, '0')
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`
+  return `${minutes}:${ss}`
 }
 
 export function formatDuration(ms: number | null): string {
