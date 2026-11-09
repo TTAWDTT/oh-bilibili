@@ -32,6 +32,17 @@ const ICONS = {
       />
     </>
   ),
+  /** 拖拽柄：两列小圆点。 */
+  grip: (
+    <>
+      <circle cx="8" cy="5" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="10" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="15" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="13" cy="5" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="13" cy="10" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="13" cy="15" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
   /** 收藏：B 站是带星的书签。 */
   bookmarkStar: (
     <>

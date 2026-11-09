@@ -59,8 +59,8 @@ function QueueRow({
         ) : (
           <>
             <span className="num font-mono text-[12px] text-[var(--text-2)] group-hover:hidden">{index + 1}</span>
-            <span className="hidden cursor-grab text-[12px] text-[var(--text-3)] group-hover:block" aria-hidden>
-              ⠿
+            <span className="hidden cursor-grab text-[var(--text-3)] group-hover:block" aria-hidden>
+              <Icon name="grip" size={12} />
             </span>
           </>
         )}
