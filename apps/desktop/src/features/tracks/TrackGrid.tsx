@@ -1,10 +1,10 @@
 import { DownloadButton } from '../downloads/DownloadButton'
+import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { useState } from 'react'
 import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
-import { toWireError } from '../../shared/lib/errors'
-import { toastDone, toastFailure } from '../../app/notice'
+import { toastDone } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { formatDuration } from '../../shared/lib/format'
@@ -82,7 +82,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
       else await ipc.favSet(track.key, true)
       toastDone(kind === 'like' ? '已点赞' : '已收藏')
     } catch (e) {
-      toastFailure('三连', toWireError(e))
+      reportActionError('三连', e)
     }
   }
 
@@ -92,7 +92,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
       await ipc.watchLaterSet(track.key, true)
       toastDone('已加入稍后再看')
     } catch (e) {
-      toastFailure('稍后再看', toWireError(e))
+      reportActionError('稍后再看', e)
     }
   }
 
@@ -105,7 +105,7 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
       await ipc.coinAdd(track.key, 1, true)
       toastDone('已投 1 枚币并点赞')
     } catch (e) {
-      toastFailure('投币', toWireError(e))
+      reportActionError('投币', e)
     }
   }
 

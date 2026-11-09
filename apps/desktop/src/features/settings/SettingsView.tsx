@@ -39,6 +39,7 @@ function Chip({ label, value }: { label: string; value: string }) {
 
 export function SettingsView() {
   const auth = useAuthStore((state) => state.auth)
+  const loggedIn = auth?.logged_in === true
   const logout = useAuthStore((state) => state.logout)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const [health, setHealth] = useState<Health | null>(null)
@@ -133,14 +134,16 @@ export function SettingsView() {
             <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
               离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
             </p>
+            {/* 未登录时同步一定失败，别让按钮看起来可用。 */}
             <button
               type="button"
               onClick={() => void sync()}
-              disabled={syncing}
-              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--line)] hover:text-[var(--text-1)] disabled:cursor-default disabled:opacity-40"
+              disabled={syncing || !loggedIn}
+              title={loggedIn ? '把本地待推送的喜欢与收藏推到 B 站' : '登录后才能同步'}
+              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--text-1)]"
             >
               <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? '同步中…' : '立即同步'}
+              {syncing ? '同步中…' : loggedIn ? '立即同步' : '登录后才能同步'}
             </button>
           </Section>
 
