@@ -45,6 +45,8 @@ pub struct Engine {
     token: AtomicU64,
     volume: Mutex<f32>,
     speed: Mutex<f32>,
+    /// 恢复队列时要跳回的位置（毫秒）。0 表示从头开始。
+    resume_at_ms: Mutex<u64>,
     repeat: Mutex<String>,
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
@@ -79,6 +81,7 @@ impl Engine {
             token: AtomicU64::new(0),
             volume: Mutex::new(0.7),
             speed: Mutex::new(1.0),
+            resume_at_ms: Mutex::new(0),
             repeat: Mutex::new("off".into()),
             events,
             http: reqwest::Client::new(),
@@ -86,6 +89,7 @@ impl Engine {
             restoring: Mutex::new(None),
         });
         engine.restore_queue();
+        engine.start_progress_persist();
         Ok(engine)
     }
 
@@ -231,6 +235,16 @@ impl Engine {
 
         match self.fetch_and_load(key, token).await {
             Ok(prepared) => {
+                // 恢复上次退出时的进度（只对恢复出来的第一首生效）。
+                let resume = {
+                    let mut at = lock(&self.resume_at_ms);
+                    let v = *at;
+                    *at = 0;
+                    v
+                };
+                if resume > 0 {
+                    lock(&self.player).seek(resume);
+                }
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
                 drop(st);
@@ -416,7 +430,17 @@ impl Engine {
             let clock = player.clock();
             (clock.position_ms(), clock.sample_rate())
         };
-        let track = state.track().and_then(|k| lock(&self.known).get(k.as_opaque()).cloned());
+        // 空闲但没有在播曲目时（比如刚恢复队列），把队列里的当前项亮出来，
+        // 让用户看到「上次听的是这首、停在第几秒」，而不是一片空白。
+        let track = state
+            .track()
+            .and_then(|k| lock(&self.known).get(k.as_opaque()).cloned())
+            .or_else(|| {
+                if state.phase() != "idle" {
+                    return None;
+                }
+                lock(&self.queue).current().map(|entry| entry.track.clone())
+            });
         let quality = state.prepared().map(|p| p.quality.kbps());
         let _ = duration_ms;
         PlayerSnapshot {
@@ -433,16 +457,34 @@ impl Engine {
     }
 
     /// 把当前队列写成一行 JSON。队列是上下文，重启要能接上。
+    /// 播放中每 5 秒把进度写一次。放退出事件里存是不够的——窗口被强杀就没有退出事件。
+    fn start_progress_persist(self: &Arc<Self>) {
+        let engine = self.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            let snapshot = engine.snapshot();
+            if snapshot.phase == "playing" {
+                engine.persist_queue();
+            }
+        });
+    }
+
     fn persist_queue(&self) {
-        let keys: Vec<String> = lock(&self.queue)
-            .items()
-            .iter()
-            .map(|t| t.key.as_opaque().to_string())
-            .collect();
-        if keys.is_empty() {
+        let (tracks, index) = {
+            let queue = lock(&self.queue);
+            (queue.items(), queue.index())
+        };
+        if tracks.is_empty() {
             return;
         }
-        if let Ok(json) = serde_json::to_string(&keys) {
+        // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
+        // 进度也一起存，否则用户还得自己拖回去。
+        let snapshot = serde_json::json!({
+            "tracks": tracks,
+            "index": index,
+            "position_ms": self.snapshot().position_ms,
+        });
+        if let Ok(json) = serde_json::to_string(&snapshot) {
             let _ = self.library.save_queue(&json);
         }
     }
@@ -455,17 +497,56 @@ impl Engine {
         let Ok(Some(raw)) = self.library.load_queue() else {
             return;
         };
-        let Ok(keys): Result<Vec<String>, _> = serde_json::from_str(&raw) else {
-            return;
+        // 兼容旧格式：老版本存的是纯 key 数组。
+        let parsed: serde_json::Value = match serde_json::from_str(&raw) {
+            Ok(v) => v,
+            Err(_) => return,
         };
-        if keys.is_empty() {
+        let (keys, saved_index, saved_ms, saved_tracks): (
+            Vec<String>,
+            usize,
+            u64,
+            Vec<Track>,
+        ) = if parsed.is_array() {
+            match serde_json::from_value::<Vec<String>>(parsed) {
+                Ok(keys) => (keys, 0, 0, Vec::new()),
+                Err(_) => return,
+            }
+        } else {
+            let keys = parsed["keys"]
+                .as_array()
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or_default();
+            let tracks = serde_json::from_value::<Vec<Track>>(parsed["tracks"].clone())
+                .unwrap_or_default();
+            (
+                keys,
+                parsed["index"].as_u64().unwrap_or(0) as usize,
+                parsed["position_ms"].as_u64().unwrap_or(0),
+                tracks,
+            )
+        };
+        if keys.is_empty() && saved_tracks.is_empty() {
+            return;
+        }
+        if !saved_tracks.is_empty() {
+            // 新格式：曲目就在快照里，直接恢复，不用等网络。
+            for t in &saved_tracks {
+                self.remember(t);
+            }
+            let start = saved_index.min(saved_tracks.len().saturating_sub(1));
+            let mut q = lock(&self.queue);
+            *q = Queue::from_tracks(&saved_tracks, start);
+            *lock(&self.resume_at_ms) = saved_ms;
             return;
         }
         let tracks = self.tracks_for(&keys);
         if !tracks.is_empty() {
+            let start = saved_index.min(tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&tracks, 0);
+            *q = Queue::from_tracks(&tracks, start);
         }
+        *lock(&self.resume_at_ms) = saved_ms;
 
         // 有缺的就后台补，补完再整体替换队列。
         let already = tracks.len();

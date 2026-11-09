@@ -738,6 +738,15 @@ mod tests {
     }
 
     #[test]
+    fn 队列快照能带进度() {
+        let l = lib();
+        l.save_queue(r#"{"keys":["BV1"],"index":0,"position_ms":90362}"#).unwrap();
+        let raw = l.load_queue().unwrap().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(v["position_ms"], 90362);
+    }
+
+    #[test]
     fn 设置可以覆盖() {
         let l = lib();
         assert_eq!(l.get_setting("volume").unwrap(), None);
