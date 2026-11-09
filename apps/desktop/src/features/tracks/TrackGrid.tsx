@@ -1,3 +1,4 @@
+import { DownloadButton } from '../downloads/DownloadButton'
 import type React from 'react'
 import { useState } from 'react'
 import { copyText } from '../../shared/lib/clipboard'
@@ -265,6 +266,8 @@ export function TrackGrid({ tracks, activeKey, playing }: TrackGridProps) {
                 >
                   <Icon name="watchLater" size={12} />
                 </button>
+                <span className="h-2.5 w-px bg-[var(--line)]" />
+                <DownloadButton trackKey={track.key} size={12} />
               </span>
             </div>
 
