@@ -203,6 +203,16 @@ export function unfavFrom(key: string, folderId: number): Promise<null> {
   return call<null>('unfav_from', { key, folder_id: folderId })
 }
 
+/** 删掉一条已下载的音轨（连文件一起）。 */
+export function downloadRemove(key: string): Promise<DownloadView[]> {
+  return call<DownloadView[]>('download_remove', { key })
+}
+
+/** 在访达里定位这个文件。 */
+export function downloadReveal(key: string): Promise<null> {
+  return call<null>('download_reveal', { key })
+}
+
 /** 加入或移出稍后再看。 */
 export function watchLaterSet(key: string, on: boolean): Promise<null> {
   return call<null>('watch_later_set', { key, on })

@@ -196,6 +196,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       emit({ type: 'download', view: { ...view } })
       return { ...view }
     }
+    case 'download_remove': {
+      const key = str(args, 'key')
+      state.downloads = state.downloads.filter((d) => d.key !== key)
+      return state.downloads
+    }
+    case 'download_reveal':
+      return null
     case 'downloads_list':
       return state.downloads.map((item) => ({ ...item }))
     case 'sync_now':

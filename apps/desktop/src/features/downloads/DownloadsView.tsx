@@ -1,6 +1,8 @@
+import { reportActionError } from '../../shared/lib/actionError'
 import type { DownloadState } from '../../shared/lib/contract'
 import { copyText } from '../../shared/lib/clipboard'
 import { useAppStore } from '../../app/appStore'
+import * as ipc from '../../shared/lib/ipc'
 import { toastDone, toastFailure } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -24,6 +26,27 @@ async function copyPath(path: string): Promise<void> {
 export function DownloadsView() {
   const items = useDownloadsStore((state) => state.items)
   const navigate = useAppStore((state) => state.navigate)
+
+  /** 在访达里定位文件。 */
+  const reveal = async (key: string): Promise<void> => {
+    try {
+      await ipc.downloadReveal(key)
+    } catch (e) {
+      reportActionError('打开位置', e)
+    }
+  }
+
+  /** 删掉这条（连文件），成功后用返回的列表刷新。 */
+  const remove = async (key: string): Promise<void> => {
+    try {
+      // 删除后重新拉一次列表，保证界面与磁盘一致
+      await ipc.downloadRemove(key)
+      await useDownloadsStore.getState().load()
+      toastDone('已删除下载')
+    } catch (e) {
+      reportActionError('删除下载', e)
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -99,6 +122,28 @@ export function DownloadsView() {
                       <div className="mt-1.5 text-[12px] text-[var(--text-2)]">等待开始</div>
                     )}
                   </div>
+                  <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {item.state === 'done' ? (
+                      <button
+                        type="button"
+                        aria-label={`在访达中显示 ${item.title}`}
+                        title="在访达中显示"
+                        onClick={() => void reveal(item.key)}
+                        className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]"
+                      >
+                        <Icon name="library" size={13} />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label={`删除下载 ${item.title}`}
+                      title="删除这条下载"
+                      onClick={() => void remove(item.key)}
+                      className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--bili-pink)]"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </span>
                   <span className="flex w-16 shrink-0 justify-end">
                     {item.state === 'done' ? (
                       <span className="text-[#7bf0a0]">

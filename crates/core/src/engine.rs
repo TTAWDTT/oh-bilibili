@@ -932,6 +932,33 @@ impl Engine {
         self.auth()
     }
 
+    /// 删掉一条已下载的音轨：先删文件再从列表移除。
+    ///
+    /// 文件已经被用户手动删掉时仍然把列表项去掉——列表不该显示一个不存在的文件。
+    pub fn download_remove(&self, key: &str) -> Result<Vec<DownloadView>, WireError> {
+        let path = {
+            let list = lock(&self.downloads);
+            list.iter()
+                .find(|d| d.key == key)
+                .and_then(|d| d.path.clone())
+        };
+        if let Some(p) = path {
+            match std::fs::remove_file(&p) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(WireError::internal(format!("删不掉文件：{e}"))),
+            }
+        }
+        {
+            let mut list = lock(&self.downloads);
+            list.retain(|d| d.key != key);
+        }
+        self.emit(AppEvent::Download {
+            view: serde_json::json!({ "key": key, "state": "removed" }),
+        });
+        Ok(lock(&self.downloads).clone())
+    }
+
     pub fn downloads(&self) -> Vec<DownloadView> {
         lock(&self.downloads).clone()
     }

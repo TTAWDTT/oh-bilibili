@@ -8,6 +8,7 @@ mod mv;
 use std::sync::Arc;
 
 use bilimusic_core::engine::Engine;
+use bilimusic_core::engine::DownloadView;
 use bilimusic_core::lyrics::LyricDoc;
 use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, WireError};
 use bilimusic_model::{Track, TrackKey};
@@ -42,15 +43,6 @@ struct QrView {
 struct QrStatusView {
     state: String,
     auth: AuthSnapshot,
-}
-
-#[derive(Serialize)]
-struct DownloadView {
-    key: String,
-    title: String,
-    state: String,
-    progress: f32,
-    path: Option<String>,
 }
 
 /// MV 代理监听的端口，界面用它拼视频地址。
@@ -515,6 +507,34 @@ async fn auth_logout(engine: tauri::State<'_, Arc<Engine>>) -> Result<AuthSnapsh
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn download_remove(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<DownloadView>, WireError> {
+    engine.download_remove(&key)
+}
+
+/// 在系统文件管理器里定位这个文件。路径来自下载记录，不接受前端传任意路径。
+#[tauri::command(rename_all = "snake_case")]
+fn download_reveal(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<(), WireError> {
+    let path = engine
+        .downloads()
+        .into_iter()
+        .find(|d| d.key == key)
+        .and_then(|d| d.path)
+        .ok_or_else(|| WireError::input("key", "这条记录还没有落盘路径"))?;
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| WireError::internal(format!("打不开访达：{e}")))?;
+    Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
     engine
         .downloads()
@@ -636,6 +656,8 @@ pub fn run() {
             auth_poll,
             auth_logout,
             downloads_list,
+            download_remove,
+            download_reveal,
             download_enqueue,
             sync_now,
         ])
