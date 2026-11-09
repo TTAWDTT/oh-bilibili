@@ -28,11 +28,9 @@ function RailTabButton({ active, label, onClick }: { active: boolean; label: str
 }
 
 function TrackHeader({ track, quality, loading }: { track: Track; quality: number | null; loading: boolean }) {
-  // 播放中才转：暂停时静止，避免满屏都在动。
-  const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
   return (
     <div className="flex gap-4 px-5 py-4">
-      <div className="stage-cover shrink-0" data-playing={playing}>
+      <div className="shrink-0">
         <Cover
           cover={track.cover}
           title={track.title}
