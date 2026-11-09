@@ -28,22 +28,25 @@ type EmptyStateProps = {
 export function EmptyState({ icon, mascot, title, detail, action, compact = false }: EmptyStateProps) {
   return (
     <div className={compact ? 'flex flex-col items-center px-4 py-10 text-center' : 'flex flex-col items-center px-3 py-16 text-center'}>
-      {mascot ? (
-        <img
-          src={MASCOT_SRC[mascot]}
-          alt=""
-          aria-hidden
-          className="bili-mascot h-[88px] w-[88px] select-none object-contain"
-          draggable={false}
-        />
-      ) : icon === 'biliTv' ? (
+      {mascot ? null : icon === 'biliTv' ? (
         <span className="text-[var(--accent)]">
           <BiliTvArt />
         </span>
       ) : (
         <Icon name={icon} size={22} className="text-[var(--text-2)]" />
       )}
-      <h2 className="mt-3 text-[16px] font-medium text-[var(--text-1)]" title={title}>
+      <h2 className="mt-3 flex items-center justify-center gap-1.5 text-[16px] font-medium text-[var(--text-1)]" title={title}>
+        {mascot ? (
+          /* 这两张是 B 站的聊天表情，原生用法是 24–32px 挂在文字旁；
+             放大成主插图就会露出方底、压过整页的克制感。 */
+          <img
+            src={MASCOT_SRC[mascot]}
+            alt=""
+            aria-hidden
+            draggable={false}
+            className="h-[26px] w-[26px] shrink-0 select-none object-contain mix-blend-multiply"
+          />
+        ) : null}
         {title}
       </h2>
       <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-[var(--text-2)]">{detail}</p>

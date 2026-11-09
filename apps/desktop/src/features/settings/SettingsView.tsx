@@ -91,7 +91,7 @@ export function SettingsView() {
           <Section title="账号">
             {user ? (
               <div className="flex items-center gap-4">
-                <FramedAvatar src={user.avatar} alt={user.uname} size={104} />
+                <FramedAvatar src={user.avatar} alt={user.uname} size={56} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
                     {user.uname}
