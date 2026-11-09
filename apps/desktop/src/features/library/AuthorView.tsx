@@ -105,7 +105,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const views = tracks.reduce((sum, t) => sum + (t.views ?? 0), 0)
 
   return (
-    <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6">
+    <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <header className="mb-6 flex items-center gap-4">
         <Avatar src={avatar} alt={name} size={64} />
         <div className="min-w-0">

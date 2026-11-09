@@ -160,9 +160,13 @@ export function PlayerBar() {
 
       <div className="flex min-w-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
-        <LevelBars />
-        <SpeedButton />
-        <VolumeControl />
+        <span className="hidden md:block">
+          <LevelBars />
+        </span>
+        <span className="hidden items-center gap-2 md:flex">
+          <SpeedButton />
+          <VolumeControl />
+        </span>
         <span className="h-5 w-px bg-[var(--line)]" />
         <button
           type="button"

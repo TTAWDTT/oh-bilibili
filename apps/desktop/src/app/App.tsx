@@ -18,6 +18,7 @@ import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { ChannelBar } from './ChannelBar'
+import { MobileTabBar } from './MobileTabBar'
 import { DanmakuStrip } from './DanmakuStrip'
 import { BackToTop } from '../shared/ui/BackToTop'
 import { Sidebar } from './Sidebar'
@@ -111,18 +112,22 @@ export default function App() {
       </a>
       <StageGlow />
       <TitleBar />
-      <ChannelBar />
+      <div className="hidden md:contents">
+        <ChannelBar />
+      </div>
       <DanmakuStrip />
 
       <div className="relative z-10 flex min-h-0 flex-1">
-        <Sidebar />
+        <div className="hidden md:contents">
+          <Sidebar />
+        </div>
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           <div key={view.kind} className="bili-page h-full">
             <h1 className="sr-only">{viewTitle(view)}</h1>
             <CurrentView view={view} />
           </div>
         </main>
-        <div className="rail-slot" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
+        <div className="rail-slot hidden md:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
       </div>
@@ -130,6 +135,7 @@ export default function App() {
       <BackToTop targetId="scroll-main" />
       <PlayerBar />
       <StatusBar />
+      <MobileTabBar />
       <MvOverlay />
       <StageView />
       <ToastHost />

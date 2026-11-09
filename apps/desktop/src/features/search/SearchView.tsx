@@ -141,7 +141,7 @@ export function SearchView() {
             setPage((p) => p + 1)
           }
         }}
-        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-6"
+        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
       >
         {/* 搜索框在顶栏，这里只呈现结果。 */}
 
@@ -156,7 +156,7 @@ export function SearchView() {
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(word)}
-                    className="t text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                    className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
                   >
                     {word}
                   </button>
@@ -173,7 +173,7 @@ export function SearchView() {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pick(word)}
-                      className="t text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                      className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
                     >
                       {word}
                     </button>
@@ -215,7 +215,7 @@ export function SearchView() {
           </div>
         ) : (
           <section className="mt-6">
-            <div className="mb-2 flex min-h-5 items-center justify-between border-b border-hairline px-4 pb-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
+            <div className="mb-2 flex min-h-5 flex-wrap items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
               <span>
                 {status === 'error'
                   ? '搜索失败'

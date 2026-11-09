@@ -37,14 +37,14 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="relative z-20 flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-[var(--panel-alt)] pl-[80px] pr-3"
+      className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pl-[74px] pr-3 md:gap-4 md:pl-[80px]"
     >
       <div className="flex shrink-0 items-center gap-2">
         <span className="bili-tv-mark text-[var(--accent)]">
           <Icon name="biliTv" size={19} />
         </span>
         <span className="text-[16px] font-semibold tracking-tight text-[var(--accent)]">bilibili</span>
-        <span className="rounded-[3px] border border-hairline px-1.5 text-[12px] text-[var(--text-3)]">
+        <span className="hidden rounded-[3px] border border-hairline px-1.5 text-[12px] text-[var(--text-3)] md:inline">
           music
         </span>
       </div>
@@ -54,7 +54,7 @@ export function TitleBar() {
           e.preventDefault()
           submit()
         }}
-        className="bili-focus-scale flex h-9 max-w-[520px] flex-1 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3"
+        className="bili-focus-scale flex h-9 min-w-0 max-w-[520px] flex-1 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3"
       >
         <Icon name="search" size={15} className="shrink-0 text-[var(--text-3)]" />
         <input
