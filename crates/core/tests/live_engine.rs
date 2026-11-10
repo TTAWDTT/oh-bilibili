@@ -508,3 +508,30 @@ fn 听视频接的是正在看的那一条() {
         assert_eq!(snap.volume, 0.0);
     });
 }
+
+/// 进度上报要能通。这里直接调一次，不去等 20 秒的定时器。
+#[test]
+#[ignore = "真实网络"]
+fn 观看进度能上报() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-rp-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let result = engine.report_progress_public(&key, 42, now).await;
+        println!("上报结果: {:?}", result.as_ref().map(|_| "ok").map_err(|e| e.message()));
+        assert!(result.is_ok(), "登录态下上报应该成功");
+    });
+}

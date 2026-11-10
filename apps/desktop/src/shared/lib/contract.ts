@@ -58,8 +58,22 @@ export type PageRef = {
   duration_ms: number
 }
 
+export type WatchStats = {
+  views: number
+  danmaku: number
+  likes: number
+  coins: number
+  favorites: number
+  shares: number
+  replies: number
+}
+
 export type WatchView = {
   key: string
+  desc: string
+  owner: string
+  owner_mid: number | null
+  stats: WatchStats
   pages: PageRef[]
   current_page: number
   manifest_url: string

@@ -158,6 +158,18 @@ pub struct AuthSnapshot {
     pub user: Option<AuthUser>,
 }
 
+/// 观看页显示的统计。
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct WatchStats {
+    pub views: u64,
+    pub danmaku: u64,
+    pub likes: u64,
+    pub coins: u64,
+    pub favorites: u64,
+    pub shares: u64,
+    pub replies: u64,
+}
+
 /// 评论。领域类型定义在 bili crate 的解析边界旁，这里只做重导出，
 /// 免得同一份结构写两遍、改一处漏一处。
 pub use bilimusic_bili::comments::{Comment, CommentPage};
@@ -166,6 +178,13 @@ pub use bilimusic_bili::comments::{Comment, CommentPage};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchView {
     pub key: String,
+    /// 视频简介。
+    pub desc: String,
+    /// UP 主昵称与 uid。
+    pub owner: String,
+    pub owner_mid: Option<u64>,
+    /// 汇总统计。
+    pub stats: WatchStats,
     /// 分P 列表，单 P 视频只有一条。
     pub pages: Vec<bilimusic_bili::PageRef>,
     /// 当前在放的分P 序号（从 1 开始）。

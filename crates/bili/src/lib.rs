@@ -257,6 +257,19 @@ impl Source {
         self.client.relation_state(&key.as_opaque()).await
     }
 
+    /// 上报观看进度。未登录时返回 Err，调用方忽略即可。
+    pub async fn report_progress(
+        &self,
+        key: &TrackKey,
+        played_secs: u64,
+        start_ts: u64,
+    ) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        self.client
+            .report_progress(detail.aid, detail.cid, played_secs, start_ts)
+            .await
+    }
+
     /// UP 主名片（粉丝数、签名、认证）。
     pub async fn author_card(&self, mid: u64) -> Result<crate::sync::AuthorCard, BiliError> {
         self.client.author_card(mid).await

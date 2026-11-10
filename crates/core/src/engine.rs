@@ -99,6 +99,7 @@ impl Engine {
         });
         engine.restore_queue();
         engine.start_progress_persist();
+        engine.start_progress_report();
         engine.start_cookie_persist();
         engine.start_track_end_watch();
         Ok(engine)
@@ -353,6 +354,18 @@ impl Engine {
         let qualities = crate::dash_bridge::quality_list(&video);
         Ok(WatchView {
             key: key.as_opaque().to_string(),
+            desc: detail.meta.desc.clone(),
+            owner: detail.track.artist.clone(),
+            owner_mid: detail.track.up_mid,
+            stats: crate::wire::WatchStats {
+                views: detail.meta.views,
+                danmaku: detail.meta.danmaku,
+                likes: detail.meta.likes,
+                coins: detail.meta.coins,
+                favorites: detail.meta.favorites,
+                shares: detail.meta.shares,
+                replies: detail.meta.replies,
+            },
             pages: detail.pages.clone(),
             current_page: page_no,
             manifest_url,
@@ -404,6 +417,16 @@ impl Engine {
             self.seek(at);
         }
         Ok(self.snapshot())
+    }
+
+    /// 给测试与手动触发用的进度上报。
+    pub async fn report_progress_public(
+        &self,
+        key: &TrackKey,
+        played_secs: u64,
+        start_ts: u64,
+    ) -> Result<(), WireError> {
+        Ok(self.source.report_progress(key, played_secs, start_ts).await?)
     }
 
     /// 首页推荐。风控拒绝时返回空列表，界面显示「换一批」。
@@ -673,6 +696,47 @@ impl Engine {
                 engine.persist_queue();
             }
         });
+    }
+
+    /// 播放中每 20 秒向 B 站上报一次观看进度。
+    ///
+    /// 只有位置变了才报，避免暂停时反复发同样的数。未登录时直接跳过：
+    /// 这不是核心功能，失败也不该影响本地播放。
+    fn start_progress_report(self: &Arc<Self>) {
+        let engine = self.clone();
+        let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() else {
+            return;
+        };
+        std::thread::Builder::new()
+            .name("bilimusic-progress-report".into())
+            .spawn(move || {
+                let mut last_secs = u64::MAX;
+                let started = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(20));
+                    let snapshot = engine.snapshot();
+                    if snapshot.phase != "playing" {
+                        continue;
+                    }
+                    let secs = snapshot.position_ms / 1000;
+                    if secs == last_secs || secs == 0 {
+                        continue;
+                    }
+                    let Some(track) = snapshot.track else { continue };
+                    last_secs = secs;
+                    // 失败只记一条追迹，不重试也不打扰用户
+                    let result = rt.block_on(engine.source.report_progress(&track.key, secs, started));
+                    if result.is_err() {
+                        if std::env::var_os("BILIMUSIC_AUDIO_TRACE").is_some() {
+                            eprintln!("[progress] 上报失败（不影响播放）");
+                        }
+                    }
+                }
+            })
+            .ok();
     }
 
     /// cookie 变了就写盘。

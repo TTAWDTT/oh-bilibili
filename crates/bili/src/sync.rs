@@ -91,6 +91,37 @@ impl Client {
         Ok(())
     }
 
+    /// 上报观看进度，B 站网页端的「继续观看」靠它。
+    ///
+    /// 只有位置变了才值得上报，所以调用方负责去重；这里不做节流，
+    /// 免得「该报的时候被内部逻辑吞掉」这种难查的问题。
+    pub async fn report_progress(
+        &self,
+        aid: u64,
+        cid: u64,
+        played_secs: u64,
+        start_ts: u64,
+    ) -> Result<(), BiliError> {
+        let csrf = self
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        let body = vec![
+            ("aid", aid.to_string()),
+            ("cid", cid.to_string()),
+            ("played_time", played_secs.to_string()),
+            ("realtime", played_secs.to_string()),
+            ("start_ts", start_ts.to_string()),
+            ("type", "3".to_string()),
+            ("sub_type", "0".to_string()),
+            ("dt", "2".to_string()),
+            ("play_type", "0".to_string()),
+            ("csrf", csrf),
+        ];
+        self.post_form(&format!("{API}/x/click-interface/web/heartbeat"), body)
+            .await?;
+        Ok(())
+    }
+
     /// UP 主名片：粉丝数、签名、头像、认证。
     ///
     /// 走的是老接口 `x/web-interface/card`，它不要求登录也不要求 wbi；

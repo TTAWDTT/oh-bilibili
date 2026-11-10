@@ -3,7 +3,7 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { formatTime } from '../../shared/lib/format'
+import { formatCount, formatTime } from '../../shared/lib/format'
 import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
@@ -252,6 +252,25 @@ export function WatchView({ track }: { track: Track }) {
           <span className="ml-auto text-[12px] text-[var(--text-3)]">
             弹幕 {danmaku.length} 条
           </span>
+        </div>
+      ) : null}
+
+      {data ? (
+        <div className="border-t border-hairline px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--text-2)]">
+            <span className="font-medium text-[var(--text-1)]">{data.owner}</span>
+            <span className="num">{formatCount(data.stats.views)} 播放</span>
+            <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+            <span className="num">{formatCount(data.stats.likes)} 点赞</span>
+            <span className="num">{formatCount(data.stats.coins)} 投币</span>
+            <span className="num">{formatCount(data.stats.favorites)} 收藏</span>
+            <span className="num">{formatCount(data.stats.shares)} 分享</span>
+          </div>
+          {data.desc ? (
+            <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-[12px] leading-[1.5] text-[var(--text-3)]">
+              {data.desc}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
