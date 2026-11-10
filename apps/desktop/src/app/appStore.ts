@@ -38,7 +38,11 @@ type AppStore = {
   /** 搜索页要预填的作者名。点 UP 主时写入，搜索页消费后清空。 */
   authorQuery: string | null
   toasts: Toast[]
+  /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
+  history: View[]
   navigate: (view: View) => void
+  /** 回上一层；没有历史就回发现页。 */
+  goBack: () => void
   setRail: (tab: RailTab | null) => void
   toggleRail: (tab: RailTab) => void
   closeRail: () => void
@@ -55,6 +59,7 @@ type AppStore = {
 
 export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'home' },
+  history: [],
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,
@@ -68,7 +73,20 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   stage: false,
   authorQuery: null,
   toasts: [],
-  navigate: (view) => set({ view }),
+  navigate: (view) =>
+    set((state) => {
+      // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
+      if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
+        return {}
+      }
+      return { view, history: [...state.history, state.view].slice(-32) }
+    }),
+  goBack: () =>
+    set((state) => {
+      const prev = state.history.at(-1)
+      if (!prev) return { view: { kind: 'home' } }
+      return { view: prev, history: state.history.slice(0, -1) }
+    }),
   setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),

@@ -21,6 +21,7 @@ import { Icon } from '../../shared/ui/Icon'
  */
 export function WatchView({ track }: { track: Track }) {
   const navigate = useAppStore((s) => s.navigate)
+  const goBack = useAppStore((s) => s.goBack)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const [data, setData] = useState<WatchData | null>(null)
@@ -167,7 +168,7 @@ export function WatchView({ track }: { track: Track }) {
         <button
           type="button"
           aria-label="返回"
-          onClick={() => navigate({ kind: 'search' })}
+          onClick={() => goBack()}
           className="t press flex h-7 w-7 items-center justify-center rounded-[6px] hover:bg-[var(--panel-alt)]"
         >
           <Icon name="chevronLeft" size={16} />
@@ -180,7 +181,8 @@ export function WatchView({ track }: { track: Track }) {
             void ipc
               .setMode('listen', at, track.key)
               .then(() => {
-                navigate({ kind: 'search' })
+                // 切到「听」之后回上一层，用户回到刚才浏览的地方
+                goBack()
               })
               .catch(() => {
                 // 切不过去就留在观看页，不假装成功
