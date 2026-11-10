@@ -4,7 +4,7 @@ import { formatDuration } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import { Cover } from '../../shared/ui/Cover'
 import { Skeleton } from '../../shared/ui/Skeleton'
-import { usePlayerStore } from './playerStore'
+import { useAppStore } from '../../app/appStore'
 
 function formatCount(n: number): string {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
@@ -20,7 +20,8 @@ function formatCount(n: number): string {
  */
 export function RelatedList({ trackKey }: { trackKey: string }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
-  const play = usePlayerStore((state) => state.playContext)
+  // 相关推荐是「另一条视频」，点它应该打开那条的观看页，而不是接着播声音。
+  const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
     let cancelled = false
@@ -53,11 +54,11 @@ export function RelatedList({ trackKey }: { trackKey: string }) {
     <div className="border-t border-hairline">
       <div className="px-4 pb-1 pt-3 text-[12px] tracking-[0.14em] text-[var(--text-3)]">相关推荐</div>
       <ul>
-        {tracks.map((track, index) => (
+        {tracks.map((track) => (
           <li key={track.key}>
             <button
               type="button"
-              onClick={() => void play(tracks.map((t) => t.key), index)}
+              onClick={() => navigate({ kind: 'watch', track })}
               title={`${track.title} · ${track.artist}`}
               className="group flex w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-[var(--hover)]"
             >

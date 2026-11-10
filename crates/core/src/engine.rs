@@ -326,6 +326,9 @@ impl Engine {
         proxy_origin: &str,
         page: Option<u32>,
     ) -> Result<WatchView, WireError> {
+        // 打开观看页就是「看」模式：底部音频条按模式隐藏，
+        // 不会出现「没在听却挂着一条音频」。
+        *lock(&self.mode) = crate::wire::PlayMode::Watch;
         let detail = self.source.detail(key).await?;
         // 观看也把这一条设成队列当前项：否则切到「听」会接着放队列里上一首，
         // 用户看到的是 A 却听到 B。实测踩到过。

@@ -344,6 +344,7 @@ export function SearchView() {
 
             {tracks.length > 0 ? (
               <TrackGrid
+            open="watch"
                 tracks={tracks}
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}

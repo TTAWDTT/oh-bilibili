@@ -60,6 +60,7 @@ export function HomeView() {
 
       {items.length > 0 ? (
         <TrackGrid
+          open="watch"
           tracks={items}
           activeKey={activeKey}
           playing={playing}

@@ -24,6 +24,7 @@ const EMPTY_TIMES: number[] = []
 
 export function StageView() {
   const open = useAppStore((state) => state.stage)
+  const navigate = useAppStore((state) => state.navigate)
   const setStage = useAppStore((state) => state.setStage)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const toggle = usePlayerStore((state) => state.toggle)
@@ -185,7 +186,7 @@ export function StageView() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => void usePlayerStore.getState().play(item.key)}
+                onClick={() => navigate({ kind: 'watch', track: item })}
                 title={item.title}
                 className="group w-[132px] shrink-0 text-left"
               >

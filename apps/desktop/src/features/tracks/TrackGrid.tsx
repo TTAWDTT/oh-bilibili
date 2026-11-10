@@ -59,6 +59,12 @@ function partitionColor(name: string): string {
 
 type TrackGridProps = {
   tracks: Track[]
+  /**
+   * 点封面时做什么。这是「点内容」的唯一规则：
+   * 视频语境（发现、搜索、相关推荐）打开观看页，音乐语境（曲库、歌单、收藏）直接播。
+   * 之前封面一律直接播音频，于是刷视频时点封面只会听到声音、页面不动。
+   */
+  open?: 'watch' | 'play'
   activeKey: string | null
   playing: boolean
   /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
@@ -71,7 +77,7 @@ type TrackGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、时长压右下角、标题两行、UP 主一行灰字，hover 时标题变粉。
  */
-export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGridProps) {
+export function TrackGrid({ tracks, activeKey, playing, extraAction, open = 'play' }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const liked = useReactionStore((state) => state.liked)
@@ -148,8 +154,14 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
           >
             <button
               type="button"
-              onClick={() => void playContext(tracks.map((t) => t.key), index)}
-              aria-label={`播放 ${track.title}`}
+              onClick={() => {
+                if (open === 'watch') {
+                  navigate({ kind: 'watch', track })
+                  return
+                }
+                void playContext(tracks.map((t) => t.key), index)
+              }}
+              aria-label={open === 'watch' ? `观看 ${track.title}` : `播放 ${track.title}`}
               className="bili-press relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
               style={{ aspectRatio: '16 / 10' }}
             >
@@ -226,16 +238,29 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
               >
                 {track.key}
               </button>
-              <button
-                type="button"
-                aria-label={`看视频 ${track.title}`}
-                title="看视频"
-                onClick={() => navigate({ kind: 'watch', track })}
-                className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-              >
-                <Icon name="biliTv" size={11} />
-                看视频
-              </button>
+              {open === 'watch' ? (
+                <button
+                  type="button"
+                  aria-label={`听 ${track.title}`}
+                  title="只听声音"
+                  onClick={() => void playContext(tracks.map((t) => t.key), index)}
+                  className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                >
+                  <Icon name="play" size={11} />
+                  听
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`看视频 ${track.title}`}
+                  title="看视频"
+                  onClick={() => navigate({ kind: 'watch', track })}
+                  className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                >
+                  <Icon name="biliTv" size={11} />
+                  看视频
+                </button>
+              )}
             </div>
 
             <div className="mt-1.5 flex items-center justify-between gap-2 text-[14px] text-[var(--text-3)]">

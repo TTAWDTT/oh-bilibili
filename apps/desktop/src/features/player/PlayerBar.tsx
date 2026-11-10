@@ -143,6 +143,15 @@ export function PlayerBar() {
   const [adding, setAdding] = useState(false)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
   const track = snapshot?.track ?? null
+  const phase = snapshot?.phase ?? 'idle'
+  const mode = snapshot?.mode ?? 'listen'
+
+  // 播放条只在「真的在听」时出现。
+  //
+  // 之前判据是「快照里有曲目」，而队列会在启动时恢复，于是刷视频、看视频时
+  // 底部一直挂着一条无声的音频，看着像坏了。现在要求：听模式，且这次会话
+  // 真的在放（loading/playing/paused/ended 都算，idle 不算）。
+  if (mode !== 'listen' || phase === 'idle') return null
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
