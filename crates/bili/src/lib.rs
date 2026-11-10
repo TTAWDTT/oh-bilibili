@@ -3,6 +3,7 @@
 //! 出门只有领域类型：`Track`、`TrackDetail`、`AudioStream`。
 //! 这个 crate 之外的代码不会看到 bvid、cid、dash、fnval 这些词。
 
+pub mod dash;
 pub mod auth;
 pub mod client;
 pub mod media;

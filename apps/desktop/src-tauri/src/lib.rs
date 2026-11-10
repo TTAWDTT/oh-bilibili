@@ -112,13 +112,16 @@ async fn danmaku_heat(
         .await
 }
 
-/// 取一条可播放的 mp4 直链；界面会把它交给本地代理转发。
+/// 取一条可播放的 mp4。返回的是本机句柄地址，远端直链不出这一层。
 #[tauri::command(rename_all = "snake_case")]
 async fn mv_source(
     engine: tauri::State<'_, Arc<Engine>>,
+    port: tauri::State<'_, MvPort>,
     key: String,
 ) -> Result<String, WireError> {
-    engine.mv_url(&TrackKey::from_provider(key)).await
+    let remote = engine.mv_url(&TrackKey::from_provider(key)).await?;
+    let handle = engine.mint_stream(remote);
+    Ok(format!("http://127.0.0.1:{}/m/{}", port.0, handle))
 }
 
 #[tauri::command]
@@ -595,7 +598,7 @@ pub fn run() {
             let db_path = dir.join("library.sqlite");
 
             let engine = Engine::new(&db_path)?;
-            let mv_port = mv::spawn(engine.cookie_header())
+            let mv_port = mv::spawn(engine.cookie_header(), engine.clone())
                 .map_err(|e| format!("MV 代理起不来：{e}"))?;
             app.manage(MvPort(mv_port));
             app.manage(engine.clone());

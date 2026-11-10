@@ -197,7 +197,6 @@ pub async fn from_lrclib(http: &reqwest::Client, track: &Track) -> Option<LyricD
         return None;
     }
     let (tx, mut rx) = tokio::sync::mpsc::channel::<(usize, LyricDoc)>(keywords.len().max(1));
-    let total = keywords.len();
     for (priority, keyword) in keywords.into_iter().enumerate() {
         let client = http.clone();
         let tx = tx.clone();

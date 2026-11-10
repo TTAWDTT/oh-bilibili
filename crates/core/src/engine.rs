@@ -51,6 +51,8 @@ pub struct Engine {
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
     downloads: Mutex<Vec<DownloadView>>,
+    /// 本机代理的票据表。谁能被代理转发的唯一决定处。
+    tickets: crate::tickets::Tickets,
     /// 引擎启动时刻，用来给进度事件打时间戳。
     started_at: std::time::Instant,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
@@ -59,7 +61,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(db_path: &std::path::Path) -> Result<Arc<Engine>, WireError> {
-        let mut source = tauri_runtime::block_on_bili()?;
+        let source = tauri_runtime::block_on_bili()?;
         // 启动时把上次的登录态装回去，否则每次重开都要重新扫码。
         let cookie_file = db_path.with_file_name("cookies.json");
         if let Ok(raw) = std::fs::read_to_string(&cookie_file) {
@@ -89,6 +91,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
         });
         engine.restore_queue();
@@ -296,6 +299,16 @@ impl Engine {
                 Err(err)
             }
         }
+    }
+
+    /// 把一条远端地址换成不透明句柄。句柄是前端能拿到的唯一地址形态。
+    pub fn mint_stream(&self, url: impl Into<String>) -> String {
+        self.tickets.mint(url)
+    }
+
+    /// 代理兑换句柄。返回 None 就回 404。
+    pub fn redeem_stream(&self, handle: &str) -> Option<String> {
+        self.tickets.redeem(handle)
     }
 
     /// 这次加载还是不是当前那一次。

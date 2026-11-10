@@ -4,16 +4,21 @@
 //! Referer。所以视频字节必须由本机代理转发：它补上 Referer 与 Cookie，把 Range 原样
 //! 传下去，再把 206 响应流回 webview。
 //!
-//! 只允许转发 bilivideo.com 的地址，避免这个端口被当成任意代理。
+//! 只转发引擎铸过票的地址。前端拿到的是不透明句柄，既造不出远端地址，
+//! 也没法把这个端口当任意代理用。
 
+use bilimusic_core::engine::Engine;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 
 const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-fn allowed(url: &str) -> bool {
-    url.starts_with("https://") && url.contains("bilivideo.com")
+/// 从请求行里取出 `/m/<handle>` 的句柄。
+fn handle_of(request_line: &str) -> Option<&str> {
+    let path = request_line.split_whitespace().nth(1)?;
+    path.strip_prefix("/m/").filter(|h| !h.is_empty())
 }
 
 fn percent_decode(s: &str) -> String {
@@ -55,7 +60,7 @@ fn query(url: &str, key: &str) -> Option<String> {
         .map(percent_decode)
 }
 
-fn handle(mut stream: TcpStream, cookie: &str) -> std::io::Result<()> {
+fn handle(mut stream: TcpStream, cookie: &str, engine: &Engine) -> std::io::Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
@@ -75,15 +80,15 @@ fn handle(mut stream: TcpStream, cookie: &str) -> std::io::Result<()> {
         }
     }
 
-    // 只接受我们自己的路径，其他一律 404，避免成为通用代理。
-    let Some(target) = query(&request_line, "u") else {
+    // 只认 /m/<handle>。地址从票据表兑换，前端拿不到也造不出远端地址。
+    let Some(ticket) = handle_of(&request_line) else {
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return Ok(());
     };
-    if !allowed(&target) {
-        let _ = stream.write_all(b"HTTP/1.1 403 Forbidden\r\ncontent-length: 0\r\n\r\n");
+    let Some(target) = engine.redeem_stream(ticket) else {
+        let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n");
         return Ok(());
-    }
+    };
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -128,7 +133,7 @@ fn handle(mut stream: TcpStream, cookie: &str) -> std::io::Result<()> {
 }
 
 /// 在 127.0.0.1 的随机端口上起代理，返回端口号。
-pub fn spawn(cookie: String) -> std::io::Result<u16> {
+pub fn spawn(cookie: String, engine: Arc<Engine>) -> std::io::Result<u16> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
     std::thread::Builder::new()
@@ -136,8 +141,9 @@ pub fn spawn(cookie: String) -> std::io::Result<u16> {
         .spawn(move || {
             for stream in listener.incoming().flatten() {
                 let cookie = cookie.clone();
+                let engine = engine.clone();
                 std::thread::spawn(move || {
-                    let _ = handle(stream, &cookie);
+                    let _ = handle(stream, &cookie, &engine);
                 });
             }
         })?;
