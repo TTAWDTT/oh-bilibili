@@ -279,8 +279,8 @@ export function mvSource(key: string): Promise<string> {
 
 
 /** 切换看/听。从看到听时传画面当前位置。 */
-export function setMode(mode: PlayMode, atMs?: number): Promise<PlayerSnapshot> {
-  return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null })
+export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<PlayerSnapshot> {
+  return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
 /** 首页推荐。风控拒绝时返回空列表。 */

@@ -240,11 +240,11 @@ impl DriftPolicy {
 
 ## Open questions and risks
 
-shaka 在 Tauri 的 WKWebView 里表现如何。原型跑在 Chromium 上。这条要在第一件事就验，不通过就退回 `Picture::Progressive`，画质上限 720P。
+~~shaka 在 WKWebView 里能不能用~~ 已验证可用：真机播放 4K 与 1080P、切档不黑屏。
 
 首页推荐接口只测过一次调用。连续刷新会不会撞风控，还不确定。它不影响这个架构，但会影响发现页能不能做。
 
-1080p 的解码开销没测。若在高码率下掉帧，`Quality::P1080` 要设一个默认上限。
+1080p 的解码开销还没测。掉帧的话给 `VideoRate` 设默认上限。
 
 分P 的每个 P 有独立的 cid，弹幕也按 cid 分开。切换分P 时队列里的「当前项」该怎么算，是替换还是新增，需要你定一个说法。
 

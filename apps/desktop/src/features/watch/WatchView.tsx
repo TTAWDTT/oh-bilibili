@@ -160,7 +160,7 @@ export function WatchView({ track }: { track: Track }) {
           onClick={() => {
             const at = videoRef.current ? Math.round(videoRef.current.currentTime * 1000) : 0
             void ipc
-              .setMode('listen', at)
+              .setMode('listen', at, track.key)
               .then(() => {
                 navigate({ kind: 'search' })
               })

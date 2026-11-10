@@ -411,12 +411,12 @@ fn 切到听视频能接管并接上位置() {
         println!("准备阶段: {:?} 相位={}", prepared.as_ref().map(|_| "ok").map_err(|e| e.message()), engine.snapshot().phase);
         std::thread::sleep(std::time::Duration::from_millis(900));
         println!("播放 0.9 秒后位置 {}ms（音量 {}）", engine.snapshot().position_ms, engine.snapshot().volume);
-        engine.set_mode(bilimusic_core::wire::PlayMode::Watch, None).await.expect("切到看");
+        engine.set_mode(bilimusic_core::wire::PlayMode::Watch, None, None).await.expect("切到看");
         assert_eq!(engine.snapshot().mode, bilimusic_core::wire::PlayMode::Watch);
 
         // 从「看到第 40 秒」切到听
         let snap = engine
-            .set_mode(bilimusic_core::wire::PlayMode::Listen, Some(40_000))
+            .set_mode(bilimusic_core::wire::PlayMode::Listen, Some(40_000), None)
             .await
             .expect("切到听");
         println!("模式={:?} 相位={} 位置={}ms 音量={}", snap.mode, snap.phase, snap.position_ms, snap.volume);
@@ -443,5 +443,68 @@ fn 切到听视频能接管并接上位置() {
         println!("3 秒后位置 {}ms（音量 {}）", later.position_ms, later.volume);
         assert!(later.position_ms > landed + 2_000, "位置应该继续前进");
         assert_eq!(later.volume, 0.0, "音量必须是 0，整条链路静音");
+    });
+}
+
+/// 看过 A 之后切「听」，必须接着放 A，而不是队列里上一条。
+///
+/// 真机上踩到过：观看页没把视频设为队列当前项，切过去听到的是上一首。
+/// 音量置 0，整条链路静音。
+#[test]
+#[ignore = "真实网络；音量 0 所以无声"]
+fn 听视频接的是正在看的那一条() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-focus-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    engine.set_volume(0.0);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let first = tracks.first().expect("至少一条").key.clone();
+        let second = tracks.get(1).expect("至少两条").key.clone();
+        assert_ne!(first.as_opaque(), second.as_opaque());
+
+        // 先听第一条，让队列里有东西
+        let keys: Vec<String> = vec![second.as_opaque().to_string()];
+        engine.play_context(&keys, 0).await.ok();
+        println!("队列当前: {:?}", engine.snapshot().track.map(|t| t.key.as_opaque().to_string()));
+
+        // 再看第一条，然后切听
+        let view = engine.open_watch(&first, "http://127.0.0.1:9").await.expect("打开观看页");
+        println!("观看: {} 时长 {}ms", view.key, view.duration_ms);
+        let snap = engine
+            .set_mode(bilimusic_core::wire::PlayMode::Listen, Some(5_000), Some(&first))
+            .await
+            .expect("切到听");
+
+        // 等加载完成后看当前曲目
+        println!(
+            "set_mode 返回: 曲目 {:?} 相位 {}",
+            snap.track.as_ref().map(|t| t.key.as_opaque().to_string()),
+            snap.phase
+        );
+        // 加载期间快照里仍是旧曲目，所以要等到真的换成目标那条，
+        // 不能「非空就跳出」——那是测试自己的错，不是产品的问题。
+        let mut current = String::new();
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            current = engine
+                .snapshot()
+                .track
+                .map(|t| t.key.as_opaque().to_string())
+                .unwrap_or_default();
+            if current == first.as_opaque() {
+                break;
+            }
+        }
+        println!("切听之后在放: {current}（期望 {}）音量 {}", first.as_opaque(), snap.volume);
+        assert_eq!(current, first.as_opaque(), "应该接正在看的那一条");
+        assert_eq!(snap.volume, 0.0);
     });
 }

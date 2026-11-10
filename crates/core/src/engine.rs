@@ -326,6 +326,17 @@ impl Engine {
         page: Option<u32>,
     ) -> Result<WatchView, WireError> {
         let detail = self.source.detail(key).await?;
+        // 观看也把这一条设成队列当前项：否则切到「听」会接着放队列里上一首，
+        // 用户看到的是 A 却听到 B。实测踩到过。
+        // jump_by_key 只在条目已存在时有效，所以不存在要先插进去。
+        lock(&self.known).insert(key.as_opaque().to_string(), detail.track.clone());
+        {
+            let mut queue = lock(&self.queue);
+            if !queue.jump_by_key(key) {
+                queue.push_back(detail.track.clone());
+                queue.jump_by_key(key);
+            }
+        }
         let current = page
             .and_then(|no| detail.pages.iter().find(|p| p.no == no))
             .or_else(|| detail.pages.first());
@@ -359,20 +370,31 @@ impl Engine {
         self: &Arc<Self>,
         mode: crate::wire::PlayMode,
         at_ms: Option<u64>,
+        key: Option<&TrackKey>,
     ) -> Result<PlayerSnapshot, WireError> {
         *lock(&self.mode) = mode;
         if mode == crate::wire::PlayMode::Watch {
             return Ok(self.snapshot());
         }
-        // 听：只要没有音频在放，就从画面当前位置接上。
-        // 只看 idle 不够：上一次加载失败会停在 faulted，那时也该重新接管。
-        let needs_load = matches!(lock(&self.state).phase(), "idle" | "faulted" | "ended");
+
+        // 要听哪一条：调用方给了就用它，否则用队列当前项。
+        // 只看「有没有在放」不够——正在放 A 却要看 B 的时候，
+        // 那样会继续放 A，用户看到 B 听到 A。实测踩到过。
+        // 比的是「实际加载的那一条」，不是队列当前项：观看时队列当前项
+        // 已经被改成目标了，拿它比会得出「不用加载」，结果继续放旧的。
+        let loaded = self.snapshot().track.map(|t| t.key);
+        let target = key.cloned().or_else(|| lock(&self.queue).current().map(|e| e.track.key.clone()));
+        let needs_load = match (&target, &loaded) {
+            (Some(t), Some(l)) => t != l,
+            (Some(_), None) => true,
+            (None, _) => false,
+        } || matches!(lock(&self.state).phase(), "idle" | "faulted" | "ended");
+
         if needs_load {
-            let key = lock(&self.queue)
-                .current()
-                .map(|e| e.track.key.clone())
-                .ok_or_else(|| WireError::input("queue", "队列是空的"))?;
-            let snapshot = self.play_key(&key).await?;
+            let Some(t) = target else {
+                return Err(WireError::input("queue", "队列是空的"));
+            };
+            let snapshot = self.play_key(&t).await?;
             if let Some(at) = at_ms.filter(|v| *v > 0) {
                 self.seek(at);
             }

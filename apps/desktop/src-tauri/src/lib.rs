@@ -118,8 +118,10 @@ async fn set_mode(
     engine: tauri::State<'_, Arc<Engine>>,
     mode: bilimusic_core::wire::PlayMode,
     at_ms: Option<u64>,
+    key: Option<String>,
 ) -> Result<PlayerSnapshot, WireError> {
-    engine.set_mode(mode, at_ms).await
+    let target = key.map(TrackKey::from_provider);
+    engine.set_mode(mode, at_ms, target.as_ref()).await
 }
 
 /// 首页推荐。
