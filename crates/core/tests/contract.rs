@@ -146,6 +146,7 @@ fn 事件类型标签_ts_联合里有() {
             position_ms: 0,
             duration_ms: 0,
             level: 0.0,
+            sent_at_ms: 0,
         },
         AppEvent::NowPlaying {
             track: sample_track(),

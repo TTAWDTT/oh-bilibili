@@ -10,6 +10,9 @@ let ticket = 0
 let initPromise: Promise<void> | null = null
 
 type PlayerStore = {
+  /** 轻量进度切片：只有明确订阅它的组件才会因进度变化重渲染。 */
+  progress: { position_ms: number; duration_ms: number }
+  setProgress: (p: { position_ms: number; duration_ms: number }) => void
   snapshot: PlayerSnapshot | null
   queue: QueueView | null
   init: () => Promise<void>
@@ -27,7 +30,7 @@ type PlayerStore = {
   moveInQueue: (from: string, to: string) => Promise<void>
   removeFromQueue: (key: string) => Promise<void>
   clearQueue: () => Promise<void>
-  applyProgress: (positionMs: number, durationMs: number, level?: number) => void
+  applyProgress: (positionMs: number, durationMs: number, level?: number, sentAtMs?: number) => void
   applyTrack: (track: Track) => void
   applyBuffering: (track: Track) => void
   applyStopped: () => void
@@ -59,6 +62,8 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
 
   return {
     snapshot: null,
+  progress: { position_ms: 0, duration_ms: 0 },
+  setProgress: (p) => set({ progress: p }),
     queue: null,
     init: () => {
       if (initPromise) return initPromise
@@ -150,11 +155,14 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
         // 同上
       }
     },
-    applyProgress: (positionMs, durationMs, level = 0) => {
+    applyProgress: (positionMs, durationMs, level = 0, sentAtMs) => {
       const current = get().snapshot
       if (!current) return
       setLevel(level)
-      apply({ ...current, position_ms: positionMs, duration_ms: durationMs })
+      // 位置只放在 anchor 里，不写回 snapshot：写回会让所有订阅 snapshot 的
+      // 组件每秒重渲染 5 次，而它们真正需要的只有「当前是第几行」。
+      syncPlayhead(positionMs, current.phase === 'playing', durationMs, sentAtMs)
+      set({ progress: { position_ms: positionMs, duration_ms: durationMs } })
     },
     applyTrack: (track) => {
       const current = get().snapshot

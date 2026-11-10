@@ -51,6 +51,8 @@ pub struct Engine {
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
     downloads: Mutex<Vec<DownloadView>>,
+    /// 引擎启动时刻，用来给进度事件打时间戳。
+    started_at: std::time::Instant,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
 }
@@ -87,6 +89,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            started_at: std::time::Instant::now(),
         });
         engine.restore_queue();
         engine.start_progress_persist();
@@ -103,6 +106,7 @@ impl Engine {
                 position_ms: snap.position_ms,
                 duration_ms: snap.duration_ms,
                 level: lock(&self.player).clock().level(),
+                sent_at_ms: self.started_at.elapsed().as_millis() as u64,
             });
         }
     }

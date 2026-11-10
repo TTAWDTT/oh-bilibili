@@ -187,60 +187,40 @@ pub fn from_local(track: &Track) -> Option<LyricDoc> {
 }
 
 pub async fn from_lrclib(http: &reqwest::Client, track: &Track) -> Option<LyricDoc> {
-    // 用搜索而不是精确匹配：B 站投稿的「歌手」是 UP 主，拿去做精确查询必然落空。
+    // 候选词全部并发打出去，「谁先带着时间轴回来就用谁」。
     //
-    // 候选词并发打出去，取第一个带时间轴的结果。串行试的时候最坏要等 6 次
-    // 请求的时间（实测 3~5 秒），并发之后只等最快的那一个。
+    // 早先按候选顺序 await：第一条慢就得干等它（实测被限流时 3 秒），
+    // 明明第三条 300ms 就有结果。现在用 channel 收第一个成功的。
     let keywords = lyric_queries(&track.title);
     if keywords.is_empty() {
         return None;
     }
-
-    // 先只打最具体的那一条（「歌手 歌名」那种）。绝大多数情况它就命中，
-    // 一条请求 300~600ms 就够；只有它落空才把其余候选并发出去，
-    // 免得每次都并发六条被 lrclib 限流。
-    if let Some(hit) = query_lrclib(http, &keywords[0]).await {
-        return Some(hit_to_doc(hit)?);
-    }
-
-    let rest: Vec<String> = keywords.into_iter().skip(1).collect();
-    let mut tasks = Vec::with_capacity(rest.len());
-    for keyword in rest {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<LyricDoc>(keywords.len().max(1));
+    let total = keywords.len();
+    for keyword in keywords {
         let client = http.clone();
-        tasks.push(tokio::spawn(async move {
-            let url = format!("https://lrclib.net/api/search?q={}", urlencode(&keyword));
-            // 单条最多等 3 秒：lrclib 被限流时可能几十秒才回，
-            // 实测出现过一次 45 秒，不能让它把整首歌的等待拖住。
-            let fut = async {
-                let resp = client
-                    .get(url)
-                    .header("User-Agent", "BiliMusic/0.1 (https://github.com/bilimusic)")
-                    .send()
-                    .await
-                    .ok()?
-                    .error_for_status()
-                    .ok()?;
-                resp.json::<Vec<LrclibHit>>().await.ok()
-            };
-            let list = tokio::time::timeout(std::time::Duration::from_secs(3), fut)
-                .await
-                .ok()??;
-            list.into_iter().find(|h| h.synced_lyrics.is_some())
-        }));
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            if let Some(hit) = query_lrclib(&client, &keyword).await {
+                if let Some(doc) = hit_to_doc(hit) {
+                    let _ = tx.send(doc).await;
+                }
+            }
+        });
     }
-    // 按候选词顺序收集结果，先发出的优先
-    let mut best: Option<LrclibHit> = None;
-    for task in tasks {
-        if let Ok(Some(hit)) = task.await {
-            best = Some(hit);
-            break;
+    drop(tx);
+    // 收到第一个就返回；全失败则等到 channel 关闭
+    for _ in 0..total {
+        match rx.recv().await {
+            Some(doc) => return Some(doc),
+            None => break,
         }
     }
-    let hit = best?;
-    hit_to_doc(hit)
+    None
 }
 
-/// 一条查询 + 3 秒超时。
+/// 一条查询 + 2 秒超时。健康的 lrclib 200~600ms 就回；
+/// 被限流时要早放手，别把整首歌的等待拖长。
 async fn query_lrclib(http: &reqwest::Client, keyword: &str) -> Option<LrclibHit> {
     let client = http.clone();
     let url = format!("https://lrclib.net/api/search?q={}", urlencode(keyword));
@@ -256,7 +236,7 @@ async fn query_lrclib(http: &reqwest::Client, keyword: &str) -> Option<LrclibHit
         let list: Vec<LrclibHit> = resp.json().await.ok()?;
         list.into_iter().find(|h| h.synced_lyrics.is_some())
     };
-    tokio::time::timeout(std::time::Duration::from_secs(3), fut)
+    tokio::time::timeout(std::time::Duration::from_millis(2000), fut)
         .await
         .ok()
         .flatten()

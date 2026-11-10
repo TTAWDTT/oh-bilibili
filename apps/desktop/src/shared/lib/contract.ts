@@ -94,7 +94,14 @@ export type WireError = {
 export type SearchPage = { tracks: Track[]; page: number }
 
 export type AppEvent =
-  | { type: 'progress'; position_ms: number; duration_ms: number; level: number }
+  | {
+      type: 'progress'
+      position_ms: number
+      duration_ms: number
+      level: number
+      /** 采样时刻（引擎单调毫秒），用来校正 IPC 延迟。 */
+      sent_at_ms?: number
+    }
   | { type: 'now_playing'; track: Track; index: number | null }
   | { type: 'buffering'; track: Track }
   | { type: 'stopped' }

@@ -323,9 +323,12 @@ impl Source {
     /// B 站字幕。作为歌词的第三级来源：视频没挂字幕就返回空。
     pub async fn subtitles(&self, key: &TrackKey) -> Result<Vec<(u64, String)>, BiliError> {
         let detail = self.detail(key).await?;
+        // 字幕属于播放链路（歌词要用），走播放专用闸门：
+        // 通用闸门是全局串行的，会被弹幕、相关推荐这些后台请求堵住，
+        // 实测歌词因此拖到 8.9 秒。
         let value = self
             .client
-            .signed_get(
+            .signed_get_play(
                 &format!("{}/x/player/wbi/v2", client::API),
                 vec![
                     ("bvid", key.as_opaque().to_string()),
@@ -350,9 +353,11 @@ impl Source {
         } else {
             url.to_string()
         };
+        // 字幕正文在 CDN 上（aisubtitle.hdslb.com），是静态 JSON，
+        // 不该和 B 站接口挤同一条串行闸门——实测被挤到 6 秒。
         let body = self
             .client
-            .get_json(&absolute, std::time::Duration::from_millis(200))
+            .get_json(&absolute, std::time::Duration::ZERO)
             .await?;
         Ok(wire::subtitle_lines(&body))
     }

@@ -21,7 +21,7 @@ export function useBootstrap(): void {
       const player = usePlayerStore.getState()
       switch (event.type) {
         case 'progress':
-          player.applyProgress(event.position_ms, event.duration_ms, event.level)
+          player.applyProgress(event.position_ms, event.duration_ms, event.level, event.sent_at_ms)
           break
         case 'now_playing':
           player.applyTrack(event.track)
