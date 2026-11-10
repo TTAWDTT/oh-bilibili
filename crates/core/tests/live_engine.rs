@@ -618,3 +618,46 @@ fn 稍后再看能写入也能移除() {
         }
     });
 }
+
+/// 收藏的往返，结束时恢复原状。
+///
+/// 投币不可逆（会真花掉硬币），所以不在这里验；这条只覆盖可逆的收藏。
+#[test]
+#[ignore = "真实网络；结束时恢复"]
+fn 收藏能写入也能取消() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-fav-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        let original = fav_state(&engine, &key).await;
+        println!("目标 {} 原始收藏状态={original}", key.as_opaque());
+
+        let flipped = !original;
+        engine.fav_set(&key, flipped, None).await.expect("写入收藏");
+        let after = fav_state(&engine, &key).await;
+        println!("改成 {flipped} 之后={after}");
+        assert_eq!(after, flipped, "服务端应该跟上");
+
+        engine.fav_set(&key, original, None).await.expect("恢复收藏");
+        let restored = fav_state(&engine, &key).await;
+        println!("恢复成 {original} 之后={restored}");
+        assert_eq!(restored, original, "必须恢复原状");
+    });
+}
+
+async fn fav_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::TrackKey) -> bool {
+    let rows = engine
+        .relation_states(vec![key.as_opaque().to_string()])
+        .await
+        .expect("查状态");
+    rows[0].2
+}
