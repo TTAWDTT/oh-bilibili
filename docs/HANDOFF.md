@@ -127,3 +127,18 @@ model  ← bili / store / audio
 
 见 `apps/desktop/src/styles.css` 顶部的注释：纯中性灰阶、密集排版、单一强调色。
 B 站化之后的色值：底 `#f6f7f8`、面板 `#fff`、线 `#e3e5e7`、主色 `#fb7299`。
+
+## 已知限制：取消点赞不可用
+
+实测结论，不是猜测。
+
+| 操作 | 接口返回 | 结论 |
+|---|---|---|
+| 点赞（like=1） | `code 0`，relation 变 True | 可用 |
+| 取消点赞（like=0） | `-400 请求错误` | 不可用 |
+
+试过并全部失败的写法：form 编码、JSON、加 `type`/`oper`/`mobi_app`/`platform`、带 `bvid`、WBI 签名（`w_rid`+`wts`）、`/archive/like/cancel`、`/archive/unlike`。
+
+不是 csrf 的问题：同一条 `bili_jct` 打评论接口能通过校验（返回「不可发送空白内容」而不是「CSRF 校验失败」）。也不是通用写路径坏了：稍后再看的加入与移除都返回 `code 0`。
+
+所以界面上的「取消点赞」现在会失败。`reactionStore.toggleLike` 已改成先请求成功再改本地状态，失败会弹提示，不会假装点亮。

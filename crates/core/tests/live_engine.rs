@@ -586,3 +586,36 @@ fn 点赞能写入也能取消() {
         assert!(!after, "取消之后服务端应该记为未点赞");
     });
 }
+
+/// 稍后再看的往返：加进去，再拿出来。写路径是否可用，用这条可逆的操作判定。
+#[test]
+#[ignore = "真实网络；结束时恢复"]
+fn 稍后再看能写入也能移除() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-wl-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        println!("目标 {}", key.as_opaque());
+        match engine.watch_later_set(&key, true).await {
+            Ok(()) => println!("加入稍后再看: ok"),
+            Err(e) => {
+                println!("加入失败: {}", e.message());
+                panic!("写路径不可用");
+            }
+        }
+        // 立刻移除，保持账号状态不变
+        match engine.watch_later_set(&key, false).await {
+            Ok(()) => println!("移出稍后再看: ok"),
+            Err(e) => panic!("移出失败，账号可能被弄脏: {}", e.message()),
+        }
+    });
+}
