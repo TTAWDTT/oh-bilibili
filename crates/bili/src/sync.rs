@@ -25,6 +25,19 @@ pub struct AuthorCard {
     pub likes: u64,
 }
 
+/// 把 `03:45` / `1:02:03` 解析成毫秒。UP 主投稿列表里时长是字符串。
+fn parse_mmss(text: &str) -> Option<u64> {
+    let parts: Vec<&str> = text.split(':').collect();
+    let nums: Option<Vec<u64>> = parts.iter().map(|p| p.parse::<u64>().ok()).collect();
+    let nums = nums?;
+    let secs = match nums.as_slice() {
+        [m, s] => m * 60 + s,
+        [h, m, s] => h * 3600 + m * 60 + s,
+        _ => return None,
+    };
+    Some(secs * 1000)
+}
+
 /// 我关注的一个 UP 主。
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Followed {
@@ -259,6 +272,76 @@ impl Client {
             return Ok(Vec::new());
         };
         Ok(list.iter().filter_map(|i| i["aid"].as_u64()).collect())
+    }
+
+    /// UP 主的投稿列表。
+    ///
+    /// 走 `space/wbi/arc/search`，**必须 WBI 签名**：不签名会返回 `-403 访问权限不足`，
+    /// 而不走 wbi 的老接口 `space/arc/search` 会一直 `-799` 限流。
+    pub async fn space_videos(
+        &self,
+        mid: u64,
+        page: u32,
+    ) -> Result<(Vec<bilimusic_model::Track>, u32), BiliError> {
+        use bilimusic_model::{Millis, Track, TrackKey};
+
+        let v = self
+            .signed_get(
+                &format!("{API}/x/space/wbi/arc/search"),
+                vec![
+                    ("mid", mid.to_string()),
+                    ("pn", page.max(1).to_string()),
+                    ("ps", "30".to_string()),
+                    ("order", "pubdate".to_string()),
+                ],
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let total = v["data"]["page"]["count"].as_u64().unwrap_or(0) as u32;
+        let list = v["data"]["list"]["vlist"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| {
+                        let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+                        Some(Track {
+                            key: TrackKey::from_provider(bvid),
+                            title: m["title"].as_str().unwrap_or("").to_string(),
+                            artist: m["author"].as_str().unwrap_or("").to_string(),
+                            duration: m["length"]
+                                .as_str()
+                                .and_then(parse_mmss)
+                                .map(Millis),
+                            cover: m["pic"]
+                                .as_str()
+                                .map(|c| c.replacen("http://", "https://", 1)),
+                            accent: None,
+                            views: m["play"].as_u64(),
+                            danmaku: m["video_review"].as_u64(),
+                            up_avatar: None,
+                            up_mid: Some(mid),
+                            tname: None,
+                            typeid: None,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok((list, total))
+    }
+
+    /// UP 主的粉丝与关注数。老接口，不需要签名。
+    pub async fn space_stat(&self, mid: u64) -> Result<(u64, u64), BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/relation/stat?vmid={mid}"),
+                std::time::Duration::from_millis(300),
+            )
+            .await?;
+        Ok((
+            v["data"]["follower"].as_u64().unwrap_or(0),
+            v["data"]["following"].as_u64().unwrap_or(0),
+        ))
     }
 
     /// 我关注的人。分页取，一页 20 个。

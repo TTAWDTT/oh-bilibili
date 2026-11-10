@@ -257,6 +257,20 @@ impl Source {
         self.client.relation_state(&key.as_opaque()).await
     }
 
+    /// UP 主投稿。
+    pub async fn space_videos(
+        &self,
+        mid: u64,
+        page: u32,
+    ) -> Result<(Vec<Track>, u32), BiliError> {
+        self.client.space_videos(mid, page).await
+    }
+
+    /// UP 主粉丝与关注数。
+    pub async fn space_stat(&self, mid: u64) -> Result<(u64, u64), BiliError> {
+        self.client.space_stat(mid).await
+    }
+
     /// 我关注的人。
     pub async fn following(&self, page: u32) -> Result<(Vec<sync::Followed>, u32), BiliError> {
         self.client.following(page).await

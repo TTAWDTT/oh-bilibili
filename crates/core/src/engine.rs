@@ -432,6 +432,20 @@ impl Engine {
         Ok(self.source.report_progress(key, played_secs, start_ts).await?)
     }
 
+    /// UP 主投稿。
+    pub async fn space_videos(
+        &self,
+        mid: u64,
+        page: u32,
+    ) -> Result<(Vec<bilimusic_model::Track>, u32), WireError> {
+        Ok(self.source.space_videos(mid, page).await?)
+    }
+
+    /// UP 主粉丝与关注数。
+    pub async fn space_stat(&self, mid: u64) -> Result<(u64, u64), WireError> {
+        Ok(self.source.space_stat(mid).await?)
+    }
+
     /// 我关注的人。返回列表与该页总数。
     pub async fn following(
         &self,

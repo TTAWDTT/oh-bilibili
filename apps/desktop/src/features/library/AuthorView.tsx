@@ -14,8 +14,9 @@ import { usePlayerStore } from '../player/playerStore'
 /**
  * UP 主页面。
  *
- * B 站的用户空间接口被风控（-352），所以这里用「按作者名搜索」的结果聚合：
- * 头像取他最近一条投稿的 upic，统计是当前结果集内的，界面上如实标注。
+ * 有 mid 时走真正的空间接口 `space/wbi/arc/search`（WBI 签名），拿的是这个 UP
+ * 主的全部投稿和总数。没有 mid 时退回「按作者名搜索」的结果聚合，那种情况下
+ * 界面会标注数据来源，不假装是完整投稿列表。
  */
 /** 等级徽章配色。B 站 LV1 灰、LV2 绿、LV3 蓝、LV4 青、LV5 紫、LV6 红。 */
 function levelColor(level: number): string {
@@ -29,6 +30,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
   const [followed, setFollowed] = useState(false)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
+  const [total, setTotal] = useState(0)
+  /** 是否退回了搜索聚合。界面要如实标注这一点。 */
+  const [isFallback, setIsFallback] = useState(false)
 
   // 粉丝数与签名走 card 接口，公开可见。
   useEffect(() => {
@@ -66,15 +70,37 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   useEffect(() => {
     let cancelled = false
     setTracks(null)
+    if (mid) {
+      void ipc
+        .spaceVideos(mid, 1)
+        .then(([list, total]) => {
+          if (cancelled) return
+          setTracks(list)
+          setTotal(total)
+        })
+        .catch(() => {
+          // 空间接口不通时退回搜索聚合，并在界面上标注
+          if (cancelled) return
+          setIsFallback(true)
+          void ipc
+            .searchQ(name, 1)
+            .then((list) => {
+              if (!cancelled) setTracks(list.filter((t) => t.up_mid === mid))
+            })
+            .catch(() => {
+              if (!cancelled) setTracks([])
+            })
+        })
+      return () => {
+        cancelled = true
+      }
+    }
     void ipc
       .searchQ(name, 1)
       .then((list) => {
         if (cancelled) return
-        // 有 mid 就按 mid 精确匹配——同名 UP 主不会混进来；没有才退回按名字匹配。
-        const exact = mid
-          ? list.filter((t) => t.up_mid === mid)
-          : list.filter((t) => t.artist === name)
-        setTracks(exact)
+        setIsFallback(true)
+        setTracks(list.filter((t) => t.artist === name))
       })
       .catch(() => {
         if (!cancelled) setTracks([])
@@ -90,7 +116,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       <EmptyState
         icon="biliTv"
         title="没找到这个 UP 主"
-        detail="B 站的用户空间接口目前有风控，只能按名字搜到他的投稿。"
+        detail="这个 UP 主没有可显示的视频，或空间接口取不到。"
         action={{ label: '回到搜索', onClick: () => navigate({ kind: 'search' }) }}
       />
     )
@@ -149,7 +175,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 <span>{formatCount(card.videos)} 投稿</span>
                 <span>{formatCount(card.likes)} 获赞</span>
                 <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
-                  下方仅显示搜索结果里的 {tracks.length} 个
+                  {isFallback
+                    ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
+                    : `共 ${formatCount(total)} 个投稿`}
                 </span>
               </>
             ) : (
@@ -157,7 +185,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 <span>{tracks.length} 个投稿</span>
                 <span>{formatCount(views)} 累计播放</span>
                 <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
-                  来自搜索结果
+                  来自搜索结果，不是完整投稿列表
                 </span>
               </>
             )}

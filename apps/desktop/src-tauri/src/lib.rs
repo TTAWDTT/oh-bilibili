@@ -124,6 +124,25 @@ async fn set_mode(
     engine.set_mode(mode, at_ms, target.as_ref()).await
 }
 
+/// UP 主投稿。
+#[tauri::command(rename_all = "snake_case")]
+async fn space_videos(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    page: u32,
+) -> Result<(Vec<Track>, u32), WireError> {
+    engine.space_videos(mid, page).await
+}
+
+/// UP 主粉丝与关注数。
+#[tauri::command(rename_all = "snake_case")]
+async fn space_stat(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<(u64, u64), WireError> {
+    engine.space_stat(mid).await
+}
+
 /// 我关注的人。
 #[tauri::command(rename_all = "snake_case")]
 async fn following(
@@ -697,6 +716,8 @@ pub fn run() {
             home_feed,
             watch_later_list,
             following,
+            space_videos,
+            space_stat,
             set_mode,
             search_q,
             player_state,

@@ -283,6 +283,16 @@ export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<Pl
   return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
+/** UP 主投稿。返回 (列表, 总数)。 */
+export function spaceVideos(mid: number, page: number): Promise<[Track[], number]> {
+  return invoke<[Track[], number]>('space_videos', { mid, page })
+}
+
+/** UP 主粉丝与关注数。 */
+export function spaceStat(mid: number): Promise<[number, number]> {
+  return invoke<[number, number]>('space_stat', { mid })
+}
+
 /** 我关注的人。返回 (列表, 总数)。 */
 export function following(page: number): Promise<[Followed[], number]> {
   return invoke<[Followed[], number]>('following', { page })
