@@ -256,6 +256,15 @@ impl Engine {
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
                 drop(st);
+                // 开播就在后台把歌词取好：用户打开右栏时通常已经在了，
+                // 不用等 lrclib 那几秒。
+                {
+                    let engine = self.clone();
+                    let k = key.clone();
+                    tokio::spawn(async move {
+                        let _ = engine.lyrics_get(&k).await;
+                    });
+                }
                 let storing = self.track_of(key)?;
                 let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
                 // 每次真正进入播放才记一条历史，切歌失败不记。
@@ -890,26 +899,46 @@ impl Engine {
             return Ok(doc);
         }
         let track = self.track_of(key)?;
-        // 两级回退：本地 lrc 优先（用户自己放的更准），再打 lrclib。
-        // B 站字幕那一级还没接，README 已写明。
+        // 同一首歌在 B 站有几十个投稿，标题清洗后往往一样。
+        // 按标题命中缓存，换一条投稿就不用再打一次网络。
+        let title_key = format!("title:{}", crate::lyrics::clean_title(&track.title));
+        if !title_key.ends_with(':') {
+            if let Some(doc) = lock(&self.lyrics_cache).get(&title_key).cloned() {
+                lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
+                return Ok(doc);
+            }
+        }
+        // 本地 lrc 优先（用户自己放的更准）；没有就同时打 lrclib 和 B 站字幕。
+        //
+        // 早先是串行三级：lrclib 落空要等满它的超时，再去请求字幕，实测一首歌
+        // 要 9 秒才出词。两路并发之后最坏只等较慢的那一路。
         let doc = match lyrics::from_local(&track) {
             Some(doc) => doc,
-            None => match lyrics::from_lrclib(&self.http, &track).await {
-                Some(doc) => doc,
-                None => match self.source.subtitles(key).await {
-                    Ok(lines) if !lines.is_empty() => LyricDoc {
-                        synced: true,
-                        source: "bilibili-subtitle".into(),
-                        lines: lines
-                            .into_iter()
-                            .map(|(at_ms, text)| crate::lyrics::LyricLine { at_ms, text })
-                            .collect(),
+            None => {
+                let (lr, sub) = tokio::join!(
+                    lyrics::from_lrclib(&self.http, &track),
+                    self.source.subtitles(key)
+                );
+                match lr {
+                    Some(doc) => doc,
+                    None => match sub {
+                        Ok(lines) if !lines.is_empty() => LyricDoc {
+                            synced: true,
+                            source: "bilibili-subtitle".into(),
+                            lines: lines
+                                .into_iter()
+                                .map(|(at_ms, text)| crate::lyrics::LyricLine { at_ms, text })
+                                .collect(),
+                        },
+                        _ => LyricDoc::empty(),
                     },
-                    _ => LyricDoc::empty(),
-                },
-            },
+                }
+            }
         };
         lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
+        if !title_key.ends_with(':') && !doc.lines.is_empty() {
+            lock(&self.lyrics_cache).insert(title_key, doc.clone());
+        }
         Ok(doc)
     }
 

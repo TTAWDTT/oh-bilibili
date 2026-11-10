@@ -1,6 +1,6 @@
 import { toastDone } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -26,6 +26,7 @@ export function FavFoldersView() {
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
   const [exhausted, setExhausted] = useState(false)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const playContext = usePlayerStore((state) => state.playContext)
@@ -112,7 +113,15 @@ export function FavFoldersView() {
 
   if (picked) {
     return (
-      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+      <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          const el = event.currentTarget
+          // 离底部还有 600px 就预取下一页，滚动时不会等
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) void loadMore()
+        }}
+        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+      >
         <button
           type="button"
           onClick={() => setPicked(null)}

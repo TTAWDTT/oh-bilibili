@@ -146,7 +146,18 @@ impl Client {
     }
 
     /// 某个收藏夹里的视频 bvid 列表。
-    pub async fn fav_items(&self, folder_id: i64, page: u32) -> Result<Vec<String>, BiliError> {
+    /// 收藏夹里的视频。
+    ///
+    /// 列表接口本身就带标题、封面、时长、UP 主与播放量，
+    /// 所以一次请求就能凑出完整的 Track——早先只取 bvid 再逐条查详情，
+    /// 一页 40 条要发 41 个请求、十几秒才出来。
+    pub async fn fav_tracks(
+        &self,
+        folder_id: i64,
+        page: u32,
+    ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        use bilimusic_model::{Millis, Track, TrackKey};
+
         let v = self
             .get_json(
                 &format!(
@@ -161,7 +172,29 @@ impl Client {
         };
         Ok(list
             .iter()
-            .filter_map(|m| m["bvid"].as_str().map(|s| s.to_string()))
+            .filter_map(|m| {
+                let bvid = m["bvid"].as_str()?.to_string();
+                let duration = m["duration"].as_u64().filter(|d| *d > 0);
+                let play = m["cnt_info"]["play"].as_u64();
+                let danmaku = m["cnt_info"]["danmaku"].as_u64();
+                let upper_mid = m["upper"]["mid"].as_u64();
+                Some(Track {
+                    key: TrackKey::from_provider(bvid),
+                    title: m["title"].as_str().unwrap_or_default().to_string(),
+                    artist: m["upper"]["name"].as_str().unwrap_or_default().to_string(),
+                    duration: duration.map(|d| Millis(d * 1000)),
+                    cover: m["cover"]
+                        .as_str()
+                        .map(|c| c.replacen("http://", "https://", 1)),
+                    accent: None,
+                    views: play,
+                    danmaku,
+                    up_avatar: None,
+                    up_mid: upper_mid,
+                    tname: None,
+                    typeid: None,
+                })
+            })
             .collect())
     }
 

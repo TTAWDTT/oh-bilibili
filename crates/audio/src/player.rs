@@ -231,7 +231,6 @@ fn run_engine(
             // 只按「真的送到声卡的那部分」推进时钟：
             // 原先按 out.len() 推进，缓冲空了（歌播完或网络卡住）也照走，
             // 位置会一直涨到远超时长——实测一首 2:17 的歌被存成了 42:02。
-            let played_frames = (written / channels) as u64;
             // RMS 才是「有多响」，取绝对值平均会虚高。
             if written > 0 {
                 let mut sum = 0.0f32;

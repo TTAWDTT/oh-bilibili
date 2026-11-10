@@ -120,3 +120,29 @@ async fn 歌词三级回退的实际命中情况() {
     // 至少有一首能拿到歌词，否则说明整条链路都是断的
     assert!(!stats.is_empty());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络，用来量歌词耗时"]
+async fn 歌词要多久() {
+    use std::time::Instant;
+    let dir = std::env::temp_dir().join(format!("bilimusic-lrc-t-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+    }
+    let _c = Cleanup(dir.clone());
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
+    for track in tracks.iter().take(4) {
+        let t0 = Instant::now();
+        let doc = engine.lyrics_get(&track.key).await.expect("歌词");
+        println!(
+            "{:>6} ms  {:16} {:3} 行  {}",
+            t0.elapsed().as_millis(),
+            doc.source,
+            doc.lines.len(),
+            track.title.chars().take(14).collect::<String>()
+        );
+    }
+}

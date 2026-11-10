@@ -244,16 +244,20 @@
 
 /* 弹幕：从右向左匀速穿过，带一点描边保证在封面背景上可读 */
 .danmaku {
-  right: -40%;
+  left: 100%;
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.85);
+  /* 单程、播完就停：条目的生命周期由组件按时间收走，不需要无限循环。
+     无限循环会让每条在屏幕外的空档里白白重跑，位置也对不上时间。 */
   animation-name: danmaku-drift;
   animation-timing-function: linear;
-  animation-iteration-count: infinite;
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+  will-change: transform;
 }
 
 @keyframes danmaku-drift {
   from { transform: translateX(0); }
-  to { transform: translateX(-180vw); }
+  to { transform: translateX(calc(-100vw - 100%)); }
 }
 
 /* 2233 娘：轻微上下浮动，两颗头错开相位，看起来像在轻轻点头 */
@@ -465,10 +469,13 @@
 
 /* 全局弹幕带：从右向左匀速穿过窗口顶部 */
 .bili-strip-item {
-  right: -30%;
+  left: 100%;
+  /* 单程：条目的生命周期由组件按时间收走，无限循环会让动画与时间脱节 */
   animation-name: bili-strip-drift;
   animation-timing-function: linear;
-  animation-iteration-count: infinite;
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+  will-change: transform;
 }
 
 @keyframes bili-strip-drift {

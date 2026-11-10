@@ -8,6 +8,7 @@ import { Skeleton } from '../../shared/ui/Skeleton'
 import { toastFailure } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
 import { usePlayerStore } from './playerStore'
+import { useSmoothIndex } from '../../shared/lib/useSmoothIndex'
 
 function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
   const fillRef = useRef<HTMLSpanElement | null>(null)
@@ -45,8 +46,9 @@ function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
   )
 }
 
+const EMPTY_TIMES: number[] = []
+
 export function LyricsView({ track }: { track: Track | null }) {
-  const position = usePlayerStore((state) => state.snapshot?.position_ms ?? 0)
   const seek = usePlayerStore((state) => state.seek)
   const navigate = useAppStore((state) => state.navigate)
   const toggleRail = useAppStore((state) => state.toggleRail)
@@ -84,12 +86,8 @@ export function LyricsView({ track }: { track: Track | null }) {
     }
   }, [key])
 
-  let active = -1
-  if (doc && doc.synced) {
-    doc.lines.forEach((line, index) => {
-      if (line.at_ms <= position) active = index
-    })
-  }
+  const lineTimes = doc && doc.synced ? doc.lines.map((l) => l.at_ms) : EMPTY_TIMES
+  const active = useSmoothIndex(lineTimes, Boolean(doc && doc.synced))
 
   useEffect(() => {
     const scroller = scrollerRef.current

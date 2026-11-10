@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
+import { readPlayhead } from '../../shared/lib/playhead'
+import { usePlayerStore } from './playerStore'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { Icon } from '../../shared/ui/Icon'
@@ -15,6 +17,45 @@ export function MvOverlay() {
   const setMv = useAppStore((state) => state.setMv)
   const [src, setSrc] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const phase = usePlayerStore((s) => s.snapshot?.phase ?? 'idle')
+
+  /**
+   * 画面跟随音频引擎。
+   *
+   * <video> 自带音轨，而声音是由 Rust 引擎放的：两边各走一套时钟，
+   * 一开 MV 就有两路声音、还对不上。所以视频静音，位置以引擎为准——
+   * 落后或超前超过 400ms 就拉回来。Clock 是唯一的真值来源。
+   */
+  useEffect(() => {
+    if (!mv || !src) return
+    let raf = 0
+    let last = 0
+    const tick = (now: number): void => {
+      raf = requestAnimationFrame(tick)
+      // 每 250ms 校一次，太频繁会打断解码
+      if (now - last < 250) return
+      last = now
+      const video = videoRef.current
+      if (!video || video.readyState < 2) return
+      if (Math.abs(video.currentTime * 1000 - readPlayhead()) > 400) {
+        video.currentTime = readPlayhead() / 1000
+      }
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [mv, src])
+
+  // 播放/暂停跟随引擎
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (phase === 'playing') {
+      void video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
+  }, [phase, src])
 
   useEffect(() => {
     if (!mv) {
@@ -81,9 +122,11 @@ export function MvOverlay() {
           </div>
         ) : src ? (
           <video
+            ref={videoRef}
             src={src}
             controls
             autoPlay
+            muted
             playsInline
             className="w-full rounded-[4px] bg-black"
             style={{ maxHeight: '70vh' }}

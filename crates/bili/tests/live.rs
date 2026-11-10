@@ -356,3 +356,37 @@ async fn 换歌的三个网络调用各自多久() {
     println!("open     {:>6} ms", d3.as_millis());
     println!("合计     {:>6} ms", (d1 + d2 + d3).as_millis());
 }
+
+#[tokio::test]
+#[ignore = "真实网络，用来量收藏夹一页的耗时"]
+async fn 收藏夹一页要多久() {
+    use std::time::Instant;
+    let source = Source::open().await.expect("Source");
+    // 用应用已保存的登录态；没有就跳过（这条测试只在登录后有意义）
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
+        println!("没有 cookies.json，跳过");
+        return;
+    };
+    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+    source.import_cookies(&pairs);
+    source.refresh_session().await.expect("刷新会话");
+    let folders = source.fav_folders().await.expect("收藏夹列表");
+    let (id, name, count) = folders
+        .iter()
+        .max_by_key(|(_, _, c)| *c)
+        .map(|(i, n, c)| (*i, n.clone(), *c))
+        .expect("至少一个收藏夹");
+    println!("用收藏夹「{name}」({count} 个视频)");
+
+    let t0 = Instant::now();
+    let page = source.fav_tracks(id, 1).await.expect("一页");
+    println!("第一页 {} 条，耗时 {} ms", page.len(), t0.elapsed().as_millis());
+    if let Some(t) = page.first() {
+        println!("首条: {} / {} / {:?} / 播放 {:?}", t.title.chars().take(18).collect::<String>(), t.artist, t.duration.map(|d| d.0), t.views);
+    }
+    assert!(!page.is_empty(), "应该读到内容");
+    assert!(page[0].duration.is_some(), "时长应该来自列表接口");
+}
