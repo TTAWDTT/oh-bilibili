@@ -8,7 +8,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
-import { TrackGrid } from '../tracks/TrackGrid'
+import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -165,7 +165,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         </div>
       </header>
 
-      <TrackGrid
+      <ContentGrid
         tracks={tracks}
         activeKey={snapshot?.track?.key ?? null}
         playing={snapshot?.phase === 'playing'}

@@ -10,7 +10,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
-import { TrackGrid } from '../tracks/TrackGrid'
+import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -160,7 +160,7 @@ export function FavFoldersView() {
           <EmptyState mascot="hug" icon="biliTv" title="这个收藏夹是空的" detail="去 B 站收几个视频再来。" action={null} />
         ) : (
           <>
-            <TrackGrid
+            <ContentGrid
               tracks={tracks}
               activeKey={snapshot?.track?.key ?? null}
               playing={snapshot?.phase === 'playing'}

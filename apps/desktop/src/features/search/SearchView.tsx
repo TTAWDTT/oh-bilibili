@@ -6,7 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { usePlayerStore } from '../player/playerStore'
-import { TrackGrid } from '../tracks/TrackGrid'
+import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 import { ChannelGrid } from './ChannelGrid'
 import { ContinueListening } from './ContinueListening'
@@ -343,8 +343,7 @@ export function SearchView() {
             ) : null}
 
             {tracks.length > 0 ? (
-              <TrackGrid
-            open="watch"
+              <ContentGrid
                 tracks={tracks}
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}

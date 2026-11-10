@@ -6,7 +6,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
-import { TrackGrid } from '../tracks/TrackGrid'
+import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -114,7 +114,7 @@ export function HistoryView() {
             <h2 className="text-[15px] font-medium text-[var(--text-1)]">{group.label}</h2>
             <span className="num text-[12px] text-[var(--text-3)]">{group.items.length} 首</span>
           </div>
-          <TrackGrid
+          <ContentGrid
             tracks={group.items.map((e) => e.track)}
             activeKey={snapshot?.track?.key ?? null}
             playing={snapshot?.phase === 'playing'}

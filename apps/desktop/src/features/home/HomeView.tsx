@@ -3,7 +3,7 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { TrackGrid } from '../tracks/TrackGrid'
+import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -59,8 +59,7 @@ export function HomeView() {
       {error ? <p className="px-1 py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}
 
       {items.length > 0 ? (
-        <TrackGrid
-          open="watch"
+        <ContentGrid
           tracks={items}
           activeKey={activeKey}
           playing={playing}
