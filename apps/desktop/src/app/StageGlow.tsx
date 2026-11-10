@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { subscribeLevel } from '../shared/lib/level'
-import { usePlayerStore } from '../features/player/playerStore'
+import { useIsPlaying } from '../features/player/playerStore'
 
 /**
  * 背景呼吸。整页底下压一层暖色光晕，强度跟着真实响度走。
@@ -10,7 +10,7 @@ import { usePlayerStore } from '../features/player/playerStore'
  */
 export function StageGlow() {
   const ref = useRef<HTMLDivElement | null>(null)
-  const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
+  const playing = useIsPlaying()
 
   useEffect(() => {
     let smooth = 0

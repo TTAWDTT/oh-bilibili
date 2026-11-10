@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { subscribeLevel } from '../../shared/lib/level'
-import { usePlayerStore } from './playerStore'
+import { useIsPlaying } from './playerStore'
 
 const BAR_W = 3
 const GAP = 2
@@ -16,7 +16,7 @@ const GAP = 2
 export function WaveRibbon() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const levelRef = useRef(0)
-  const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
+  const playing = useIsPlaying()
 
   useEffect(() => subscribeLevel((v) => {
     levelRef.current = v

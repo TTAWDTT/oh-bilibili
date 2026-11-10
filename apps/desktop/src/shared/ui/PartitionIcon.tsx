@@ -5,7 +5,7 @@ import type { IconName } from './Icon'
  *
  * 这里用色块 + 简单符号表达，不追求逐像素还原，但要一眼看出「这是分区图标」。
  */
-type Kind = 'music' | 'dance' | 'game' | 'anime' | 'life' | 'film' | 'history' | 'favs' | 'search' | 'settings'
+type Kind = 'home' | 'music' | 'dance' | 'game' | 'anime' | 'life' | 'film' | 'history' | 'favs' | 'search' | 'settings'
 
 /**
  * 底色沿用 B 站的品牌色，图形用图标组件里的 SVG 路径。
@@ -14,6 +14,7 @@ type Kind = 'music' | 'dance' | 'game' | 'anime' | 'life' | 'film' | 'history' |
  * 而且撑满色块时会显得像凑数。SVG 路径在任何设备上都一样。
  */
 const STYLE: Record<Kind, { bg: string; icon: IconName }> = {
+  home: { bg: '#fb7299', icon: 'biliTv' },
   music: { bg: '#ff6699', icon: 'music' },
   dance: { bg: '#ff8fb3', icon: 'music' },
   game: { bg: '#53b6ff', icon: 'play' },

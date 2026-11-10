@@ -8,6 +8,7 @@ import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { CommentsPanel } from './CommentsPanel'
+import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 
 /**
@@ -27,6 +28,7 @@ export function WatchView({ track }: { track: Track }) {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
+  const [related, setRelated] = useState<Track[]>([])
   const [page, setPage] = useState<number | undefined>(undefined)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const danmakuOn = useDanmakuSettings((s) => s.enabled)
@@ -63,6 +65,22 @@ export function WatchView({ track }: { track: Track }) {
         if (!cancelled) setDanmaku(toDanmakuItems(list))
       })
       .catch(() => setDanmaku([]))
+    return () => {
+      cancelled = true
+    }
+  }, [track.key])
+
+  // 相关推荐。右栏只在「听」时出现，所以观看页要有自己的一份，
+  // 否则看视频时完全没有相关推荐可点。
+  useEffect(() => {
+    let cancelled = false
+    setRelated([])
+    void ipc
+      .related(track.key)
+      .then((list) => {
+        if (!cancelled) setRelated(list.slice(0, 10))
+      })
+      .catch(() => setRelated([]))
     return () => {
       cancelled = true
     }
@@ -271,6 +289,36 @@ export function WatchView({ track }: { track: Track }) {
               {data.desc}
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {related.length > 0 ? (
+        <div className="border-t border-hairline px-3 py-2">
+          <h3 className="mb-1.5 text-[12px] text-[var(--text-3)]">相关推荐</h3>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {related.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => navigate({ kind: 'watch', track: item })}
+                title={item.title}
+                className="group w-[148px] shrink-0 text-left"
+              >
+                <span className="relative block overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
+                  <Cover
+                    cover={item.cover}
+                    title={item.title}
+                    className="h-full w-full"
+                    glyphClassName="text-[22px] font-semibold text-white/80"
+                  />
+                </span>
+                <span className="mt-1 line-clamp-2 block text-[12px] leading-[1.35] text-[var(--text-2)] group-hover:text-[var(--accent)]">
+                  {item.title}
+                </span>
+                <span className="num mt-0.5 block text-[11px] text-[var(--text-3)]">{item.artist}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 

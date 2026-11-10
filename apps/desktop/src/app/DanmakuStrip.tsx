@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { usePlayerStore } from '../features/player/playerStore'
+import { useIsPlaying, usePlayerStore } from '../features/player/playerStore'
 import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import { useSentDanmaku } from '../features/player/sentDanmaku'
 import { readPlayhead } from '../shared/lib/playhead'
@@ -22,7 +22,7 @@ const LANES = 8
  */
 export function DanmakuStrip() {
   const trackKey = usePlayerStore((state) => state.snapshot?.track?.key ?? null)
-  const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
+  const playing = useIsPlaying()
   const enabled = useDanmakuSettings((s) => s.enabled)
   const opacity = useDanmakuSettings((s) => s.opacity)
   const speed = useDanmakuSettings((s) => s.speed)

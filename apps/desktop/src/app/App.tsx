@@ -10,7 +10,7 @@ import { PlaylistView } from '../features/library/PlaylistView'
 import { NowPlayingRail } from '../features/player/NowPlayingRail'
 import { StageView } from '../features/player/StageView'
 import { PlayerBar } from '../features/player/PlayerBar'
-import { usePlayerStore } from '../features/player/playerStore'
+import { useHasSession, useIsListening, usePlayerStore } from '../features/player/playerStore'
 import { SearchView } from '../features/search/SearchView'
 import { SettingsView } from '../features/settings/SettingsView'
 import { ToastHost } from '../shared/ui/ToastHost'
@@ -99,8 +99,12 @@ export default function App() {
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
 
-  // 没歌也没队列时右栏没有任何内容可看，收起它让中间真正铺满。
-  const hasContent = track !== null || queued > 0
+  // 右栏是「听」才需要的东西（歌词与队列）。
+  // 判据不能只是「有曲目或队列」：队列会在启动时恢复，于是刷视频、看视频时
+  // 右侧一直挂着一栏歌词，像在放一首根本不存在的歌。
+  const listening = useIsListening()
+  const hasSession = useHasSession()
+  const hasContent = listening && hasSession && (track !== null || queued > 0)
   const railOpen = hasContent && rail !== null
   const trackKey = track?.key ?? null
 

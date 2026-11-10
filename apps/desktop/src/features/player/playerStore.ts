@@ -185,3 +185,27 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     },
   }
 })
+
+/**
+ * 这次会话在不在放。全应用只在这里定义「在放」。
+ *
+ * 早先每个组件各写一遍 `snapshot?.phase === 'playing'`，语义靠各自理解；
+ * 「会话是否活着」（播放条要不要出现）和「是否正在出声」（动画要不要跑）
+ * 是两件事，分开给名字，读代码的人不用再猜。
+ */
+export function useIsPlaying(): boolean {
+  return usePlayerStore((state) => state.snapshot?.phase === 'playing')
+}
+
+/** 会话是否活着：有加载、在放、暂停、播完都算，没有会话（idle）就不算。 */
+export function useHasSession(): boolean {
+  return usePlayerStore((state) => {
+    const phase = state.snapshot?.phase ?? 'idle'
+    return phase !== 'idle'
+  })
+}
+
+/** 这次会话是不是「听」模式。看视频时不跑音频动画，也不显示播放条。 */
+export function useIsListening(): boolean {
+  return usePlayerStore((state) => (state.snapshot?.mode ?? 'listen') === 'listen')
+}
