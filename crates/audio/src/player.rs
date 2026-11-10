@@ -23,7 +23,9 @@ use crate::AudioError;
 use crate::{Clock, Media, SharedClock};
 
 /// 环形缓冲容量，按 f32 样本计。约两秒双声道。
-const RING_CAPACITY: usize = 48000 * 2 * 2;
+// 4 秒缓冲（48kHz 双声道 × 4）：网络抖动时不容易欠载，
+// 欠载会直接表现为声音断续和进度落后。
+const RING_CAPACITY: usize = 48000 * 2 * 4;
 
 enum Cmd {
     Load(Media),
@@ -241,7 +243,12 @@ fn run_engine(
             } else {
                 cb_clock.set_level(0.0);
             }
-            advance_played(&cb_clock, written, channels);
+            // 时钟按「声卡这一拍消费掉的时间」推进，而不是「真的有多少样本」。
+            //
+            // 缓冲欠载时声卡照样走时间（放的是静音），只按 written 推进会让时钟
+            // 落后于真实时间——实测 20.4 秒墙钟只推进了 16 秒位置（慢 21%），
+            // 歌词于是越唱越落后。播完的边界由解码线程 set_playing(false) 管。
+            advance_played(&cb_clock, out.len(), channels);
         },
         |err| eprintln!("音频输出错误: {err}"),
         None,
