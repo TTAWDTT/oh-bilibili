@@ -322,3 +322,37 @@ async fn 音质标签与实际档位一致() {
         top.bandwidth / 1000
     );
 }
+
+#[tokio::test]
+#[ignore = "真实网络，用来定位换歌延迟"]
+async fn 换歌的三个网络调用各自多久() {
+    use std::time::Instant;
+    let source = Source::open().await.expect("Source");
+    let q = SearchQuery::parse("周杰伦 晴天", 1).expect("查询");
+    let tracks = source.search(&q).await.expect("搜索");
+    let key = &tracks[0].key;
+
+    let t0 = Instant::now();
+    let detail = source.detail(key).await.expect("detail");
+    let d1 = t0.elapsed();
+
+    let t1 = Instant::now();
+    let streams = source.streams(&detail).await.expect("streams");
+    let d2 = t1.elapsed();
+
+    let t2 = Instant::now();
+    let headers = source.stream_headers();
+    let url = streams[0].url.clone();
+    let _media = tokio::task::spawn_blocking(move || {
+        bilimusic_bili::media::RemoteMedia::open(url, headers)
+    })
+    .await
+    .expect("join")
+    .expect("打开流");
+    let d3 = t2.elapsed();
+
+    println!("detail   {:>6} ms", d1.as_millis());
+    println!("streams  {:>6} ms", d2.as_millis());
+    println!("open     {:>6} ms", d3.as_millis());
+    println!("合计     {:>6} ms", (d1 + d2 + d3).as_millis());
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { Avatar } from '../shared/ui/Avatar'
+import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon } from '../shared/ui/Icon'
 
 /**
@@ -19,6 +20,7 @@ export function TitleBar() {
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const drag = useWindowDrag()
 
   // ⌘K / 左侧栏点击都会递增 nonce，这里跟着聚焦
   useEffect(() => {
@@ -36,7 +38,7 @@ export function TitleBar() {
 
   return (
     <div
-      data-tauri-drag-region
+      {...drag}
       className="safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pl-[74px] pr-3 md:gap-4 md:pl-[80px]"
     >
       {/* 装饰性的 logo 块不参与命中：让它穿透，按下时目标才是带

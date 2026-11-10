@@ -54,14 +54,25 @@ pub struct AudioStream {
 
 pub struct Source {
     client: Client,
+    /// 视频详情缓存（cid/aid 不会变）。
+    ///
+    /// 换歌时 detail 要花 150ms 外加一次限速等待，而同一首歌重复播很常见。
+    /// 只存最近若干条，避免长时间使用后无限增长。
+    detail_cache: std::sync::Mutex<std::collections::HashMap<String, TrackDetail>>,
 }
+
+/// 详情缓存最多留这么多条。
+const DETAIL_CACHE_MAX: usize = 128;
 
 impl Source {
     pub async fn open() -> Result<Source, BiliError> {
         let client = Client::new()?;
         client.ensure_fingerprint().await?;
         let _ = client.refresh_nav().await?;
-        Ok(Source { client })
+        Ok(Source {
+            client,
+            detail_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
+        })
     }
 
     /// cookie 是否在上次落盘后有变化。
@@ -157,22 +168,38 @@ impl Source {
     /// 用 TrackKey 换回 cid 与 aid。TrackKey 只在这个 crate 里被解释。
     pub async fn detail(&self, key: &TrackKey) -> Result<TrackDetail, BiliError> {
         let bvid = key.as_opaque().to_string();
+        if let Ok(cache) = self.detail_cache.lock() {
+            if let Some(hit) = cache.get(&bvid) {
+                return Ok(hit.clone());
+            }
+        }
         let value = self
             .client
-            .signed_get(
+            .signed_get_play(
                 &format!("{}/x/web-interface/wbi/view", client::API),
                 vec![("bvid", bvid.clone())],
                 PLAY_INTERVAL,
             )
             .await?;
-        wire::track_detail(&value, key)
+        let detail = wire::track_detail(&value, key)?;
+        if let Ok(mut cache) = self.detail_cache.lock() {
+            if cache.len() >= DETAIL_CACHE_MAX {
+                // 简单清一半，够用且不用引入 LRU 依赖
+                let keep: Vec<String> = cache.keys().take(DETAIL_CACHE_MAX / 2).cloned().collect();
+                for k in keep {
+                    cache.remove(&k);
+                }
+            }
+            cache.insert(bvid, detail.clone());
+        }
+        Ok(detail)
     }
 
     /// 取流。返回的 URL 带签名会过期，不要长期缓存。
     pub async fn streams(&self, detail: &TrackDetail) -> Result<Vec<AudioStream>, BiliError> {
         let value = self
             .client
-            .signed_get(
+            .signed_get_play(
                 &format!("{}/x/player/wbi/playurl", client::API),
                 vec![
                     ("bvid", detail.track.key.as_opaque().to_string()),

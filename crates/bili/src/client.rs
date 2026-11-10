@@ -34,6 +34,12 @@ pub struct Client {
     jar: RwLock<HashMap<String, String>>,
     keys: tokio::sync::Mutex<Option<(WbiKeys, Instant)>>,
     gate: tokio::sync::Mutex<Option<Instant>>,
+    /// 播放专用的闸门，与通用闸门分开。
+    ///
+    /// 通用闸门是全局串行的：换歌时 detail/playurl 要排在弹幕、相关推荐、
+    /// UP 名片后面，实测能等到一两秒。播放是用户按下去就要有反应的动作，
+    /// 所以给它一条独立队列。
+    play_gate: tokio::sync::Mutex<Option<Instant>>,
     cooldown: tokio::sync::Mutex<Option<Instant>>,
     nav: RwLock<NavState>,
     /// 罐里的 cookie 自上次落盘后是否变过。
@@ -55,6 +61,7 @@ impl Client {
             jar: RwLock::new(HashMap::new()),
             keys: tokio::sync::Mutex::new(None),
             gate: tokio::sync::Mutex::new(None),
+            play_gate: tokio::sync::Mutex::new(None),
             cooldown: tokio::sync::Mutex::new(None),
             nav: RwLock::new(NavState::default()),
             cookies_dirty: std::sync::atomic::AtomicBool::new(false),
@@ -183,10 +190,21 @@ impl Client {
 
     /// 全局串行闸门。B 站对并发很敏感，这里宁可慢。
     async fn gate(&self, min_interval: Duration) {
+        let gate = &self.gate;
+        Client::wait_slot(gate, min_interval).await;
+    }
+
+    /// 播放链路用这条：不和后台请求抢。
+    pub async fn gate_play(&self, min_interval: Duration) {
+        let gate = &self.play_gate;
+        Client::wait_slot(gate, min_interval).await;
+    }
+
+    async fn wait_slot(gate: &tokio::sync::Mutex<Option<Instant>>, min_interval: Duration) {
         if min_interval.is_zero() {
             return;
         }
-        let mut last = self.gate.lock().await;
+        let mut last = gate.lock().await;
         if let Some(at) = *last {
             let elapsed = at.elapsed();
             if elapsed < min_interval {
@@ -419,6 +437,25 @@ impl Client {
             .unwrap_or(0);
         let query = keys.sign(&params, wts);
         self.get_json(&format!("{base}?{query}"), min_interval).await
+    }
+
+    /// 同上，但走播放专用闸门：换歌不该排在弹幕和相关推荐后面。
+    pub async fn signed_get_play(
+        &self,
+        base: &str,
+        params: Vec<(&str, String)>,
+        min_interval: Duration,
+    ) -> Result<Value, BiliError> {
+        let keys = self.wbi_keys().await?;
+        let wts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let query = keys.sign(&params, wts);
+        self.gate_play(min_interval).await;
+        // 闸门已经过完了，这里用零间隔再走一遍完整流程（含风控冷却与 cookie 吸收）
+        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false)
+            .await
     }
 
     async fn set_cooldown(&self, dur: Duration) {

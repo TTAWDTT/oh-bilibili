@@ -213,6 +213,14 @@ fn run_engine(
         config,
         move |out: &mut [f32], _| {
             let gain = f32::from_bits(cb_volume.load(Ordering::Relaxed));
+            // 暂停时不要再吐缓冲：环里存着最多 2 秒已解码的音频，
+            // 无条件 pop 会让「点暂停」之后还继续响两秒——这就是暂停的延迟来源。
+            // 缓冲保持不动，恢复时正好从这里接上。
+            if !cb_clock.is_playing() {
+                out.fill(0.0);
+                cb_clock.set_level(0.0);
+                return;
+            }
             let written = consumer.pop_slice(out);
             for s in out.iter_mut().take(written) {
                 *s *= gain;
