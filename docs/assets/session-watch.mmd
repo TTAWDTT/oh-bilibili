@@ -1,0 +1,44 @@
+---
+title: "观看会话在看与听之间怎么走"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: 收听
+    lg1: 观看
+    lg2: 两端
+  }
+  class lg0 blue
+  class lg1 teal
+  class lg2 tan
+  s0: 还没开始
+  s1: 只听得见声音
+  s2: 放完了
+  s3: 暂停中
+  s4: 正在接上画面
+  s5: 在看也在听
+  s6: 画面卡住只剩声音
+  [*] --> s0
+  s0 --> s1: 你按下播放
+  s1 --> s2: 声音放完
+  s1 --> s3: 你按下暂停
+  s1 --> s4: 你切到看
+  s3 --> s1: 你继续播放
+  s4 --> s1: 你切到听视频
+  s4 --> s3: 你按下暂停
+  s4 --> s5: 画面接上了
+  s4 --> s6: 画面卡住太久
+  s3 --> s4: 你继续播放
+  s5 --> s1: 你切到听视频
+  s5 --> s4: 你换了个画质
+  s5 --> s6: 画面卡住太久
+  s5 --> s3: 你按下暂停
+  s6 --> s1: 画面彻底卸掉
+  s6 --> s3: 你按下暂停
+  s3 --> s5: 你继续播放
+  s3 --> s6: 你继续播放
+  class s0 tan
+  class s1 blue
+  class s2 tan
+  class s4 teal
+  class s5 teal
+  class s6 blue

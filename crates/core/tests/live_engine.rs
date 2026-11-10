@@ -146,3 +146,34 @@ async fn 歌词要多久() {
         );
     }
 }
+
+/// 连续两次打开同一首，慢的那次不许把状态弄坏。
+///
+/// 修之前 fetch_and_load 收下 token 却没用（`let _ = token;`），
+/// 解析完照样把字节塞给声卡，还会把状态置成 faulted。
+#[tokio::test]
+#[ignore]
+async fn 连续两次打开不会把状态打成失败() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-race-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎应该能起来");
+    let found = engine.search("晴天 周杰伦".into(), 1).await.expect("搜索");
+    let key = found.first().map(|t| t.key.clone()).expect("至少一条结果");
+
+    let a = engine.clone();
+    let b = engine.clone();
+    let _ = (&a, &b);
+    let ka = key.clone();
+    let kb = key;
+    let (ra, rb) = tokio::join!(a.play_key(&ka), b.play_key(&kb));
+    println!("第一次: {:?}", ra.as_ref().map(|_| "ok").map_err(|e| e.message()));
+    println!("第二次: {:?}", rb.as_ref().map(|_| "ok").map_err(|e| e.message()));
+
+    let snap = engine.snapshot();
+    println!("最终状态: {:?}", snap.phase);
+    assert_ne!(
+        format!("{:?}", snap.phase),
+        "Faulted",
+        "两次打开交错之后不该停在失败态"
+    );
+}

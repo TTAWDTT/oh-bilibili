@@ -280,6 +280,11 @@ impl Engine {
                 Ok(self.snapshot())
             }
             Err(err) => {
+                // 这一次打开已经被更晚的一次取代，状态归新的一次管。
+                // 这里如果照常置 faulted，会把用户真正在等的那次加载打成失败。
+                if !self.load_is_current(token) {
+                    return Err(err);
+                }
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle)
                     .fail(crate::state::Fault::Network(err.message().to_string()));
@@ -291,6 +296,11 @@ impl Engine {
                 Err(err)
             }
         }
+    }
+
+    /// 这次加载还是不是当前那一次。
+    fn load_is_current(&self, token: LoadToken) -> bool {
+        lock(&self.state).token() == Some(token)
     }
 
     async fn fetch_and_load(
@@ -309,6 +319,12 @@ impl Engine {
             .await
             .map_err(|e| WireError::internal(e.to_string()))?
             .map_err(WireError::internal)?;
+        // 加载是会过期的动作。解析 URL、连 CDN 都要几百毫秒，这期间用户可能
+        // 已经点了另一首；不判就 load 的话，扬声器会放 A 而状态说当前是 B。
+        // 实测这个错只影响听感、不影响测试，所以一直没被发现。
+        if !self.load_is_current(token) {
+            return Err(WireError::internal("加载已过期，用户点了别的"));
+        }
         {
             let player = lock(&self.player);
             player.load(Media::new(media)).map_err(|e| WireError::internal(e.to_string()))?;
@@ -318,7 +334,12 @@ impl Engine {
             // 不要在 load 之后 seek(0)：load 已经重置了时钟，再 seek 一次会在
             // 音频线程刚开始推进时把帧计数打回 0，位置看起来像卡住。
         }
-        let _ = token;
+        // load 之后再过一次：spawn_blocking 期间仍可能有新的打开插进来。
+        // 这一拍已经写了写指针，用 stop 把声卡停住，别让旧音轨继续发声。
+        if !self.load_is_current(token) {
+            lock(&self.player).stop();
+            return Err(WireError::internal("加载已过期，用户点了别的"));
+        }
         let quality: Quality = best.quality;
         Ok(Prepared {
             quality,
