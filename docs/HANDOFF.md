@@ -128,17 +128,16 @@ model  ← bili / store / audio
 见 `apps/desktop/src/styles.css` 顶部的注释：纯中性灰阶、密集排版、单一强调色。
 B 站化之后的色值：底 `#f6f7f8`、面板 `#fff`、线 `#e3e5e7`、主色 `#fb7299`。
 
-## 已知限制：取消点赞不可用
+## 已修复：取消点赞要传 like=2
 
-实测结论，不是猜测。
+踩了很久的一个坑，记下来免得再踩。
 
-| 操作 | 接口返回 | 结论 |
-|---|---|---|
-| 点赞（like=1） | `code 0`，relation 变 True | 可用 |
-| 取消点赞（like=0） | `-400 请求错误` | 不可用 |
+原文的症状：取消点赞恒定返回 `-400 请求错误`，而点赞正常。
 
-试过并全部失败的写法：form 编码、JSON、加 `type`/`oper`/`mobi_app`/`platform`、带 `bvid`、WBI 签名（`w_rid`+`wts`）、`/archive/like/cancel`、`/archive/unlike`。
+真正的原因只有一个：**B 站取消点赞传的是 `like=2`，不是 `like=0`**。传 0 会被判成非法参数。
 
-不是 csrf 的问题：同一条 `bili_jct` 打评论接口能通过校验（返回「不可发送空白内容」而不是「CSRF 校验失败」）。也不是通用写路径坏了：稍后再看的加入与移除都返回 `code 0`。
+排查过程中排除掉的（都不成立）：csrf 失效（同一条 `bili_jct` 打评论接口能过校验）、缺 WBI 签名（补了 `w_rid`+`wts` 仍 400）、冷却（等 70 秒仍 400）、编码问题（form / JSON 都试过）、缺 `bvid`/`type`/`oper`/`mobi_app`。
 
-所以界面上的「取消点赞」现在会失败。`reactionStore.toggleLike` 已改成先请求成功再改本地状态，失败会弹提示，不会假装点亮。
+网页端还会带 `eab_x=1`、`ramval=9`、`source=web_normal`、`ga=1`，现在一并带上。
+
+`crates/core/tests/live_engine.rs` 的 `点赞能写入也能取消` 做往返验证，顺序是「读原状 → 改成反面 → 校验 → 改回原状 → 校验」，跑完不留痕迹。

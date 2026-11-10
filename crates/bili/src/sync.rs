@@ -77,14 +77,23 @@ impl Client {
     }
 
     /// 点赞 / 取消点赞。
+    /// 点赞或取消点赞。
+    ///
+    /// 取消用的是 `like=2`，不是 `like=0`。用 0 会一直返回 `-400 请求错误`，
+    /// 这一条查了很久才定位到（见 docs/HANDOFF.md 的记录）。
+    /// 另外几个参数是网页端原样带的，缺了不一定报错，但保持一致更稳。
     pub async fn like_video(&self, aid: u64, on: bool) -> Result<(), BiliError> {
         let csrf = self
             .csrf()
             .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
         let body = vec![
             ("aid", aid.to_string()),
-            ("like", if on { "1" } else { "0" }.to_string()),
+            ("like", if on { "1" } else { "2" }.to_string()),
             ("csrf", csrf),
+            ("eab_x", "1".to_string()),
+            ("ramval", "9".to_string()),
+            ("source", "web_normal".to_string()),
+            ("ga", "1".to_string()),
         ];
         self.post_form(&format!("{API}/x/web-interface/archive/like"), body)
             .await?;

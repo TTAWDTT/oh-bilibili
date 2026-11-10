@@ -536,11 +536,21 @@ fn 观看进度能上报() {
     });
 }
 
-/// 点赞写路径的往返：点上，服务端确认为真，再取消，服务端确认为假。
+async fn like_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::TrackKey) -> bool {
+    let rows = engine
+        .relation_states(vec![key.as_opaque().to_string()])
+        .await
+        .expect("查状态");
+    rows[0].1
+}
+
+/// 点赞写路径的往返，**并恢复账号原状**。
 ///
-/// 这条测试同时是「把账号恢复干净」的工具：中途失败留下点赞时，重跑一次即可。
+/// 顺序是「读原状 → 改成反面 → 校验 → 改回原状 → 校验」。
+/// 早先写成「先点再取」，结果把用户本来点过赞的视频取消了——
+/// 验证写操作之前必须先想清楚怎么恢复。
 #[test]
-#[ignore = "真实网络；会短暂修改账号点赞状态，结束时恢复"]
+#[ignore = "真实网络；结束时恢复账号原状"]
 fn 点赞能写入也能取消() {
     let dir = std::env::temp_dir().join(format!("bilimusic-like-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("临时目录");
@@ -560,30 +570,19 @@ fn 点赞能写入也能取消() {
         } else {
             bilimusic_model::TrackKey::from_provider(target)
         };
-        println!("目标 {}", key.as_opaque());
+        let original = like_state(&engine, &key).await;
+        println!("目标 {} 原始状态 like={original}", key.as_opaque());
 
-        // 已经点过会返回「重复点赞」。这条测试要能反复跑，所以不把它当失败——
-        // 幂等正是这里需要的性质。
-        match engine.like_set(&key, true).await {
-            Ok(()) => println!("点赞成功"),
-            Err(e) => println!("点赞返回（可能已点过）: {}", e.message()),
-        }
-        let states = engine
-            .relation_states(vec![key.as_opaque().to_string()])
-            .await
-            .expect("查状态");
-        let liked = states[0].1;
-        println!("点上之后 like={liked}");
-        assert!(liked, "服务端应该记为已点赞");
+        let flipped = !original;
+        engine.like_set(&key, flipped).await.expect("写入");
+        let after = like_state(&engine, &key).await;
+        println!("改成 {flipped} 之后 like={after}");
+        assert_eq!(after, flipped, "服务端应该跟上写入");
 
-        engine.like_set(&key, false).await.expect("取消点赞");
-        let states2 = engine
-            .relation_states(vec![key.as_opaque().to_string()])
-            .await
-            .expect("查状态");
-        let after = states2[0].1;
-        println!("取消之后 like={after}");
-        assert!(!after, "取消之后服务端应该记为未点赞");
+        engine.like_set(&key, original).await.expect("恢复");
+        let restored = like_state(&engine, &key).await;
+        println!("恢复成 {original} 之后 like={restored}");
+        assert_eq!(restored, original, "必须恢复原状");
     });
 }
 
