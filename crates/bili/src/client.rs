@@ -36,6 +36,11 @@ pub struct Client {
     gate: tokio::sync::Mutex<Option<Instant>>,
     cooldown: tokio::sync::Mutex<Option<Instant>>,
     nav: RwLock<NavState>,
+    /// 罐里的 cookie 自上次落盘后是否变过。
+    ///
+    /// B 站会通过 Set-Cookie 轮换 SESSDATA；只存在内存里不写盘的话，
+    /// 重启后加载的是登录当天的旧 cookie，一旦被轮换就会被判未登录。
+    cookies_dirty: std::sync::atomic::AtomicBool,
 }
 
 impl Client {
@@ -52,6 +57,7 @@ impl Client {
             gate: tokio::sync::Mutex::new(None),
             cooldown: tokio::sync::Mutex::new(None),
             nav: RwLock::new(NavState::default()),
+            cookies_dirty: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -323,6 +329,7 @@ impl Client {
 
     /// 把响应里的 Set-Cookie 收进罐里。登录靠的就是这一步。
     fn absorb_cookies(&self, headers: &reqwest::header::HeaderMap) {
+        let mut dropped = false;
         let mut jar = match self.jar.write() {
             Ok(j) => j,
             Err(_) => return,
@@ -337,8 +344,35 @@ impl Client {
             if name.is_empty() {
                 continue;
             }
-            jar.insert(name.to_string(), value.trim().to_string());
+            let new_value = value.trim().to_string();
+            if jar.get(name) != Some(&new_value) {
+                jar.insert(name.to_string(), new_value);
+                dropped = true;
+            }
         }
+        drop(jar);
+        if dropped {
+            self.cookies_dirty
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// 记一条 cookie，值真的变了才置脏。供 absorb_cookies 与测试共用。
+    fn remember(&self, name: &str, value: &str) -> bool {
+        let mut jar = self.jar.write().expect("cookie 罐");
+        if jar.get(name) == Some(&value.to_string()) {
+            return false;
+        }
+        jar.insert(name.to_string(), value.to_string());
+        self.cookies_dirty
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        true
+    }
+
+    /// 取走「变脏」标记：返回 true 就说明该落盘了。
+    pub fn take_cookies_dirty(&self) -> bool {
+        self.cookies_dirty
+            .swap(false, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// 表单 POST。点赞、收藏、建收藏夹都走这里，所以也要过闸门。
@@ -417,5 +451,28 @@ mod logout_tests {
         assert!(client.cookie_value("SESSDATA").is_none(), "登录凭据必须清掉");
         assert!(client.cookie_value("bili_jct").is_none(), "csrf 必须清掉");
         assert!(client.cookie_value("DedeUserID").is_none());
+    }
+}
+
+#[cfg(test)]
+mod cookie_dirty_tests {
+    use super::Client;
+
+    /// 服务端轮换 cookie 时必须标脏，否则只在内存里更新、重启就回到旧值。
+    #[test]
+    fn 值变化才标脏() {
+        let client = Client::new().expect("client");
+        client.import_cookies(&[("SESSDATA".into(), "old".into())]);
+        // 清掉 import 可能留下的影响，从干净状态开始
+        let _ = client.take_cookies_dirty();
+        assert!(!client.take_cookies_dirty(), "干净状态不该是脏的");
+
+        // 同一个值重复下发不算变化
+        client.remember("SESSDATA", "old");
+        assert!(!client.take_cookies_dirty(), "值没变不该标脏");
+
+        client.remember("SESSDATA", "new");
+        assert!(client.take_cookies_dirty(), "值变了要标脏");
+        assert!(!client.take_cookies_dirty(), "取走之后要复位");
     }
 }

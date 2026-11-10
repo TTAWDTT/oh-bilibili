@@ -333,3 +333,36 @@ mod clock_tests {
         assert_eq!(clock.position_ms(), 500, "0.5 倍速下 1 秒帧等于 0.5 秒媒体时间");
     }
 }
+
+#[cfg(test)]
+mod clock_end_tests {
+    use super::Clock;
+
+    /// 一段音频播完之后，位置必须停在原地，不能继续往上走。
+    ///
+    /// 曾经按输出缓冲长度推进，缓冲空了也照走，实测把 2:17 的歌存成了 42:02。
+    #[test]
+    fn 放完不再涨() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        clock.set_playing(true);
+        clock.advance(48_000); // 1 秒
+        let at_one_second = clock.position_ms();
+        assert_eq!(at_one_second, 1000);
+
+        // 之后没有真实样本了：不再推进，位置保持
+        let after_idle = clock.position_ms();
+        assert_eq!(after_idle, at_one_second, "没有新样本时不该继续涨");
+    }
+
+    #[test]
+    fn 位置不会超过设定的末尾() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        clock.set_playing(true);
+        for _ in 0..3 {
+            clock.advance(48_000);
+        }
+        assert_eq!(clock.position_ms(), 3000);
+    }
+}

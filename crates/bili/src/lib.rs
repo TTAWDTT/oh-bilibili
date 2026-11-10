@@ -64,6 +64,11 @@ impl Source {
         Ok(Source { client })
     }
 
+    /// cookie 是否在上次落盘后有变化。
+    pub fn take_cookies_dirty(&self) -> bool {
+        self.client.take_cookies_dirty()
+    }
+
     pub fn is_logged_in(&self) -> bool {
         self.client.is_logged_in()
     }

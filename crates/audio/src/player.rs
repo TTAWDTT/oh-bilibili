@@ -36,6 +36,20 @@ enum Cmd {
     Shutdown,
 }
 
+/// 按「真的送到声卡的样本数」推进时钟。
+///
+/// 不能按输出缓冲长度推进：缓冲空了（歌播完或网络卡住）时那里面是静音，
+/// 推进它会让位置一路涨到远超时长——实测一首 2:17 的歌被存成了 42:02。
+fn advance_played(clock: &Clock, written_samples: usize, channels: usize) {
+    if channels == 0 {
+        return;
+    }
+    let frames = (written_samples / channels) as u64;
+    if frames > 0 {
+        clock.advance(frames);
+    }
+}
+
 pub struct Player {
     tx: Sender<Cmd>,
     clock: SharedClock,
@@ -206,7 +220,10 @@ fn run_engine(
             for s in out.iter_mut().skip(written) {
                 *s = 0.0;
             }
-            let frames = (out.len() / channels) as u64;
+            // 只按「真的送到声卡的那部分」推进时钟：
+            // 原先按 out.len() 推进，缓冲空了（歌播完或网络卡住）也照走，
+            // 位置会一直涨到远超时长——实测一首 2:17 的歌被存成了 42:02。
+            let played_frames = (written / channels) as u64;
             // RMS 才是「有多响」，取绝对值平均会虚高。
             if written > 0 {
                 let mut sum = 0.0f32;
@@ -217,7 +234,7 @@ fn run_engine(
             } else {
                 cb_clock.set_level(0.0);
             }
-            cb_clock.advance(frames);
+            advance_played(&cb_clock, written, channels);
         },
         |err| eprintln!("音频输出错误: {err}"),
         None,
@@ -405,5 +422,41 @@ impl LinearResampler {
         self.tail = combined[consumed_frames * self.channels..].to_vec();
         self.pos = pos - consumed_frames as f64;
         producer.push_slice(&out);
+    }
+}
+
+#[cfg(test)]
+mod advance_played_tests {
+    use super::advance_played;
+    use crate::Clock;
+
+    /// 缓冲空了就是没有声音在放，位置必须停住。
+    #[test]
+    fn 没有样本推进为零() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        clock.set_playing(true);
+        advance_played(&clock, 0, 2);
+        assert_eq!(clock.position_ms(), 0);
+    }
+
+    /// 走了多少帧就推进多少毫秒，按声道数折算。
+    #[test]
+    fn 按实际帧数折算毫秒() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        clock.set_playing(true);
+        // 双声道，48000 个样本 = 24000 帧 = 500ms
+        advance_played(&clock, 48_000, 2);
+        assert_eq!(clock.position_ms(), 500);
+    }
+
+    /// 声道数为 0 是异常输入，不能除零panic。
+    #[test]
+    fn 声道为零不崩() {
+        let clock = Clock::default();
+        clock.reset(48_000);
+        advance_played(&clock, 1000, 0);
+        assert_eq!(clock.position_ms(), 0);
     }
 }

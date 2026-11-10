@@ -90,6 +90,8 @@ impl Engine {
         });
         engine.restore_queue();
         engine.start_progress_persist();
+        engine.start_cookie_persist();
+        engine.start_track_end_watch();
         Ok(engine)
     }
 
@@ -242,8 +244,14 @@ impl Engine {
                     *at = 0;
                     v
                 };
-                if resume > 0 {
-                    lock(&self.player).seek(resume);
+                // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
+                // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
+                let bounded = match track.duration {
+                    Some(d) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
+                    _ => resume,
+                };
+                if bounded > 0 {
+                    lock(&self.player).seek(bounded);
                 }
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
@@ -390,6 +398,12 @@ impl Engine {
                     let player = lock(&self.player);
                     player.pause();
                 }
+                // 队列走到头要把状态挪出 playing，否则「一首放完」的检测会一直重试
+                {
+                    let mut st = lock(&self.state);
+                    let current = std::mem::replace(&mut *st, PlayerState::Idle);
+                    *st = current.ended();
+                }
                 self.emit(AppEvent::Stopped);
                 Ok(self.snapshot())
             }
@@ -447,10 +461,9 @@ impl Engine {
 
     pub fn snapshot(&self) -> PlayerSnapshot {
         let state = lock(&self.state).clone();
-        let (position_ms, duration_ms) = {
+        let position_ms = {
             let player = lock(&self.player);
-            let clock = player.clock();
-            (clock.position_ms(), clock.sample_rate())
+            player.clock().position_ms()
         };
         // 空闲但没有在播曲目时（比如刚恢复队列），把队列里的当前项亮出来，
         // 让用户看到「上次听的是这首、停在第几秒」，而不是一片空白。
@@ -464,7 +477,6 @@ impl Engine {
                 lock(&self.queue).current().map(|entry| entry.track.clone())
             });
         let quality = state.prepared().map(|p| p.quality.kbps());
-        let _ = duration_ms;
         PlayerSnapshot {
             phase: state.phase().to_string(),
             duration_ms: track.as_ref().and_then(|t| t.duration).map(|d| d.0).unwrap_or(0),
@@ -489,6 +501,60 @@ impl Engine {
                 engine.persist_queue();
             }
         });
+    }
+
+    /// cookie 变了就写盘。
+    ///
+    /// 登录只写一次是不够的：B 站会轮换 SESSDATA，只在内存里更新会导致
+    /// 重启后拿旧 cookie 被判未登录——用户看到的就是「怎么又要重新登录」。
+    fn start_cookie_persist(self: &Arc<Self>) {
+        let engine = self.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            if engine.source.take_cookies_dirty() {
+                engine.persist_cookies();
+            }
+        });
+    }
+
+    /// 一首放完自动下一首。
+    ///
+    /// 解码器到 EOF 时只把时钟停了，上层状态仍停在 playing：位置定在末尾、
+    /// 也不切歌。一个音乐播放器不能这样，所以这里补一个结束看门狗。
+    fn start_track_end_watch(self: &Arc<Self>) {
+        let engine = self.clone();
+        let spawned = std::thread::Builder::new()
+            .name("bilimusic-track-end".into())
+            .spawn(move || {
+                let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build()
+                else {
+                    return;
+                };
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                    if !engine.reached_track_end() {
+                        continue;
+                    }
+                    // 切歌要拉流，交给这个小 runtime 跑；失败就停在 ended，别空转
+                    if rt.block_on(engine.next()).is_err() {
+                        let mut st = lock(&engine.state);
+                        let current = std::mem::replace(&mut *st, PlayerState::Idle);
+                        *st = current.ended();
+                    }
+                }
+            });
+        if let Err(e) = spawned {
+            eprintln!("结束检测线程起不来: {e}");
+        }
+    }
+
+    /// 时钟停了且状态还认为在播，说明解码器到了末尾。
+    fn reached_track_end(&self) -> bool {
+        if lock(&self.state).phase() != "playing" {
+            return false;
+        }
+        let player = lock(&self.player);
+        !player.clock().is_playing()
     }
 
     fn persist_queue(&self) {

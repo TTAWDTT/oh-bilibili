@@ -33,6 +33,13 @@ export function SearchView() {
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
   const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
+  // 统计行要说实话：用户选了「最多播放」，这里就不能还写着「按标题匹配排序」。
+  const orderLabel: Record<typeof order, string> = {
+    totalrank: '综合排序',
+    click: '按播放量',
+    pubdate: '按发布时间',
+    danmaku: '按弹幕数',
+  }
   const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
   const history = useSearchHistory((s) => s.items)
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
@@ -222,7 +229,7 @@ export function SearchView() {
                   : status === 'loading'
                     ? '正在搜索…'
                     : status === 'ready'
-                      ? `为你找到 ${tracks.length} 首 · 按标题匹配排序 · 第 ${page} 页`
+                      ? `为你找到 ${tracks.length} 首 · ${orderLabel[order]} · 第 ${page} 页`
                       : ''}
               </span>
               {status === 'loading' && tracks.length > 0 ? (
