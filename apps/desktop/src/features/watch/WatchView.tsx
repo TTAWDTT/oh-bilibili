@@ -40,6 +40,18 @@ export function WatchView({ track }: { track: Track }) {
   const addCoin = useReactionStore((st) => st.addCoin)
   const refresh = useReactionStore((st) => st.refresh)
   const [page, setPage] = useState<number | undefined>(undefined)
+  /** 控制条是否显示。鼠标移动时出现，静止 2.5 秒后淡出；暂停时常驻。 */
+  const [controls, setControls] = useState(true)
+  const hideTimer = useRef<number | null>(null)
+  /** 画质菜单展开状态。 */
+  const [qualityOpen, setQualityOpen] = useState(false)
+  /** 当前播放位置，只在控制条可见时更新，避免无谓重渲染。 */
+  const [now, setNow] = useState(0)
+  const [sending, setSending] = useState(false)
+  const [draft, setDraft] = useState('')
+  /** 全屏用浏览器全屏，不支持时退回 CSS 铺满。 */
+  const [cinema, setCinema] = useState(false)
+  const stageRef = useRef<HTMLDivElement | null>(null)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const danmakuOn = useDanmakuSettings((s) => s.enabled)
   const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
@@ -107,6 +119,77 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key])
 
+  // 控制条：鼠标动就出现，静止后淡出；暂停时不淡出。
+  const poke = (): void => {
+    setControls(true)
+    if (hideTimer.current) window.clearTimeout(hideTimer.current)
+    hideTimer.current = window.setTimeout(() => setControls(false), 2500)
+  }
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) window.clearTimeout(hideTimer.current)
+    }
+  }, [])
+
+  // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
+  useEffect(() => {
+    if (!controls) return
+    const timer = window.setInterval(() => {
+      const v = videoRef.current
+      if (v) setNow(Math.round(v.currentTime * 1000))
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [controls])
+
+  const togglePlay = (): void => {
+    const v = videoRef.current
+    if (!v) return
+    if (v.paused) void v.play().catch(() => {})
+    else v.pause()
+    poke()
+  }
+
+  const seekTo = (ratio: number): void => {
+    const v = videoRef.current
+    if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return
+    v.currentTime = Math.min(Math.max(ratio, 0), 1) * v.duration
+    poke()
+  }
+
+  const toggleFullscreen = async (): Promise<void> => {
+    const box = stageRef.current
+    if (!box) return
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        return
+      }
+      await box.requestFullscreen()
+    } catch {
+      // WebView 不支持元素全屏时，用 CSS 铺满顶上
+      setCinema((on) => !on)
+    }
+  }
+
+  const sendDanmaku = async (): Promise<void> => {
+    const text = draft.trim()
+    if (!text || sending) return
+    setSending(true)
+    try {
+      const v = videoRef.current
+      const at = v ? Math.round(v.currentTime * 1000) : 0
+      await ipc.danmakuSend(track.key, text, at)
+      setDraft('')
+      // 立刻在本地画出来，不用等下一次拉取
+      setDanmaku((prev) => [...prev, { at, text, color: 'var(--text-1)' }])
+      poke()
+    } catch {
+      // 发不出去就留着草稿，不假装成功
+    } finally {
+      setSending(false)
+    }
+  }
+
   // 弹幕只关心「在不在播」。位置由 DanmakuField 直接读元素，
   // 这样父组件不必为时间推进重渲染。
   useEffect(() => {
@@ -149,6 +232,13 @@ export function WatchView({ track }: { track: Track }) {
         video.muted = true
         video.volume = 0
         await player.load(data.manifest_url)
+        // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
+        // 否则按钮上只能显示兜底文案「画质」，用户不知道现在是多少。
+        const activeVariant = player.getVariantTracks().find((t) => t.active)
+        if (activeVariant) {
+          const match = data.qualities.find((q) => q.height === activeVariant.height)
+          if (match) setActiveId(match.id)
+        }
         if (cancelled) {
           await player.destroy()
           return
@@ -217,12 +307,23 @@ export function WatchView({ track }: { track: Track }) {
         </span>
       </div>
 
-      <div className="relative min-h-0 flex-1 bg-black" style={{ flex: '0 0 auto', height: '52%' }}>
+      <div
+        ref={stageRef}
+        onMouseMove={poke}
+        onMouseLeave={() => setControls(false)}
+        className={
+          cinema
+            ? 'fixed inset-0 z-50 flex flex-col justify-center bg-black'
+            : 'relative min-h-0 bg-black'
+        }
+        style={cinema ? undefined : { flex: '0 0 auto', height: '52%' }}
+      >
         <video
           ref={videoRef}
           muted
           playsInline
-          className="h-full w-full object-contain"
+          onClick={togglePlay}
+          className="h-full w-full cursor-pointer object-contain"
           aria-label="视频画面"
         />
         <DanmakuField
@@ -236,7 +337,7 @@ export function WatchView({ track }: { track: Track }) {
           fade
         />
         {!ready && !error ? (
-          <div className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
             正在取流…
           </div>
         ) : null}
@@ -248,6 +349,124 @@ export function WatchView({ track }: { track: Track }) {
             </span>
           </div>
         ) : null}
+
+        {/* 控制条浮在画面上：鼠标移上来才出现，静止就淡出。
+            视频网站都是这么做的——常驻一条控制条会把画面挤小。 */}
+        <div
+          className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-10 text-white transition-opacity duration-200 ${
+            controls || !videoPlaying ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* 进度：点哪里跳哪里 */}
+          <div
+            role="slider"
+            aria-label="播放进度"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round((now / Math.max(1, track.duration_ms ?? 1)) * 100)}
+            tabIndex={0}
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect()
+              seekTo((event.clientX - box.left) / box.width)
+            }}
+            className="group relative mb-1.5 h-3 cursor-pointer"
+          >
+            <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
+            <span
+              className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
+              style={{ width: `${Math.min(100, (now / Math.max(1, track.duration_ms ?? 1)) * 100)}%` }}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label={videoPlaying ? '暂停' : '播放'}
+              className="t press flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-white/15"
+            >
+              <Icon name={videoPlaying ? 'pause' : 'play'} size={15} />
+            </button>
+            <span className="num shrink-0 text-[12px] text-white/85">
+              {formatTime(now)} / {formatTime(track.duration_ms ?? 0)}
+            </span>
+
+            <div className="min-w-0 flex-1" />
+
+            {/* 发弹幕：跟着画面当前时刻发 */}
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void sendDanmaku()
+              }}
+              placeholder="发条弹幕"
+              aria-label="发弹幕"
+              className="h-7 w-[150px] shrink-0 rounded-[4px] bg-white/15 px-2 text-[12px] text-white placeholder-white/50 outline-none focus:bg-white/25"
+            />
+            <button
+              type="button"
+              onClick={() => void sendDanmaku()}
+              disabled={!draft.trim() || sending}
+              className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
+            >
+              发送
+            </button>
+
+            <button
+              type="button"
+              aria-pressed={danmakuOn}
+              title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
+              onClick={() => setDanmakuEnabled(!danmakuOn)}
+              className={`t press flex h-7 shrink-0 items-center rounded-[4px] px-2 text-[12px] ${
+                danmakuOn ? 'bg-white/20' : 'text-white/60 hover:bg-white/10'
+              }`}
+            >
+              弹
+            </button>
+
+            {data && data.qualities.length > 0 ? (
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setQualityOpen((open) => !open)}
+                  aria-expanded={qualityOpen}
+                  className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+                >
+                  {data.qualities.find((q) => q.id === activeId)?.label ?? '画质'}
+                </button>
+                {qualityOpen ? (
+                  <div className="absolute bottom-8 right-0 z-30 flex max-h-[220px] w-[104px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                    {data.qualities.map((q) => (
+                      <button
+                        key={`${q.id}-${q.height}`}
+                        type="button"
+                        onClick={() => {
+                          pickQuality(q)
+                          setQualityOpen(false)
+                        }}
+                        className={`t press px-2 py-1 text-left text-[12px] ${
+                          activeId === q.id ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                        }`}
+                      >
+                        {q.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => void toggleFullscreen()}
+              aria-label="全屏"
+              className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
+            >
+              <Icon name={cinema || document.fullscreenElement ? 'close' : 'fullscreen'} size={14} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {data && data.pages.length > 1 ? (
@@ -271,43 +490,6 @@ export function WatchView({ track }: { track: Track }) {
         </div>
       ) : null}
 
-      {data ? (
-        <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-2">
-          {/* 弹幕开关属于播放器，所以放在这里而不是全局顶栏 */}
-          <button
-            type="button"
-            aria-pressed={danmakuOn}
-            title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
-            onClick={() => setDanmakuEnabled(!danmakuOn)}
-            className={`t press mr-2 flex h-6 items-center rounded-[4px] border px-2 text-[12px] ${
-              danmakuOn
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-[var(--line)] text-[var(--text-3)]'
-            }`}
-          >
-            弹
-          </button>
-          <span className="mr-1 text-[12px] text-[var(--text-3)]">画质</span>
-          {data.qualities.map((q) => (
-            <button
-              key={`${q.id}-${q.height}`}
-              type="button"
-              aria-pressed={activeId === q.id}
-              onClick={() => pickQuality(q)}
-              className={`t press rounded-[6px] px-2 py-1 text-[12px] ${
-                activeId === q.id
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'hover:bg-[var(--panel-alt)] text-[var(--text-2)]'
-              }`}
-            >
-              {q.label}
-            </button>
-          ))}
-          <span className="ml-auto text-[12px] text-[var(--text-3)]">
-            弹幕 {danmaku.length} 条
-          </span>
-        </div>
-      ) : null}
 
       {data ? (
         <div className="border-t border-hairline px-3 py-2">
@@ -428,7 +610,7 @@ export function WatchView({ track }: { track: Track }) {
   )
 }
 
-type ShakaVariant = { height: number; bandwidth: number | null }
+type ShakaVariant = { height: number; bandwidth: number | null; active?: boolean }
 
 type ShakaPlayer = {
   load: (url: string) => Promise<void>
