@@ -457,9 +457,9 @@ impl Source {
     }
 
     async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<(f64, String, u32)>, BiliError> {
-        let url = format!(
-            "https://api.bilibili.com/x/v1/dm/list.so?oid={cid}"
-        );
+        // x/v1/dm/list.so 现在返回一张 HTML 页，拿不到弹幕了（实测 3.4KB 的登录页）。
+        // comment.bilibili.com 的 XML 还在，且一次给全量。
+        let url = format!("https://comment.bilibili.com/{cid}.xml");
         let raw = self
             .client
             .get_bytes(&url, std::time::Duration::from_millis(300))

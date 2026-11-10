@@ -4,6 +4,9 @@ import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatTime } from '../../shared/lib/format'
+import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
+import type { DanmakuItem } from '../player/DanmakuField'
+import { useDanmakuSettings } from '../player/danmakuSettings'
 import { Icon } from '../../shared/ui/Icon'
 
 /**
@@ -22,6 +25,12 @@ export function WatchView({ track }: { track: Track }) {
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
+  const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
+  const [videoPlaying, setVideoPlaying] = useState(false)
+  const danmakuOn = useDanmakuSettings((s) => s.enabled)
+  const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
+  const danmakuSize = useDanmakuSettings((s) => s.size)
+  const danmakuSpeed = useDanmakuSettings((s) => s.speed)
 
   // 取清单与档位
   useEffect(() => {
@@ -42,6 +51,38 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key])
 
+  // 取弹幕。时间轴跟视频走，不跟音频引擎。
+  useEffect(() => {
+    let cancelled = false
+    setDanmaku([])
+    void ipc
+      .danmakuColored(track.key)
+      .then((list) => {
+        if (!cancelled) setDanmaku(toDanmakuItems(list))
+      })
+      .catch(() => setDanmaku([]))
+    return () => {
+      cancelled = true
+    }
+  }, [track.key])
+
+  // 弹幕只关心「在不在播」。位置由 DanmakuField 直接读元素，
+  // 这样父组件不必为时间推进重渲染。
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const sync = (): void => setVideoPlaying(!video.paused && !video.ended)
+    sync()
+    video.addEventListener('play', sync)
+    video.addEventListener('pause', sync)
+    video.addEventListener('ended', sync)
+    return () => {
+      video.removeEventListener('play', sync)
+      video.removeEventListener('pause', sync)
+      video.removeEventListener('ended', sync)
+    }
+  }, [data])
+
   // 挂载 shaka
   useEffect(() => {
     const video = videoRef.current
@@ -58,6 +99,10 @@ export function WatchView({ track }: { track: Track }) {
         const player = new shaka.Player(video)
         playerRef.current = player
         player.addEventListener('error', (event: { detail?: unknown }) => {
+          // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
+          // 早先任何 error 都当致命，用户会看到一条红字盖在正常播放的画面上。
+          const detail = event.detail as { handled?: boolean; severity?: number } | undefined
+          if (detail?.handled) return
           setError(`播放失败：${String(event.detail ?? '未知错误')}`)
         })
         video.muted = true
@@ -121,6 +166,16 @@ export function WatchView({ track }: { track: Track }) {
           className="h-full w-full object-contain"
           aria-label="视频画面"
         />
+        <DanmakuField
+          items={danmaku}
+          position={() => (videoRef.current ? Math.round(videoRef.current.currentTime * 1000) : 0)}
+          playing={videoPlaying}
+          enabled={danmakuOn}
+          opacity={danmakuOpacity}
+          size={danmakuSize}
+          speed={danmakuSpeed}
+          fade
+        />
         {!ready && !error ? (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
             正在取流…
@@ -154,6 +209,9 @@ export function WatchView({ track }: { track: Track }) {
               {q.label}
             </button>
           ))}
+          <span className="ml-auto text-[12px] text-[var(--text-3)]">
+            弹幕 {danmaku.length} 条
+          </span>
         </div>
       ) : null}
     </div>

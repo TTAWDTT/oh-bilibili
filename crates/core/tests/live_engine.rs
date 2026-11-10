@@ -236,3 +236,33 @@ fn 观看页能拿到只含视频的清单() {
         assert!(xml.contains("http://127.0.0.1:9/m/t"), "清单里的地址应该是本机代理的绝对地址");
     });
 }
+
+/// 弹幕要真能取到。
+///
+/// 这条测试存在的原因：x/v1/dm/list.so 改成返回 HTML 之后取数一直是空的，
+/// 而界面只在 mock 里验过动画，所以「0 条弹幕」很久没被发现。
+#[test]
+#[ignore = "真实网络"]
+fn 弹幕能取到真实数据() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-dm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        let list = engine.danmaku_colored(&key).await.expect("取弹幕");
+        println!("共 {} 条弹幕", list.len());
+        for (at, text, color) in list.iter().take(3) {
+            println!("  {at:.1}s  {text}  #{color:06x}");
+        }
+        assert!(list.len() > 50, "一条视频动辄上千条，实际只有 {}", list.len());
+        assert!(list.iter().any(|(_, t, _)| !t.is_empty()), "文本不该全空");
+    });
+}

@@ -8,9 +8,12 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-/// 票据有效期。B 站的播放地址本身会过期，这里比它更短，
-/// 让一张泄漏的票在几分钟内失效。
-pub const TTL: Duration = Duration::from_secs(300);
+/// 票据有效期。
+///
+/// 必须长于一条视频的播放时长：定 5 分钟时，5 分 17 秒的视频后半段会全部
+/// 拿到 404，shaka 报 Error 1003 再靠重试硬撑。30 分钟既够长，
+/// 又让一张泄漏的票在有限时间内失效。
+pub const TTL: Duration = Duration::from_secs(1800);
 
 /// 票据指向的东西。媒体字节要去远端取，清单是我们自己生成的文本。
 #[derive(Debug, Clone)]
