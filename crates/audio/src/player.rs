@@ -42,6 +42,14 @@ enum Cmd {
 ///
 /// 不能按输出缓冲长度推进：缓冲空了（歌播完或网络卡住）时那里面是静音，
 /// 推进它会让位置一路涨到远超时长——实测一首 2:17 的歌被存成了 42:02。
+/// 音频侧追迹。只在设置 `BILIMUSIC_AUDIO_TRACE` 时打印，
+/// 平时安静；排查「位置不动」这类问题时打开就能看到解码线程为什么停。
+fn trace(message: &str) {
+    if std::env::var_os("BILIMUSIC_AUDIO_TRACE").is_some() {
+        eprintln!("[audio] {message}");
+    }
+}
+
 fn advance_played(clock: &Clock, written_samples: usize, channels: usize) {
     if channels == 0 {
         return;
@@ -309,6 +317,7 @@ fn run_engine(
                         resampler.set_source_rate(base_rate * speed);
                         clock.reset(device_rate);
                         clock.set_playing(true);
+                        trace("已加载并开始推进");
                         ended.store(false, Ordering::Relaxed);
                         decoder = Some(d);
                     }
@@ -368,13 +377,15 @@ fn run_engine(
                 if e.kind() == std::io::ErrorKind::UnexpectedEof =>
             {
                 // 自然播到末尾：这是「该切歌」的信号
+                trace(&format!("EOF，位置 {}ms", clock.position_ms()));
                 ended.store(true, Ordering::Relaxed);
                 clock.set_playing(false);
                 decoder = None;
                 continue;
             }
-            Err(_) => {
+            Err(err) => {
                 // 解码出错：不置 ended，上层会当作卡住并原地续播
+                trace(&format!("解码错误 {err}，位置 {}ms", clock.position_ms()));
                 clock.set_playing(false);
                 decoder = None;
                 continue;

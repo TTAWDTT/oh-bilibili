@@ -422,10 +422,26 @@ fn 切到听视频能接管并接上位置() {
         println!("模式={:?} 相位={} 位置={}ms 音量={}", snap.mode, snap.phase, snap.position_ms, snap.volume);
         assert_eq!(snap.mode, bilimusic_core::wire::PlayMode::Listen);
         assert_eq!(snap.volume, 0.0, "音量必须是 0，否则会出声");
-        std::thread::sleep(std::time::Duration::from_millis(1200));
-        let after = engine.snapshot();
-        // 已知未解：在这个测试进程里音频时钟不推进（相位 playing 但位置恒为 0），
-        // 用真机播放时是正常的。原因未查明，所以这里只记录不假设。
-        println!("1.2 秒后位置 {}ms（未解：此处时钟不推进）", after.position_ms);
+        // 拉流要一两秒，加载完成后 seek 才落到时钟上，所以轮询等而不是睡固定时长。
+        let mut landed = 0u64;
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            landed = engine.snapshot().position_ms;
+            if landed > 1_000 {
+                break;
+            }
+        }
+        println!("接管后位置 {landed}ms");
+        assert!(
+            landed >= 38_000,
+            "位置应该接在画面传过来的 40 秒附近，实际 {landed}ms"
+        );
+
+        // 再走 3 秒，位置应该继续前进：证明是真的在放，不是停在某一帧
+        std::thread::sleep(std::time::Duration::from_millis(3000));
+        let later = engine.snapshot();
+        println!("3 秒后位置 {}ms（音量 {}）", later.position_ms, later.volume);
+        assert!(later.position_ms > landed + 2_000, "位置应该继续前进");
+        assert_eq!(later.volume, 0.0, "音量必须是 0，整条链路静音");
     });
 }
