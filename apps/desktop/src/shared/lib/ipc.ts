@@ -283,6 +283,11 @@ export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<Pl
   return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
+/** 稍后再看列表。 */
+export function watchLaterList(): Promise<Track[]> {
+  return invoke<Track[]>('watch_later_list')
+}
+
 /** 首页推荐。风控拒绝时返回空列表。 */
 export function homeFeed(fresh: number): Promise<Track[]> {
   return invoke<Track[]>('home_feed', { fresh })

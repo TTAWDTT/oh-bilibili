@@ -10,6 +10,7 @@ export type View =
   | { kind: 'downloads' | 'history' | 'favs' }
   | { kind: 'author'; name: string; mid?: number | null }
   | { kind: 'watch'; track: Track }
+  | { kind: 'watchLater' }
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'

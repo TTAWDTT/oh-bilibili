@@ -29,6 +29,7 @@ import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
 import { WatchView } from '../features/watch/WatchView'
 import { HomeView } from '../features/home/HomeView'
+import { WatchLaterView } from '../features/library/WatchLaterView'
 
 /**
  * 当前页面的标题。
@@ -60,6 +61,8 @@ function viewTitle(view: View): string {
       return '设置'
     case 'watch':
       return `观看：${view.track.title}`
+    case 'watchLater':
+      return '稍后再看'
   }
 }
 
@@ -87,6 +90,8 @@ function CurrentView({ view }: { view: View }) {
       return <SettingsView />
     case 'watch':
       return <WatchView track={view.track} />
+    case 'watchLater':
+      return <WatchLaterView />
   }
 }
 

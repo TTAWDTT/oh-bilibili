@@ -252,6 +252,44 @@ impl Client {
         Ok(list.iter().filter_map(|i| i["aid"].as_u64()).collect())
     }
 
+    /// 稍后再看列表。一条响应就带全卡片数据，不需要逐条查详情。
+    pub async fn watch_later_tracks(&self) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        use bilimusic_model::{Millis, Track, TrackKey};
+
+        let v = self
+            .get_json(
+                &format!("{API}/x/v2/history/toview"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["list"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|m| {
+                let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+                let duration = m["duration"].as_u64().filter(|d| *d > 0);
+                Some(Track {
+                    key: TrackKey::from_provider(bvid),
+                    title: m["title"].as_str().unwrap_or_default().to_string(),
+                    artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+                    duration: duration.map(|d| Millis(d * 1000)),
+                    cover: m["pic"]
+                        .as_str()
+                        .map(|c| c.replacen("http://", "https://", 1)),
+                    accent: None,
+                    views: m["stat"]["view"].as_u64(),
+                    danmaku: m["stat"]["danmaku"].as_u64(),
+                    up_avatar: None,
+                    up_mid: m["owner"]["mid"].as_u64(),
+                    tname: m["tname"].as_str().map(|s| s.to_string()),
+                    typeid: None,
+                })
+            })
+            .collect())
+    }
+
     /// 加入稍后再看。
     pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
         let csrf = self

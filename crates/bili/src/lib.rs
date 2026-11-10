@@ -257,6 +257,11 @@ impl Source {
         self.client.relation_state(&key.as_opaque()).await
     }
 
+    /// 稍后再看列表。
+    pub async fn watch_later_list(&self) -> Result<Vec<Track>, BiliError> {
+        self.client.watch_later_tracks().await
+    }
+
     /// 上报观看进度。未登录时返回 Err，调用方忽略即可。
     pub async fn report_progress(
         &self,

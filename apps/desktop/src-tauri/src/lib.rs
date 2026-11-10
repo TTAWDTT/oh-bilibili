@@ -124,6 +124,14 @@ async fn set_mode(
     engine.set_mode(mode, at_ms, target.as_ref()).await
 }
 
+/// 稍后再看列表。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_later_list(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<bilimusic_model::Track>, WireError> {
+    engine.watch_later_list().await
+}
+
 /// 首页推荐。
 #[tauri::command(rename_all = "snake_case")]
 async fn home_feed(
@@ -678,6 +686,7 @@ pub fn run() {
             watch_open,
             watch_comments,
             home_feed,
+            watch_later_list,
             set_mode,
             search_q,
             player_state,

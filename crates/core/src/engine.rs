@@ -432,6 +432,11 @@ impl Engine {
         Ok(self.source.report_progress(key, played_secs, start_ts).await?)
     }
 
+    /// 稍后再看列表。
+    pub async fn watch_later_list(&self) -> Result<Vec<bilimusic_model::Track>, WireError> {
+        Ok(self.source.watch_later_list().await?)
+    }
+
     /// 首页推荐。风控拒绝时返回空列表，界面显示「换一批」。
     pub async fn home_feed(&self, fresh: u32) -> Result<Vec<bilimusic_model::Track>, WireError> {
         Ok(self.source.home_feed(fresh).await?)
