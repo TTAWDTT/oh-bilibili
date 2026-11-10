@@ -2,6 +2,7 @@ import type { Track } from '../shared/lib/contract'
 import { create } from 'zustand'
 
 export type View =
+  | { kind: 'home' }
   | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }
@@ -53,7 +54,7 @@ type AppStore = {
 }
 
 export const useAppStore = create<AppStore>()((set, get) => ({
-  view: { kind: 'search' },
+  view: { kind: 'home' },
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,

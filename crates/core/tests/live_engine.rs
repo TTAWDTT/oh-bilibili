@@ -357,3 +357,28 @@ fn 分P_列表与切换() {
         assert_ne!(v2.manifest_url, view.manifest_url, "换分P 应该是一条新清单");
     });
 }
+
+/// 首页推荐要真能取到。风控会拒，所以只断言「要么有货、要么明确为空」。
+#[test]
+#[ignore = "真实网络"]
+fn 首页推荐能取到卡片() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-fd-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let items = engine.home_feed(1).await.expect("取推荐");
+        println!("推荐 {} 条", items.len());
+        for t in items.iter().take(5) {
+            println!("  {} | {} | {:?}s", t.title.chars().take(22).collect::<String>(), t.artist, t.duration.map(|d| d.0 / 1000));
+        }
+        assert!(!items.is_empty(), "第一屏不该是空的");
+        assert!(items.iter().all(|t| !t.title.is_empty()));
+    });
+}

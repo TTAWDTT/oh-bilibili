@@ -278,6 +278,11 @@ export function mvSource(key: string): Promise<string> {
 }
 
 
+/** 首页推荐。风控拒绝时返回空列表。 */
+export function homeFeed(fresh: number): Promise<Track[]> {
+  return invoke<Track[]>('home_feed', { fresh })
+}
+
 /** 取一页评论。 */
 export function watchComments(key: string, page: number): Promise<CommentPage> {
   return invoke<CommentPage>('watch_comments', { key, page })

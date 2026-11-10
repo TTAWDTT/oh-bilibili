@@ -112,6 +112,15 @@ async fn danmaku_heat(
         .await
 }
 
+/// 首页推荐。
+#[tauri::command(rename_all = "snake_case")]
+async fn home_feed(
+    engine: tauri::State<'_, Arc<Engine>>,
+    fresh: u32,
+) -> Result<Vec<bilimusic_model::Track>, WireError> {
+    engine.home_feed(fresh).await
+}
+
 /// 取一页评论。评论区只读，取不到不该挡住看视频。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_comments(
@@ -656,6 +665,7 @@ pub fn run() {
             mv_source,
             watch_open,
             watch_comments,
+            home_feed,
             search_q,
             player_state,
             player_play,

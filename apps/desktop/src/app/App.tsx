@@ -28,6 +28,7 @@ import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
 import { WatchView } from '../features/watch/WatchView'
+import { HomeView } from '../features/home/HomeView'
 
 /**
  * 当前页面的标题。
@@ -37,6 +38,8 @@ import { WatchView } from '../features/watch/WatchView'
  */
 function viewTitle(view: View): string {
   switch (view.kind) {
+    case 'home':
+      return '发现'
     case 'search':
       return '搜索'
     case 'library':
@@ -62,6 +65,8 @@ function viewTitle(view: View): string {
 
 function CurrentView({ view }: { view: View }) {
   switch (view.kind) {
+    case 'home':
+      return <HomeView />
     case 'search':
       return <SearchView />
     case 'library':

@@ -4,6 +4,7 @@
 //! 这个 crate 之外的代码不会看到 bvid、cid、dash、fnval 这些词。
 
 pub mod comments;
+pub mod feed;
 pub mod dash;
 pub mod auth;
 pub mod client;
@@ -374,6 +375,24 @@ impl Source {
             .get_json(&absolute, std::time::Duration::ZERO)
             .await?;
         Ok(wire::subtitle_lines(&body))
+    }
+
+    /// 取一屏推荐。风控随时可能拒绝，失败就返回空列表，界面显示「换一批」。
+    pub async fn home_feed(&self, fresh: u32) -> Result<Vec<Track>, BiliError> {
+        let value = self
+            .client
+            .signed_get(
+                &format!("{}/x/web-interface/wbi/index/top/feed/rcmd", client::API),
+                vec![
+                    ("ps", "12".to_string()),
+                    ("fresh_type", "3".to_string()),
+                    ("fresh_idx", fresh.to_string()),
+                    ("feed_version", "V8".to_string()),
+                ],
+                std::time::Duration::from_millis(600),
+            )
+            .await?;
+        Ok(crate::feed::items_from(&value))
     }
 
     /// 取一页评论。aid 来自详情，评论区只读，失败就返回空页。

@@ -348,6 +348,11 @@ impl Engine {
         })
     }
 
+    /// 首页推荐。风控拒绝时返回空列表，界面显示「换一批」。
+    pub async fn home_feed(&self, fresh: u32) -> Result<Vec<bilimusic_model::Track>, WireError> {
+        Ok(self.source.home_feed(fresh).await?)
+    }
+
     /// 取一页评论。评论区只读，取不到不该挡住看视频。
     pub async fn comments(
         &self,
