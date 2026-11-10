@@ -177,3 +177,62 @@ async fn 连续两次打开不会把状态打成失败() {
         "两次打开交错之后不该停在失败态"
     );
 }
+
+fn dirs_cookies() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    let p = std::path::PathBuf::from(home)
+        .join("Library/Application Support/dev.bilimusic.app/cookies.json");
+    p.exists().then_some(p)
+}
+
+/// 观看页的数据链路要能跑通：拿到 DASH 视频轨，合成只含视频的 MPD，
+/// 铸出句柄，再从句柄换回清单。全程不出声。
+///
+/// 用同步测试再自己建 runtime：Engine::new 在带登录态时会刷新 nav，
+/// 而它内部会 block_on 一个新 runtime，放进 tokio::test 里会直接 panic。
+#[test]
+#[ignore = "真实网络"]
+fn 观看页能拿到只含视频的清单() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-watch-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    match dirs_cookies() {
+        Some(src) => {
+            std::fs::copy(&src, dir.join("cookies.json")).expect("复制登录态");
+            println!("已带入登录态");
+        }
+        None => println!("没有找到本机登录态，画质会退到未登录档位"),
+    }
+
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+
+        let view = engine.open_watch(&key, "http://127.0.0.1:9").await.expect("打开观看页");
+        println!(
+            "句柄={} 时长={}ms 档位={}",
+            view.manifest_url, view.duration_ms, view.qualities.len()
+        );
+        for q in view.qualities.iter().take(5) {
+            println!("  {} {}x{} id={}", q.label, q.width, q.height, q.id);
+        }
+        assert!(!view.qualities.is_empty(), "应该有画质档位");
+        assert!(view.qualities[0].height >= 720, "最高档不该低于 720P");
+
+        let handle = view.manifest_url.rsplit('/').next().expect("清单地址末尾是句柄");
+        let payload = engine.redeem_stream(handle).expect("句柄能换回清单");
+        let bilimusic_core::tickets::Payload::Doc(xml) = payload else {
+            panic!("清单应该是本机文本，不是远端地址");
+        };
+        println!("清单长度 {} 字节", xml.len());
+        assert!(xml.contains("contentType=\"video\""));
+        assert!(!xml.contains("contentType=\"audio\""), "清单里不该有音频轨");
+        assert!(!xml.contains("bilivideo"), "远端地址不该出现在清单里");
+        assert!(xml.contains("http://127.0.0.1:9/m/t"), "清单里的地址应该是本机代理的绝对地址");
+    });
+}

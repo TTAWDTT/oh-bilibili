@@ -17,7 +17,7 @@ use bilimusic_store::{Library, ReactionKind, ReactionState};
 
 use crate::lyrics::{self, LyricDoc};
 use crate::state::{LoadToken, PlayerState, Prepared, Queue};
-use crate::wire::{AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, WireError};
+use crate::wire::{AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, WatchView, WireError};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DownloadView {
@@ -301,13 +301,48 @@ impl Engine {
         }
     }
 
+    /// 打开观看页。一次调用给齐画面需要的东西，前端看不到任何远端地址。
+    ///
+    /// 只合成视频轨的 MPD。音频仍由音频引擎出声，所以视频元素上没有音轨，
+    /// 不会出现两路声音，也不重复解码。
+    /// `proxy_origin` 是本机代理的源，形如 `http://127.0.0.1:52194`。
+    /// 端口只有外壳知道，所以由它传进来，引擎不猜。
+    pub async fn open_watch(
+        &self,
+        key: &TrackKey,
+        proxy_origin: &str,
+    ) -> Result<WatchView, WireError> {
+        let detail = self.source.detail(key).await?;
+        let video = self.source.dash_video(key).await?;
+        let duration = detail.track.duration.unwrap_or(Millis(0));
+        let origin = proxy_origin.trim_end_matches('/').to_string();
+        let engine = self;
+        let mpd = crate::dash_bridge::video_mpd(&video, duration.0, |url| {
+            format!("{origin}/m/{}", engine.mint_stream(url))
+        });
+        let manifest_url = format!("{origin}/m/{}", self.mint_doc(mpd));
+        let qualities = crate::dash_bridge::quality_list(&video);
+        Ok(WatchView {
+            key: key.as_opaque().to_string(),
+            manifest_url,
+            duration_ms: duration.0,
+            qualities,
+            audio_quality: None,
+        })
+    }
+
     /// 把一条远端地址换成不透明句柄。句柄是前端能拿到的唯一地址形态。
     pub fn mint_stream(&self, url: impl Into<String>) -> String {
         self.tickets.mint(url)
     }
 
+    /// 铸造一张指向本机文本的票，给 DASH 清单用。
+    pub fn mint_doc(&self, doc: impl Into<String>) -> String {
+        self.tickets.mint_doc(doc)
+    }
+
     /// 代理兑换句柄。返回 None 就回 404。
-    pub fn redeem_stream(&self, handle: &str) -> Option<String> {
+    pub fn redeem_stream(&self, handle: &str) -> Option<crate::tickets::Payload> {
         self.tickets.redeem(handle)
     }
 

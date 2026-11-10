@@ -85,9 +85,22 @@ fn handle(mut stream: TcpStream, cookie: &str, engine: &Engine) -> std::io::Resu
         let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n");
         return Ok(());
     };
-    let Some(target) = engine.redeem_stream(ticket) else {
+    let Some(payload) = engine.redeem_stream(ticket) else {
         let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n");
         return Ok(());
+    };
+    // 清单是我们自己拼的文本，直接回，不去远端取。
+    let target = match payload {
+        bilimusic_core::tickets::Payload::Doc(xml) => {
+            let head = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/dash+xml\r\ncontent-length: {}\r\naccess-control-allow-origin: *\r\nconnection: close\r\n\r\n",
+                xml.len()
+            );
+            stream.write_all(head.as_bytes())?;
+            let _ = stream.write_all(xml.as_bytes());
+            return Ok(());
+        }
+        bilimusic_core::tickets::Payload::Url(u) => u,
     };
 
     let client = reqwest::blocking::Client::builder()

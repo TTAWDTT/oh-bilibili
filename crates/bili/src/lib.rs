@@ -363,6 +363,39 @@ impl Source {
         Ok(wire::subtitle_lines(&body))
     }
 
+    /// 取 DASH 的视频轨。只返回视频，音频永远走音频引擎。
+    ///
+    /// 用 fnval=4048 拿到全部特性与全部档位（含 1080P+），并且 fourk=1
+    /// 才允许 4K 档出现。fnval=1 的 durl 单文件只到 720P，够不到这里。
+    pub async fn dash_video(&self, key: &TrackKey) -> Result<Vec<crate::dash::VideoStream>, BiliError> {
+        let detail = self.detail(key).await?;
+        let value = self
+            .client
+            .signed_get_play(
+                &format!("{}/x/player/wbi/playurl", client::API),
+                vec![
+                    ("bvid", key.as_opaque().to_string()),
+                    ("cid", detail.cid.to_string()),
+                    ("fnval", "4048".into()),
+                    ("fourk", "1".into()),
+                    // platform=pc 才会给全档位。少了它只回 480P 与 360P。
+                    ("platform", "pc".into()),
+                ],
+                PLAY_INTERVAL,
+            )
+            .await?;
+        let video = value["data"]["dash"]["video"]
+            .as_array()
+            .ok_or_else(|| BiliError::Api {
+                code: -1,
+                message: "这条内容没有 DASH 视频轨".into(),
+            })?;
+        serde_json::from_value(serde_json::Value::Array(video.clone())).map_err(|e| BiliError::Api {
+            code: -1,
+            message: format!("视频轨解析失败：{e}"),
+        })
+    }
+
     /// 取一条音视频合一的 MP4 地址，给界面里的 `<video>` 用。
     ///
     /// 用 fnval=1 拿 durl，而不是 DASH：MASH 的音轨与视频轨是分开的，

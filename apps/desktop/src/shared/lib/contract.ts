@@ -29,6 +29,22 @@ export type PlayerSnapshot = {
   quality_kbps: number | null
 }
 
+/** 观看页一次调用拿到的全部东西。manifest_url 已经带上本机代理端口。 */
+export type WatchView = {
+  key: string
+  manifest_url: string
+  duration_ms: number
+  qualities: QualityOption[]
+  audio_quality: number | null
+}
+
+export type QualityOption = {
+  id: number
+  label: string
+  width: number
+  height: number
+}
+
 export type VideoMeta = {
   desc: string
   pubdate: number

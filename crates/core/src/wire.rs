@@ -148,6 +148,17 @@ pub struct AuthSnapshot {
     pub user: Option<AuthUser>,
 }
 
+/// 观看页一次调用拿到的全部东西。前端看不到任何远端地址。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchView {
+    pub key: String,
+    /// 清单的完整地址，已经带上本机代理端口。
+    pub manifest_url: String,
+    pub duration_ms: u64,
+    pub qualities: Vec<crate::dash_bridge::QualityOption>,
+    pub audio_quality: Option<u16>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppEvent {

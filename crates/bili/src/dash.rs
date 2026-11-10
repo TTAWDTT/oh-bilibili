@@ -7,9 +7,9 @@ use serde::Deserialize;
 
 /// 一条视频轨。字段来自 playurl 的 `dash.video[]`。
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "RawVideo")]
 pub struct VideoStream {
     pub id: u32,
-    #[serde(rename = "baseUrl", alias = "base_url")]
     pub url: String,
     pub bandwidth: u64,
     pub codecs: String,
@@ -19,6 +19,40 @@ pub struct VideoStream {
     pub frame_rate: Option<String>,
     #[serde(rename = "SegmentBase")]
     pub segment_base: SegmentBase,
+}
+
+/// 原始形态。B 站的响应里 `baseUrl` 与 `base_url` 会同时出现，
+/// 直接给字段加 alias 会报重复字段，所以先收原始结构再归一。
+#[derive(Deserialize)]
+struct RawVideo {
+    id: u32,
+    #[serde(default)]
+    base_url: Option<String>,
+    #[serde(rename = "baseUrl", default)]
+    base_url_camel: Option<String>,
+    bandwidth: u64,
+    codecs: String,
+    width: u32,
+    height: u32,
+    #[serde(default)]
+    frame_rate: Option<String>,
+    #[serde(rename = "SegmentBase")]
+    segment_base: SegmentBase,
+}
+
+impl From<RawVideo> for VideoStream {
+    fn from(r: RawVideo) -> VideoStream {
+        VideoStream {
+            id: r.id,
+            url: r.base_url_camel.or(r.base_url).unwrap_or_default(),
+            bandwidth: r.bandwidth,
+            codecs: r.codecs,
+            width: r.width,
+            height: r.height,
+            frame_rate: r.frame_rate,
+            segment_base: r.segment_base,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

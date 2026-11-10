@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type {
+import type { WatchView,
   AuthSnapshot,
   DownloadView,
   LyricDoc,
@@ -275,6 +275,12 @@ export async function mvPort(): Promise<number> {
 /** 取一条可播放的 mp4 直链；必须经本地代理转发才有 Referer。 */
 export function mvSource(key: string): Promise<string> {
   return call<string>('mv_source', { key })
+}
+
+
+/** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
+export function watchOpen(key: string): Promise<WatchView> {
+  return invoke<WatchView>('watch_open', { key })
 }
 
 export function authStatus(): Promise<AuthSnapshot> {

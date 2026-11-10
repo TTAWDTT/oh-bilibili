@@ -12,9 +12,16 @@ use std::time::{Duration, Instant};
 /// 让一张泄漏的票在几分钟内失效。
 pub const TTL: Duration = Duration::from_secs(300);
 
+/// 票据指向的东西。媒体字节要去远端取，清单是我们自己生成的文本。
+#[derive(Debug, Clone)]
+pub enum Payload {
+    Url(String),
+    Doc(String),
+}
+
 #[derive(Debug, Clone)]
 struct Ticket {
-    url: String,
+    payload: Payload,
     minted_at: Instant,
 }
 
@@ -29,8 +36,18 @@ impl Tickets {
         Tickets::default()
     }
 
-    /// 铸造一张票。远端地址从 playurl 响应里来，别处不铸造。
+    /// 铸造一张指向远端地址的票。
     pub fn mint(&self, url: impl Into<String>) -> String {
+        self.mint_payload(Payload::Url(url.into()))
+    }
+
+    /// 铸造一张指向本机文本的票。DASH 清单走这条路，
+    /// 因为清单是我们拼出来的，不在任何 CDN 上。
+    pub fn mint_doc(&self, doc: impl Into<String>) -> String {
+        self.mint_payload(Payload::Doc(doc.into()))
+    }
+
+    fn mint_payload(&self, payload: Payload) -> String {
         let mut next = self.next.lock().unwrap_or_else(|e| e.into_inner());
         *next += 1;
         let handle = format!("t{}", *next);
@@ -39,7 +56,7 @@ impl Tickets {
         live.insert(
             handle.clone(),
             Ticket {
-                url: url.into(),
+                payload,
                 minted_at: Instant::now(),
             },
         );
@@ -47,15 +64,15 @@ impl Tickets {
     }
 
     /// 代理收到请求时兑换。未知或过期返回 None，调用方回 404。
-    pub fn redeem(&self, handle: &str) -> Option<String> {
+    pub fn redeem(&self, handle: &str) -> Option<Payload> {
         self.redeem_at(handle, Instant::now())
     }
 
-    fn redeem_at(&self, handle: &str, now: Instant) -> Option<String> {
+    fn redeem_at(&self, handle: &str, now: Instant) -> Option<Payload> {
         let mut live = self.live.lock().unwrap_or_else(|e| e.into_inner());
         // 顺手清过期项，免得表无限长
         live.retain(|_, t| now.duration_since(t.minted_at) < TTL);
-        live.get(handle).map(|t| t.url.clone())
+        live.get(handle).map(|t| t.payload.clone())
     }
 
     pub fn len(&self) -> usize {
@@ -71,7 +88,7 @@ mod tests {
     fn 铸出的票能换回原地址() {
         let t = Tickets::new();
         let h = t.mint("https://example.invalid/a.m4s");
-        assert_eq!(t.redeem(&h).as_deref(), Some("https://example.invalid/a.m4s"));
+        assert!(matches!(t.redeem(&h), Some(Payload::Url(ref u)) if u == "https://example.invalid/a.m4s"));
     }
 
     #[test]
@@ -80,8 +97,8 @@ mod tests {
         let a = t.mint("https://example.invalid/a");
         let b = t.mint("https://example.invalid/b");
         assert_ne!(a, b);
-        assert_eq!(t.redeem(&a).as_deref(), Some("https://example.invalid/a"));
-        assert_eq!(t.redeem(&b).as_deref(), Some("https://example.invalid/b"));
+        assert!(matches!(t.redeem(&a), Some(Payload::Url(ref u)) if u == "https://example.invalid/a"));
+        assert!(matches!(t.redeem(&b), Some(Payload::Url(ref u)) if u == "https://example.invalid/b"));
     }
 
     #[test]
@@ -90,6 +107,13 @@ mod tests {
         assert!(t.redeem("t999").is_none());
         assert!(t.redeem("").is_none());
         assert!(t.redeem("https://evil.invalid/x").is_none(), "地址当票用必须失败");
+    }
+
+    #[test]
+    fn 清单也能铸票并且能换回全文() {
+        let t = Tickets::new();
+        let h = t.mint_doc("<MPD/>");
+        assert!(matches!(t.redeem(&h), Some(Payload::Doc(ref d)) if d == "<MPD/>"));
     }
 
     #[test]

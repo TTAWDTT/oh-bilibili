@@ -112,6 +112,19 @@ async fn danmaku_heat(
         .await
 }
 
+/// 打开观看页。一次给齐清单地址与画质档位，前端看不到任何远端地址。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_open(
+    engine: tauri::State<'_, Arc<Engine>>,
+    port: tauri::State<'_, MvPort>,
+    key: String,
+) -> Result<bilimusic_core::wire::WatchView, WireError> {
+    let origin = format!("http://127.0.0.1:{}", port.0);
+    engine
+        .open_watch(&TrackKey::from_provider(key), &origin)
+        .await
+}
+
 /// 取一条可播放的 mp4。返回的是本机句柄地址，远端直链不出这一层。
 #[tauri::command(rename_all = "snake_case")]
 async fn mv_source(
@@ -630,6 +643,7 @@ pub fn run() {
             related,
             video_meta,
             mv_source,
+            watch_open,
             search_q,
             player_state,
             player_play,
