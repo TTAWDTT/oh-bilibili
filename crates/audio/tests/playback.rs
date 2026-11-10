@@ -1,12 +1,27 @@
 //! 真实声卡验证：加载一段真实音轨，看位置是否被回调推进。
-//! 没有输出设备时跳过，不让 CI 红。
+//!
+//! 这些测试**会通过扬声器放声音**，所以在 CI 与任何安静场合都必须跳过。
+//! 只有显式设置 `BILIMUSIC_AUDIO_TESTS=1` 才会真正执行：
+//!
+//! ```sh
+//! BILIMUSIC_AUDIO_TESTS=1 cargo test -p bilimusic-audio --test playback -- --nocapture
+//! ```
 
 use std::time::Duration;
 
 use bilimusic_audio::{Media, Player};
 
+/// 没有显式开启就直接跳过，避免在开会/深夜等场合突然出声。
+fn audio_tests_enabled() -> bool {
+    std::env::var("BILIMUSIC_AUDIO_TESTS").is_ok_and(|v| v == "1")
+}
+
 #[test]
 fn 播放时位置由声卡推进() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
     let path = std::path::Path::new("../../testdata/sample.m4s");
     if !path.exists() {
         eprintln!("跳过：没有 testdata/sample.m4s");
@@ -44,6 +59,10 @@ fn 播放时位置由声卡推进() {
 /// 实测出现过 20 秒墙钟只推进 16 秒（慢 21%）的情况。
 #[test]
 fn 位置推进速度等于真实时间() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
     let path = std::path::Path::new("../../testdata/sample.m4s");
     if !path.exists() {
         eprintln!("跳过：没有 testdata/sample.m4s");

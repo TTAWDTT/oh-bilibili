@@ -543,16 +543,34 @@ impl Engine {
                 else {
                     return;
                 };
+                // 卡住的计数：连续几次发现「在播但时钟停了」才动手，避免误判
+                let mut stalled = 0u32;
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(400));
-                    if !engine.reached_track_end() {
+                    if engine.reached_track_end() {
+                        // 真的唱完了：切下一首；失败就停在 ended，别空转
+                        if rt.block_on(engine.next()).is_err() {
+                            let mut st = lock(&engine.state);
+                            let current = std::mem::replace(&mut *st, PlayerState::Idle);
+                            *st = current.ended();
+                        }
+                        stalled = 0;
                         continue;
                     }
-                    // 切歌要拉流，交给这个小 runtime 跑；失败就停在 ended，别空转
-                    if rt.block_on(engine.next()).is_err() {
-                        let mut st = lock(&engine.state);
-                        let current = std::mem::replace(&mut *st, PlayerState::Idle);
-                        *st = current.ended();
+                    // 没到末尾却停了，说明是卡住（网络断、解码出错）。
+                    // 从当前位置原地续播，而不是当成播完跳下一首。
+                    if !engine.stalled_midway() {
+                        stalled = 0;
+                        continue;
+                    }
+                    stalled += 1;
+                    if stalled < 3 {
+                        continue;
+                    }
+                    stalled = 0;
+                    let key = lock(&engine.queue).current().map(|e| e.track.key.clone());
+                    if let Some(k) = key {
+                        let _ = rt.block_on(engine.play_key(&k));
                     }
                 }
             });
@@ -566,8 +584,45 @@ impl Engine {
         if lock(&self.state).phase() != "playing" {
             return false;
         }
-        let player = lock(&self.player);
-        !player.clock().is_playing()
+        let (clock_stopped, position) = {
+            let player = lock(&self.player);
+            (!player.clock().is_playing(), player.clock().position_ms())
+        };
+        if !clock_stopped {
+            return false;
+        }
+        // 时钟停了不等于播完了：网络断、解码出错也会停。
+        // 只有位置确实走到末尾（差 2 秒以内）才算唱完，
+        // 否则那是卡住，交给下面的续播处理，而不是跳下一首。
+        let duration = lock(&self.queue)
+            .current()
+            .and_then(|e| e.track.duration)
+            .map(|d| d.0)
+            .unwrap_or(0);
+        if duration == 0 {
+            return false;
+        }
+        position + 2_000 >= duration
+    }
+
+    /// 状态说在播、时钟却停了，而且离末尾还远——这是卡住，不是播完。
+    fn stalled_midway(&self) -> bool {
+        if lock(&self.state).phase() != "playing" {
+            return false;
+        }
+        let (stopped, position) = {
+            let player = lock(&self.player);
+            (!player.clock().is_playing(), player.clock().position_ms())
+        };
+        if !stopped {
+            return false;
+        }
+        let duration = lock(&self.queue)
+            .current()
+            .and_then(|e| e.track.duration)
+            .map(|d| d.0)
+            .unwrap_or(0);
+        duration == 0 || position + 2_000 < duration
     }
 
     fn persist_queue(&self) {

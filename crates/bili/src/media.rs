@@ -50,6 +50,13 @@ impl RemoteMedia {
         })
     }
 
+    /// 丢掉当前连接，下次 read 会按 self.pos 重发 Range。
+    fn drop_response(&self) {
+        if let Ok(mut guard) = self.response.lock() {
+            *guard = None;
+        }
+    }
+
     fn ensure_response(&self) -> std::io::Result<()> {
         let mut guard = self
             .response
@@ -77,17 +84,57 @@ impl RemoteMedia {
 
 impl Read for RemoteMedia {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.ensure_response()?;
-        let mut guard = self
-            .response
-            .lock()
-            .map_err(|_| std::io::Error::other("音频流锁被毒化"))?;
-        let Some(resp) = guard.as_mut() else {
-            return Ok(0);
-        };
-        let n = resp.read(buf)?;
-        self.pos += n as u64;
-        Ok(n)
+        // B 站 CDN 的长连接会中途断掉。早先这里直接往上抛错，而解码线程遇到
+        // 任何 IO 错误就 set_playing(false)——表现就是「播到随机位置突然停住」，
+        // 进度冻结、按钮回到播放态。
+        //
+        // 现在在这里自己接住：只要还没读到末尾，就按当前偏移重发一次 Range 续上。
+        for attempt in 0..3 {
+            if let Err(e) = self.ensure_response() {
+                if attempt == 2 {
+                    return Err(e);
+                }
+                self.drop_response();
+                std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
+                continue;
+            }
+            let mut guard = match self.response.lock() {
+                Ok(g) => g,
+                Err(_) => return Err(std::io::Error::other("音频流锁被毒化")),
+            };
+            let Some(resp) = guard.as_mut() else {
+                return Ok(0);
+            };
+            match resp.read(buf) {
+                Ok(0) => {
+                    // 0 是 EOF。只有真的到末尾才算播完；否则当作连接断了重连。
+                    let at_end = self.total.is_some_and(|t| self.pos >= t);
+                    drop(guard);
+                    if at_end {
+                        return Ok(0);
+                    }
+                    self.drop_response();
+                    if attempt == 2 {
+                        return Ok(0);
+                    }
+                    std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
+                }
+                Ok(n) => {
+                    self.pos += n as u64;
+                    return Ok(n);
+                }
+                Err(e) => {
+                    drop(guard);
+                    if attempt == 2 {
+                        return Err(e);
+                    }
+                    // 丢掉断掉的连接，下一轮按 self.pos 重新 Range
+                    self.drop_response();
+                    std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
+                }
+            }
+        }
+        Ok(0)
     }
 }
 
@@ -131,5 +178,79 @@ mod tests {
         assert_eq!(m.seek(SeekFrom::Start(100)).unwrap(), 100);
         assert_eq!(m.seek(SeekFrom::Current(50)).unwrap(), 150);
         assert_eq!(m.seek(SeekFrom::End(-150)).unwrap(), 850);
+    }
+}
+
+#[cfg(test)]
+mod reconnect_tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    /// 前两次连接都在发了一小段后强行断开，第三次才把剩余字节发完。
+    ///
+    /// 这是 B 站 CDN 的真实行为：长连接会中途断。早先 read() 直接把错往上抛，
+    /// 解码线程遇到 IO 错误就停播——表现就是「播到随机位置突然停住」。
+    #[test]
+    fn 断线后能按偏移续上() {
+        let hits = Arc::new(AtomicUsize::new(0));
+        let listener = TcpListener::bind("127.0.0.1:0").expect("端口");
+        let port = listener.local_addr().expect("地址").port();
+        let counter = hits.clone();
+
+        std::thread::spawn(move || {
+            const BODY: usize = 4096;
+            for stream in listener.incoming() {
+                let Ok(mut s) = stream else { break };
+                let n = counter.fetch_add(1, Ordering::SeqCst);
+                // 读掉请求头
+                let mut head = [0u8; 2048];
+                let _ = s.read(&mut head);
+                // 解析 Range 起点
+                let text = String::from_utf8_lossy(&head).to_string();
+                let start = text
+                    .split("bytes=")
+                    .nth(1)
+                    .and_then(|r| r.split('-').next())
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                let _ = s.write_all(
+                    format!(
+                        "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n",
+                        start, BODY - 1, BODY, BODY - start
+                    )
+                    .as_bytes(),
+                );
+                if n < 2 {
+                    // 前两次只发 16 字节就断
+                    let _ = s.write_all(&vec![b'A'; 16]);
+                    continue;
+                }
+                let _ = s.write_all(&vec![b'B'; BODY - start]);
+            }
+        });
+
+        std::thread::sleep(Duration::from_millis(120));
+        let mut media =
+            RemoteMedia::open(format!("http://127.0.0.1:{port}/x"), Vec::new()).expect("打开");
+
+        let mut got = Vec::new();
+        let mut buf = [0u8; 512];
+        // 读到总长为止；断线应该被自动续上而不是报错
+        for _ in 0..20 {
+            match media.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => got.extend_from_slice(&buf[..n]),
+                Err(e) => panic!("不该把断线抛给上层: {e}"),
+            }
+            if got.len() >= 4096 {
+                break;
+            }
+        }
+        println!("读到 {} 字节，建立了 {} 次连接", got.len(), hits.load(Ordering::SeqCst));
+        assert!(got.len() >= 4096, "应该读完整段，实际 {}", got.len());
+        assert!(hits.load(Ordering::SeqCst) >= 3, "应该重连过");
     }
 }
