@@ -32,10 +32,20 @@ function QueueRow({
   onRemove: (key: string) => void
 }) {
   return (
-    <button
-      type="button"
+    // 用 div 而不是 button 来承载拖拽：WebKit 对 <button draggable> 起拖不可靠，
+    // 实测按住拖不动。键盘可达性用 role + tabIndex + Enter/Space 补回来。
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onPlay}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onPlay()
+        }
+      }}
       aria-current={active ? 'true' : undefined}
+      title="拖动可以调整顺序"
       style={{ height: QUEUE_ROW_HEIGHT }}
       draggable
       onDragStart={(event) => {
@@ -51,7 +61,7 @@ function QueueRow({
         const from = event.dataTransfer.getData('text/plain')
         if (from && from !== track.key) onMove(from, track.key)
       }}
-      className="t group flex w-full items-center gap-2.5 border-b border-hairline px-4 py-2.5 text-left"
+      className="t group flex w-full cursor-grab items-center gap-2.5 border-b border-hairline px-4 py-2.5 text-left active:cursor-grabbing"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
         {active ? (
@@ -90,7 +100,7 @@ function QueueRow({
       >
         <Icon name="close" size={11} />
       </span>
-    </button>
+    </div>
   )
 }
 

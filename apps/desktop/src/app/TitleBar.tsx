@@ -39,7 +39,10 @@ export function TitleBar() {
       data-tauri-drag-region
       className="safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pl-[74px] pr-3 md:gap-4 md:pl-[80px]"
     >
-      <div className="flex shrink-0 items-center gap-2">
+      {/* 装饰性的 logo 块不参与命中：让它穿透，按下时目标才是带
+          data-tauri-drag-region 的顶栏本身，窗口才能被拖动。
+          Tauri 的判定只看事件目标自己有没有这个属性，所以子元素必须穿透。 */}
+      <div className="pointer-events-none flex shrink-0 items-center gap-2">
         <span className="bili-tv-mark text-[var(--accent)]">
           <Icon name="biliTv" size={19} />
         </span>
@@ -73,7 +76,7 @@ export function TitleBar() {
         </button>
       </form>
 
-      <div className="ml-auto flex shrink-0 items-center gap-3">
+      <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-3 [&>*]:pointer-events-auto">
         <button
           type="button"
           onClick={() => navigate({ kind: 'downloads' })}
