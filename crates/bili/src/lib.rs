@@ -257,6 +257,11 @@ impl Source {
         self.client.relation_state(&key.as_opaque()).await
     }
 
+    /// 我关注的人。
+    pub async fn following(&self, page: u32) -> Result<(Vec<sync::Followed>, u32), BiliError> {
+        self.client.following(page).await
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<Track>, BiliError> {
         self.client.watch_later_tracks().await

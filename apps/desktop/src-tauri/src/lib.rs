@@ -124,6 +124,15 @@ async fn set_mode(
     engine.set_mode(mode, at_ms, target.as_ref()).await
 }
 
+/// 我关注的人。
+#[tauri::command(rename_all = "snake_case")]
+async fn following(
+    engine: tauri::State<'_, Arc<Engine>>,
+    page: u32,
+) -> Result<(Vec<bilimusic_core::wire::Followed>, u32), WireError> {
+    engine.following(page).await
+}
+
 /// 稍后再看列表。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_later_list(
@@ -687,6 +696,7 @@ pub fn run() {
             watch_comments,
             home_feed,
             watch_later_list,
+            following,
             set_mode,
             search_q,
             player_state,

@@ -11,6 +11,7 @@ export type View =
   | { kind: 'author'; name: string; mid?: number | null }
   | { kind: 'watch'; track: Track }
   | { kind: 'watchLater' }
+  | { kind: 'following' }
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'

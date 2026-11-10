@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { CommentPage, PlayMode, WatchView,
+import type { CommentPage, Followed, PlayMode, WatchView,
   AuthSnapshot,
   DownloadView,
   LyricDoc,
@@ -281,6 +281,11 @@ export function mvSource(key: string): Promise<string> {
 /** 切换看/听。从看到听时传画面当前位置。 */
 export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<PlayerSnapshot> {
   return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
+}
+
+/** 我关注的人。返回 (列表, 总数)。 */
+export function following(page: number): Promise<[Followed[], number]> {
+  return invoke<[Followed[], number]>('following', { page })
 }
 
 /** 稍后再看列表。 */

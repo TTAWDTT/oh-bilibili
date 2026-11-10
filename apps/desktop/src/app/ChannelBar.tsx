@@ -3,7 +3,7 @@ import { useAppStore } from './appStore'
 import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import { PartitionIcon } from '../shared/ui/PartitionIcon'
 
-type ChannelKind = 'home' | 'search' | 'music' | 'history' | 'favs' | 'watchLater' | 'settings'
+type ChannelKind = 'home' | 'search' | 'music' | 'history' | 'favs' | 'watchLater' | 'following' | 'settings'
 type Channel = { view: View; label: string; kind: ChannelKind }
 
 /** B 站网页端那条白色频道栏。当前频道用粉色下划线标记，和侧栏的选中行是两套语义。 */
@@ -13,6 +13,7 @@ const CHANNELS: readonly Channel[] = [
   { view: { kind: 'history' }, label: '历史', kind: 'history' },
   { view: { kind: 'favs' }, label: '收藏夹', kind: 'favs' },
   { view: { kind: 'watchLater' }, label: '稍后再看', kind: 'watchLater' },
+  { view: { kind: 'following' }, label: '关注', kind: 'following' },
   { view: { kind: 'library' }, label: '曲库', kind: 'music' },
   { view: { kind: 'settings' }, label: '设置', kind: 'settings' },
 ]

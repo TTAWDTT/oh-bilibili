@@ -432,6 +432,14 @@ impl Engine {
         Ok(self.source.report_progress(key, played_secs, start_ts).await?)
     }
 
+    /// 我关注的人。返回列表与该页总数。
+    pub async fn following(
+        &self,
+        page: u32,
+    ) -> Result<(Vec<bilimusic_bili::sync::Followed>, u32), WireError> {
+        Ok(self.source.following(page).await?)
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<bilimusic_model::Track>, WireError> {
         Ok(self.source.watch_later_list().await?)

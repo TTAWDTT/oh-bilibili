@@ -25,6 +25,15 @@ pub struct AuthorCard {
     pub likes: u64,
 }
 
+/// 我关注的一个 UP 主。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Followed {
+    pub mid: u64,
+    pub name: String,
+    pub face: Option<String>,
+    pub sign: String,
+}
+
 impl Client {
     /// 读一条视频当前在账号里的互动状态（点赞、收藏、投币）。
     ///
@@ -250,6 +259,48 @@ impl Client {
             return Ok(Vec::new());
         };
         Ok(list.iter().filter_map(|i| i["aid"].as_u64()).collect())
+    }
+
+    /// 我关注的人。分页取，一页 20 个。
+    pub async fn following(&self, page: u32) -> Result<(Vec<Followed>, u32), BiliError> {
+        let nav = self
+            .get_json(
+                &format!("{API}/x/web-interface/nav"),
+                std::time::Duration::from_millis(200),
+            )
+            .await?;
+        let mid = nav["data"]["mid"]
+            .as_u64()
+            .ok_or_else(|| BiliError::NeedsLogin("没有登录".into()))?;
+        let v = self
+            .get_json(
+                &format!(
+                    "{API}/x/relation/followings?vmid={mid}&pn={}&ps=20&order=desc",
+                    page.max(1)
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let total = v["data"]["total"].as_u64().unwrap_or(0) as u32;
+        let list = v["data"]["list"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|u| {
+                        Some(Followed {
+                            mid: u["mid"].as_u64()?,
+                            name: u["uname"].as_str().unwrap_or("").to_string(),
+                            face: u["face"]
+                                .as_str()
+                                .filter(|f| !f.is_empty())
+                                .map(|f| f.replacen("http://", "https://", 1)),
+                            sign: u["sign"].as_str().unwrap_or("").trim().to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok((list, total))
     }
 
     /// 稍后再看列表。一条响应就带全卡片数据，不需要逐条查详情。

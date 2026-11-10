@@ -32,6 +32,13 @@ export type PlayerSnapshot = {
 
 export type PlayMode = 'listen' | 'watch' 
 
+export type Followed = {
+  mid: number
+  name: string
+  face: string | null
+  sign: string
+}
+
 export type Comment = {
   id: string
   author: string

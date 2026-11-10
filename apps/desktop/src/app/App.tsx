@@ -30,6 +30,7 @@ import { useShortcuts } from './useShortcuts'
 import { WatchView } from '../features/watch/WatchView'
 import { HomeView } from '../features/home/HomeView'
 import { WatchLaterView } from '../features/library/WatchLaterView'
+import { FollowingView } from '../features/library/FollowingView'
 
 /**
  * 当前页面的标题。
@@ -63,6 +64,8 @@ function viewTitle(view: View): string {
       return `观看：${view.track.title}`
     case 'watchLater':
       return '稍后再看'
+    case 'following':
+      return '我关注的人'
   }
 }
 
@@ -92,6 +95,8 @@ function CurrentView({ view }: { view: View }) {
       return <WatchView track={view.track} />
     case 'watchLater':
       return <WatchLaterView />
+    case 'following':
+      return <FollowingView />
   }
 }
 
