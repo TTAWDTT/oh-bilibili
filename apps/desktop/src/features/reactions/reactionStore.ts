@@ -14,6 +14,8 @@ type ReactionStore = {
   likedTracks: Track[]
   /** 从账号拉一次真实互动状态，把心/星点亮。未登录会抛 needs_login。 */
   hydrate: (keys: string[]) => Promise<void>
+  /** 无视缓存重新查一次。详情页用：打开时看到的必须是真的。 */
+  refresh: (keys: string[]) => Promise<void>
   toggleLike: (track: Track) => Promise<void>
   toggleFav: (track: Track) => Promise<void>
   /** 投币。成功后本地计数 +count，与账号一致。 */
@@ -47,22 +49,43 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
       return { liked, faved, coins, known }
     })
   },
+  refresh: async (keys) => {
+    const rows = await ipc.relationStates(keys)
+    set((state) => {
+      const liked = { ...state.liked }
+      const faved = { ...state.faved }
+      const coins = { ...state.coins }
+      const known = { ...state.known }
+      for (const [key, isLiked, isFaved, coin] of rows) {
+        liked[key] = isLiked
+        faved[key] = isFaved
+        coins[key] = coin
+        known[key] = true
+      }
+      return { liked, faved, coins, known }
+    })
+  },
   toggleLike: async (track) => {
     const previous = get().liked[track.key] ?? false
-    const previousTracks = get().likedTracks
     const next = !previous
+    // 先请求，成功了再改本地状态。
+    //
+    // 早先是乐观更新：先点亮再发请求，失败再回滚。可是这条写路径会被服务端拒
+    // （实测返回 65006 / -400），而回滚在某些时序下没跑到，界面就一直亮着——
+    // 用户看到的是「已点赞」，服务端根本没记上。宁可点下去有半秒延迟，
+    // 也不要让界面撒谎。
+    try {
+      await ipc.likeSet(track.key, next)
+    } catch (cause) {
+      toastFailure(next ? '喜欢' : '取消喜欢', cause)
+      return
+    }
     set((state) => ({
       liked: { ...state.liked, [track.key]: next },
       likedTracks: next
         ? [track, ...state.likedTracks.filter((item) => item.key !== track.key)]
         : state.likedTracks.filter((item) => item.key !== track.key),
     }))
-    try {
-      await ipc.likeSet(track.key, next)
-    } catch (cause) {
-      set((state) => ({ liked: { ...state.liked, [track.key]: previous }, likedTracks: previousTracks }))
-      toastFailure(next ? '喜欢' : '取消喜欢', cause)
-    }
   },
   addCoin: async (track, count) => {
     const previous = get().coins[track.key] ?? 0

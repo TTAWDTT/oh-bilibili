@@ -8,6 +8,8 @@ import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { CommentsPanel } from './CommentsPanel'
+import { useReactionStore } from '../reactions/reactionStore'
+import { toastDone } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 
@@ -30,6 +32,13 @@ export function WatchView({ track }: { track: Track }) {
   const [ready, setReady] = useState(false)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
   const [related, setRelated] = useState<Track[]>([])
+  const liked = useReactionStore((st) => st.liked[track.key] ?? false)
+  const faved = useReactionStore((st) => st.faved[track.key] ?? false)
+  const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
+  const toggleLike = useReactionStore((st) => st.toggleLike)
+  const toggleFav = useReactionStore((st) => st.toggleFav)
+  const addCoin = useReactionStore((st) => st.addCoin)
+  const refresh = useReactionStore((st) => st.refresh)
   const [page, setPage] = useState<number | undefined>(undefined)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const danmakuOn = useDanmakuSettings((s) => s.enabled)
@@ -70,6 +79,16 @@ export function WatchView({ track }: { track: Track }) {
       cancelled = true
     }
   }, [track.key])
+
+  // 打开就把这条视频的真实点赞/收藏/投币状态拉回来，
+  // 否则按钮看起来永远是未点过的。
+  useEffect(() => {
+    // 用 refresh 而不是 hydrate：hydrate 会跳过查过的 key，而详情页
+    // 打开时必须显示服务端真实状态，不能吃缓存。
+    void refresh([track.key]).catch(() => {
+      // 未登录时拉不到，保持未点亮即可
+    })
+  }, [track.key, refresh])
 
   // 相关推荐。右栏只在「听」时出现，所以观看页要有自己的一份，
   // 否则看视频时完全没有相关推荐可点。
@@ -285,6 +304,60 @@ export function WatchView({ track }: { track: Track }) {
             <span className="num">{formatCount(data.stats.coins)} 投币</span>
             <span className="num">{formatCount(data.stats.favorites)} 收藏</span>
             <span className="num">{formatCount(data.stats.shares)} 分享</span>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={liked}
+              onClick={() => void toggleLike(track)}
+              className={`t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] ${
+                liked ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
+              }`}
+            >
+              <Icon name={liked ? 'heartFilled' : 'heart'} size={13} />
+              {liked ? '已点赞' : '点赞'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={coins > 0}
+              onClick={() => {
+                if (coins >= 2) {
+                  toastDone('已经投过两枚', 'B 站上限 2 枚')
+                  return
+                }
+                void addCoin(track, 1)
+              }}
+              className={`t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] ${
+                coins > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
+              }`}
+            >
+              <Icon name="coin" size={13} />
+              {coins > 0 ? `已投 ${coins} 枚` : '投币'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={faved}
+              onClick={() => void toggleFav(track)}
+              className={`t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] ${
+                faved ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
+              }`}
+            >
+              <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={13} />
+              {faved ? '已收藏' : '收藏'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void ipc
+                  .watchLaterSet(track.key, true)
+                  .then(() => toastDone('已加入稍后再看'))
+                  .catch(() => toastDone('加入稍后再看失败', '登录后再试'))
+              }}
+              className="t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
+            >
+              <Icon name="watchLater" size={13} />
+              稍后再看
+            </button>
           </div>
           {data.desc ? (
             <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-[12px] leading-[1.5] text-[var(--text-3)]">

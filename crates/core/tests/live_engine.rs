@@ -535,3 +535,54 @@ fn 观看进度能上报() {
         assert!(result.is_ok(), "登录态下上报应该成功");
     });
 }
+
+/// 点赞写路径的往返：点上，服务端确认为真，再取消，服务端确认为假。
+///
+/// 这条测试同时是「把账号恢复干净」的工具：中途失败留下点赞时，重跑一次即可。
+#[test]
+#[ignore = "真实网络；会短暂修改账号点赞状态，结束时恢复"]
+fn 点赞能写入也能取消() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-like-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let target = std::env::var("LIKE_BVID").unwrap_or_default();
+    rt.block_on(async {
+        let key = if target.is_empty() {
+            let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+            tracks.first().map(|t| t.key.clone()).expect("至少一条")
+        } else {
+            bilimusic_model::TrackKey::from_provider(target)
+        };
+        println!("目标 {}", key.as_opaque());
+
+        // 已经点过会返回「重复点赞」。这条测试要能反复跑，所以不把它当失败——
+        // 幂等正是这里需要的性质。
+        match engine.like_set(&key, true).await {
+            Ok(()) => println!("点赞成功"),
+            Err(e) => println!("点赞返回（可能已点过）: {}", e.message()),
+        }
+        let states = engine
+            .relation_states(vec![key.as_opaque().to_string()])
+            .await
+            .expect("查状态");
+        let liked = states[0].1;
+        println!("点上之后 like={liked}");
+        assert!(liked, "服务端应该记为已点赞");
+
+        engine.like_set(&key, false).await.expect("取消点赞");
+        let states2 = engine
+            .relation_states(vec![key.as_opaque().to_string()])
+            .await
+            .expect("查状态");
+        let after = states2[0].1;
+        println!("取消之后 like={after}");
+        assert!(!after, "取消之后服务端应该记为未点赞");
+    });
+}
