@@ -8,10 +8,10 @@ import { useSentDanmaku } from './sentDanmaku'
 /** 一条弹幕：出现时刻（毫秒）、文本、颜色。 */
 type Item = { at: number; text: string; color: string }
 /** 屏幕上正在飘的一条，key 里带一个自增号，避免同文本去重。 */
-type Flight = Item & { id: number; born: number }
+type Flight = Item & { id: number; born: number; lane: number }
 
 const LIFE_MS = 9000
-const MAX_ON_SCREEN = 14
+const LANES = 10
 /** 多久检查一次「有哪些新弹幕该出现」。motion 本身由 CSS 跑，不受这个频率影响。 */
 const SPAWN_TICK_MS = 220
 const EMPTY: never[] = []
@@ -72,16 +72,29 @@ export function DanmakuLayer({ trackKey }: { trackKey: string }) {
       const pos = readPlayhead()
       setFlights((prev) => {
         const alive = prev.filter((f) => pos - f.born < LIFE_MS)
-        if (!playing) return alive
+        if (!playing) return alive.length === prev.length ? prev : alive
+        // 按车道占用挑一条空的。车道必须在这里定下来并存进条目里：
+        // 早先用数组下标算 top，一条飘完被移除后其余条目下标前移，
+        // 整排弹幕会瞬间跳一行——就是肉眼看到的「跳动」。
+        const used = new Set(alive.map((f) => f.lane))
         const fresh: Flight[] = []
         for (const item of all) {
           if (item.at > pos || item.at <= pos - 2000) continue
           if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
+          let lane = -1
+          for (let c = 0; c < LANES; c += 1) {
+            if (!used.has(c) && !fresh.some((f) => f.lane === c)) {
+              lane = c
+              break
+            }
+          }
+          // 车道满了就丢掉这条：B 站也是这么做的，硬塞会互相压住
+          if (lane < 0) continue
           seq.current += 1
-          fresh.push({ ...item, id: seq.current, born: item.at })
+          fresh.push({ ...item, id: seq.current, born: item.at, lane })
         }
-        const next = [...alive, ...fresh].slice(-MAX_ON_SCREEN)
-        return next.length === prev.length && fresh.length === 0 ? prev : next
+        if (fresh.length === 0) return alive.length === prev.length ? prev : alive
+        return [...alive, ...fresh]
       })
     }, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
@@ -91,12 +104,12 @@ export function DanmakuLayer({ trackKey }: { trackKey: string }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
-      {flights.map((f, i) => (
+      {flights.map((f) => (
         <span
           key={f.id}
           className="danmaku absolute whitespace-nowrap text-[14px]"
           style={{
-            top: `${6 + ((i * 82) / MAX_ON_SCREEN)}%`,
+            top: `${6 + (f.lane * 82) / LANES}%`,
             animationDuration: `${LIFE_MS / speed / 1000}s`,
             // 开始时刻由 born 决定，动画本身从 0 起跑，不再用负 delay 反复对齐
             animationPlayState: playing ? 'running' : 'paused',

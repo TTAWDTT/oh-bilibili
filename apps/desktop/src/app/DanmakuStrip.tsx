@@ -8,7 +8,7 @@ import * as ipc from '../shared/lib/ipc'
 /** 弹幕一条：出现时刻（毫秒）、文本、颜色。 */
 type Item = { at: number; text: string; color: string }
 /** 正在屏幕上飘的一条。id 自增，避免同文本被去重掉。 */
-type Flight = Item & { id: number; born: number }
+type Flight = Item & { id: number; born: number; lane: number }
 
 const LIFE_MS = 12000
 const SPAWN_TICK_MS = 240
@@ -73,15 +73,26 @@ export function DanmakuStrip() {
       setFlights((prev) => {
         const alive = prev.filter((f) => pos - f.born < LIFE_MS)
         if (!playing) return alive.length === prev.length ? prev : alive
+        // 车道在生成时定死并记住。用数组下标算纵向位置的话，一条飘完被移除后
+        // 其余条目下标前移，整排会瞬间跳一行——那就是肉眼看到的「跳动」。
+        const used = new Set(alive.map((f) => f.lane))
         const fresh: Flight[] = []
         for (const item of all) {
           if (item.at > pos || item.at <= pos - 2000) continue
           if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
+          let lane = -1
+          for (let c = 0; c < LANES; c += 1) {
+            if (!used.has(c) && !fresh.some((f) => f.lane === c)) {
+              lane = c
+              break
+            }
+          }
+          if (lane < 0) continue // 车道满了就丢弃，硬塞会互相压住
           seq.current += 1
-          fresh.push({ ...item, id: seq.current, born: item.at })
+          fresh.push({ ...item, id: seq.current, born: item.at, lane })
         }
         if (fresh.length === 0) return alive.length === prev.length ? prev : alive
-        return [...alive, ...fresh].slice(-24)
+        return [...alive, ...fresh]
       })
     }, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
@@ -95,13 +106,13 @@ export function DanmakuStrip() {
       aria-hidden
       data-danmaku-fullscreen
     >
-      {flights.map((f, i) => (
+      {flights.map((f) => (
         <span
           key={f.id}
           className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[14px]"
           style={{
             color: f.color,
-            top: `${4 + ((i % LANES) * 88) / LANES}%`,
+            top: `${4 + (f.lane * 88) / LANES}%`,
             animationDuration: `${LIFE_MS / speed / 1000}s`,
             opacity: opacity * 0.9,
             textShadow: '0 0 2px #fff, 0 0 4px #fff, 0 0 6px #fff',
