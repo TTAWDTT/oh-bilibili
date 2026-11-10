@@ -56,6 +56,12 @@ pub struct Player {
     tx: Sender<Cmd>,
     clock: SharedClock,
     volume_bits: Arc<AtomicU32>,
+    /// 解码器是否真的走到了音频末尾。
+    ///
+    /// 「时钟停了」有三种原因：播完、网络断、解码出错。位置数字不可靠
+    /// （实测播到 5:13 时长 5:17 就 EOF 了），所以让解码线程直接记下
+    /// 「这是自然结束」，上层据此决定切歌还是原地续播。
+    ended: Arc<std::sync::atomic::AtomicBool>,
     device_rate: u32,
     _thread: JoinHandle<()>,
 }
@@ -64,15 +70,17 @@ impl Player {
     pub fn start() -> Result<Player, AudioError> {
         let clock: SharedClock = Arc::new(Clock::default());
         let volume_bits = Arc::new(AtomicU32::new(0.7f32.to_bits()));
+        let ended = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (tx, rx) = channel();
         let (ready_tx, ready_rx) = channel::<Result<u32, AudioError>>();
 
         let thread_clock = clock.clone();
+        let thread_ended = ended.clone();
         let thread_volume = volume_bits.clone();
         let handle = std::thread::Builder::new()
             .name("bilimusic-audio".into())
             .spawn(move || {
-                run_engine(rx, thread_clock, thread_volume, ready_tx);
+                run_engine(rx, thread_clock, thread_volume, thread_ended, ready_tx);
             })
             .map_err(|e| AudioError::Device(e.to_string()))?;
 
@@ -84,6 +92,7 @@ impl Player {
             tx,
             clock,
             volume_bits,
+            ended,
             device_rate,
             _thread: handle,
         })
@@ -91,6 +100,16 @@ impl Player {
 
     pub fn clock(&self) -> SharedClock {
         self.clock.clone()
+    }
+
+    /// 取走「自然播放到结尾」标记。
+    pub fn take_ended(&self) -> bool {
+        self.ended.swap(false, Ordering::Relaxed)
+    }
+
+    /// 只看不清，供「是不是卡住」的判断用。
+    pub fn peek_ended(&self) -> bool {
+        self.ended.load(Ordering::Relaxed)
     }
 
     pub fn device_rate(&self) -> u32 {
@@ -185,6 +204,7 @@ fn run_engine(
     rx: Receiver<Cmd>,
     clock: SharedClock,
     volume_bits: Arc<AtomicU32>,
+    ended: Arc<std::sync::atomic::AtomicBool>,
     ready_tx: Sender<Result<u32, AudioError>>,
 ) {
     let host = cpal::default_host();
@@ -289,6 +309,7 @@ fn run_engine(
                         resampler.set_source_rate(base_rate * speed);
                         clock.reset(device_rate);
                         clock.set_playing(true);
+                        ended.store(false, Ordering::Relaxed);
                         decoder = Some(d);
                     }
                     Err(e) => {
@@ -346,11 +367,14 @@ fn run_engine(
             Err(symphonia::core::errors::Error::IoError(ref e))
                 if e.kind() == std::io::ErrorKind::UnexpectedEof =>
             {
+                // 自然播到末尾：这是「该切歌」的信号
+                ended.store(true, Ordering::Relaxed);
                 clock.set_playing(false);
                 decoder = None;
                 continue;
             }
             Err(_) => {
+                // 解码出错：不置 ended，上层会当作卡住并原地续播
                 clock.set_playing(false);
                 decoder = None;
                 continue;

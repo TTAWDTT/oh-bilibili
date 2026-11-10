@@ -584,25 +584,11 @@ impl Engine {
         if lock(&self.state).phase() != "playing" {
             return false;
         }
-        let (clock_stopped, position) = {
-            let player = lock(&self.player);
-            (!player.clock().is_playing(), player.clock().position_ms())
-        };
-        if !clock_stopped {
-            return false;
-        }
-        // 时钟停了不等于播完了：网络断、解码出错也会停。
-        // 只有位置确实走到末尾（差 2 秒以内）才算唱完，
-        // 否则那是卡住，交给下面的续播处理，而不是跳下一首。
-        let duration = lock(&self.queue)
-            .current()
-            .and_then(|e| e.track.duration)
-            .map(|d| d.0)
-            .unwrap_or(0);
-        if duration == 0 {
-            return false;
-        }
-        position + 2_000 >= duration
+        // 只有解码器真的报「到末尾」才算播完。
+        // 用位置数字判断不可靠：实测播到 5:13（时长 5:17）就 EOF 了，
+        // 差 4 秒会被误判成「卡住」然后重播同一首。
+        let ended = lock(&self.player).take_ended();
+        ended
     }
 
     /// 状态说在播、时钟却停了，而且离末尾还远——这是卡住，不是播完。
@@ -610,19 +596,9 @@ impl Engine {
         if lock(&self.state).phase() != "playing" {
             return false;
         }
-        let (stopped, position) = {
-            let player = lock(&self.player);
-            (!player.clock().is_playing(), player.clock().position_ms())
-        };
-        if !stopped {
-            return false;
-        }
-        let duration = lock(&self.queue)
-            .current()
-            .and_then(|e| e.track.duration)
-            .map(|d| d.0)
-            .unwrap_or(0);
-        duration == 0 || position + 2_000 < duration
+        let player = lock(&self.player);
+        // 时钟还在走就不是卡住；自然播完也不算卡住（那条走 reached_track_end）
+        !player.clock().is_playing() && !player.peek_ended()
     }
 
     fn persist_queue(&self) {
