@@ -312,8 +312,23 @@ impl Engine {
         key: &TrackKey,
         proxy_origin: &str,
     ) -> Result<WatchView, WireError> {
+        self.open_watch_page(key, proxy_origin, None).await
+    }
+
+    /// 打开某个分P。`page` 是从 1 开始的序号，None 表示当前/第一个。
+    pub async fn open_watch_page(
+        &self,
+        key: &TrackKey,
+        proxy_origin: &str,
+        page: Option<u32>,
+    ) -> Result<WatchView, WireError> {
         let detail = self.source.detail(key).await?;
-        let video = self.source.dash_video(key).await?;
+        let current = page
+            .and_then(|no| detail.pages.iter().find(|p| p.no == no))
+            .or_else(|| detail.pages.first());
+        let page_cid = current.map(|p| p.cid);
+        let page_no = current.map(|p| p.no).unwrap_or(1);
+        let video = self.source.dash_video_at(key, page_cid).await?;
         let duration = detail.track.duration.unwrap_or(Millis(0));
         let origin = proxy_origin.trim_end_matches('/').to_string();
         let engine = self;
@@ -324,6 +339,8 @@ impl Engine {
         let qualities = crate::dash_bridge::quality_list(&video);
         Ok(WatchView {
             key: key.as_opaque().to_string(),
+            pages: detail.pages.clone(),
+            current_page: page_no,
             manifest_url,
             duration_ms: duration.0,
             qualities,

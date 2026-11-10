@@ -309,3 +309,51 @@ fn 评论能取到真实数据与嵌套回复() {
         );
     });
 }
+
+/// 分P 要能取到，并且切换分P 会换 cid。
+#[test]
+#[ignore = "真实网络"]
+fn 分P_列表与切换() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-pg-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        // 找一个多 P 的视频
+        let tracks = engine.search("罗翔 刑法".into(), 1).await.expect("搜索");
+        let mut found = None;
+        for t in tracks.iter().take(6) {
+            let v = engine.open_watch(&t.key, "http://127.0.0.1:9").await;
+            if let Ok(v) = v {
+                if v.pages.len() > 1 {
+                    found = Some(v);
+                    break;
+                }
+            }
+        }
+        let Some(view) = found else {
+            println!("没找到多 P 的视频，跳过");
+            return;
+        };
+        println!("分P 数 {}，当前 P{}", view.pages.len(), view.current_page);
+        for p in view.pages.iter().take(3) {
+            println!("  P{} {} ({}ms)", p.no, p.title, p.duration_ms);
+        }
+        assert!(view.pages.len() > 1);
+        let second = view.pages[1].no;
+        let key = bilimusic_model::TrackKey::from_provider(view.key.clone());
+        let v2 = engine
+            .open_watch_page(&key, "http://127.0.0.1:9", Some(second))
+            .await
+            .expect("切到第二个分P");
+        println!("切到 P{}，清单 {}", v2.current_page, v2.manifest_url);
+        assert_eq!(v2.current_page, second);
+        assert_ne!(v2.manifest_url, view.manifest_url, "换分P 应该是一条新清单");
+    });
+}

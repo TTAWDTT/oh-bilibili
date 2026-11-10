@@ -156,6 +156,10 @@ pub use bilimusic_bili::comments::{Comment, CommentPage};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchView {
     pub key: String,
+    /// 分P 列表，单 P 视频只有一条。
+    pub pages: Vec<bilimusic_bili::PageRef>,
+    /// 当前在放的分P 序号（从 1 开始）。
+    pub current_page: u32,
     /// 清单的完整地址，已经带上本机代理端口。
     pub manifest_url: String,
     pub duration_ms: u64,

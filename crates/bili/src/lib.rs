@@ -45,6 +45,18 @@ pub struct TrackDetail {
     pub cid: u64,
     pub aid: u64,
     pub meta: VideoMeta,
+    /// 分P 列表。单 P 视频就是一条。
+    pub pages: Vec<PageRef>,
+}
+
+/// 一个分P。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PageRef {
+    /// 从 1 开始的序号。
+    pub no: u32,
+    pub cid: u64,
+    pub title: String,
+    pub duration_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -394,14 +406,24 @@ impl Source {
     /// 用 fnval=4048 拿到全部特性与全部档位（含 1080P+），并且 fourk=1
     /// 才允许 4K 档出现。fnval=1 的 durl 单文件只到 720P，够不到这里。
     pub async fn dash_video(&self, key: &TrackKey) -> Result<Vec<crate::dash::VideoStream>, BiliError> {
+        self.dash_video_at(key, None).await
+    }
+
+    /// 取指定分P 的视频轨。`page_cid` 为空时用主 cid。
+    pub async fn dash_video_at(
+        &self,
+        key: &TrackKey,
+        page_cid: Option<u64>,
+    ) -> Result<Vec<crate::dash::VideoStream>, BiliError> {
         let detail = self.detail(key).await?;
+        let cid = page_cid.unwrap_or(detail.cid);
         let value = self
             .client
             .signed_get_play(
                 &format!("{}/x/player/wbi/playurl", client::API),
                 vec![
                     ("bvid", key.as_opaque().to_string()),
-                    ("cid", detail.cid.to_string()),
+                    ("cid", cid.to_string()),
                     ("fnval", "4048".into()),
                     ("fourk", "1".into()),
                     // platform=pc 才会给全档位。少了它只回 480P 与 360P。
@@ -720,6 +742,21 @@ mod wire {
             shares: stat["share"].as_u64().unwrap_or(0),
             likes: stat["like"].as_u64().unwrap_or(0),
         };
+        let pages: Vec<PageRef> = data["pages"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|p| {
+                        Some(PageRef {
+                            no: p["page"].as_u64()? as u32,
+                            cid: p["cid"].as_u64()?,
+                            title: search::strip_tags(p["part"].as_str().unwrap_or("")),
+                            duration_ms: p["duration"].as_u64().unwrap_or(0) * 1000,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let track = Track {
             key: key.clone(),
             title: search::strip_tags(data["title"].as_str().unwrap_or("（无标题）")),
@@ -740,6 +777,7 @@ mod wire {
             track,
             cid,
             aid,
+            pages,
             meta,
         })
     }

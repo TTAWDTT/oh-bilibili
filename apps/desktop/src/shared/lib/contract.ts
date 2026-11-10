@@ -48,8 +48,17 @@ export type CommentPage = {
 }
 
 /** 观看页一次调用拿到的全部东西。manifest_url 已经带上本机代理端口。 */
+export type PageRef = {
+  no: number
+  cid: number
+  title: string
+  duration_ms: number
+}
+
 export type WatchView = {
   key: string
+  pages: PageRef[]
+  current_page: number
   manifest_url: string
   duration_ms: number
   qualities: QualityOption[]

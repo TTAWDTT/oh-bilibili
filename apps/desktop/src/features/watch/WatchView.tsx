@@ -27,6 +27,7 @@ export function WatchView({ track }: { track: Track }) {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
+  const [page, setPage] = useState<number | undefined>(undefined)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const danmakuOn = useDanmakuSettings((s) => s.enabled)
   const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
@@ -41,7 +42,7 @@ export function WatchView({ track }: { track: Track }) {
     setReady(false)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key)
+        const next = await ipc.watchOpen(track.key, page)
         if (!cancelled) setData(next)
       } catch (e) {
         if (!cancelled) setError(toWireError(e).message)
@@ -50,7 +51,7 @@ export function WatchView({ track }: { track: Track }) {
     return () => {
       cancelled = true
     }
-  }, [track.key])
+  }, [track.key, page])
 
   // 取弹幕。时间轴跟视频走，不跟音频引擎。
   useEffect(() => {
@@ -191,6 +192,27 @@ export function WatchView({ track }: { track: Track }) {
           </div>
         ) : null}
       </div>
+
+      {data && data.pages.length > 1 ? (
+        <div className="flex gap-1 overflow-x-auto border-t border-hairline px-3 py-2">
+          {data.pages.map((p) => (
+            <button
+              key={p.cid}
+              type="button"
+              aria-pressed={p.no === data.current_page}
+              onClick={() => setPage(p.no)}
+              title={p.title}
+              className={`t press shrink-0 rounded-[6px] px-2 py-1 text-[12px] ${
+                p.no === data.current_page
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
+              }`}
+            >
+              P{p.no} {p.title.slice(0, 12) || '分P'}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {data ? (
         <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-2">

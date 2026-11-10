@@ -284,8 +284,8 @@ export function watchComments(key: string, page: number): Promise<CommentPage> {
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
-export function watchOpen(key: string): Promise<WatchView> {
-  return invoke<WatchView>('watch_open', { key })
+export function watchOpen(key: string, page?: number): Promise<WatchView> {
+  return invoke<WatchView>('watch_open', { key, page: page ?? null })
 }
 
 export function authStatus(): Promise<AuthSnapshot> {
