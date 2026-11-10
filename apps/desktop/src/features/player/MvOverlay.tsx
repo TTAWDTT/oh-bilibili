@@ -66,13 +66,14 @@ export function MvOverlay() {
     let cancelled = false
     void (async () => {
       try {
-        const [port, direct] = await Promise.all([ipc.mvPort(), ipc.mvSource(mv.key)])
+        // mvSource 已经返回带句柄的本机地址，这里不要再拼端口或编码参数
+        const url = await ipc.mvSource(mv.key)
         if (cancelled) return
-        if (!port) {
+        if (!url) {
           setError('浏览器预览模式没有本地代理，用桌面窗口才能看 MV。')
           return
         }
-        setSrc(`http://127.0.0.1:${port}/p?u=${encodeURIComponent(direct)}`)
+        setSrc(url)
       } catch (e) {
         if (!cancelled) setError(toWireError(e).message)
       }
