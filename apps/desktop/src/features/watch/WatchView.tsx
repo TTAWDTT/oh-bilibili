@@ -98,7 +98,7 @@ export function WatchView({ track }: { track: Track }) {
     void ipc
       .related(track.key)
       .then((list) => {
-        if (!cancelled) setRelated(list.slice(0, 10))
+        if (!cancelled) setRelated(list)
       })
       .catch(() => setRelated([]))
     return () => {
@@ -369,28 +369,37 @@ export function WatchView({ track }: { track: Track }) {
 
       {related.length > 0 ? (
         <div className="border-t border-hairline px-3 py-2">
-          <h3 className="mb-1.5 text-[12px] text-[var(--text-3)]">相关推荐</h3>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="mb-1.5 flex items-baseline gap-2">
+            <h3 className="text-[12px] text-[var(--text-3)]">相关推荐</h3>
+            <span className="num text-[11px] text-[var(--text-3)]">{related.length} 条</span>
+          </div>
+          {/* 固定高度内滚动：条目多也不会把评论挤到很远 */}
+          <div className="grid max-h-[280px] grid-cols-1 gap-x-3 gap-y-2 overflow-y-auto pr-1 sm:grid-cols-2">
             {related.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => navigate({ kind: 'watch', track: item })}
                 title={item.title}
-                className="group w-[148px] shrink-0 text-left"
+                className="group flex items-start gap-2 text-left"
               >
-                <span className="relative block overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
+                <span className="relative w-[104px] shrink-0 overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
                   <Cover
                     cover={item.cover}
                     title={item.title}
                     className="h-full w-full"
-                    glyphClassName="text-[22px] font-semibold text-white/80"
+                    glyphClassName="text-[18px] font-semibold text-white/80"
                   />
                 </span>
-                <span className="mt-1 line-clamp-2 block text-[12px] leading-[1.35] text-[var(--text-2)] group-hover:text-[var(--accent)]">
-                  {item.title}
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2 block text-[12px] leading-[1.35] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                    {item.title}
+                  </span>
+                  <span className="num mt-0.5 block truncate text-[11px] text-[var(--text-3)]">
+                    {item.artist}
+                    {item.views ? ` · ${formatCount(item.views)}` : ''}
+                  </span>
                 </span>
-                <span className="num mt-0.5 block text-[11px] text-[var(--text-3)]">{item.artist}</span>
               </button>
             ))}
           </div>
