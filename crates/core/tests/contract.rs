@@ -80,6 +80,7 @@ fn sample_track() -> Track {
 #[test]
 fn 播放快照的字段_ts_侧都有() {
     let snapshot = PlayerSnapshot {
+        mode: bilimusic_core::wire::PlayMode::Listen,
         phase: "playing".into(),
         track: Some(sample_track()),
         position_ms: 1000,

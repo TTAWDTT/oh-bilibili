@@ -155,6 +155,23 @@ export function WatchView({ track }: { track: Track }) {
           <Icon name="chevronLeft" size={16} />
         </button>
         <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium">{track.title}</h2>
+        <button
+          type="button"
+          onClick={() => {
+            const at = videoRef.current ? Math.round(videoRef.current.currentTime * 1000) : 0
+            void ipc
+              .setMode('listen', at)
+              .then(() => {
+                navigate({ kind: 'search' })
+              })
+              .catch(() => {
+                // 切不过去就留在观看页，不假装成功
+              })
+          }}
+          className="t press shrink-0 rounded-[6px] border border-[var(--line)] px-2 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
+        >
+          听视频
+        </button>
         <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
           {track.duration_ms ? formatTime(track.duration_ms) : '—'}
         </span>

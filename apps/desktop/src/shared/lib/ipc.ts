@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { CommentPage, WatchView,
+import type { CommentPage, PlayMode, WatchView,
   AuthSnapshot,
   DownloadView,
   LyricDoc,
@@ -277,6 +277,11 @@ export function mvSource(key: string): Promise<string> {
   return call<string>('mv_source', { key })
 }
 
+
+/** 切换看/听。从看到听时传画面当前位置。 */
+export function setMode(mode: PlayMode, atMs?: number): Promise<PlayerSnapshot> {
+  return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null })
+}
 
 /** 首页推荐。风控拒绝时返回空列表。 */
 export function homeFeed(fresh: number): Promise<Track[]> {

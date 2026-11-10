@@ -113,6 +113,16 @@ pub struct PlayerSnapshot {
     pub repeat: String,
     pub shuffle: bool,
     pub quality_kbps: Option<u16>,
+    /// 同一个会话的两个渲染目标。看与听共用位置与队列，只有画面这一项不同。
+    pub mode: PlayMode,
+}
+
+/// 渲染目标。它不属于领域实体，属于会话。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayMode {
+    Listen,
+    Watch,
 }
 
 /// 视频详情视图，字段与 TS 契约逐一对应。

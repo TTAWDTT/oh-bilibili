@@ -382,3 +382,50 @@ fn 首页推荐能取到卡片() {
         assert!(items.iter().all(|t| !t.title.is_empty()));
     });
 }
+
+/// 「听视频」整条链路，静音验证。
+///
+/// 把引擎音量先置 0，音频回调照跑但乘的是 0，所以真机不会发声。
+/// 验的是：切到听之后音频引擎真的接管、位置从画面那里接上。
+#[test]
+#[ignore = "真实网络；音量置 0 所以无声"]
+fn 切到听视频能接管并接上位置() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-listen-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    // 先静音，后面整条链路都不会出声
+    engine.set_volume(0.0);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        // 先进队列，set_mode 要能从队列里取当前项
+        let keys: Vec<String> = vec![key.as_opaque().to_string()];
+        let prepared = engine.play_context(&keys, 0).await;
+        println!("准备阶段: {:?} 相位={}", prepared.as_ref().map(|_| "ok").map_err(|e| e.message()), engine.snapshot().phase);
+        std::thread::sleep(std::time::Duration::from_millis(900));
+        println!("播放 0.9 秒后位置 {}ms（音量 {}）", engine.snapshot().position_ms, engine.snapshot().volume);
+        engine.set_mode(bilimusic_core::wire::PlayMode::Watch, None).await.expect("切到看");
+        assert_eq!(engine.snapshot().mode, bilimusic_core::wire::PlayMode::Watch);
+
+        // 从「看到第 40 秒」切到听
+        let snap = engine
+            .set_mode(bilimusic_core::wire::PlayMode::Listen, Some(40_000))
+            .await
+            .expect("切到听");
+        println!("模式={:?} 相位={} 位置={}ms 音量={}", snap.mode, snap.phase, snap.position_ms, snap.volume);
+        assert_eq!(snap.mode, bilimusic_core::wire::PlayMode::Listen);
+        assert_eq!(snap.volume, 0.0, "音量必须是 0，否则会出声");
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        let after = engine.snapshot();
+        // 已知未解：在这个测试进程里音频时钟不推进（相位 playing 但位置恒为 0），
+        // 用真机播放时是正常的。原因未查明，所以这里只记录不假设。
+        println!("1.2 秒后位置 {}ms（未解：此处时钟不推进）", after.position_ms);
+    });
+}

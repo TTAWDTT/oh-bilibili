@@ -108,6 +108,7 @@ export function snapshot(): PlayerSnapshot {
   return {
     phase: state.phase,
     track,
+    mode: 'listen',
     position_ms: Math.round(state.position),
     duration_ms: state.duration,
     volume: state.volume,

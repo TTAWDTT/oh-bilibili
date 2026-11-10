@@ -51,6 +51,8 @@ pub struct Engine {
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
     downloads: Mutex<Vec<DownloadView>>,
+    /// 会话当前的渲染目标。看与听共用位置，只有画面这一项不同。
+    mode: Mutex<crate::wire::PlayMode>,
     /// 本机代理的票据表。谁能被代理转发的唯一决定处。
     tickets: crate::tickets::Tickets,
     /// 引擎启动时刻，用来给进度事件打时间戳。
@@ -91,6 +93,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            mode: Mutex::new(crate::wire::PlayMode::Listen),
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
         });
@@ -348,6 +351,39 @@ impl Engine {
         })
     }
 
+    /// 切换渲染目标。
+    ///
+    /// 从「看」切到「听」时，界面把画面当前的位置传进来，音频引擎从那里接着放。
+    /// 位置因此不需要在两处各存一份：画面读它时用同一份时钟。
+    pub async fn set_mode(
+        self: &Arc<Self>,
+        mode: crate::wire::PlayMode,
+        at_ms: Option<u64>,
+    ) -> Result<PlayerSnapshot, WireError> {
+        *lock(&self.mode) = mode;
+        if mode == crate::wire::PlayMode::Watch {
+            return Ok(self.snapshot());
+        }
+        // 听：只要没有音频在放，就从画面当前位置接上。
+        // 只看 idle 不够：上一次加载失败会停在 faulted，那时也该重新接管。
+        let needs_load = matches!(lock(&self.state).phase(), "idle" | "faulted" | "ended");
+        if needs_load {
+            let key = lock(&self.queue)
+                .current()
+                .map(|e| e.track.key.clone())
+                .ok_or_else(|| WireError::input("queue", "队列是空的"))?;
+            let snapshot = self.play_key(&key).await?;
+            if let Some(at) = at_ms.filter(|v| *v > 0) {
+                self.seek(at);
+            }
+            return Ok(snapshot);
+        }
+        if let Some(at) = at_ms.filter(|v| *v > 0) {
+            self.seek(at);
+        }
+        Ok(self.snapshot())
+    }
+
     /// 首页推荐。风控拒绝时返回空列表，界面显示「换一批」。
     pub async fn home_feed(&self, fresh: u32) -> Result<Vec<bilimusic_model::Track>, WireError> {
         Ok(self.source.home_feed(fresh).await?)
@@ -600,6 +636,7 @@ impl Engine {
             repeat: lock(&self.repeat).clone(),
             shuffle: lock(&self.queue).shuffle(),
             quality_kbps: quality,
+            mode: *lock(&self.mode),
         }
     }
 

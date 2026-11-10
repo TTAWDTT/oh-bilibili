@@ -27,7 +27,10 @@ export type PlayerSnapshot = {
   repeat: RepeatMode
   shuffle: boolean
   quality_kbps: number | null
+  mode: PlayMode
 }
+
+export type PlayMode = 'listen' | 'watch' 
 
 export type Comment = {
   id: string

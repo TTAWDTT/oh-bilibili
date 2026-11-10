@@ -112,6 +112,16 @@ async fn danmaku_heat(
         .await
 }
 
+/// 切换看/听。从看到听时把画面当前位置传进来，音频从那里接着放。
+#[tauri::command(rename_all = "snake_case")]
+async fn set_mode(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mode: bilimusic_core::wire::PlayMode,
+    at_ms: Option<u64>,
+) -> Result<PlayerSnapshot, WireError> {
+    engine.set_mode(mode, at_ms).await
+}
+
 /// 首页推荐。
 #[tauri::command(rename_all = "snake_case")]
 async fn home_feed(
@@ -666,6 +676,7 @@ pub fn run() {
             watch_open,
             watch_comments,
             home_feed,
+            set_mode,
             search_q,
             player_state,
             player_play,
