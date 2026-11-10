@@ -1,87 +1,86 @@
-import { useRef } from 'react'
-import { getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window'
+import { currentMonitor, getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window'
+
+/** 可交互元素上起手不算拖窗口。 */
+function isInteractive(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el?.closest) return false
+  return Boolean(el.closest('button, input, textarea, select, a, [role="button"]'))
+}
 
 /**
  * 自己实现的窗口拖动。
  *
- * 为什么不用 data-tauri-drag-region：它走 startDragging()，在这个环境里
- * 实测按下去窗口纹丝不动（权限已开、命中目标也对）。改成监听指针事件、
- * 按屏幕坐标算位移、直接 setPosition——每一步都可在测试里观察。
+ * 为什么不用 data-tauri-drag-region：它走 startDragging()，补了
+ * core:window:allow-start-dragging 之后在这台机器上仍然纹丝不动。
  *
- * 交互细节：
- * - 从按钮、输入框等可交互元素上起手不算拖窗口
- * - 双击（没移动过）就最大化/还原
+ * 几个踩过的坑：
+ * - 位移用 PointerEvent.screenX/Y 算，这是屏幕坐标，窗口移动不会让它失效。
+ * - 窗口位置与「是否最大化」要一起异步取；取到之前不移动，取到之后按累计位移落位。
+ * - 监听挂在 document 上：窗口移动时指针可能瞬间离开顶栏，挂在元素上会断。
+ * - 最大化时不许拖。setPosition 会把全屏窗口挪出屏幕，实测留下一个
+ *   1920×1050 却停在 (120,130) 的怪状态。想移动请先点绿灯还原。
  */
-export function useWindowDrag(): {
-  onPointerDown: (event: React.PointerEvent) => void
-  onPointerMove: (event: React.PointerEvent) => void
-  onPointerUp: (event: React.PointerEvent) => void
-  onDoubleClick: () => void
-} {
-  const drag = useRef<{
-    startX: number
-    startY: number
-    winX: number
-    winY: number
-    scale: number
-    moved: boolean
-    pointerId: number
-  } | null>(null)
-
+export function useWindowDrag(): { onPointerDown: (event: React.PointerEvent) => void } {
   return {
     onPointerDown: (event) => {
       if (event.button !== 0) return
-      const target = event.target as HTMLElement
-      // 可交互元素要自己处理点击，不能拿来拖窗口
-      if (target.closest('button, input, textarea, select, a, [role="button"]')) return
-      const win = getCurrentWindow()
+      if (isInteractive(event.target)) return
+
+      const appWindow = getCurrentWindow()
+      const startX = event.screenX
+      const startY = event.screenY
+      let winX: number | null = null
+      let winY: number | null = null
+      let scale = 1
+      let maximized = true // 取到真实状态前先别动，避免在最大化窗口上误拖
+      let moved = false
+      let latestDx = 0
+      let latestDy = 0
+
+      const place = (): void => {
+        if (winX === null || winY === null || maximized) return
+        void appWindow
+          .setPosition(
+            new PhysicalPosition(Math.round(winX + latestDx), Math.round(winY + latestDy)),
+          )
+          .catch(() => {})
+      }
+
       void (async () => {
         try {
-          const pos = await win.outerPosition()
-          const wx = pos.x
-          const wy = pos.y
-          const scale = await win.scaleFactor()
-          drag.current = {
-            startX: event.screenX,
-            startY: event.screenY,
-            winX: wx,
-            winY: wy,
-            scale,
-            moved: false,
-            pointerId: event.pointerId,
-          }
-          event.currentTarget.setPointerCapture?.(event.pointerId)
+          const p = await appWindow.outerPosition()
+          const s = await appWindow.scaleFactor()
+          const monitor = await currentMonitor().catch(() => null)
+          const zoomed = await appWindow.isMaximized().catch(() => false)
+          const outer = await appWindow.outerSize()
+          winX = p.x
+          winY = p.y
+          scale = s || 1
+          // isMaximized 在 macOS 的「缩放」状态下不一定为真，再用尺寸兜一层：
+          // 占满整块屏幕的宽度就算最大化。
+          const fillsWidth = monitor ? outer.width >= monitor.size.width - 4 : false
+          maximized = zoomed || fillsWidth
+          if (moved) place()
         } catch {
-          // 拿不到窗口信息就不拖，别把点击吃掉
-          drag.current = null
+          // 拿不到窗口信息就放弃这次拖动，不阻塞点击
         }
       })()
-    },
-    onPointerMove: (event) => {
-      const d = drag.current
-      if (!d) return
-      const dx = (event.screenX - d.startX) * d.scale
-      const dy = (event.screenY - d.startY) * d.scale
-      if (!d.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return
-      d.moved = true
-      void getCurrentWindow()
-        .setPosition(new PhysicalPosition(Math.round(d.winX + dx), Math.round(d.winY + dy)))
-        .catch(() => {})
-    },
-    onPointerUp: (event) => {
-      const d = drag.current
-      drag.current = null
-      if (!d) return
-      try {
-        event.currentTarget.releasePointerCapture?.(d.pointerId)
-      } catch {
-        // 指针捕获可能已经被系统释放，忽略
+
+      const onMove = (ev: PointerEvent): void => {
+        latestDx = (ev.screenX - startX) * scale
+        latestDy = (ev.screenY - startY) * scale
+        if (!moved && Math.abs(latestDx) < 3 && Math.abs(latestDy) < 3) return
+        moved = true
+        place()
       }
-      // 移动过就不再当成双击
-      if (d.moved) event.stopPropagation()
-    },
-    onDoubleClick: () => {
-      void getCurrentWindow().toggleMaximize().catch(() => {})
+
+      const onUp = (): void => {
+        document.removeEventListener('pointermove', onMove)
+        document.removeEventListener('pointerup', onUp)
+      }
+
+      document.addEventListener('pointermove', onMove)
+      document.addEventListener('pointerup', onUp)
     },
   }
 }
