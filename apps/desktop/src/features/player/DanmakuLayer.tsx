@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { usePlayerStore } from './playerStore'
@@ -58,7 +58,12 @@ export function DanmakuLayer({ trackKey }: { trackKey: string }) {
     }
   }, [trackKey])
 
-  const all = sent.length === 0 ? items : [...items, ...sent].sort((a, b) => a.at - b.at)
+  // 必须 memo：不 memo 的话每次渲染都是新数组，下面那个 effect 会被
+  // 反复销毁重建，定时器永远等不到第一次触发，弹幕就一条都不出。
+  const all = useMemo(
+    () => (sent.length === 0 ? items : [...items, ...sent].sort((a, b) => a.at - b.at)),
+    [items, sent],
+  )
 
   // 定时把「该出现了」的弹幕放上去，并收走飘完的。
   useEffect(() => {

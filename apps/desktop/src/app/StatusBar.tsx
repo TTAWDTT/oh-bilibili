@@ -1,6 +1,6 @@
 import { usePlayerStore } from '../features/player/playerStore'
-import { formatTime } from '../shared/lib/format'
 import { Icon } from '../shared/ui/Icon'
+import { PlayheadText } from '../shared/ui/PlayheadText'
 
 /**
  * 状态条。编辑器式外壳的最后一段：22px，11px 字，只放事实，不放操作。
@@ -20,9 +20,7 @@ export function StatusBar() {
           <Icon name="biliTv" size={12} />
           本机直连 B 站
         </span>
-        <span className="num">
-          {formatTime(snapshot?.position_ms ?? 0)} / {formatTime(snapshot?.duration_ms ?? 0)}
-        </span>
+        <PlayheadText className="num" durationMs={snapshot?.duration_ms ?? 0} />
         <span className="num">{quality ? `${quality}K` : '—'}</span>
         <span className="num">{queued} 首在队列</span>
       </div>

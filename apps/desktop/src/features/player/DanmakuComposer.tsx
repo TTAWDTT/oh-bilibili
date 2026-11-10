@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { reportActionError } from '../../shared/lib/actionError'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
+import { readPlayhead } from '../../shared/lib/playhead'
 import { Icon } from '../../shared/ui/Icon'
 import { useSentDanmaku } from './sentDanmaku'
 
@@ -13,14 +14,18 @@ import { useSentDanmaku } from './sentDanmaku'
  */
 export function DanmakuComposer({
   trackKey,
-  position,
   onSent,
 }: {
   trackKey: string | null
-  position: number
   onSent?: () => void
 }) {
   const [text, setText] = useState('')
+  // 占位文案里的秒数自己读，不再让整个舞台因为进度变化重渲染
+  const [at, setAt] = useState(() => readPlayhead())
+  useEffect(() => {
+    const timer = window.setInterval(() => setAt(readPlayhead()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
   const [busy, setBusy] = useState(false)
   const append = useSentDanmaku((s) => s.append)
 
@@ -29,10 +34,10 @@ export function DanmakuComposer({
     if (!trackKey || value.length === 0 || busy) return
     setBusy(true)
     try {
-      await ipc.danmakuSend(trackKey, value, Math.max(0, Math.round(position)))
-      append(trackKey, { at: Math.max(0, Math.round(position)), text: value, color: 'var(--text-1)' })
+      await ipc.danmakuSend(trackKey, value, Math.max(0, Math.round(readPlayhead())))
+      append(trackKey, { at: Math.max(0, Math.round(readPlayhead())), text: value, color: 'var(--text-1)' })
       setText('')
-      toastDone('弹幕已发出', `${Math.floor(position / 1000)} 秒处`)
+      toastDone('弹幕已发出', `${Math.floor(at / 1000)} 秒处`)
       onSent?.()
     } catch (e) {
       reportActionError('发弹幕', e)
@@ -58,7 +63,7 @@ export function DanmakuComposer({
         maxLength={100}
         onChange={(event) => setText(event.target.value)}
         placeholder={
-          trackKey ? `在 ${Math.floor(position / 1000)} 秒处发条弹幕` : '选一首再发弹幕'
+          trackKey ? `在 ${Math.floor(at / 1000)} 秒处发条弹幕` : '选一首再发弹幕'
         }
         disabled={!trackKey || busy}
         className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"

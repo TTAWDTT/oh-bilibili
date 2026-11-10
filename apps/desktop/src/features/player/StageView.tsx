@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
+import { useSmoothIndex } from '../../shared/lib/useSmoothIndex'
 import { useSwipe } from '../../shared/lib/useSwipe'
 import type { Track } from '../../shared/lib/contract'
 import type { LyricDoc } from '../../shared/lib/contract'
@@ -19,6 +20,8 @@ import { usePlayerStore } from './playerStore'
  * 这一屏不做"信息"，只做"在场"：封面铺满、背景是同一张图重模糊、
  * 歌词只留当前一句和下一句。列表页负责找歌，这里负责听歌。
  */
+const EMPTY_TIMES: number[] = []
+
 export function StageView() {
   const open = useAppStore((state) => state.stage)
   const setStage = useAppStore((state) => state.setStage)
@@ -78,14 +81,14 @@ export function StageView() {
     onRight: () => void prev(),
   })
 
+  const lineTimes = doc && doc.synced ? doc.lines.map((l) => l.at_ms) : EMPTY_TIMES
+  const activeLine = useSmoothIndex(lineTimes, Boolean(doc && doc.synced))
+
   if (!open || !track) return null
 
   const lines = doc?.lines ?? []
-  const pos = snapshot?.position_ms ?? 0
-  let active = -1
-  for (let i = 0; i < lines.length; i += 1) {
-    if ((lines[i]?.at_ms ?? 0) <= pos) active = i
-  }
+  // 用平滑索引：只在「换行」时重渲染，而不是每秒 5 次
+  const active = activeLine
   const current = lines[active]?.text ?? ''
   const upcoming = lines[active + 1]?.text ?? ''
 
@@ -147,7 +150,7 @@ export function StageView() {
         {/* 弹幕输入框放在播放键上方：真机窗口比网页矮，放下面会被底部的
             「相关推荐」压住，实测看不到。 */}
         <div className="mt-4 flex w-full justify-center px-8">
-          <DanmakuComposer trackKey={track.key} position={snapshot?.position_ms ?? 0} />
+          <DanmakuComposer trackKey={track.key} />
         </div>
 
         <div className="mt-4 flex items-center gap-6 text-[var(--text-2)]">
