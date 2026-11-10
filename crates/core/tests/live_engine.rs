@@ -296,5 +296,16 @@ fn 评论能取到真实数据与嵌套回复() {
         assert!(!page.items.is_empty(), "本页不该是空的");
         assert!(page.items.iter().any(|c| !c.text.is_empty()), "文本不该全空");
         assert!(page.has_more, "24 万条的视频第一页之后应该还有");
+
+        // 第二页必须真的换了一批，而不是把第一页再发一次
+        let second = engine.comments(&key, 2).await.expect("取第 2 页");
+        println!("第 2 页 {} 条", second.items.len());
+        assert_eq!(second.page, 2);
+        assert!(!second.items.is_empty(), "第 2 页不该是空的");
+        let first_ids: Vec<&str> = page.items.iter().map(|c| c.id.as_str()).collect();
+        assert!(
+            second.items.iter().all(|c| !first_ids.contains(&c.id.as_str())),
+            "第 2 页不该重复第 1 页的评论"
+        );
     });
 }
