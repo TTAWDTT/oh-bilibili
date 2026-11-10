@@ -45,6 +45,7 @@ export function WatchView({ track }: { track: Track }) {
   const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
   const danmakuSize = useDanmakuSettings((s) => s.size)
   const danmakuSpeed = useDanmakuSettings((s) => s.speed)
+  const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
 
   // 取清单与档位
   useEffect(() => {
@@ -272,6 +273,20 @@ export function WatchView({ track }: { track: Track }) {
 
       {data ? (
         <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-2">
+          {/* 弹幕开关属于播放器，所以放在这里而不是全局顶栏 */}
+          <button
+            type="button"
+            aria-pressed={danmakuOn}
+            title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
+            onClick={() => setDanmakuEnabled(!danmakuOn)}
+            className={`t press mr-2 flex h-6 items-center rounded-[4px] border px-2 text-[12px] ${
+              danmakuOn
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-[var(--line)] text-[var(--text-3)]'
+            }`}
+          >
+            弹
+          </button>
           <span className="mr-1 text-[12px] text-[var(--text-3)]">画质</span>
           {data.qualities.map((q) => (
             <button
