@@ -60,21 +60,29 @@ export function DanmakuStrip() {
 
   if (!enabled || !playing || visible.length === 0) return null
 
+  // 铺满内容区的全屏弹幕：原来只是一条 24px 高的带子，一次只看得到一两句。
+  // 现在按 8 条车道从上到下排开，压在内容上方，pointer-events-none 不挡操作。
+  const LANES = 8
   return (
-    <div className="pointer-events-none relative h-6 shrink-0 overflow-hidden border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bili-pink)_5%,white)]" aria-hidden>
+    <div
+      className="pointer-events-none absolute inset-0 z-30 overflow-hidden"
+      aria-hidden
+      data-danmaku-fullscreen
+    >
       {visible.map((item, i) => (
         <span
           key={`${item.at}-${item.text}-${i}`}
           className="bili-strip-item absolute whitespace-nowrap rounded-[3px] px-1.5 text-[14px]"
           style={{
             color: item.color,
-            top: `${(i % 2) * 11}px`,
+            top: `${4 + ((i % LANES) * 88) / LANES}%`,
             animationDuration: `${LIFE_MS / speed / 1000}s`,
             // 负延迟让它落在已经飘过的那一段，而不是从右边缘重新开始
             animationDelay: `-${(position - item.at) / 1000}s`,
             animationPlayState: 'paused',
-            opacity: opacity * 0.85,
-            background: 'color-mix(in oklab, var(--bili-pink) 10%, white)',
+            opacity: opacity * 0.9,
+            textShadow: '0 0 2px #fff, 0 0 4px #fff, 0 0 6px #fff',
+            background: 'color-mix(in oklab, var(--bili-pink) 12%, white / 0.86)',
           }}
         >
           {item.text}

@@ -116,14 +116,15 @@ export default function App() {
       <div className="hidden md:contents">
         <ChannelBar />
       </div>
-      <DanmakuStrip />
 
       <div className="relative z-10 flex min-h-0 flex-1">
         <div className="hidden md:contents">
           <Sidebar />
         </div>
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
-          <div key={view.kind} className="bili-page h-full">
+          {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
+                父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
+          <div key={view.kind} className="bili-page flex h-full flex-col">
             <h1 className="sr-only">{viewTitle(view)}</h1>
             <CurrentView view={view} />
           </div>
@@ -131,6 +132,8 @@ export default function App() {
         <div className="rail-slot hidden md:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
+        {/* 全屏弹幕压在内容之上；它不吃点击，所以不影响任何操作 */}
+        <DanmakuStrip />
       </div>
 
       <BackToTop targetId="scroll-main" />

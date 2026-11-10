@@ -28,6 +28,7 @@ export function FavFoldersView() {
   const [exhausted, setExhausted] = useState(false)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const snapshot = usePlayerStore((state) => state.snapshot)
+  const playContext = usePlayerStore((state) => state.playContext)
 
   useEffect(() => {
     let cancelled = false
@@ -120,12 +121,30 @@ export function FavFoldersView() {
           <Icon name="chevronLeft" size={13} />
           收藏夹
         </button>
-        <h2 className="mb-4 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
-          {picked.title}
-          <span className="num ml-2 text-[14px] font-normal text-[var(--text-3)]">
-            {picked.count} 个视频
-          </span>
-        </h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="min-w-0 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
+            {picked.title}
+            <span className="num ml-2 text-[14px] font-normal text-[var(--text-3)]">
+              {picked.count} 个视频
+            </span>
+          </h2>
+          {/* 播放全部：把当前已加载的曲目按顺序塞进队列，从第一首开始放 */}
+          <button
+            type="button"
+            disabled={!tracks || tracks.length === 0}
+            onClick={() => {
+              if (!tracks || tracks.length === 0) return
+              void playContext(
+                tracks.map((t) => t.key),
+                0,
+              )
+            }}
+            className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white disabled:opacity-40"
+          >
+            <Icon name="play" size={13} />
+            播放全部
+          </button>
+        </div>
         {tracks === null ? (
           <TrackListSkeleton rows={6} />
         ) : tracks.length === 0 ? (

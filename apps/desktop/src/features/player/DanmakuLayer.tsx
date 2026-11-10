@@ -11,7 +11,7 @@ type Item = { at: number; text: string; color: string }
 /** 弹幕在屏幕上停留的时长，和 B 站默认速度接近。 */
 const LIFE_MS = 9000
 /** 同时最多几条，超出的丢掉——真实弹幕池一秒钟可能几十条。 */
-const MAX_ON_SCREEN = 12
+const MAX_ON_SCREEN = 14
 
 /**
  * 弹幕层。按视频时间轴显示——第 30 秒的弹幕在第 30 秒出现，不是随机排队飘过。
@@ -73,8 +73,9 @@ export function DanmakuLayer({ trackKey, position }: { trackKey: string; positio
           key={`${item.at}-${item.text}-${i}`}
           className="danmaku absolute whitespace-nowrap text-[14px]"
           style={{
-            // 只占上半部：下半部是标题和歌词，弹幕压上去会读不清
-            top: `${5 + (i * 44) / MAX_ON_SCREEN}%`,
+            // 铺满整屏：B 站全屏弹幕就是从上到下的，只占上半屏会显得空
+            // 且容易互相压住。按条数均分高度，留出上下边距。
+            top: `${6 + (i * 82) / MAX_ON_SCREEN}%`,
             // 已经飘了多久决定它现在到哪：位置越靠后，越接近左边缘
             animationDuration: `${LIFE_MS / speed / 1000}s`,
             animationDelay: `-${(position - item.at) / 1000}s`,
