@@ -47,3 +47,15 @@ export function initials(title: string): string {
   const trimmed = title.trim()
   return trimmed.length === 0 ? '♪' : trimmed.slice(0, 1)
 }
+
+/**
+ * 播放量、点赞数这类大数的口语写法。
+ *
+ * 原来 TrackGrid 与 AuthorView 各写了一份，第三处要用时才发现是两份实现。
+ * B 站的说法是「1.1亿」「8.3万」。
+ */
+export function formatCount(n: number): string {
+  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
+  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
+  return String(n)
+}

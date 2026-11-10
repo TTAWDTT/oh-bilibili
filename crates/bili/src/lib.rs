@@ -3,6 +3,7 @@
 //! 出门只有领域类型：`Track`、`TrackDetail`、`AudioStream`。
 //! 这个 crate 之外的代码不会看到 bvid、cid、dash、fnval 这些词。
 
+pub mod comments;
 pub mod dash;
 pub mod auth;
 pub mod client;
@@ -361,6 +362,31 @@ impl Source {
             .get_json(&absolute, std::time::Duration::ZERO)
             .await?;
         Ok(wire::subtitle_lines(&body))
+    }
+
+    /// 取一页评论。aid 来自详情，评论区只读，失败就返回空页。
+    pub async fn comments(
+        &self,
+        key: &TrackKey,
+        page: u32,
+    ) -> Result<crate::comments::CommentPage, BiliError> {
+        let detail = self.detail(key).await?;
+        let per_page = 20u32;
+        let value = self
+            .client
+            .signed_get(
+                &format!("{}/x/v2/reply", client::API),
+                vec![
+                    ("type", "1".to_string()),
+                    ("oid", detail.aid.to_string()),
+                    ("sort", "2".to_string()),
+                    ("ps", per_page.to_string()),
+                    ("pn", page.to_string()),
+                ],
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(crate::comments::page_from(&value, page, per_page))
     }
 
     /// 取 DASH 的视频轨。只返回视频，音频永远走音频引擎。

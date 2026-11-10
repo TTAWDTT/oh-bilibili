@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { WatchView,
+import type { CommentPage, WatchView,
   AuthSnapshot,
   DownloadView,
   LyricDoc,
@@ -277,6 +277,11 @@ export function mvSource(key: string): Promise<string> {
   return call<string>('mv_source', { key })
 }
 
+
+/** 取一页评论。 */
+export function watchComments(key: string, page: number): Promise<CommentPage> {
+  return invoke<CommentPage>('watch_comments', { key, page })
+}
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
 export function watchOpen(key: string): Promise<WatchView> {

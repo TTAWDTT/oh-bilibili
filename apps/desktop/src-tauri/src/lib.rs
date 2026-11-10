@@ -112,6 +112,16 @@ async fn danmaku_heat(
         .await
 }
 
+/// 取一页评论。评论区只读，取不到不该挡住看视频。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_comments(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    page: u32,
+) -> Result<bilimusic_core::wire::CommentPage, WireError> {
+    engine.comments(&TrackKey::from_provider(key), page).await
+}
+
 /// 打开观看页。一次给齐清单地址与画质档位，前端看不到任何远端地址。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_open(
@@ -644,6 +654,7 @@ pub fn run() {
             video_meta,
             mv_source,
             watch_open,
+            watch_comments,
             search_q,
             player_state,
             player_play,

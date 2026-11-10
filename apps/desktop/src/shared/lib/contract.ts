@@ -29,6 +29,24 @@ export type PlayerSnapshot = {
   quality_kbps: number | null
 }
 
+export type Comment = {
+  id: string
+  author: string
+  avatar: string | null
+  text: string
+  likes: number
+  at: number
+  replies: Comment[]
+  reply_count: number
+}
+
+export type CommentPage = {
+  total: number
+  page: number
+  items: Comment[]
+  has_more: boolean
+}
+
 /** 观看页一次调用拿到的全部东西。manifest_url 已经带上本机代理端口。 */
 export type WatchView = {
   key: string

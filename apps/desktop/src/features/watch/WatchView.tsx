@@ -7,6 +7,7 @@ import { formatTime } from '../../shared/lib/format'
 import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
+import { CommentsPanel } from './CommentsPanel'
 import { Icon } from '../../shared/ui/Icon'
 
 /**
@@ -158,7 +159,7 @@ export function WatchView({ track }: { track: Track }) {
         </span>
       </div>
 
-      <div className="relative min-h-0 flex-1 bg-black">
+      <div className="relative min-h-0 flex-1 bg-black" style={{ flex: '0 0 auto', height: '52%' }}>
         <video
           ref={videoRef}
           muted
@@ -214,6 +215,10 @@ export function WatchView({ track }: { track: Track }) {
           </span>
         </div>
       ) : null}
+
+      <div className="min-h-0 flex-1 border-t border-hairline">
+        <CommentsPanel trackKey={track.key} />
+      </div>
     </div>
   )
 }

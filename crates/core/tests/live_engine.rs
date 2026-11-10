@@ -266,3 +266,35 @@ fn 弹幕能取到真实数据() {
         assert!(list.iter().any(|(_, t, _)| !t.is_empty()), "文本不该全空");
     });
 }
+
+/// 评论区要真能取到数据。用真接口，不用 mock。
+#[test]
+#[ignore = "真实网络"]
+fn 评论能取到真实数据与嵌套回复() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-cm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
+        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
+        let page = engine.comments(&key, 1).await.expect("取评论");
+        println!("总数 {} 条，本页 {} 条，还有更多={}", page.total, page.items.len(), page.has_more);
+        for c in page.items.iter().take(3) {
+            println!("  {} 赞{}  {} 字", c.author, c.likes, c.text.chars().count());
+            for r in c.replies.iter().take(1) {
+                println!("     └ {}: {}", r.author, r.text.chars().count());
+            }
+        }
+        assert!(page.total > 0, "真实视频应该有评论");
+        assert!(!page.items.is_empty(), "本页不该是空的");
+        assert!(page.items.iter().any(|c| !c.text.is_empty()), "文本不该全空");
+        assert!(page.has_more, "24 万条的视频第一页之后应该还有");
+    });
+}

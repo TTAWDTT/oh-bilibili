@@ -1,4 +1,5 @@
 import { toastDone, toastFailure } from '../../app/notice'
+import { formatCount } from '../../shared/lib/format'
 import { toWireError } from '../../shared/lib/errors'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
@@ -9,12 +10,6 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { TrackGrid } from '../tracks/TrackGrid'
 import { usePlayerStore } from '../player/playerStore'
-
-function formatCount(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
-  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
-  return String(n)
-}
 
 /**
  * UP 主页面。

@@ -1,4 +1,5 @@
 import { DownloadButton } from '../downloads/DownloadButton'
+import { formatCount } from '../../shared/lib/format'
 import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
 import { CardDanmaku } from './CardDanmaku'
@@ -33,12 +34,6 @@ function coverFlags(title: string): string[] {
 
 /** 分区胶囊：从标题推断，没有标签的视频不显示。 */
 /** B 站的计数写法：一万以上用「万」。 */
-function formatCount(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
-  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
-  return String(n)
-}
-
 /** B 站各分区的代表色，用于分区标签底色。 */
 function partitionColor(name: string): string {
   const table: Record<string, string> = {
