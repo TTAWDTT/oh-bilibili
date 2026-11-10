@@ -1,3 +1,4 @@
+import type { Track } from '../shared/lib/contract'
 import { create } from 'zustand'
 
 export type View =
@@ -7,6 +8,7 @@ export type View =
   | { kind: 'liked' }
   | { kind: 'downloads' | 'history' | 'favs' }
   | { kind: 'author'; name: string; mid?: number | null }
+  | { kind: 'watch'; track: Track }
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'
@@ -44,7 +46,6 @@ type AppStore = {
   setCurrentQuery: (q: string) => void
   setSearchFilters: (partition: string, order: string, duration?: number) => void
   setAuthOpen: (open: boolean) => void
-  setMv: (mv: { key: string; title: string } | null) => void
   setStage: (open: boolean) => void
   setAuthorQuery: (q: string | null) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
@@ -76,7 +77,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setSearchFilters: (partition, order, duration = 0) =>
     set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),
   setAuthOpen: (open) => set({ authOpen: open }),
-  setMv: (mv) => set({ mv }),
   setStage: (open) => set({ stage: open }),
   setAuthorQuery: (q) => set({ authorQuery: q }),
   pushToast: (tone, title, detail) => {

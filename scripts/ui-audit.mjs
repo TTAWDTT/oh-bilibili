@@ -16,7 +16,8 @@ const ROOT = new URL('../apps/desktop/src', import.meta.url).pathname
 
 // 这些文件整体是深色语境（全屏视频浮层、banner 深色遮罩），浅色字合法
 const DARK_CONTEXT_FILES = [
-  'features/player/MvOverlay.tsx',
+  // 观看页的提示文字压在视频画面上，底色是黑的
+  'features/watch/WatchView.tsx',
   'features/search/SearchBanner.tsx',
 ]
 

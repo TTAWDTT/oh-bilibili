@@ -8,7 +8,6 @@ import { LibraryView } from '../features/library/LibraryView'
 import { LikedView } from '../features/library/LikedView'
 import { PlaylistView } from '../features/library/PlaylistView'
 import { NowPlayingRail } from '../features/player/NowPlayingRail'
-import { MvOverlay } from '../features/player/MvOverlay'
 import { StageView } from '../features/player/StageView'
 import { PlayerBar } from '../features/player/PlayerBar'
 import { usePlayerStore } from '../features/player/playerStore'
@@ -28,6 +27,7 @@ import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
+import { WatchView } from '../features/watch/WatchView'
 
 /**
  * 当前页面的标题。
@@ -55,6 +55,8 @@ function viewTitle(view: View): string {
       return `UP 主：${view.name}`
     case 'settings':
       return '设置'
+    case 'watch':
+      return `观看：${view.track.title}`
   }
 }
 
@@ -78,6 +80,8 @@ function CurrentView({ view }: { view: View }) {
       return <AuthorView name={view.name} mid={view.mid ?? null} />
     case 'settings':
       return <SettingsView />
+    case 'watch':
+      return <WatchView track={view.track} />
   }
 }
 
@@ -141,7 +145,6 @@ export default function App() {
       <StatusBar />
       <MobileTabBar />
       {railOpen ? <MobileRailSheet tab={rail ?? 'lyrics'} /> : null}
-      <MvOverlay />
       <StageView />
       <ToastHost />
       <AuthModal />

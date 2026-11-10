@@ -21,7 +21,7 @@ type TrackRowProps = {
 }
 
 export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProps) {
-  const setMv = useAppStore((state) => state.setMv)
+  const navigate = useAppStore((state) => state.navigate)
   const [adding, setAdding] = useState(false)
 
   return (
@@ -84,9 +84,9 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
   
       <button
         type="button"
-        aria-label={`看 ${track.title} 的 MV`}
-        title="看 MV"
-        onClick={() => setMv({ key: track.key, title: track.title })}
+        aria-label={`看视频 ${track.title}`}
+        title="看视频"
+        onClick={() => navigate({ kind: 'watch', track })}
         className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:text-[var(--text-1)]"
       >
         <Icon name="play" size={13} />

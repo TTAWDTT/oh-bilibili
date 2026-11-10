@@ -78,7 +78,6 @@ type TrackGridProps = {
  */
 export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
-  const setMv = useAppStore((state) => state.setMv)
   const navigate = useAppStore((state) => state.navigate)
   const liked = useReactionStore((state) => state.liked)
   const faved = useReactionStore((state) => state.faved)
@@ -234,13 +233,13 @@ export function TrackGrid({ tracks, activeKey, playing, extraAction }: TrackGrid
               </button>
               <button
                 type="button"
-                aria-label={`看 ${track.title} 的 MV`}
-                title="看 MV"
-                onClick={() => setMv({ key: track.key, title: track.title })}
+                aria-label={`看视频 ${track.title}`}
+                title="看视频"
+                onClick={() => navigate({ kind: 'watch', track })}
                 className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
               >
                 <Icon name="biliTv" size={11} />
-                MV
+                看视频
               </button>
             </div>
 
