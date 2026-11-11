@@ -1,5 +1,8 @@
 # 视频 + 听视频的架构设计
 
+> 这份是设计期的方案记录。文中的 `ChannelBar.tsx` 后来被 `app/Sidebar.tsx` 取代，
+> `TrackGrid.tsx` 现在叫 `features/tracks/ContentGrid.tsx`。当前状态以 README 与 HANDOFF 为准。
+
 把现有音乐播放器扩成 B 站桌面客户端。一条内容实体 `Track` 不动，新增一个可选的画面出口。
 
 ## Problem

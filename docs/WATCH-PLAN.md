@@ -1,5 +1,8 @@
 # B 站客户端计划：把音乐应用扩成「视频 + 听视频」
 
+> 这份是计划期的记录。文中的 `ChannelBar.tsx` 后来被 `app/Sidebar.tsx` 取代，
+> `TrackGrid.tsx` 现在叫 `features/tracks/ContentGrid.tsx`。当前状态以 README 与 HANDOFF 为准。
+
 把 BiliMusic 从音乐播放器扩成一个 B 站桌面客户端，音乐保留成「听视频」模式。一条内容实体，两种看法：看画面，或只听声音。
 
 阅读顺序：先看「保留什么 / 改什么 / 新建什么」三张表，再看九个阶段。每个阶段是一个可独立验收的 PR 单元，带自己的证据。
