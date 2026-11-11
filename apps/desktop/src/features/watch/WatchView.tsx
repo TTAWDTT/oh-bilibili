@@ -54,6 +54,8 @@ export function WatchView({ track }: { track: Track }) {
   const [draft, setDraft] = useState('')
   /** 全屏用浏览器全屏，不支持时退回 CSS 铺满。 */
   const [cinema, setCinema] = useState(false)
+  /** 这条视频在不在「稍后再看」里。按钮必须复述服务端的事实，不能只看点击过没有。 */
+  const [saved, setSaved] = useState(false)
   const stageRef = useRef<HTMLDivElement | null>(null)
   /**
    * 「引擎在不在放」。
@@ -111,6 +113,21 @@ export function WatchView({ track }: { track: Track }) {
       // 未登录时拉不到，保持未点亮即可
     })
   }, [track.key, refresh])
+
+  // 稍后再看的初始状态取自服务端列表；拿不到就当没加入，不猜。
+  useEffect(() => {
+    let cancelled = false
+    setSaved(false)
+    void ipc
+      .watchLaterList()
+      .then((list) => {
+        if (!cancelled) setSaved(list.some((t) => t.key === track.key))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [track.key])
 
   // 相关推荐。右栏只在「听」时出现，所以观看页要有自己的一份，
   // 否则看视频时完全没有相关推荐可点。
@@ -561,16 +578,27 @@ export function WatchView({ track }: { track: Track }) {
             </button>
             <button
               type="button"
+              aria-pressed={saved}
               onClick={() => {
+                const next = !saved
                 void ipc
-                  .watchLaterSet(track.key, true)
-                  .then(() => toastDone('已加入稍后再看'))
-                  .catch(() => toastDone('加入稍后再看失败', '登录后再试'))
+                  .watchLaterSet(track.key, next)
+                  .then(() => {
+                    setSaved(next)
+                    toastDone(next ? '已加入稍后再看' : '已从稍后再看移除')
+                  })
+                  .catch(() =>
+                    toastDone(next ? '加入稍后再看失败' : '移出稍后再看失败', '登录后再试'),
+                  )
               }}
-              className="t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
+              className={`t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] ${
+                saved
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
+              }`}
             >
               <Icon name="watchLater" size={13} />
-              稍后再看
+              {saved ? '已加入稍后再看' : '稍后再看'}
             </button>
           </div>
           {data.desc ? (

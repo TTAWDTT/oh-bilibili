@@ -161,8 +161,9 @@ export default function App() {
         <div className="rail-slot hidden md:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
-        {/* 全屏弹幕压在内容之上；它不吃点击，所以不影响任何操作 */}
-        <DanmakuStrip />
+        {/* 全屏弹幕压在内容之上；它不吃点击，所以不影响任何操作。
+            观看页有自己的弹幕层，跟着视频时钟走，这里不能再叠一层。 */}
+        {view.kind === 'watch' ? null : <DanmakuStrip />}
       </div>
 
       <BackToTop targetId="scroll-main" />
