@@ -4,6 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
+import { SearchBanner } from '../search/SearchBanner'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -82,6 +83,11 @@ export function HomeView() {
         >
           {loading ? '正在换…' : '换一批'}
         </button>
+      </div>
+
+      {/* 首页顶部一张主视觉，和 B 站网页端一致。 */}
+      <div className="mb-5 h-[200px]">
+        <SearchBanner />
       </div>
 
       {error ? <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}

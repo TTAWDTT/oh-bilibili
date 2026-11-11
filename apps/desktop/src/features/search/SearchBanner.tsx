@@ -47,7 +47,8 @@ export function SearchBanner() {
   }, [])
 
   return (
-    <div className="relative h-full min-h-[236px] overflow-hidden rounded-[8px]">
+    /* 高度交给外面的容器：自己带 min-h 会把容器设的高度顶开，压掉下面一行的间距。 */
+    <div className="relative h-full overflow-hidden rounded-[8px]">
       {SLIDES.map((slide, i) => (
         <div
           key={slide.title}

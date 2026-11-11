@@ -8,10 +8,7 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { usePlayerStore } from '../player/playerStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
-import { ChannelGrid } from './ChannelGrid'
 import { ContinueListening } from './ContinueListening'
-import { HotRanking } from './HotRanking'
-import { SearchBanner } from './SearchBanner'
 import { DurationFilter, type DurationKey } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
 
@@ -191,34 +188,24 @@ export function SearchView() {
         ) : null}
 
         {trimmed.length === 0 ? (
-          <div className="mt-6">
+          <div className="mt-2">
+            {/* 搜索页只放「接着看什么」和「搜什么」。大 banner、排行榜、分区入口
+                是首页的东西，摆在搜索页会让人以为这里是首页。 */}
+            <ContinueListening />
 
-            {/* 高度定死：不 item-stretch 时右栏排行有多长 banner 就有多高，会吃掉半屏。 */}
-            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="h-[260px]">
-                <SearchBanner />
-              </div>
-              <div className="hidden h-full rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 xl:block">
-                <HotRanking onPick={(kw) => pick(kw)} limit={6} />
-              </div>
-            </div>
-
-            <div className="mt-8 text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">试试这些</div>
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="mt-7 text-[13px] text-[var(--text-3)]">大家都在搜</div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => pick(suggestion)}
-                  className="t press text-[14px] text-[var(--text-2)] underline-offset-4 hover:text-[var(--text-1)] hover:underline"
+                  className="t press rounded-full border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 >
                   {suggestion}
                 </button>
               ))}
             </div>
-            <ContinueListening />
-
-            <ChannelGrid onPick={(kw) => pick(kw)} />
           </div>
         ) : (
           <section className="mt-6">
