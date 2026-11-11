@@ -17,6 +17,8 @@ const CHANNELS: readonly Channel[] = [
   { view: { kind: 'watchLater' }, label: '稍后再看' },
   { view: { kind: 'following' }, label: '关注' },
   { view: { kind: 'library' }, label: '曲库' },
+  { view: { kind: 'liked' }, label: '喜欢' },
+  { view: { kind: 'downloads' }, label: '已下载' },
   { view: { kind: 'settings' }, label: '设置' },
 ]
 

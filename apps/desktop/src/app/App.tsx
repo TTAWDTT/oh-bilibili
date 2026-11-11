@@ -21,7 +21,6 @@ import { MobileTabBar } from './MobileTabBar'
 import { MobileRailSheet } from './MobileRailSheet'
 import { DanmakuStrip } from './DanmakuStrip'
 import { BackToTop } from '../shared/ui/BackToTop'
-import { Sidebar } from './Sidebar'
 import { StageGlow } from './StageGlow'
 import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
@@ -116,10 +115,6 @@ export default function App() {
   const hasSession = useHasSession()
   const hasContent = listening && hasSession && (track !== null || queued > 0)
   const railOpen = hasContent && rail !== null
-  // 左侧栏是「音乐库」的导航（歌单、已下载、喜欢的音乐）。
-  // 视频客户端的主导航是频道栏，所以侧栏只在音乐模块里出现——
-  // 刷视频时左边挂着一列歌单是没有道理的。
-  const showSidebar = ['library', 'liked', 'downloads', 'playlist'].includes(view.kind)
   const trackKey = track?.key ?? null
 
   useEffect(() => {
@@ -145,11 +140,6 @@ export default function App() {
       </div>
 
       <div className="relative z-10 flex min-h-0 flex-1">
-        {showSidebar ? (
-          <div className="hidden md:contents">
-            <Sidebar />
-          </div>
-        ) : null}
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
