@@ -472,7 +472,7 @@ impl Source {
         text: &str,
         root: Option<&str>,
         parent: Option<&str>,
-    ) -> Result<(), BiliError> {
+    ) -> Result<String, BiliError> {
         let detail = self.detail(key).await?;
         let csrf = self
             .client
@@ -489,8 +489,35 @@ impl Source {
             body.push(("root", root_id.to_string()));
             body.push(("parent", parent.unwrap_or(root_id).to_string()));
         }
-        self.client
+        let value = self
+            .client
             .post_form(&format!("{}/x/v2/reply/add", client::API), body)
+            .await?;
+        // 返回新评论的 rpid，界面拿它在列表里认出自己刚发的那条。
+        Ok(value["data"]["rpid_str"]
+            .as_str()
+            .map(str::to_string)
+            .or_else(|| value["data"]["rpid"].as_i64().map(|v| v.to_string()))
+            .unwrap_or_default())
+    }
+
+    /// 删掉自己发的一条评论。别人的评论会被服务端拒绝。
+    pub async fn comment_del(&self, key: &TrackKey, rpid: &str) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        let csrf = self
+            .client
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        self.client
+            .post_form(
+                &format!("{}/x/v2/reply/del", client::API),
+                vec![
+                    ("type", "1".to_string()),
+                    ("oid", detail.aid.to_string()),
+                    ("rpid", rpid.to_string()),
+                    ("csrf", csrf),
+                ],
+            )
             .await?;
         Ok(())
     }

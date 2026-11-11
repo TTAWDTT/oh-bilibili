@@ -234,8 +234,13 @@ export function commentAdd(
   text: string,
   root?: string,
   parent?: string,
-): Promise<null> {
-  return call<null>('comment_add', { key, text, root, parent })
+): Promise<string> {
+  return call<string>('comment_add', { key, text, root, parent })
+}
+
+/** 删掉自己发的一条评论。 */
+export function commentDel(key: string, rpid: string): Promise<null> {
+  return call<null>('comment_del', { key, rpid })
 }
 
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */

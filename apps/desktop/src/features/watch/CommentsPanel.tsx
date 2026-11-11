@@ -3,16 +3,19 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
+import { useAuthStore } from '../auth/authStore'
 
 /** 一条评论，含楼中楼预览。一级评论可以回复。 */
 function CommentRow({
   c,
   depth = 0,
   onReply,
+  onDelete,
 }: {
   c: Comment
   depth?: number
   onReply?: (c: Comment) => void
+  onDelete?: ((c: Comment) => void) | undefined
 }) {
   return (
     <li className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}>
@@ -43,6 +46,15 @@ function CommentRow({
                 className="t press ml-auto shrink-0 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
               >
                 回复
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(c)}
+                className="t press shrink-0 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                删除
               </button>
             ) : null}
           </div>
@@ -83,7 +95,10 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
+  /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
+  const [mine, setMine] = useState<Set<string>>(new Set())
   const boxRef = useRef<HTMLDivElement | null>(null)
+  const me = useAuthStore((s) => s.auth?.user ?? null)
 
   const load = async (next: number): Promise<void> => {
     setLoading(true)
@@ -123,14 +138,46 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
     setError(null)
     try {
       // 回复一级评论：root 与 parent 都是那一条的 rpid。
-      await ipc.commentAdd(trackKey, text, replyTo?.id, replyTo?.id)
+      const rpid = await ipc.commentAdd(trackKey, text, replyTo?.id, replyTo?.id)
       setDraft('')
       setReplyTo(null)
-      await load(1)
+      // 列表按热度排，刚发的没有热度，刷新也翻不到。把这条直接插到顶部，
+      // 用户才看得到自己刚发的东西，也才有地方删。
+      if (rpid) {
+        setMine((prev) => new Set(prev).add(rpid))
+        setItems((prev) => [
+          {
+            id: rpid,
+            author: me?.uname ?? '我',
+            avatar: me?.avatar ?? null,
+            text,
+            likes: 0,
+            at: Math.floor(Date.now() / 1000),
+            replies: [],
+            reply_count: 0,
+          },
+          ...prev,
+        ])
+        setTotal((prev) => prev + 1)
+      }
     } catch (e) {
       setError(toWireError(e).message)
     } finally {
       setSending(false)
+    }
+  }
+
+  const remove = async (c: Comment): Promise<void> => {
+    try {
+      await ipc.commentDel(trackKey, c.id)
+      setMine((prev) => {
+        const next = new Set(prev)
+        next.delete(c.id)
+        return next
+      })
+      await load(1)
+    } catch (e) {
+      setError(toWireError(e).message)
     }
   }
 
@@ -200,6 +247,7 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
               key={c.id}
               c={c}
               onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
+              onDelete={mine.has(c.id) ? remove : undefined}
             />
           ))}
         </ul>

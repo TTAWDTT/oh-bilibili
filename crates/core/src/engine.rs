@@ -501,8 +501,13 @@ impl Engine {
         text: &str,
         root: Option<&str>,
         parent: Option<&str>,
-    ) -> Result<(), WireError> {
-        self.source.comment_add(key, text, root, parent).await?;
+    ) -> Result<String, WireError> {
+        Ok(self.source.comment_add(key, text, root, parent).await?)
+    }
+
+    /// 删掉自己发的一条评论。
+    pub async fn comment_del(&self, key: &TrackKey, rpid: &str) -> Result<(), WireError> {
+        self.source.comment_del(key, rpid).await?;
         Ok(())
     }
 

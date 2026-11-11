@@ -186,7 +186,7 @@ async fn comment_add(
     text: String,
     root: Option<String>,
     parent: Option<String>,
-) -> Result<(), WireError> {
+) -> Result<String, WireError> {
     engine
         .comment_add(
             &TrackKey::from_provider(key),
@@ -195,6 +195,15 @@ async fn comment_add(
             parent.as_deref(),
         )
         .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn comment_del(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    rpid: String,
+) -> Result<(), WireError> {
+    engine.comment_del(&TrackKey::from_provider(key), &rpid).await
 }
 
 /// 打开观看页。一次给齐清单地址与画质档位，前端看不到任何远端地址。
@@ -740,6 +749,7 @@ pub fn run() {
             watch_open,
             watch_comments,
             comment_add,
+            comment_del,
             home_feed,
             watch_later_list,
             following,
