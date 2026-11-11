@@ -7,7 +7,7 @@ import type { IconName } from '../shared/ui/Icon'
 /**
  * 移动端底部标签栏。
  *
- * 桌面端靠左侧栏 + 频道栏切换视图；窄屏放不下两条，收成底部四个标签，
+ * 桌面端靠左侧栏切换视图；窄屏放不下，收成底部四个标签，
  * 和 B 站 App 的「首页 / 频道 / 动态 / 我的」是同一个信息层次。
  */
 const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
