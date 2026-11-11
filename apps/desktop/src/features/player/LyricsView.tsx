@@ -34,7 +34,9 @@ function ActiveLine({ line, nextAt }: { line: LyricLine; nextAt: number }) {
         aria-hidden
         className="absolute inset-0 block"
         style={{
-          backgroundImage: 'linear-gradient(96deg, #ffffff 8%, var(--accent) 92%)',
+          // 已唱部分用深色正文到强调蓝；原来是 #ffffff 起头，
+          // 在白底上等于没唱过的字反而更清楚，唱到的部分直接消失。
+          backgroundImage: 'linear-gradient(96deg, var(--text-1) 8%, var(--accent) 92%)',
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
           color: 'transparent',
