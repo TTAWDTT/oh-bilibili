@@ -112,7 +112,7 @@ export function WatchInfo({
 
       <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
         <span className="flex min-w-0 items-center gap-2">
-          <Avatar src={track.up_avatar ?? null} alt={data.owner} size={28} />
+          <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
         </span>
         {data.owner_mid && followed !== null ? (

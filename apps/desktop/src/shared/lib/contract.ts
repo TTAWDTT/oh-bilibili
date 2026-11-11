@@ -80,6 +80,7 @@ export type WatchView = {
   desc: string
   owner: string
   owner_mid: number | null
+  owner_avatar: string | null
   stats: WatchStats
   pages: PageRef[]
   current_page: number

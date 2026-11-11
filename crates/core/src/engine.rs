@@ -381,6 +381,7 @@ impl Engine {
             desc: detail.meta.desc.clone(),
             owner: detail.track.artist.clone(),
             owner_mid: detail.track.up_mid,
+            owner_avatar: detail.track.up_avatar.clone(),
             stats: crate::wire::WatchStats {
                 views: detail.meta.views,
                 danmaku: detail.meta.danmaku,
@@ -537,6 +538,10 @@ impl Engine {
         token: LoadToken,
     ) -> Result<Prepared, WireError> {
         let detail = self.source.detail(key).await?;
+        // 详情是字段最全的一份（UP 主头像、分区名都在里面），把它写回 known。
+        // 入库与卡片都从 known 取，不写回的话历史里的头像会一直是空的——
+        // 队列里那份来自列表接口，字段没这么全。
+        lock(&self.known).insert(key.as_opaque().to_string(), detail.track.clone());
         let streams = self.source.streams(&detail).await?;
         let best = streams.first().ok_or_else(|| WireError::internal("没有可用音轨"))?;
         // 阻塞 HTTP 客户端必须在阻塞线程池里建，否则它的内部 runtime 会在

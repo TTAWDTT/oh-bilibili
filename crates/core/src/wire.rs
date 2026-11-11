@@ -184,6 +184,9 @@ pub struct WatchView {
     /// UP 主昵称与 uid。
     pub owner: String,
     pub owner_mid: Option<u64>,
+    /// UP 主头像。观看页的 track 是从列表点进来的，那一路没有头像，
+    /// 只有详情里有，所以单独给一个字段。
+    pub owner_avatar: Option<String>,
     /// 汇总统计。
     pub stats: WatchStats,
     /// 分P 列表，单 P 视频只有一条。
