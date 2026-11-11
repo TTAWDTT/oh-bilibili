@@ -367,6 +367,9 @@ export function WatchView({ track }: { track: Track }) {
         </span>
       </div>
 
+      {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={stageRef}
         onMouseMove={poke}
@@ -374,9 +377,8 @@ export function WatchView({ track }: { track: Track }) {
         className={
           cinema
             ? 'fixed inset-0 z-50 flex flex-col justify-center bg-black'
-            : 'relative min-h-0 bg-black'
+            : 'relative aspect-video w-full shrink-0 bg-black md:max-h-[64vh]'
         }
-        style={cinema ? undefined : { flex: '0 0 auto', height: '52%' }}
       >
         <video
           ref={videoRef}
@@ -680,46 +682,48 @@ export function WatchView({ track }: { track: Track }) {
         </div>
       ) : null}
 
-      {related.length > 0 ? (
-        <div className="border-t border-hairline px-3 py-2">
-          <div className="mb-1.5 flex items-baseline gap-2">
-            <h3 className="text-[12px] text-[var(--text-3)]">相关推荐</h3>
-            <span className="num text-[11px] text-[var(--text-3)]">{related.length} 条</span>
-          </div>
-          {/* 固定高度内滚动：条目多也不会把评论挤到很远 */}
-          <div className="grid max-h-[280px] grid-cols-1 gap-x-3 gap-y-2 overflow-y-auto pr-1 sm:grid-cols-2">
-            {related.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => navigate({ kind: 'watch', track: item })}
-                title={item.title}
-                className="group flex items-start gap-2 text-left"
-              >
-                <span className="relative w-[104px] shrink-0 overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
-                  <Cover
-                    cover={item.cover}
-                    title={item.title}
-                    className="h-full w-full"
-                  />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 block text-[12px] leading-[1.35] text-[var(--text-1)] group-hover:text-[var(--accent)]">
-                    {item.title}
-                  </span>
-                  <span className="num mt-0.5 block truncate text-[11px] text-[var(--text-3)]">
-                    {item.artist}
-                    {item.views ? ` · ${formatCount(item.views)}` : ''}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       <div className="min-h-0 flex-1 border-t border-hairline">
         <CommentsPanel trackKey={track.key} />
+      </div>
+        </div>
+
+        <aside className="hidden min-h-0 w-[340px] shrink-0 overflow-y-auto border-l border-hairline md:block">
+          {related.length > 0 ? (
+            <div className="px-3 py-2">
+              <div className="mb-1.5 flex items-baseline gap-2">
+                <h3 className="text-[12px] text-[var(--text-3)]">相关推荐</h3>
+                <span className="num text-[11px] text-[var(--text-3)]">{related.length} 条</span>
+              </div>
+              <div className="flex flex-col gap-y-2">
+                {related.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => navigate({ kind: 'watch', track: item })}
+                    title={item.title}
+                    className="group flex items-start gap-2 text-left"
+                  >
+                    <span
+                      className="relative w-[120px] shrink-0 overflow-hidden rounded-[4px]"
+                      style={{ aspectRatio: '16 / 10' }}
+                    >
+                      <Cover cover={item.cover} title={item.title} className="h-full w-full" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 block text-[12px] leading-[1.35] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                        {item.title}
+                      </span>
+                      <span className="num mt-0.5 block truncate text-[11px] text-[var(--text-3)]">
+                        {item.artist}
+                        {item.views ? ` · ${formatCount(item.views)}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </aside>
       </div>
     </div>
   )
