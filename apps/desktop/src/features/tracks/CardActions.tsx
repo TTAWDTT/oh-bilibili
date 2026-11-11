@@ -56,7 +56,7 @@ export function CardActions({
         title={coins >= 2 ? '已经投满 2 枚' : '投币'}
         disabled={coins >= 2}
         onClick={onCoin}
-        className={`${item} ${coins > 0 ? 'text-[#ffc46b]' : off} ${coins >= 2 ? 'cursor-default opacity-50' : ''}`}
+        className={`${item} ${coins > 0 ? 'text-[var(--coin)]' : off} ${coins >= 2 ? 'cursor-default opacity-50' : ''}`}
       >
         <BiliCoin size={13} />
       </button>
@@ -66,7 +66,7 @@ export function CardActions({
         aria-pressed={faved}
         title={faved ? '取消收藏' : '收藏'}
         onClick={onFav}
-        className={`${item} ${faved ? 'text-[#ffc46b]' : off}`}
+        className={`${item} ${faved ? 'text-[var(--coin)]' : off}`}
       >
         <BiliStar size={13} />
       </button>

@@ -45,7 +45,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
         }}
         className={[
           't press flex h-6 w-6 items-center justify-center rounded-[4px]',
-          faved ? 'text-[#ffc46b]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
+          faved ? 'text-[var(--coin)]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
         <BiliStar size={size} />

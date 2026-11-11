@@ -20,13 +20,13 @@ const STATUS: Record<QrStatus['state'], { title: string; detail: string; tone: s
   confirmed: {
     title: '登录成功',
     detail: '喜欢与收藏现在会同步到这个账号。',
-    tone: 'text-[#1a9e57]',
+    tone: 'text-[var(--ok)]',
     icon: 'check',
   },
   expired: {
     title: '二维码已过期',
     detail: '链接已经失效，点下面的刷新重新生成一个。',
-    tone: 'text-[#c97a17]',
+    tone: 'text-[var(--warn)]',
     icon: 'refresh',
   },
 }

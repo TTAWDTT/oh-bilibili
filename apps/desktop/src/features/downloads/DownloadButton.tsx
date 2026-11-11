@@ -29,7 +29,7 @@ export function DownloadButton({ trackKey, size = 16 }: DownloadButtonProps) {
       className={[
         't press flex h-6 w-6 items-center justify-center rounded-[4px]',
         done
-          ? 'text-[#1a9e57]'
+          ? 'text-[var(--ok)]'
           : busy
             ? 'text-[var(--accent)]'
             : 'text-[var(--text-2)] hover:text-[var(--text-1)]',

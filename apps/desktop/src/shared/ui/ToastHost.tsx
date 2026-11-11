@@ -6,10 +6,10 @@ import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
 const TONE: Record<ToastTone, { icon: IconName; tint: string; edge: string }> = {
-  error: { icon: 'alert', tint: 'text-[#e23a5e]', edge: 'border-[#e23a5e]/30' },
-  warn: { icon: 'alert', tint: 'text-[#c97a17]', edge: 'border-[#c97a17]/30' },
+  error: { icon: 'alert', tint: 'text-[var(--danger)]', edge: 'border-[var(--danger)]/30' },
+  warn: { icon: 'alert', tint: 'text-[var(--warn)]', edge: 'border-[var(--warn)]/30' },
   info: { icon: 'info', tint: 'text-[var(--accent)]', edge: 'border-[var(--accent)]/30' },
-  success: { icon: 'check', tint: 'text-[#1a9e57]', edge: 'border-[#1a9e57]/30' },
+  success: { icon: 'check', tint: 'text-[var(--ok)]', edge: 'border-[var(--ok)]/30' },
 }
 
 function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
