@@ -135,17 +135,14 @@ export function SettingsView() {
           </Section>
 
           <Section title="同步">
-            <div className="text-[14px] text-[var(--text-1)]">喜欢与收藏</div>
-            <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-              离线操作先落本机，标成待推送；登录后按限速批量推送，失败可以重试。
-            </p>
+            <p className="text-[14px] text-[var(--text-2)]">离线时的喜欢与收藏先记在本机，登录后推到 B 站。</p>
             {/* 未登录时同步一定失败，别让按钮看起来可用。 */}
             <button
               type="button"
               onClick={() => void sync()}
               disabled={syncing || !loggedIn}
               title={loggedIn ? '把本地待推送的喜欢与收藏推到 B 站' : '登录后才能同步'}
-              className="t press mt-4 flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--text-1)]"
+              className="t press mt-3 flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--text-1)]"
             >
               <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
               {syncing ? '同步中…' : loggedIn ? '立即同步' : '登录后才能同步'}
@@ -153,22 +150,14 @@ export function SettingsView() {
           </Section>
 
           <Section title="音质">
-            <div className="text-[14px] text-[var(--text-1)]">如实显示，不承诺无损</div>
-            <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-              普通账号能拿到 64 / 132 / 192K 三档；大会员账号还会出现杜比全景声与 Hi-Res（30250 / 30251）。播放条与右栏显示实际码率，取不到时显示 ——。
+            {/* 档位由账号决定，本来就该读账号的真实能力，不写死一串让人以为可以选。 */}
+            <p className="text-[14px] leading-relaxed text-[var(--text-2)]">
+              播放条显示实际码率。普通账号上限约 192K，大会员另有杜比与 Hi-Res。
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Chip label="档位" value="64 · 132 · 192K · 杜比 · Hi-Res" />
-              <Chip label="引擎" value={health?.engine ?? (healthFailed ? '不可用' : '…')} />
-            </div>
           </Section>
 
           <Section title="关于">
-            <div className="text-[14px] text-[var(--text-1)]">BiliMusic alpha</div>
-            <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
-              音频不进 webview：Rust 取流、解码、输出到声卡，界面只发命令、收事件。本机直连 B 站，不经过中间服务器。
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               <Chip label="版本" value={health?.version ?? '…'} />
               <Chip label="构建" value={buildId()} />
               <Chip label="平台" value={health?.platform ?? '…'} />
