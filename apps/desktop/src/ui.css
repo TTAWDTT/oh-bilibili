@@ -233,32 +233,6 @@
   to { transform: translateX(calc(-100vw - 100%)); }
 }
 
-/* 2233 娘：轻微上下浮动，两颗头错开相位，看起来像在轻轻点头 */
-.bili-2233__girl-a,
-.bili-2233__girl-b {
-  animation: bili-2233-float 3.4s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-
-.bili-2233__girl-b {
-  animation-delay: -1.7s;
-}
-
-@keyframes bili-2233-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-.bili-2233__heart {
-  animation: bili-2233-pulse 2.2s ease-in-out infinite;
-  transform-origin: 100px 60px;
-}
-
-@keyframes bili-2233-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.25); opacity: 1; }
-}
-
 /* B 站主题：22 娘蓝与 33 娘粉双色。蓝色只用于次级强调，比如链接与标签描边。 */
 :root {
   --bili-blue: #00aeec;
@@ -439,26 +413,6 @@
   to {
     transform: translateX(-190vw);
   }
-}
-
-/* 右下角常驻的 2233：轻微起伏，像站在那里呼吸 */
-.bili-mascot {
-  animation: bili-mascot-idle 4.2s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-
-@keyframes bili-mascot-idle {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-4px) rotate(-1deg); }
-}
-
-.bili-mascot-bubble {
-  animation: bili-mascot-pop 220ms var(--ease) both;
-}
-
-@keyframes bili-mascot-pop {
-  from { opacity: 0; transform: translateY(4px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* 搜索建议下拉：从输入框下方展开，带一点向下的滑入 */
