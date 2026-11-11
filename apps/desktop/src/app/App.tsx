@@ -117,6 +117,9 @@ export default function App() {
   // 观看页不要导航：播放器要的是宽度，而且这一页里导航没有去处。
   // 返回靠信息区标题旁的返回键，不是靠侧栏。
   const showSidebar = view.kind !== 'watch'
+  // 全屏弹幕只在「正在听」的音乐页出现。它说的是一条正在播放的音轨，
+  // 盖在发现页的封面上就是噪声；观看页有自己的弹幕层，再叠一层会双倍。
+  const musicView = ['library', 'playlist', 'liked', 'downloads'].includes(view.kind)
 
   useEffect(() => {
     if (!trackKey) return
@@ -149,9 +152,7 @@ export default function App() {
         <div className="rail-slot hidden md:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
-        {/* 全屏弹幕压在内容之上；它不吃点击，所以不影响任何操作。
-            观看页有自己的弹幕层，跟着视频时钟走，这里不能再叠一层。 */}
-        {view.kind === 'watch' ? null : <DanmakuStrip />}
+        {musicView && listening ? <DanmakuStrip /> : null}
       </div>
 
       <BackToTop targetId="scroll-main" />
