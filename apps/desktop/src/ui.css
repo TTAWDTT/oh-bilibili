@@ -390,10 +390,11 @@
 }
 
 .bili-skeleton {
+  /* 中性灰的流光：粉色占位一屏十几块，整页泛红，比空着更吵。 */
   background: linear-gradient(
     90deg,
     var(--panel-raised) 0%,
-    color-mix(in oklab, var(--bili-pink) 14%, var(--panel-raised)) 50%,
+    color-mix(in oklab, var(--text-3) 12%, var(--panel-raised)) 50%,
     var(--panel-raised) 100%
   );
   background-size: 200% 100%;
@@ -580,6 +581,13 @@
  */
 .bili-card-cover {
   transition: transform 260ms var(--ease);
+  /* 图片解码前是透明的，不铺底色就是一排白块。 */
+  background: var(--panel-raised);
+}
+
+/* 所有封面（网格、右栏推荐、播放条）在图片到之前都铺这层灰。 */
+.cover-frame {
+  background: var(--panel-raised);
 }
 
 .bili-card:hover .bili-card-cover {

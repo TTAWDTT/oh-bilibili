@@ -5,6 +5,7 @@ import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PageTitle } from '../../shared/ui/PageTitle'
+import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { SearchBanner } from '../search/SearchBanner'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -109,9 +110,7 @@ export function HomeView() {
           )}
         />
       ) : null}
-      {loading && items.length === 0 ? (
-        <p className="py-6 text-[13px] text-[var(--text-3)]">正在取推荐…</p>
-      ) : null}
+      {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
       {loadingMore ? (
         <p className="py-4 text-center text-[12px] text-[var(--text-3)]">正在加载更多…</p>
       ) : null}

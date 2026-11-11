@@ -45,10 +45,11 @@ export function TitleBar() {
           data-tauri-drag-region 的顶栏本身，窗口才能被拖动。
           Tauri 的判定只看事件目标自己有没有这个属性，所以子元素必须穿透。 */}
       <div className="pointer-events-none flex shrink-0 items-center gap-2">
-        <span className="bili-tv-mark text-[var(--accent)]">
+        {/* 官方 wordmark 是粉色 #FF6699；蓝色是 B 站的链接与按钮色，不是标志色。 */}
+        <span className="bili-tv-mark text-[var(--bili-pink)]">
           <Icon name="biliTv" size={19} />
         </span>
-        <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
+        <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--bili-pink)] sm:inline">bilibili</span>
       </div>
 
       <form

@@ -35,3 +35,22 @@ export function PlaylistRowsSkeleton({ rows }: { rows: number }) {
     </div>
   )
 }
+
+/** 封面卡片网格的骨架。首屏还没到数据时用它占位，比一行「正在取」稳定得多。 */
+export function CardGridSkeleton({ cards }: { cards: number }) {
+  return (
+    <div
+      aria-hidden
+      className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]"
+    >
+      {Array.from({ length: cards }, (_, index) => (
+        <div key={index}>
+          <Skeleton className="aspect-[16/10] w-full rounded-[8px]" />
+          <Skeleton className="mt-2.5 h-3.5 w-full" />
+          <Skeleton className="mt-1.5 h-3.5 w-4/5" />
+          <Skeleton className="mt-2 h-3 w-28" />
+        </div>
+      ))}
+    </div>
+  )
+}

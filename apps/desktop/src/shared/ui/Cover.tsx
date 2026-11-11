@@ -23,7 +23,7 @@ export function Cover({ cover, title, className }: CoverProps) {
            所以必须显式不发 Referer。缺这一条，封面在真机上全部裂图。 */
         referrerPolicy="no-referrer"
         loading="lazy"
-        className={`${className} object-cover`}
+        className={`${className} cover-frame object-cover`}
         onError={() => setBroken(true)}
       />
     )
@@ -37,7 +37,7 @@ export function Cover({ cover, title, className }: CoverProps) {
       alt=""
       draggable={false}
       aria-hidden
-      className={`${className} object-cover`}
+      className={`${className} cover-frame object-cover`}
       title={title}
     />
   )
