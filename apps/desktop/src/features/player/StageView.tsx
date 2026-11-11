@@ -160,7 +160,8 @@ export function StageView() {
             type="button"
             aria-label={snapshot?.phase === 'playing' ? '暂停' : '播放'}
             onClick={() => void toggle()}
-            className="bili-press flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_6px_20px_-6px_rgba(251,114,153,0.8)]"
+            // 阴影跟随强调色（蓝）。原来这条还留着旧主色的粉色，蓝按钮配粉影子。
+            className="bili-press flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_6px_20px_-6px_color-mix(in_oklab,var(--accent)_80%,transparent)]"
           >
             <Icon name={snapshot?.phase === 'playing' ? 'pause' : 'play'} size={22} />
           </button>
