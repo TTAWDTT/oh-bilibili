@@ -202,13 +202,13 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
 
   return (
     <div className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
-      <div className={`flex items-baseline gap-2 py-3 ${flow ? 'px-6' : 'px-3'}`}>
+      <div className={`flex items-baseline gap-2 py-3 ${flow ? '' : 'px-3'}`}>
         <h3 className="text-[14px] font-medium">评论</h3>
         <span className="num text-[12px] text-[var(--text-3)]">
           {total > 0 ? formatCount(total) : '—'}
         </span>
       </div>
-      <div className={`border-b border-hairline pb-3 ${flow ? 'px-6' : 'px-3'}`}>
+      <div className={`border-b border-hairline pb-3 ${flow ? '' : 'px-3'}`}>
         {replyTo ? (
           <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
             <span>回复 @{replyTo.author}</span>
@@ -245,7 +245,7 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
       <div
         ref={boxRef}
         onScroll={flow ? undefined : onScroll}
-        className={flow ? 'px-6 pb-6' : 'min-h-0 flex-1 overflow-y-auto px-3 pb-4'}
+        className={flow ? 'pb-6' : 'min-h-0 flex-1 overflow-y-auto px-3 pb-4'}
       >
         {items.length === 0 && !loading && !error ? (
           <p className="py-6 text-center text-[12px] text-[var(--text-3)]">

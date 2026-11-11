@@ -91,14 +91,16 @@ export function WatchView({ track }: { track: Track }) {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
             之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
-        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto">
+        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto px-6 pt-4">
           {data ? (
-            <WatchPlayer
-              track={track}
-              data={data}
-              danmaku={danmaku}
-              onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
-            />
+            <div className="overflow-hidden rounded-[8px]">
+              <WatchPlayer
+                track={track}
+                data={data}
+                danmaku={danmaku}
+                onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
+              />
+            </div>
           ) : (
             <div className="aspect-video w-full shrink-0 bg-black" />
           )}

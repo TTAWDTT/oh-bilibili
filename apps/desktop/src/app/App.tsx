@@ -114,6 +114,9 @@ export default function App() {
   const hasContent = listening && hasSession && (track !== null || queued > 0)
   const railOpen = hasContent && rail !== null
   const trackKey = track?.key ?? null
+  // 观看页不要导航：播放器要的是宽度，而且这一页里导航没有去处。
+  // 返回靠信息区标题旁的返回键，不是靠侧栏。
+  const showSidebar = view.kind !== 'watch'
 
   useEffect(() => {
     if (!trackKey) return
@@ -134,7 +137,7 @@ export default function App() {
       <TitleBar />
 
       <div className="relative z-10 flex min-h-0 flex-1">
-        <Sidebar />
+        {showSidebar ? <Sidebar /> : null}
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}

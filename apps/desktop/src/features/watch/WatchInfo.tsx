@@ -79,7 +79,7 @@ export function WatchInfo({
     ].join(' ')
 
   return (
-    <div className="px-6 pb-4 pt-4">
+    <div className="pb-4 pt-4">
       {/* 返回、标题、听视频排在同一行：单独一条只有箭头的工具栏看着像丢了内容。 */}
       <div className="flex items-start gap-2">
         <button
@@ -191,7 +191,7 @@ export function WatchInfo({
       </div>
 
       {data.desc ? (
-        <p className="mt-3 whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)]">
+        <p className="mt-3 max-w-[820px] whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)]">
           {data.desc}
         </p>
       ) : null}
