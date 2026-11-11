@@ -11,9 +11,21 @@ function isWireError(value: unknown): value is WireError {
 /** 命令失败与后台事件共用 WireError；其余任何抛出物都在这里收敛成同一种形状。 */
 export function toWireError(cause: unknown): WireError {
   if (isWireError(cause)) return cause
-  if (cause instanceof Error) return { class: 'internal', message: cause.message }
-  if (typeof cause === 'string') return { class: 'internal', message: cause }
+  if (cause instanceof Error) return { class: 'internal', message: explainTransport(cause.message) }
+  if (typeof cause === 'string') return { class: 'internal', message: explainTransport(cause) }
   return { class: 'internal', message: '发生了未预期的错误' }
+}
+
+/**
+ * Tauri 的 IPC 失败会把底层 reqwest 的原文抛上来：
+ * 「error sending request for url (https://api.bilibili.com/...?w_rid=...)」。
+ * 这条串里带着签名和完整查询参数，既看不懂也不该出现在界面上。
+ */
+function explainTransport(message: string): string {
+  if (/error sending request|error trying to connect|operation timed out|dns error/i.test(message)) {
+    return '连不上 B 站，检查一下网络。'
+  }
+  return message
 }
 
 const HEADLINE: Record<ErrorClass, string> = {
