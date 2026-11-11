@@ -18,6 +18,8 @@ const ROOT = new URL('../apps/desktop/src', import.meta.url).pathname
 const DARK_CONTEXT_FILES = [
   // 观看页的提示文字压在视频画面上，底色是黑的
   'features/watch/WatchView.tsx',
+  // 播放器控制条浮在画面上，文字与描边都压在黑色视频画面上
+  'features/watch/WatchPlayer.tsx',
   'features/search/SearchBanner.tsx',
 ]
 
