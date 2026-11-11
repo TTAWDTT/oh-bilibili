@@ -129,7 +129,9 @@ export function WatchView({ track }: { track: Track }) {
           </div>
         </div>
 
-        <aside className="hidden min-h-0 w-[340px] shrink-0 overflow-y-auto border-l border-hairline md:block">
+        {/* 和音乐右栏同一个宽度变量。两处「右栏」宽度不一致，切换模式时中间
+            的画面会跟着跳一下。 */}
+        <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
           <RelatedAside items={related} />
         </aside>
       </div>
