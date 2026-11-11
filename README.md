@@ -138,8 +138,9 @@ osascript -e 'tell application "System Events" to tell process "bilimusic" to se
 - **登录系的成功路径没有真账号验证。** 扫码登录、点赞、投币、收藏、关注、稍后再看
   六条写入路径的代码与错误分支都完成了，离线测试覆盖「未登录时正确报 NeedsLogin」
   与「点赞/收藏/投币状态能读回并回滚」。成功路径需要你自己点一遍。
-- **UP 主的全部投稿拿不到。** `space/arc/search` 需要登录会话，未登录返回 -412/-403。
-  UP 主页现在展示的是「按作者名搜索」的结果，并明确标注「下方仅显示搜索结果里的 N 个」。
+- **UP 主投稿的降级路径。** 有 mid 时走 `space/wbi/arc/search`，拿全部投稿与总数；
+  拿不到 mid 的场合退回「按作者名搜索」，界面会明确标注「下方仅显示搜索结果里的 N 个」，
+  不假装是完整投稿列表。
 - **没有移动端安装包。** 窄屏布局已完成并在 380×760 下实测过，但只有桌面壳；
   Tauri 2 的 iOS / Android 目标需要 Xcode 与 Android SDK，尚未接入。
 - **`cargo public-api` 闸门未接入。** 现在只有依赖方向断言（`crates/core/tests/deps.rs`）
