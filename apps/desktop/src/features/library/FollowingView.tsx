@@ -76,12 +76,13 @@ export function FollowingView() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3 flex items-baseline gap-2 px-1">
-        <PageTitle>我关注的人</PageTitle>
-        <span className="num text-[12px] text-[var(--text-3)]">{formatCount(total)}</span>
-      </div>
-      <div ref={boxRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-1 pb-4">
+    <div
+      ref={boxRef}
+      onScroll={onScroll}
+      className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+    >
+      <PageTitle extra={formatCount(total)}>我关注的人</PageTitle>
+      <div>
         <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
           {items.map((u) => (
             <li key={u.mid}>
