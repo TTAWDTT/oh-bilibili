@@ -3,8 +3,6 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { formatTime } from '../../shared/lib/format'
-import { readPlayhead } from '../../shared/lib/playhead'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
@@ -12,7 +10,6 @@ import { CommentsPanel } from './CommentsPanel'
 import { RelatedAside } from './RelatedAside'
 import { WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
-import { Icon } from '../../shared/ui/Icon'
 
 /**
  * 观看页。只负责取数与拼装：播放器、信息区、评论区、右栏各是一块。
@@ -90,31 +87,6 @@ export function WatchView({ track }: { track: Track }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
-        <button
-          type="button"
-          aria-label="返回"
-          onClick={() => goBack()}
-          className="t press flex h-7 w-7 items-center justify-center rounded-[6px] hover:bg-[var(--panel-alt)]"
-        >
-          <Icon name="chevronLeft" size={16} />
-        </button>
-        <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium">{track.title}</h2>
-        <button
-          type="button"
-          onClick={() => {
-            const at = Math.round(readPlayhead())
-            void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
-          }}
-          className="t press shrink-0 rounded-[6px] border border-[var(--line)] px-2 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
-        >
-          听视频
-        </button>
-        <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
-          {track.duration_ms ? formatTime(track.duration_ms) : '—'}
-        </span>
-      </div>
-
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="flex min-h-0 flex-1 flex-col">
@@ -133,7 +105,17 @@ export function WatchView({ track }: { track: Track }) {
               这条视频没打开：{error}
             </p>
           ) : null}
-          {data ? <WatchInfo track={track} data={data} onPage={setPage} /> : null}
+          {data ? (
+            <WatchInfo
+              track={track}
+              data={data}
+              onPage={setPage}
+              onBack={() => goBack()}
+              onListen={(at) => {
+                void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
+              }}
+            />
+          ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           <div className="border-t border-hairline md:hidden">
             <RelatedAside items={related} />

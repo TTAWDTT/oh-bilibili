@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount } from '../../shared/lib/format'
+import { readPlayhead } from '../../shared/lib/playhead'
 import { toastDone } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
 import { Icon } from '../../shared/ui/Icon'
@@ -17,10 +18,15 @@ export function WatchInfo({
   track,
   data,
   onPage,
+  onBack,
+  onListen,
 }: {
   track: Track
   data: WatchData
   onPage: (no: number) => void
+  onBack: () => void
+  /** 把当前画面位置交给音频引擎，切到听模式。 */
+  onListen: (atMs: number) => void
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
@@ -62,15 +68,52 @@ export function WatchInfo({
     }
   }, [data.owner_mid])
 
-  const actionClass = (on: boolean): string =>
-    `t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12px] ${
-      on ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
-    }`
+  /** 胶囊按钮：B 站视频页的每个操作都是这个形状，图标 + 文字 + 数字。 */
+  const pill = (on: boolean): string =>
+    [
+      't press flex h-8 items-center gap-1.5 rounded-[6px] border px-3 text-[13px]',
+      on
+        ? 'border-[var(--accent)] text-[var(--accent)]'
+        : 'border-[var(--line)] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
+    ].join(' ')
 
   return (
-    <div className="border-t border-hairline px-3 py-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--text-2)]">
-        <span className="font-medium text-[var(--text-1)]">{data.owner}</span>
+    <div className="px-1 pt-3">
+      {/* 返回、标题、听视频排在同一行：单独一条只有箭头的工具栏看着像丢了内容。 */}
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          aria-label="返回"
+          onClick={onBack}
+          className="t press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] hover:bg-[var(--panel-alt)]"
+        >
+          <Icon name="chevronLeft" size={16} />
+        </button>
+        <h1
+          className="min-w-0 flex-1 text-[20px] font-medium leading-[1.35] text-[var(--text-1)]"
+          title={track.title}
+        >
+          {track.title}
+        </h1>
+        <button
+          type="button"
+          onClick={() => onListen(Math.round(readPlayhead()))}
+          className="t press mt-0.5 h-7 shrink-0 rounded-[6px] border border-[var(--line)] px-2.5 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          听视频
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
+        <span className="num">{formatCount(data.stats.views)} 播放</span>
+        <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon name="user" size={20} className="text-[var(--text-3)]" />
+          <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
+        </span>
         {data.owner_mid && followed !== null ? (
           <button
             type="button"
@@ -85,30 +128,21 @@ export function WatchInfo({
                 })
                 .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
             }}
-            className={`t press rounded-[4px] px-2 py-0.5 text-[12px] ${
-              followed ? 'bg-[var(--panel-alt)] text-[var(--text-2)]' : 'bg-[var(--accent)] text-white'
+            className={`t press h-8 shrink-0 rounded-[6px] px-4 text-[13px] ${
+              followed
+                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                : 'bg-[var(--accent)] text-white hover:opacity-90'
             }`}
           >
             {followed ? '已关注' : '关注'}
           </button>
         ) : null}
-        <span className="num">{formatCount(data.stats.views)} 播放</span>
-        <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
-        <span className="num">{formatCount(data.stats.likes)} 点赞</span>
-        <span className="num">{formatCount(data.stats.coins)} 投币</span>
-        <span className="num">{formatCount(data.stats.favorites)} 收藏</span>
-        <span className="num">{formatCount(data.stats.shares)} 分享</span>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={liked}
-          onClick={() => void toggleLike(track)}
-          className={actionClass(liked)}
-        >
-          <BiliThumb size={14} />
-          {liked ? '已点赞' : '点赞'}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" aria-pressed={liked} onClick={() => void toggleLike(track)} className={pill(liked)}>
+          <BiliThumb size={15} />
+          {formatCount(data.stats.likes)}
         </button>
         <button
           type="button"
@@ -120,19 +154,14 @@ export function WatchInfo({
             }
             void addCoin(track, 1)
           }}
-          className={actionClass(coins > 0)}
+          className={pill(coins > 0)}
         >
-          <BiliCoin size={14} />
-          {coins > 0 ? `已投 ${coins} 枚` : '投币'}
+          <BiliCoin size={15} />
+          {formatCount(data.stats.coins)}
         </button>
-        <button
-          type="button"
-          aria-pressed={faved}
-          onClick={() => void toggleFav(track)}
-          className={actionClass(faved)}
-        >
-          <BiliStar size={14} />
-          {faved ? '已收藏' : '收藏'}
+        <button type="button" aria-pressed={faved} onClick={() => void toggleFav(track)} className={pill(faved)}>
+          <BiliStar size={15} />
+          {formatCount(data.stats.favorites)}
         </button>
         <button
           type="button"
@@ -149,21 +178,25 @@ export function WatchInfo({
                 toastDone(next ? '加入稍后再看失败' : '移出稍后再看失败', '登录后再试'),
               )
           }}
-          className={actionClass(saved)}
+          className={pill(saved)}
         >
-          <Icon name="watchLater" size={13} />
-          {saved ? '已加入稍后再看' : '稍后再看'}
+          <Icon name="watchLater" size={14} />
+          {saved ? '已加入' : '稍后再看'}
         </button>
+        <span className="num flex items-center gap-1.5 px-2 text-[13px] text-[var(--text-3)]">
+          <Icon name="copy" size={14} />
+          {formatCount(data.stats.shares)}
+        </span>
       </div>
 
       {data.desc ? (
-        <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-[12px] leading-[1.5] text-[var(--text-3)]">
+        <p className="mt-3 whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)]">
           {data.desc}
         </p>
       ) : null}
 
       {data.pages.length > 1 ? (
-        <div className="mt-2 flex gap-1 overflow-x-auto">
+        <div className="mt-3 flex gap-1 overflow-x-auto">
           {data.pages.map((p) => (
             <button
               key={p.cid}
