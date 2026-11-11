@@ -15,6 +15,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
 /** 观看页的倍速档位，和 B 站播放器一致。 */
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
@@ -618,7 +619,7 @@ export function WatchView({ track }: { track: Track }) {
                 liked ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
               }`}
             >
-              <Icon name={liked ? 'heartFilled' : 'heart'} size={13} />
+              <BiliThumb size={14} />
               {liked ? '已点赞' : '点赞'}
             </button>
             <button
@@ -635,7 +636,7 @@ export function WatchView({ track }: { track: Track }) {
                 coins > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
               }`}
             >
-              <Icon name="coin" size={13} />
+              <BiliCoin size={14} />
               {coins > 0 ? `已投 ${coins} 枚` : '投币'}
             </button>
             <button
@@ -646,7 +647,7 @@ export function WatchView({ track }: { track: Track }) {
                 faved ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
               }`}
             >
-              <Icon name={faved ? 'bookmarkFilled' : 'bookmark'} size={13} />
+              <BiliStar size={14} />
               {faved ? '已收藏' : '收藏'}
             </button>
             <button
