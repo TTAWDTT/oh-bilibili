@@ -60,6 +60,8 @@ export function WatchView({ track }: { track: Track }) {
   const [cinema, setCinema] = useState(false)
   /** 这条视频在不在「稍后再看」里。按钮必须复述服务端的事实，不能只看点击过没有。 */
   const [saved, setSaved] = useState(false)
+  /** 有没有关注这个 UP 主。null 表示还没读到（未登录或请求失败），此时不显示按钮。 */
+  const [followed, setFollowed] = useState<boolean | null>(null)
   const stageRef = useRef<HTMLDivElement | null>(null)
   const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
   const setSpeed = usePlayerStore((state) => state.setSpeed)
@@ -134,6 +136,23 @@ export function WatchView({ track }: { track: Track }) {
       cancelled = true
     }
   }, [track.key])
+
+  // 关注状态只能从服务端读：没登录或读不到时保持 null，宁可不显示按钮，也不猜。
+  useEffect(() => {
+    let cancelled = false
+    setFollowed(null)
+    const mid = data?.owner_mid
+    if (!mid) return
+    void ipc
+      .relationFollowed(mid)
+      .then((on) => {
+        if (!cancelled) setFollowed(on)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [data?.owner_mid])
 
   // 相关推荐。右栏只在「听」时出现，所以观看页要有自己的一份，
   // 否则看视频时完全没有相关推荐可点。
@@ -558,6 +577,29 @@ export function WatchView({ track }: { track: Track }) {
         <div className="border-t border-hairline px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--text-2)]">
             <span className="font-medium text-[var(--text-1)]">{data.owner}</span>
+            {data.owner_mid && followed !== null ? (
+              <button
+                type="button"
+                aria-pressed={followed}
+                onClick={() => {
+                  const next = !followed
+                  void ipc
+                    .followSet(data.owner_mid!, next)
+                    .then(() => {
+                      setFollowed(next)
+                      toastDone(next ? '已关注' : '已取消关注')
+                    })
+                    .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
+                }}
+                className={`t press rounded-[4px] px-2 py-0.5 text-[12px] ${
+                  followed
+                    ? 'bg-[var(--panel-alt)] text-[var(--text-2)]'
+                    : 'bg-[var(--accent)] text-white'
+                }`}
+              >
+                {followed ? '已关注' : '关注'}
+              </button>
+            ) : null}
             <span className="num">{formatCount(data.stats.views)} 播放</span>
             <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
             <span className="num">{formatCount(data.stats.likes)} 点赞</span>

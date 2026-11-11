@@ -1181,6 +1181,10 @@ impl Engine {
         Ok(())
     }
 
+    pub async fn is_following(&self, mid: u64) -> Result<bool, WireError> {
+        Ok(self.source.is_following(mid).await?)
+    }
+
     pub async fn fav_set(
         &self,
         key: &TrackKey,

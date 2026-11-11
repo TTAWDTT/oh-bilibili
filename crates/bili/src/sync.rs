@@ -466,6 +466,21 @@ impl Client {
         Ok(())
     }
 
+    /// 当前账号有没有关注这个 UP 主。
+    ///
+    /// `attribute` 是个位掩码：2 表示已关注，6 表示互相关注。所以判断用与运算，
+    /// 不能写成 `attribute == 2`，互关的情况下会误报成没关注。
+    pub async fn is_following(&self, mid: u64) -> Result<bool, BiliError> {
+        let value = self
+            .get_json(
+                &format!("{API}/x/relation?fid={mid}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let attribute = value["data"]["attribute"].as_u64().unwrap_or(0);
+        Ok(attribute & 2 == 2)
+    }
+
     /// 投币。`count` 是 1 或 2（B 站上限两枚）；`also_like` 为真时同时点赞，一键三连就是这么来的。
     pub async fn add_coin(&self, aid: u64, count: u8, also_like: bool) -> Result<(), BiliError> {
         let csrf = self

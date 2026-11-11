@@ -541,6 +541,14 @@ async fn follow_set(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn relation_followed(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<bool, WireError> {
+    engine.is_following(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn fav_set(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -748,6 +756,7 @@ pub fn run() {
             coin_set,
             relation_states,
             follow_set,
+            relation_followed,
             watch_later_set,
             fav_folders,
             author_card,

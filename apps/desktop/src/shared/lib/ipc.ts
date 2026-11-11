@@ -223,6 +223,11 @@ export function followSet(mid: number, on: boolean): Promise<null> {
   return call<null>('follow_set', { mid, on })
 }
 
+/** 当前账号有没有关注这个 UP 主。 */
+export function relationFollowed(mid: number): Promise<boolean> {
+  return call<boolean>('relation_followed', { mid })
+}
+
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
 /** 批量读互动状态：[key, liked, faved, coin][]。 */
 export function relationStates(keys: string[]): Promise<[string, boolean, boolean, number][]> {

@@ -337,6 +337,11 @@ impl Source {
         self.client.follow(mid, on).await
     }
 
+    /// 当前账号是否已关注这个 UP 主。
+    pub async fn is_following(&self, mid: u64) -> Result<bool, BiliError> {
+        self.client.is_following(mid).await
+    }
+
     /// 投币。三连里的「币」，和点赞是同一次操作的两个动作。
     pub async fn add_coin(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;
