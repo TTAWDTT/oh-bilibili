@@ -4,8 +4,16 @@ import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
 
-/** 一条评论，含楼中楼预览。 */
-function CommentRow({ c, depth = 0 }: { c: Comment; depth?: number }) {
+/** 一条评论，含楼中楼预览。一级评论可以回复。 */
+function CommentRow({
+  c,
+  depth = 0,
+  onReply,
+}: {
+  c: Comment
+  depth?: number
+  onReply?: (c: Comment) => void
+}) {
   return (
     <li className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}>
       <div className="flex items-start gap-2">
@@ -27,6 +35,15 @@ function CommentRow({ c, depth = 0 }: { c: Comment; depth?: number }) {
               <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
                 {formatCount(c.likes)} 赞
               </span>
+            ) : null}
+            {depth === 0 && onReply ? (
+              <button
+                type="button"
+                onClick={() => onReply(c)}
+                className="t press ml-auto shrink-0 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                回复
+              </button>
             ) : null}
           </div>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
@@ -63,6 +80,9 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
 
   const load = async (next: number): Promise<void> => {
@@ -96,6 +116,24 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
     if (box.scrollHeight - box.scrollTop - box.clientHeight < 240) void load(page + 1)
   }
 
+  const submit = async (): Promise<void> => {
+    const text = draft.trim()
+    if (!text || sending) return
+    setSending(true)
+    setError(null)
+    try {
+      // 回复一级评论：root 与 parent 都是那一条的 rpid。
+      await ipc.commentAdd(trackKey, text, replyTo?.id, replyTo?.id)
+      setDraft('')
+      setReplyTo(null)
+      await load(1)
+    } catch (e) {
+      setError(toWireError(e).message)
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-col">
       <div className="flex items-baseline gap-2 px-3 py-2">
@@ -103,6 +141,40 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
         <span className="num text-[12px] text-[var(--text-3)]">
           {total > 0 ? formatCount(total) : '—'}
         </span>
+      </div>
+      <div className="border-b border-hairline px-3 pb-2">
+        {replyTo ? (
+          <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
+            <span>回复 @{replyTo.author}</span>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="t press hover:text-[var(--text-1)]"
+            >
+              取消
+            </button>
+          </div>
+        ) : null}
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void submit()
+            }}
+            placeholder={replyTo ? `回复 @${replyTo.author}` : '发一条评论'}
+            aria-label="发评论"
+            className="h-8 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+          />
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!draft.trim() || sending}
+            className="t press h-8 shrink-0 rounded-[6px] bg-[var(--accent)] px-3 text-[12px] text-white disabled:opacity-40"
+          >
+            {sending ? '发送中…' : '发送'}
+          </button>
+        </div>
       </div>
       <div ref={boxRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {items.length === 0 && !loading && !error ? (
@@ -124,7 +196,11 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
         ) : null}
         <ul className="space-y-3">
           {items.map((c) => (
-            <CommentRow key={c.id} c={c} />
+            <CommentRow
+              key={c.id}
+              c={c}
+              onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
+            />
           ))}
         </ul>
         {loading ? (

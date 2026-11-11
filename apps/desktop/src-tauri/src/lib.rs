@@ -179,6 +179,24 @@ async fn watch_comments(
     engine.comments(&TrackKey::from_provider(key), page).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn comment_add(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    text: String,
+    root: Option<String>,
+    parent: Option<String>,
+) -> Result<(), WireError> {
+    engine
+        .comment_add(
+            &TrackKey::from_provider(key),
+            &text,
+            root.as_deref(),
+            parent.as_deref(),
+        )
+        .await
+}
+
 /// 打开观看页。一次给齐清单地址与画质档位，前端看不到任何远端地址。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_open(
@@ -721,6 +739,7 @@ pub fn run() {
             mv_source,
             watch_open,
             watch_comments,
+            comment_add,
             home_feed,
             watch_later_list,
             following,

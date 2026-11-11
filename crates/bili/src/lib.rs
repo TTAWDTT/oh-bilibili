@@ -462,6 +462,39 @@ impl Source {
         Ok(crate::comments::page_from(&value, page, per_page))
     }
 
+    /// 发一条评论，或回复某一条。
+    ///
+    /// 回复时 `root` 是楼中楼的根评论，`parent` 是被回复的那条；不传就是一级评论。
+    /// 两个 id 都是 `rpid_str`，B 站把它当字符串处理，转成数字会溢出。
+    pub async fn comment_add(
+        &self,
+        key: &TrackKey,
+        text: &str,
+        root: Option<&str>,
+        parent: Option<&str>,
+    ) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        let csrf = self
+            .client
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        let mut body = vec![
+            ("type", "1".to_string()),
+            ("oid", detail.aid.to_string()),
+            ("message", text.to_string()),
+            ("plat", "1".to_string()),
+            ("csrf", csrf),
+        ];
+        if let Some(root_id) = root {
+            body.push(("root", root_id.to_string()));
+            body.push(("parent", parent.unwrap_or(root_id).to_string()));
+        }
+        self.client
+            .post_form(&format!("{}/x/v2/reply/add", client::API), body)
+            .await?;
+        Ok(())
+    }
+
     /// 取 DASH 的视频轨。只返回视频，音频永远走音频引擎。
     ///
     /// 用 fnval=4048 拿到全部特性与全部档位（含 1080P+），并且 fourk=1

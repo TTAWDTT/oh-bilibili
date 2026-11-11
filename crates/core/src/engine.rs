@@ -485,13 +485,25 @@ impl Engine {
         Ok(self.source.home_feed(fresh).await?)
     }
 
-    /// 取一页评论。评论区只读，取不到不该挡住看视频。
+    /// 取一页评论。取不到不该挡住看视频。
     pub async fn comments(
         &self,
         key: &TrackKey,
         page: u32,
     ) -> Result<crate::wire::CommentPage, WireError> {
         Ok(self.source.comments(key, page.max(1)).await?)
+    }
+
+    /// 发评论；`root` 与 `parent` 都为空时是评论，否则是回复。
+    pub async fn comment_add(
+        &self,
+        key: &TrackKey,
+        text: &str,
+        root: Option<&str>,
+        parent: Option<&str>,
+    ) -> Result<(), WireError> {
+        self.source.comment_add(key, text, root, parent).await?;
+        Ok(())
     }
 
     /// 把一条远端地址换成不透明句柄。句柄是前端能拿到的唯一地址形态。

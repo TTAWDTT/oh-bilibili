@@ -228,6 +228,16 @@ export function relationFollowed(mid: number): Promise<boolean> {
   return call<boolean>('relation_followed', { mid })
 }
 
+/** 发评论。root 与 parent 都为空时是评论，否则是回复。 */
+export function commentAdd(
+  key: string,
+  text: string,
+  root?: string,
+  parent?: string,
+): Promise<null> {
+  return call<null>('comment_add', { key, text, root, parent })
+}
+
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
 /** 批量读互动状态：[key, liked, faved, coin][]。 */
 export function relationStates(keys: string[]): Promise<[string, boolean, boolean, number][]> {
