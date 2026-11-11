@@ -251,7 +251,11 @@ impl Client {
                     accent: None,
                     views: play,
                     danmaku,
-                    up_avatar: None,
+                    // 收藏夹的响应里 upper 自带 face；拿不到就是 None，
+                    // 卡片退回首字母，不比改之前差。
+                    up_avatar: m["upper"]["face"]
+                        .as_str()
+                        .map(|f| f.replacen("http://", "https://", 1)),
                     up_mid: upper_mid,
                     tname: None,
                     typeid: None,
@@ -318,7 +322,9 @@ impl Client {
                             accent: None,
                             views: m["play"].as_u64(),
                             danmaku: m["video_review"].as_u64(),
-                            up_avatar: None,
+                    up_avatar: m["owner"]["face"]
+                        .as_str()
+                        .map(|f| f.replacen("http://", "https://", 1)),
                             up_mid: Some(mid),
                             tname: None,
                             typeid: None,
@@ -415,7 +421,9 @@ impl Client {
                     accent: None,
                     views: m["stat"]["view"].as_u64(),
                     danmaku: m["stat"]["danmaku"].as_u64(),
-                    up_avatar: None,
+                    up_avatar: m["owner"]["face"]
+                        .as_str()
+                        .map(|f| f.replacen("http://", "https://", 1)),
                     up_mid: m["owner"]["mid"].as_u64(),
                     tname: m["tname"].as_str().map(|s| s.to_string()),
                     typeid: None,
