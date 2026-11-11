@@ -22,7 +22,6 @@ const DARK_CONTEXT_FILES = [
   'features/watch/WatchPlayer.tsx',
   // 卡片动作排压在封面图的黑色渐变上
   'features/tracks/CardActions.tsx',
-  'features/search/SearchBanner.tsx',
 ]
 
 // 封面上的字母字画在图片上，白色是对的，不参与浅色主题检查
@@ -58,6 +57,21 @@ const RULES = [
     re: /border-white\/\d+/,
     skipDarkContext: true,
     hint: '改用 var(--line) 或强调色；图片上的描边可保留',
+  },
+  {
+    // 深色主题那套霓虹色（浅绿/亮粉/亮青）在白底上对比度极低。
+    // 这两条是实测发现的：下载状态与歌词高亮都踩过。
+    name: '深色主题的霓虹色（浅色底上看不清）',
+    re: /#(7bf0a0|ff6b8a|5ce1e6|00ffcc|ff5c8a)\b/i,
+    skipDarkContext: true,
+    hint: '改用语义色（成功 #1a9e57 / 失败 #e23a5e）或 var(--accent)',
+  },
+  {
+    // 浅色主题上从 #fff 起头的文字渐变，等于把字画没了。
+    name: '文字渐变从白色起头（浅色底上字会消失）',
+    re: /linear-gradient\([^)]*#fff(fff)?\s+\d/i,
+    skipDarkContext: true,
+    hint: '起手色改用 var(--text-1) 这类深色',
   },
 ]
 

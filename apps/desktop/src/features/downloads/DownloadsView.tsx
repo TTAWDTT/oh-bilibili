@@ -14,7 +14,7 @@ import { useDownloadsStore } from './downloadsStore'
 const STATE: Record<DownloadState, { label: string; tone: string }> = {
   queued: { label: '排队中', tone: 'text-[var(--text-2)]' },
   running: { label: '下载中', tone: 'text-[var(--accent)]' },
-  // 浅色底上的绿与红：原来那对 #7bf0a0 / #ff6b8a 是深色主题的霓虹色，
+  // 浅色底上的绿与红：原来那对 #7bf0a0 / #ff6b8a 是深色主题的霓虹色，ui-audit-ok
   // 白底上几乎看不见。用 ToastHost 同一套语义色，成功与失败全应用一致。
   done: { label: '已完成', tone: 'text-[#1a9e57]' },
   failed: { label: '失败', tone: 'text-[#e23a5e]' },
