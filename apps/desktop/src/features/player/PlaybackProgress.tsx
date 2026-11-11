@@ -47,7 +47,10 @@ export function PlaybackProgress() {
   }
 
   return (
-    <div className="flex w-full items-center gap-1">
+    <div className="flex w-full items-center gap-2">
+      <span className="num w-9 shrink-0 text-right font-mono text-[11px] text-[var(--text-3)]">
+        {formatTime(scrub === null ? now : scrub * duration)}
+      </span>
       <div className="relative min-w-0 flex-1">
         {/* 高能进度条：弹幕越密的地方越亮，和 B 站播放器一致 */}
         {peak > 0 ? (
@@ -70,7 +73,7 @@ export function PlaybackProgress() {
           disabled={duration <= 0}
         />
       </div>
-      <span className="num w-10 shrink-0 font-mono text-[12px] text-[var(--text-2)]">{formatTime(duration)}</span>
+      <span className="num w-9 shrink-0 font-mono text-[11px] text-[var(--text-3)]">{formatTime(duration)}</span>
     </div>
   )
 }

@@ -52,12 +52,11 @@ export function LibraryView() {
             <PlaylistRowsSkeleton rows={4} />
           </div>
         ) : playlists.length === 0 ? (
-          <div className="flex min-h-[320px] items-center justify-center">
+          <div className="pt-6">
             <EmptyState
               mascot="cheer"
               icon="library"
               title="还没有歌单"
-              detail="建一个歌单，把歌按自己的顺序收起来。"
               /* 标题行已经有「新建歌单」，这里不再放第二个同样的按钮。 */
               action={null}
             />

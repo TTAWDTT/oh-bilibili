@@ -43,7 +43,7 @@ function CommentRow({
               <button
                 type="button"
                 onClick={() => onReply(c)}
-                className="t press ml-auto shrink-0 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                className="t press shrink-0 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
               >
                 回复
               </button>
@@ -85,7 +85,7 @@ function CommentRow({
  * 分页按需加载，滚动到底部自动取下一页。取不到内容时给明确文案，
  * 不白屏，也不影响看视频。
  */
-export function CommentsPanel({ trackKey }: { trackKey: string }) {
+export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; flow?: boolean }) {
   const [items, setItems] = useState<Comment[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -98,7 +98,26 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
   const [mine, setMine] = useState<Set<string>>(new Set())
   const boxRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
   const me = useAuthStore((s) => s.auth?.user ?? null)
+
+  // 评论区跟着整页一起滚时不能再自己滚一屏，否则是「滚动里套滚动」。
+  // 到底没有交给 IntersectionObserver：哨兵进入整页滚动容器的可视区就取下一页。
+  useEffect(() => {
+    if (!flow) return
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const root = sentinel.closest('[data-scroll-root]')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load(page + 1)
+      },
+      { root: root instanceof Element ? root : null, rootMargin: '240px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow, hasMore, loading, page, trackKey])
 
   const load = async (next: number): Promise<void> => {
     setLoading(true)
@@ -182,14 +201,14 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <div className="flex items-baseline gap-2 px-3 py-2">
-        <h3 className="text-[13px] font-medium">评论</h3>
+    <div className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
+      <div className={`flex items-baseline gap-2 py-3 ${flow ? 'px-6' : 'px-3'}`}>
+        <h3 className="text-[14px] font-medium">评论</h3>
         <span className="num text-[12px] text-[var(--text-3)]">
           {total > 0 ? formatCount(total) : '—'}
         </span>
       </div>
-      <div className="border-b border-hairline px-3 pb-2">
+      <div className={`border-b border-hairline pb-3 ${flow ? 'px-6' : 'px-3'}`}>
         {replyTo ? (
           <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
             <span>回复 @{replyTo.author}</span>
@@ -223,7 +242,11 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
           </button>
         </div>
       </div>
-      <div ref={boxRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <div
+        ref={boxRef}
+        onScroll={flow ? undefined : onScroll}
+        className={flow ? 'px-6 pb-6' : 'min-h-0 flex-1 overflow-y-auto px-3 pb-4'}
+      >
         {items.length === 0 && !loading && !error ? (
           <p className="py-6 text-center text-[12px] text-[var(--text-3)]">
             这条视频还没有评论。
@@ -241,7 +264,7 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
             </button>
           </div>
         ) : null}
-        <ul className="space-y-3">
+        <ul className="max-w-[880px] space-y-4">
           {items.map((c) => (
             <CommentRow
               key={c.id}
@@ -257,6 +280,7 @@ export function CommentsPanel({ trackKey }: { trackKey: string }) {
         {!loading && !hasMore && items.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
+        {flow ? <div ref={sentinelRef} className="h-1" /> : null}
       </div>
     </div>
   )

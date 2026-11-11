@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { WaveRibbon } from './WaveRibbon'
-import { LevelBars } from './LevelBars'
 import { useAppStore } from '../../app/appStore'
 import { AddToPlaylistModal } from '../library/AddToPlaylist'
 import type { RailTab } from '../../app/appStore'
@@ -98,9 +96,11 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           <span className="truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
             {track.artist}
           </span>
-          <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[12px] text-[var(--text-2)]">
-            {quality ? `${quality}K` : '——'}
-          </span>
+          {quality ? (
+            <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[12px] text-[var(--text-2)]">
+              {quality}K
+            </span>
+          ) : null}
         </div>
       </div>
     </div>
@@ -155,9 +155,6 @@ export function PlayerBar() {
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
     <section className="relative z-20 grid h-14 shrink-0 overflow-hidden grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-[var(--panel)] px-3">
       <AddToPlaylistModal track={track} open={adding} onClose={() => setAdding(false)} />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 opacity-45">
-        <WaveRibbon />
-      </div>
       <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
 
       <div className="flex min-w-0 flex-col items-center gap-0">
@@ -167,9 +164,6 @@ export function PlayerBar() {
 
       <div className="flex min-w-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
-        <span className="hidden md:block">
-          <LevelBars />
-        </span>
         <span className="hidden items-center gap-2 md:flex">
           <SpeedButton />
           <VolumeControl />

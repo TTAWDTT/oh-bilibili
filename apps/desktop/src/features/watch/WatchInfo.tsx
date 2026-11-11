@@ -5,6 +5,7 @@ import { formatCount } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { toastDone } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
+import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
@@ -78,7 +79,7 @@ export function WatchInfo({
     ].join(' ')
 
   return (
-    <div className="px-1 pt-3">
+    <div className="px-6 pb-4 pt-4">
       {/* 返回、标题、听视频排在同一行：单独一条只有箭头的工具栏看着像丢了内容。 */}
       <div className="flex items-start gap-2">
         <button
@@ -111,7 +112,7 @@ export function WatchInfo({
 
       <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
         <span className="flex min-w-0 items-center gap-2">
-          <Icon name="user" size={20} className="text-[var(--text-3)]" />
+          <Avatar src={track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
         </span>
         {data.owner_mid && followed !== null ? (
@@ -183,10 +184,10 @@ export function WatchInfo({
           <Icon name="watchLater" size={14} />
           {saved ? '已加入' : '稍后再看'}
         </button>
-        <span className="num flex items-center gap-1.5 px-2 text-[13px] text-[var(--text-3)]">
+        <button type="button" className={pill(false)}>
           <Icon name="copy" size={14} />
           {formatCount(data.stats.shares)}
-        </span>
+        </button>
       </div>
 
       {data.desc ? (

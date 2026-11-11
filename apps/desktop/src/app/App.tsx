@@ -16,7 +16,7 @@ import { SettingsView } from '../features/settings/SettingsView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
-import { ChannelBar } from './ChannelBar'
+import { Sidebar } from './Sidebar'
 import { MobileTabBar } from './MobileTabBar'
 import { MobileRailSheet } from './MobileRailSheet'
 import { DanmakuStrip } from './DanmakuStrip'
@@ -132,11 +132,9 @@ export default function App() {
         跳到主要内容
       </a>
       <TitleBar />
-      <div className="hidden md:contents">
-        <ChannelBar />
-      </div>
 
       <div className="relative z-10 flex min-h-0 flex-1">
+        <Sidebar />
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}

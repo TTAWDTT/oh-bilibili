@@ -171,7 +171,7 @@ export function FavFoldersView() {
                   aria-label={`从收藏夹移出 ${track.title}`}
                   title="从这个收藏夹移出"
                   onClick={() => void removeOne(track)}
-                  className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+                  className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--accent)]"
                 >
                   <Icon name="close" size={12} />
                 </button>

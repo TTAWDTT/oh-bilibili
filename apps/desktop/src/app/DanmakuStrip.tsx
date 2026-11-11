@@ -116,7 +116,7 @@ export function DanmakuStrip() {
             animationDuration: `${LIFE_MS / speed / 1000}s`,
             opacity: opacity * 0.9,
             textShadow: '0 0 2px #fff, 0 0 4px #fff, 0 0 6px #fff',
-            background: 'color-mix(in oklab, var(--bili-pink) 12%, white / 0.86)',
+            background: 'color-mix(in oklab, var(--accent) 10%, white / 0.86)',
           }}
         >
           {f.text}

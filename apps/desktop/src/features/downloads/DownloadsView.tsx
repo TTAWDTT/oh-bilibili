@@ -54,7 +54,7 @@ export function DownloadsView() {
       
 
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-        <PageTitle>下载</PageTitle>
+        <PageTitle>已下载</PageTitle>
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (
@@ -68,12 +68,11 @@ export function DownloadsView() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex min-h-[320px] items-center justify-center">
+          <div className="pt-6">
             <EmptyState
               mascot="coin"
               icon="download"
               title="还没有下载，离线听要趁早"
-              detail="在任意歌曲上点下载箭头，音轨会存到本机，断网也能听。"
               action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
             />
           </div>
@@ -106,7 +105,7 @@ export function DownloadsView() {
                           className="t h-full origin-left"
                           style={{
                             transform: `scaleX(${item.progress})`,
-                            background: 'linear-gradient(90deg, var(--accent), var(--bili-pink))',
+                            background: 'var(--accent)',
                           }}
                         />
                       </div>
@@ -141,7 +140,7 @@ export function DownloadsView() {
                       aria-label={`删除下载 ${item.title}`}
                       title="删除这条下载"
                       onClick={() => void remove(item.key)}
-                      className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--bili-pink)]"
+                      className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--accent)]"
                     >
                       <Icon name="close" size={12} />
                     </button>

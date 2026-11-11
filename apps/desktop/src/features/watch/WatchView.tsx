@@ -89,7 +89,9 @@ export function WatchView({ track }: { track: Track }) {
     <div className="flex h-full min-h-0 flex-col">
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* 整页一起滚：播放器、信息、评论是一条纵向流。
+            之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
+        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto">
           {data ? (
             <WatchPlayer
               track={track}
@@ -120,8 +122,8 @@ export function WatchView({ track }: { track: Track }) {
           <div className="border-t border-hairline md:hidden">
             <RelatedAside items={related} />
           </div>
-          <div className="min-h-0 flex-1 border-t border-hairline">
-            <CommentsPanel trackKey={track.key} />
+          <div className="border-t border-hairline">
+            <CommentsPanel trackKey={track.key} flow />
           </div>
         </div>
 

@@ -178,7 +178,7 @@ export function QueueList() {
             type="button"
             onClick={() => void clearQueue()}
             title="清空队列"
-            className="text-[11px] text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+            className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
           >
             清空
           </button>

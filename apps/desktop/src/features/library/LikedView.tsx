@@ -35,12 +35,11 @@ export function LikedView() {
           喜欢
         </PageTitle>
         {tracks.length === 0 ? (
-          <div className="flex min-h-[320px] flex-1 items-center justify-center">
+          <div className="pt-6">
             <EmptyState
               mascot="heart"
               icon="heart"
               title="一个红心都没点，下次一定？"
-              detail="在任意视频上点一下赞，它会出现在这里。"
               action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
             />
           </div>

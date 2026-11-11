@@ -19,7 +19,7 @@ type EmptyStateProps = {
   mascot?: MascotPose
   icon: IconName
   title: string
-  detail: string
+  detail?: string
   action: { label: string; onClick: () => void } | null
   compact?: boolean
 }
@@ -49,7 +49,9 @@ export function EmptyState({ icon, mascot, title, detail, action, compact = fals
         ) : null}
         {title}
       </h2>
-      <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-[var(--text-2)]">{detail}</p>
+      {detail ? (
+        <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-[var(--text-2)]">{detail}</p>
+      ) : null}
       {action ? (
         <button
           type="button"

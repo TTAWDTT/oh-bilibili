@@ -101,7 +101,7 @@ export function HistoryView() {
         <button
           type="button"
           onClick={() => void clearAll()}
-          className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--bili-pink)] hover:text-[var(--bili-pink)]"
+          className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
           清空历史
         </button>
@@ -123,7 +123,7 @@ export function HistoryView() {
                 aria-label={`删除 ${track.title} 的播放记录`}
                 title="删除这条记录"
                 onClick={() => void removeOne(track.key)}
-                className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--bili-pink)]"
+                className="bili-icon-hover text-[var(--text-3)] hover:text-[var(--accent)]"
               >
                 <Icon name="close" size={12} />
               </button>

@@ -12,12 +12,6 @@ import { FramedAvatar } from '../../shared/ui/FramedAvatar'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
 
-/** 当前前端产物的文件名。排查「改了半天其实跑的是旧包」比什么都快。 */
-function buildId(): string {
-  const file = new URL(import.meta.url).pathname.split('/').pop() ?? 'dev'
-  return file.replace(/^index-/, '').replace(/\.js$/, '') || 'dev'
-}
-
 /**
  * 设置分组卡片。
  *
@@ -27,27 +21,14 @@ function buildId(): string {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-      <h2 className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-1)]">
-        <span className="h-3 w-[3px] rounded-full bg-[var(--accent)]" />
-        {title}
-      </h2>
+      <h2 className="text-[14px] font-medium text-[var(--text-1)]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   )
 }
 
-function Chip({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="flex items-center gap-2 rounded-[4px] border border-[var(--line)] px-2 py-1">
-      <span className="text-[12px] uppercase tracking-[0.14em] text-[var(--text-2)]">{label}</span>
-      <span className="num font-mono text-[12px] text-[var(--text-2)]">{value}</span>
-    </span>
-  )
-}
-
 export function SettingsView() {
   const auth = useAuthStore((state) => state.auth)
-  const loggedIn = auth?.logged_in === true
   const logout = useAuthStore((state) => state.logout)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const [health, setHealth] = useState<Health | null>(null)
@@ -90,7 +71,7 @@ export function SettingsView() {
       
 
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-2 md:px-8">
-        <div className="mx-auto flex max-w-[720px] flex-col gap-3 py-4">
+        <div className="flex max-w-[820px] flex-col gap-3 py-4">
           <PageTitle>设置</PageTitle>
           <div className="hidden md:block">
             <Section title="快捷键">
@@ -100,21 +81,32 @@ export function SettingsView() {
 
           <Section title="账号">
             {user ? (
-              <div className="flex items-center gap-4">
-                <FramedAvatar src={user.avatar} alt={user.uname} size={56} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
-                    {user.uname}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  <FramedAvatar src={user.avatar} alt={user.uname} size={56} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
+                      {user.uname}
+                    </div>
+                    <div className="num mt-1 font-mono text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
                   </div>
-                  <div className="num mt-1 font-mono text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
+                  <button
+                    type="button"
+                    onClick={() => void logout()}
+                    className="t press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    <Icon name="logout" size={13} />
+                    退出
+                  </button>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void logout()}
-                  className="t press flex items-center justify-center flex shrink-0 items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--bili-pink)] hover:text-[var(--bili-pink)]"
+                  onClick={() => void sync()}
+                  disabled={syncing}
+                  className="t press flex h-8 w-fit items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
                 >
-                  <Icon name="logout" size={13} />
-                  退出
+                  <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
+                  {syncing ? '同步中…' : '立即同步'}
                 </button>
               </div>
             ) : (
@@ -126,7 +118,7 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => setAuthOpen(true)}
-                  className="t press mt-4 rounded-[4px] bg-white h-8 px-4 text-[14px] font-medium text-black hover:bg-white/85"
+                  className="t press mt-4 h-8 rounded-[6px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
                 >
                   扫码登录
                 </button>
@@ -134,35 +126,10 @@ export function SettingsView() {
             )}
           </Section>
 
-          <Section title="同步">
-            <p className="text-[14px] text-[var(--text-2)]">离线时的喜欢与收藏先记在本机，登录后推到 B 站。</p>
-            {/* 未登录时同步一定失败，别让按钮看起来可用。 */}
-            <button
-              type="button"
-              onClick={() => void sync()}
-              disabled={syncing || !loggedIn}
-              title={loggedIn ? '把本地待推送的喜欢与收藏推到 B 站' : '登录后才能同步'}
-              className="t press mt-3 flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--text-1)]"
-            >
-              <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? '同步中…' : loggedIn ? '立即同步' : '登录后才能同步'}
-            </button>
-          </Section>
-
-          <Section title="音质">
-            {/* 档位由账号决定，本来就该读账号的真实能力，不写死一串让人以为可以选。 */}
-            <p className="text-[14px] leading-relaxed text-[var(--text-2)]">
-              播放条显示实际码率。普通账号上限约 192K，大会员另有杜比与 Hi-Res。
-            </p>
-          </Section>
-
           <Section title="关于">
-            <div className="flex flex-wrap gap-2">
-              <Chip label="版本" value={health?.version ?? '…'} />
-              <Chip label="构建" value={buildId()} />
-              <Chip label="平台" value={health?.platform ?? '…'} />
-              <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
-            </div>
+            <p className="num text-[13px] text-[var(--text-2)]">
+              BiliMusic {health?.version ?? '…'} · {health?.platform ?? '…'}
+            </p>
             {isTauri ? null : (
               <div className="mt-4 flex items-start gap-2 text-[12px] leading-relaxed text-[var(--accent)]">
                 <Icon name="info" size={13} className="mt-[2px] shrink-0" />

@@ -108,7 +108,7 @@ export function Slider({
       <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-[var(--line)]">
         {buffered === null ? null : (
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--bili-pink)_22%,var(--line))]"
+            className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--accent)_22%,var(--line))]"
             style={{ width: `${clamp(buffered, 0, 1) * 100}%` }}
           />
         )}
@@ -116,8 +116,7 @@ export function Slider({
           className="absolute inset-y-0 left-0 rounded-full"
           style={{
             width: `${clamp(value, 0, 1) * 100}%`,
-            // B 站的进度是粉色打头、往蓝色过渡，和它首页的双色一致
-            background: 'linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--bili-pink) 60%, var(--accent)))',
+            background: 'var(--accent)',
           }}
         />
       </div>

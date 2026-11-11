@@ -65,12 +65,12 @@ export function Transport() {
         className={[
           't press mx-1 flex h-10 w-10 items-center justify-center rounded-full',
           hasTrack
-            ? 'bg-white text-black active:scale-[0.96]'
+            ? 'bg-[var(--accent)] text-white active:scale-[0.96]'
             : 'cursor-default border border-[var(--line)] bg-[var(--panel-raised)] text-[var(--text-2)]',
         ].join(' ')}
       >
         {loading ? (
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-transparent border-t-white" />
         ) : (
           <Icon name={playing ? 'pause' : 'play'} size={18} />
         )}

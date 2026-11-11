@@ -83,7 +83,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
           {tracks === null ? <TrackListSkeleton rows={6} /> : null}
 
           {error ? (
-            <div className="flex min-h-[320px] items-center justify-center">
+            <div className="pt-6">
               <EmptyState
                 icon="alert"
                 title={error}
@@ -94,7 +94,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
           ) : null}
 
           {tracks !== null && !error && tracks.length === 0 ? (
-            <div className="flex min-h-[320px] items-center justify-center">
+            <div className="pt-6">
               <EmptyState
                 mascot="cheer"
                 icon="music"
