@@ -31,6 +31,7 @@ type PlayerStore = {
   removeFromQueue: (key: string) => Promise<void>
   clearQueue: () => Promise<void>
   applyProgress: (positionMs: number, durationMs: number, level?: number, sentAtMs?: number) => void
+  applySnapshot: (snapshot: PlayerSnapshot) => void
   applyTrack: (track: Track) => void
   applyBuffering: (track: Track) => void
   applyStopped: () => void
@@ -164,6 +165,7 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       syncPlayhead(positionMs, current.phase === 'playing', durationMs, sentAtMs)
       set({ progress: { position_ms: positionMs, duration_ms: durationMs } })
     },
+    applySnapshot: (snapshot) => apply(snapshot),
     applyTrack: (track) => {
       const current = get().snapshot
       if (!current) {

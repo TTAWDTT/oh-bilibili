@@ -89,7 +89,6 @@ export function DownloadsView() {
                     cover={null}
                     title={item.title}
                     className="h-10 w-10 shrink-0 rounded-[4px] border border-[var(--line)]"
-                    glyphClassName="text-[18px] font-medium text-[var(--text-2)]"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

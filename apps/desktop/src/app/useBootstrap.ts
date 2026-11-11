@@ -20,6 +20,9 @@ export function useBootstrap(): void {
     void subscribeEvents((event) => {
       const player = usePlayerStore.getState()
       switch (event.type) {
+        case 'state':
+          player.applySnapshot(event.snapshot)
+          break
         case 'progress':
           player.applyProgress(event.position_ms, event.duration_ms, event.level, event.sent_at_ms)
           break

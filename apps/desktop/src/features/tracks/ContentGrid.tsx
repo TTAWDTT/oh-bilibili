@@ -155,7 +155,6 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                 cover={track.cover}
                 title={track.title}
                 className="h-full w-full"
-                glyphClassName="text-[40px] font-semibold text-white/85"
               />
               {coverFlags(track.title).length > 0 ? (
                 <span className="absolute right-1 top-1 flex gap-1">

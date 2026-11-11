@@ -132,7 +132,6 @@ export function StageView() {
             cover={track.cover}
             title={track.title}
             className="h-[148px] w-[148px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)] md:h-[188px] md:w-[188px]"
-            glyphClassName="text-[64px] font-semibold text-[var(--text-1)]"
           />
         </div>
 
@@ -195,7 +194,6 @@ export function StageView() {
                     cover={item.cover}
                     title={item.title}
                     className="h-full w-full"
-                    glyphClassName="text-[26px] font-semibold text-white/80"
                   />
                 </span>
                 <span className="mt-1 line-clamp-1 block text-[12px] text-[var(--text-2)] group-hover:text-[var(--accent)]">

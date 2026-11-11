@@ -36,7 +36,6 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
           cover={track.cover}
           title={track.title}
           className="h-[84px] w-[84px] rounded-[4px] border border-[var(--line)]"
-          glyphClassName="text-[30px] font-semibold text-[var(--text-2)]"
         />
       </div>
       <div className="min-w-0 flex-1">

@@ -44,6 +44,43 @@ async fn 引擎能搜到歌并真的开始播放() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
+async fn 打开观看页会让音频引擎自己起播() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-watch-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
+    let track = tracks.first().cloned().expect("至少一条结果");
+    println!("观看：{}", track.title);
+
+    engine
+        .open_watch(&track.key, "http://127.0.0.1:9")
+        .await
+        .expect("打开观看页");
+
+    // 起播要拉流，1 秒内不一定有位置；轮询到 15 秒，看到推进就停。
+    let mut moved = false;
+    for _ in 0..30 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let snap = engine.snapshot();
+        println!(
+            "相位={} 曲目={:?} 位置={}ms",
+            snap.phase,
+            snap.track.as_ref().map(|t| t.title.clone()),
+            snap.position_ms
+        );
+        if snap.track.as_ref().map(|t| t.key.clone()) == Some(track.key.clone())
+            && snap.position_ms > 800
+        {
+            moved = true;
+            break;
+        }
+    }
+    assert!(moved, "打开观看页后引擎应该自己把这一条放起来");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与 yt-dlp"]
 async fn 能把一首歌下载到本地并落到磁盘() {
     let dir = std::env::temp_dir().join(format!("bilimusic-dl-{}", std::process::id()));

@@ -161,6 +161,7 @@ export type WireError = {
 export type SearchPage = { tracks: Track[]; page: number }
 
 export type AppEvent =
+  | { type: 'state'; snapshot: PlayerSnapshot }
   | {
       type: 'progress'
       position_ms: number

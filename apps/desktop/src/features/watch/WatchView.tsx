@@ -4,9 +4,11 @@ import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatTime } from '../../shared/lib/format'
+import { readPlayhead } from '../../shared/lib/playhead'
 import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
+import { usePlayerStore } from '../player/playerStore'
 import { CommentsPanel } from './CommentsPanel'
 import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
@@ -19,7 +21,8 @@ import { Icon } from '../../shared/ui/Icon'
  * 画面由 shaka 播 DASH，清单来自 Rust 侧合成的只含视频轨的 MPD。
  * 清单与分片都走本机代理，前端拿不到任何远端地址。
  *
- * 视频元素一直静音：声音归音频引擎，两处发声就是对不上。
+ * 声音只有一个发声者，就是音频引擎。视频元素始终静音，只负责画面，
+ * 并且跟着引擎的时钟走：暂停、拖动、换档都以引擎为准。
  */
 export function WatchView({ track }: { track: Track }) {
   const navigate = useAppStore((s) => s.navigate)
@@ -52,7 +55,13 @@ export function WatchView({ track }: { track: Track }) {
   /** 全屏用浏览器全屏，不支持时退回 CSS 铺满。 */
   const [cinema, setCinema] = useState(false)
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const [videoPlaying, setVideoPlaying] = useState(false)
+  /**
+   * 「引擎在不在放」。
+   *
+   * 不用 `useIsPlaying()` 订阅：观看页切换的那一刻，全局快照会连着更新好几次，
+   * 订阅会让整页重渲染。这里只按 250ms 轮询一次布尔值，页面不会被音频事件牵着走。
+   */
+  const [playing, setPlaying] = useState(false)
   const danmakuOn = useDanmakuSettings((s) => s.enabled)
   const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
   const danmakuSize = useDanmakuSettings((s) => s.size)
@@ -78,7 +87,7 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key, page])
 
-  // 取弹幕。时间轴跟视频走，不跟音频引擎。
+  // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。
   useEffect(() => {
     let cancelled = false
     setDanmaku([])
@@ -132,27 +141,28 @@ export function WatchView({ track }: { track: Track }) {
   }, [])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
+  // 读的是引擎时钟，不是视频元素：声音先到，画面后跟。
   useEffect(() => {
     if (!controls) return
-    const timer = window.setInterval(() => {
-      const v = videoRef.current
-      if (v) setNow(Math.round(v.currentTime * 1000))
-    }, 500)
+    const timer = window.setInterval(() => setNow(Math.round(readPlayhead())), 500)
     return () => window.clearInterval(timer)
   }, [controls])
 
   const togglePlay = (): void => {
-    const v = videoRef.current
-    if (!v) return
-    if (v.paused) void v.play().catch(() => {})
-    else v.pause()
+    void ipc.playerToggle().catch(() => {
+      // 没加载起来时点播放不该静默失败，但也不该假装成功
+    })
     poke()
   }
 
   const seekTo = (ratio: number): void => {
+    const duration = data?.duration_ms ?? track.duration_ms
+    if (!duration) return
+    const at = Math.round(Math.min(Math.max(ratio, 0), 1) * duration)
+    void ipc.playerSeek(at).catch(() => {})
     const v = videoRef.current
-    if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return
-    v.currentTime = Math.min(Math.max(ratio, 0), 1) * v.duration
+    if (v) v.currentTime = at / 1000
+    setNow(at)
     poke()
   }
 
@@ -176,8 +186,7 @@ export function WatchView({ track }: { track: Track }) {
     if (!text || sending) return
     setSending(true)
     try {
-      const v = videoRef.current
-      const at = v ? Math.round(v.currentTime * 1000) : 0
+      const at = Math.round(readPlayhead())
       await ipc.danmakuSend(track.key, text, at)
       setDraft('')
       // 立刻在本地画出来，不用等下一次拉取
@@ -190,22 +199,33 @@ export function WatchView({ track }: { track: Track }) {
     }
   }
 
-  // 弹幕只关心「在不在播」。位置由 DanmakuField 直接读元素，
-  // 这样父组件不必为时间推进重渲染。
+  // 画面跟随引擎：引擎在放就放，引擎暂停就停，偏差超过 400ms 拉回来。
+  // 只看引擎的状态，不看视频自己的 play/pause，避免两个真值打架。
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const sync = (): void => setVideoPlaying(!video.paused && !video.ended)
-    sync()
-    video.addEventListener('play', sync)
-    video.addEventListener('pause', sync)
-    video.addEventListener('ended', sync)
-    return () => {
-      video.removeEventListener('play', sync)
-      video.removeEventListener('pause', sync)
-      video.removeEventListener('ended', sync)
-    }
-  }, [data])
+    if (!ready) return
+    const timer = window.setInterval(() => {
+      const v = videoRef.current
+      if (!v) return
+      const snap = usePlayerStore.getState().snapshot
+      // 引擎在放别人的时候，画面不能被它拖着走：队列恢复或换歌的瞬间，
+      // 快照里可能是另一条曲目。只有「这条视频就是引擎正在放的那条」才跟随。
+      const sameTrack = snap?.track?.key === track.key
+      const enginePlaying = sameTrack && snap?.phase === 'playing'
+      setPlaying(enginePlaying)
+      if (!sameTrack) {
+        if (!v.paused) v.pause()
+        return
+      }
+      if (!enginePlaying) {
+        if (!v.paused) v.pause()
+        return
+      }
+      if (v.paused) void v.play().catch(() => {})
+      const drift = v.currentTime * 1000 - readPlayhead()
+      if (Math.abs(drift) > 400) v.currentTime = readPlayhead() / 1000
+    }, 250)
+    return () => window.clearInterval(timer)
+  }, [ready, track.key])
 
   // 挂载 shaka
   useEffect(() => {
@@ -244,9 +264,6 @@ export function WatchView({ track }: { track: Track }) {
           return
         }
         setReady(true)
-        await video.play().catch(() => {
-          // 自动播放被拒不算错，用户点一下即可
-        })
       } catch (e) {
         if (!cancelled) setError(`播放失败：${String(e)}`)
       }
@@ -287,7 +304,7 @@ export function WatchView({ track }: { track: Track }) {
         <button
           type="button"
           onClick={() => {
-            const at = videoRef.current ? Math.round(videoRef.current.currentTime * 1000) : 0
+            const at = Math.round(readPlayhead())
             void ipc
               .setMode('listen', at, track.key)
               .then(() => {
@@ -328,8 +345,8 @@ export function WatchView({ track }: { track: Track }) {
         />
         <DanmakuField
           items={danmaku}
-          position={() => (videoRef.current ? Math.round(videoRef.current.currentTime * 1000) : 0)}
-          playing={videoPlaying}
+          position={() => Math.round(readPlayhead())}
+          playing={playing}
           enabled={danmakuOn}
           opacity={danmakuOpacity}
           size={danmakuSize}
@@ -354,7 +371,7 @@ export function WatchView({ track }: { track: Track }) {
             视频网站都是这么做的——常驻一条控制条会把画面挤小。 */}
         <div
           className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-10 text-white transition-opacity duration-200 ${
-            controls || !videoPlaying ? 'opacity-100' : 'opacity-0'
+            controls || !playing ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {/* 进度：点哪里跳哪里 */}
@@ -382,10 +399,10 @@ export function WatchView({ track }: { track: Track }) {
             <button
               type="button"
               onClick={togglePlay}
-              aria-label={videoPlaying ? '暂停' : '播放'}
+              aria-label={playing ? '暂停' : '播放'}
               className="t press flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-white/15"
             >
-              <Icon name={videoPlaying ? 'pause' : 'play'} size={15} />
+              <Icon name={playing ? 'pause' : 'play'} size={15} />
             </button>
             <span className="num shrink-0 text-[12px] text-white/85">
               {formatTime(now)} / {formatTime(track.duration_ms ?? 0)}
@@ -585,7 +602,6 @@ export function WatchView({ track }: { track: Track }) {
                     cover={item.cover}
                     title={item.title}
                     className="h-full w-full"
-                    glyphClassName="text-[18px] font-semibold text-white/80"
                   />
                 </span>
                 <span className="min-w-0 flex-1">

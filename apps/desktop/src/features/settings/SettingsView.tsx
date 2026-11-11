@@ -11,6 +11,12 @@ import { FramedAvatar } from '../../shared/ui/FramedAvatar'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
 
+/** 当前前端产物的文件名。排查「改了半天其实跑的是旧包」比什么都快。 */
+function buildId(): string {
+  const file = new URL(import.meta.url).pathname.split('/').pop() ?? 'dev'
+  return file.replace(/^index-/, '').replace(/\.js$/, '') || 'dev'
+}
+
 /**
  * 设置分组卡片。
  *
@@ -162,6 +168,7 @@ export function SettingsView() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Chip label="版本" value={health?.version ?? '…'} />
+              <Chip label="构建" value={buildId()} />
               <Chip label="平台" value={health?.platform ?? '…'} />
               <Chip label="外壳" value={isTauri ? 'Tauri' : '浏览器 mock'} />
             </div>

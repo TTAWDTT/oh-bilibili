@@ -63,7 +63,7 @@ export function RelatedList({ trackKey }: { trackKey: string }) {
               className="group flex w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-[var(--hover)]"
             >
               <span className="relative h-9 w-16 shrink-0 overflow-hidden rounded-[3px]">
-                <Cover cover={track.cover} title={track.title} className="h-full w-full" glyphClassName="text-[13px] text-white/85" />
+                <Cover cover={track.cover} title={track.title} className="h-full w-full" />
                 <span className="num absolute bottom-0.5 right-0.5 rounded-[2px] bg-black/60 px-1 text-[10px] leading-[13px] text-white">
                   {formatDuration(track.duration_ms)}
                 </span>

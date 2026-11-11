@@ -89,7 +89,7 @@ export function HotRanking({ onPick, limit = 10 }: { onPick: (keyword: string) =
                 {i + 1}
               </span>
               <span className="relative h-8 w-[52px] shrink-0 overflow-hidden rounded-[3px]">
-                <Cover cover={track.cover} title={track.title} className="h-full w-full" glyphClassName="text-[14px] text-white/85" />
+                <Cover cover={track.cover} title={track.title} className="h-full w-full" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] text-[var(--text-1)] group-hover:text-[var(--accent)]">

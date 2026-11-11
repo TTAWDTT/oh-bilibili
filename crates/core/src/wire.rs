@@ -200,6 +200,13 @@ pub struct WatchView {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppEvent {
+    /// 会话状态整体推送：相位、模式、曲目、码率一起给。
+    ///
+    /// 进度事件每秒只带位置，界面上「在放还是暂停」「看还是听」
+    /// 这类判断拿不到新值，就会停在旧快照上。状态一变就推一次完整的。
+    State {
+        snapshot: PlayerSnapshot,
+    },
     Progress {
         position_ms: u64,
         duration_ms: u64,

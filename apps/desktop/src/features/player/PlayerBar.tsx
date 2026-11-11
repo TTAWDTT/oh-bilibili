@@ -83,7 +83,6 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           cover={track.cover}
           title={track.title}
           className="h-10 w-10"
-          glyphClassName="text-[26px] font-semibold text-[var(--text-2)]"
         />
         {playing ? (
           <span className="bili-playing-bars absolute bottom-0 left-0 right-0 flex items-end justify-center gap-[2px] bg-black/35 pb-[3px] pt-[6px]">
@@ -144,11 +143,13 @@ export function PlayerBar() {
   // 底部一直挂着一条无声的音频，看着像坏了。
   const listening = useIsListening()
   const hasSession = useHasSession()
-  if (!listening || !hasSession) return null
   const rail = useAppStore((state) => state.rail)
   const [adding, setAdding] = useState(false)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
   const track = snapshot?.track ?? null
+  // 提前 return 必须放在所有 hook 之后：从「隐藏」切到「显示」时，
+  // 少调用的 hook 会让 React 抛 #310，整页白屏。看视频起播正好会触发这个切换。
+  if (!listening || !hasSession) return null
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。

@@ -47,7 +47,6 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
           cover={track.cover}
           title={track.title}
           className="h-full w-full"
-          glyphClassName="text-[18px] font-medium text-[var(--text-2)]"
         />
       </button>
 

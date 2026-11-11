@@ -126,6 +126,13 @@ impl Engine {
         let _ = self.events.send(event);
     }
 
+    /// 推一次完整快照。相位或模式变了就调它，界面不必轮询。
+    fn emit_state(&self) {
+        self.emit(AppEvent::State {
+            snapshot: self.snapshot(),
+        });
+    }
+
     fn remember(&self, track: &Track) {
         lock(&self.known).insert(track.key.as_opaque().to_string(), track.clone());
     }
@@ -284,6 +291,7 @@ impl Engine {
                     track: self.track_of(key)?,
                     index: self.queue.lock().ok().and_then(|q| q.index()),
                 });
+                self.emit_state();
                 Ok(self.snapshot())
             }
             Err(err) => {
@@ -312,7 +320,7 @@ impl Engine {
     /// `proxy_origin` 是本机代理的源，形如 `http://127.0.0.1:52194`。
     /// 端口只有外壳知道，所以由它传进来，引擎不猜。
     pub async fn open_watch(
-        &self,
+        self: &Arc<Self>,
         key: &TrackKey,
         proxy_origin: &str,
     ) -> Result<WatchView, WireError> {
@@ -321,7 +329,7 @@ impl Engine {
 
     /// 打开某个分P。`page` 是从 1 开始的序号，None 表示当前/第一个。
     pub async fn open_watch_page(
-        &self,
+        self: &Arc<Self>,
         key: &TrackKey,
         proxy_origin: &str,
         page: Option<u32>,
@@ -341,6 +349,19 @@ impl Engine {
                 queue.jump_by_key(key);
             }
         }
+        // 打开观看页就要有声音。引擎是唯一的发声者，这里顺手把它挂上：
+        // 前端不需要再补一次「开始播放」，也就不会因为调用失败而静音。
+        // 起播要等拉流，放后台跑，页面先出来。
+        {
+            let engine = Arc::clone(self);
+            let track = detail.track.key.clone();
+            tokio::spawn(async move {
+                let _ = engine.play_key(&track).await;
+            });
+        }
+        // 模式切到「看」这一步也要让界面知道：底部播放条、右栏歌词
+        // 都按模式决定是否出现，不给它们新快照就会停在「听」的旧状态。
+        self.emit_state();
         let current = page
             .and_then(|no| detail.pages.iter().find(|p| p.no == no))
             .or_else(|| detail.pages.first());
@@ -599,6 +620,7 @@ impl Engine {
             let current = std::mem::replace(&mut *st, PlayerState::Idle);
             *st = if is_playing { current.pause() } else { current.play() };
         }
+        self.emit_state();
         self.snapshot()
     }
 

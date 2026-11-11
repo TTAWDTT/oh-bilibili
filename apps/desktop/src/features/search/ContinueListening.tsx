@@ -50,7 +50,6 @@ export function ContinueListening() {
                 cover={track.cover}
                 title={track.title}
                 className="h-full w-full"
-                glyphClassName="text-[28px] font-semibold text-white/85"
               />
               <span className="num absolute bottom-1 right-1 rounded-[3px] bg-black/60 px-1 text-[12px] leading-[14px] text-white">
                 {formatDuration(track.duration_ms)}
