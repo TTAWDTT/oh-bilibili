@@ -17,7 +17,6 @@ import { useSearchHistory } from '../../shared/lib/searchHistory'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
 // 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
-const HINT = '本机直连 B 站｜不承诺无损，最高约 192K｜红心先落本机，登录后同步'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -194,8 +193,11 @@ export function SearchView() {
         {trimmed.length === 0 ? (
           <div className="mt-6">
 
-            <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <SearchBanner />
+            {/* 高度定死：不 item-stretch 时右栏排行有多长 banner 就有多高，会吃掉半屏。 */}
+            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="h-[260px]">
+                <SearchBanner />
+              </div>
               <div className="hidden h-full rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 xl:block">
                 <HotRanking onPick={(kw) => pick(kw)} limit={6} />
               </div>
@@ -217,8 +219,6 @@ export function SearchView() {
             <ContinueListening />
 
             <ChannelGrid onPick={(kw) => pick(kw)} />
-
-            <p className="mt-8 max-w-3xl border-t border-hairline pt-4 text-[14px] leading-relaxed text-[var(--text-2)]">{HINT}</p>
           </div>
         ) : (
           <section className="mt-6">

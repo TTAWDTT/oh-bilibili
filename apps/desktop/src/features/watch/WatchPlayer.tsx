@@ -264,6 +264,28 @@ export function WatchPlayer({
           controls || !playing ? 'opacity-100' : 'opacity-0'
         }`}
       >
+        {/* 窄屏把发弹幕单独放一行：控制条一行塞不下输入框，挤压后会与画面字幕糊在一起。 */}
+        <div className="mb-1.5 flex items-center gap-2 md:hidden">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void sendDanmaku()
+            }}
+            placeholder="发条弹幕"
+            aria-label="发弹幕"
+            className="h-7 min-w-0 flex-1 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
+          />
+          <button
+            type="button"
+            onClick={() => void sendDanmaku()}
+            disabled={!draft.trim() || sending}
+            className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
+          >
+            发送
+          </button>
+        </div>
+
         <div
           role="slider"
           aria-label="播放进度"
@@ -299,24 +321,26 @@ export function WatchPlayer({
 
           <div className="min-w-0 flex-1" />
 
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void sendDanmaku()
-            }}
-            placeholder="发条弹幕"
-            aria-label="发弹幕"
-            className="h-7 w-[150px] shrink-0 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
-          />
-          <button
-            type="button"
-            onClick={() => void sendDanmaku()}
-            disabled={!draft.trim() || sending}
-            className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
-          >
-            发送
-          </button>
+          <div className="hidden items-center gap-2 md:flex">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void sendDanmaku()
+              }}
+              placeholder="发条弹幕"
+              aria-label="发弹幕"
+              className="h-7 w-[150px] shrink-0 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
+            />
+            <button
+              type="button"
+              onClick={() => void sendDanmaku()}
+              disabled={!draft.trim() || sending}
+              className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
+            >
+              发送
+            </button>
+          </div>
 
           <button
             type="button"
@@ -338,13 +362,14 @@ export function WatchPlayer({
             }}
             title="播放倍速"
             aria-label={`播放倍速 ${speed}x`}
-            className="t press num h-7 shrink-0 rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+            className="t press num hidden h-7 shrink-0 rounded-[4px] px-2 text-[12px] hover:bg-white/15 md:block"
           >
             {speed}x
           </button>
 
+          {/* 音量与倍速在窄屏交给系统：手机上调的是系统音量，不是应用音量。 */}
           <span
-            className="flex shrink-0 items-center"
+            className="hidden shrink-0 items-center md:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
           >
             <VolumeControl />

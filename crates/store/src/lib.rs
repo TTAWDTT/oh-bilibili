@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -350,7 +350,9 @@ impl Library {
     pub fn push_history(&self, track_id: TrackId) -> Result<()> {
         self.with(|conn| {
             conn.execute(
-                "INSERT INTO history (track_id, played_at) VALUES (?1, ?2)",
+                // 同一首歌只保留最近一次：历史是「上次看到哪」，不是播放流水。
+                "INSERT INTO history (track_id, played_at) VALUES (?1, ?2)
+                 ON CONFLICT(track_id) DO UPDATE SET played_at = excluded.played_at",
                 params![track_id.0, now_ms()],
             )?;
             Ok(())
@@ -557,7 +559,7 @@ fn now_ms() -> i64 {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 2] = [r#"
+const MIGRATIONS: [&str; 3] = [r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -633,6 +635,15 @@ CREATE TABLE queue_snapshot (
   payload  TEXT NOT NULL,
   saved_at INTEGER NOT NULL
 );
+"#, r#"
+-- v3：同一首歌在历史里只留一条。
+--
+-- 以前每播一次插一行，于是「继续听」里同一个视频能重复四遍。
+-- 历史是「这个视频我上次看到哪」，不是流水账，按 track 唯一才对。
+DELETE FROM history WHERE id NOT IN (
+  SELECT MAX(id) FROM history GROUP BY track_id
+);
+CREATE UNIQUE INDEX idx_history_track ON history(track_id);
 "#];
 
 #[cfg(test)]
@@ -760,13 +771,18 @@ mod tests {
         let b = l.upsert_track(&track("BV1b")).unwrap();
         l.push_history(a).unwrap();
         l.push_history(b).unwrap();
+        // 真正的播放之间隔着秒，这里也要隔开一毫秒，否则 played_at 并列看不出顺序。
+        std::thread::sleep(std::time::Duration::from_millis(2));
         l.push_history(a).unwrap();
-        assert_eq!(l.history(10).unwrap().len(), 3);
+        // 同一个视频只留一条，重播的是把时间往前挪。
+        let repeated = l.history(10).unwrap();
+        assert_eq!(repeated.len(), 2);
+        assert_eq!(repeated[0].key.as_opaque(), "BVBV1a", "重播过的排在最前");
 
         let key = track("BV1a").key.as_opaque().to_string();
         let n = l.delete_history(&key).unwrap();
         assert!(n >= 1, "BV1a 至少删掉一条，实际 {n}");
-        assert_eq!(l.history(10).unwrap().len(), 3 - n);
+        assert_eq!(l.history(10).unwrap().len(), 1, "删掉 a 之后只剩 b");
 
         l.clear_history().unwrap();
         assert_eq!(l.history(10).unwrap().len(), 0);

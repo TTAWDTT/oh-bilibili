@@ -4,7 +4,6 @@ import { Mascot2233 } from '../../shared/ui/Mascot2233'
 type Slide = {
   image: string | undefined
   title: string
-  desc: string
   from: string
   to: string
 }
@@ -14,26 +13,26 @@ type Slide = {
  *
  * 这里用渐变 + 2233 娘做轮播：三张轮流淡入，每张停留 6 秒。没有图片资源时，
  * 渐变加插画比一张假照片更合适，也更省体积。
+ *
+ * 每张只放一句标题：B 站的活动 banner 也不会在图上堆功能说明，
+ * 副标题会让整个页面看起来像营销落地页。
  */
 const SLIDES: Slide[] = [
   {
     image: '/assets/banner-1.png',
     title: '干杯，把 B 站的声音装进口袋',
-    desc: '搜索、播放、弹幕、歌词、投币三连，全在本机完成。',
     from: '#ff5c8a',
     to: '#7b6bff',
   },
   {
     image: '/assets/banner-2.jpg',
     title: '22 娘和 33 娘守在这里',
-    desc: '每一条音轨都来自你自己的 B 站账号，不经任何中转。',
     from: '#00aeec',
     to: '#ff6699',
   },
   {
     image: '/assets/banner-3.jpg',
     title: '一键三连，也是一种收藏方式',
-    desc: '点赞、投币、收进「哔哩哔哩 music」，和你账号里同步。',
     from: '#ff9f2e',
     to: '#ff5c8a',
   },
@@ -81,7 +80,6 @@ export function SearchBanner() {
           <div className="relative flex h-full items-center justify-between gap-4 px-4 md:gap-6 md:px-8">
             <div className="min-w-0">
               <div className="text-[19px] font-semibold leading-tight text-white md:text-[24px]">{slide.title}</div>
-              <p className="mt-2 max-w-[420px] text-[14px] leading-relaxed text-white/85">{slide.desc}</p>
               <div className="mt-4 flex items-center gap-1.5">
                 {SLIDES.map((_, dot) => (
                   <button

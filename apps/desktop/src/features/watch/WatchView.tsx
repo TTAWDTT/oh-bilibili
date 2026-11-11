@@ -134,6 +134,10 @@ export function WatchView({ track }: { track: Track }) {
             </p>
           ) : null}
           {data ? <WatchInfo track={track} data={data} onPage={setPage} /> : null}
+          {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
+          <div className="border-t border-hairline md:hidden">
+            <RelatedAside items={related} />
+          </div>
           <div className="min-h-0 flex-1 border-t border-hairline">
             <CommentsPanel trackKey={track.key} />
           </div>

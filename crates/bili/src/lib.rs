@@ -426,7 +426,8 @@ impl Source {
             .signed_get(
                 &format!("{}/x/web-interface/wbi/index/top/feed/rcmd", client::API),
                 vec![
-                    ("ps", "12".to_string()),
+                    // 一屏取 20 条：12 条在桌面宽屏上只铺两行，下面空一大片。
+                    ("ps", "20".to_string()),
                     ("fresh_type", "3".to_string()),
                     ("fresh_idx", fresh.to_string()),
                     ("feed_version", "V8".to_string()),

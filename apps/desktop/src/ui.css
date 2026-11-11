@@ -571,26 +571,18 @@
   transform: scale(0.94);
 }
 
-/* 卡片：hover 抬起时轻微放大，像被拎起来 */
-.bili-card {
-  transition: transform 220ms var(--spring), box-shadow 220ms var(--spring);
+/*
+ * 卡片整体不动，只让封面在 hover 时轻微放大。
+ *
+ * 整块上浮加缩放是音乐播放器单卡片时代的做法：一屏十几张卡同时被甩来甩去，
+ * 密集网格会晃得人眼晕。视频网站的做法是封面内容动，卡片框不动。
+ */
+.bili-card-cover {
+  transition: transform 260ms var(--ease);
 }
 
-.bili-card:hover {
-  transform: translateY(-3px) scale(1.012);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08), 0 8px 20px -10px rgb(0 0 0 / 0.16);
-}
-
-/* 卡片进场：带过冲的弹入 */
-@keyframes bili-card-spring {
-  0% { opacity: 0; transform: translateY(14px) scale(0.97); }
-  60% { opacity: 1; transform: translateY(-2px) scale(1.004); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.bili-card-enter {
-  animation: bili-card-spring 420ms var(--spring) both;
-  animation-delay: calc(var(--i, 0) * 26ms);
+.bili-card:hover .bili-card-cover {
+  transform: scale(1.04);
 }
 
 /* 图标按钮：hover 时轻轻放大 */

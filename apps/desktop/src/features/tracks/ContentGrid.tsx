@@ -6,7 +6,6 @@ import { CardDanmaku } from './CardDanmaku'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { useEffect, useState } from 'react'
-import { copyText } from '../../shared/lib/clipboard'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
@@ -134,229 +133,172 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
   return (
     <>
       <h2 className="sr-only">曲目</h2>
-        <div className="grid gap-x-4 gap-y-6 pb-6 [grid-template-columns:repeat(auto-fill,minmax(226px,1fr))]">
-      {tracks.map((track, index) => {
-        const active = track.key === activeKey
-        return (
-          <article
-            key={track.key}
-            data-track-card
-            className="bili-card bili-card-enter group"
-            style={{ '--i': Math.min(index, 12) } as React.CSSProperties}
-          >
-            <button
-              type="button"
-              onClick={() => navigate({ kind: 'watch', track })}
-              aria-label={`观看 ${track.title}`}
-              className="bili-press relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
-              style={{ aspectRatio: '16 / 10' }}
-            >
-              <Cover
-                cover={track.cover}
-                title={track.title}
-                className="h-full w-full"
-              />
-              {coverFlags(track.title).length > 0 ? (
-                <span className="absolute right-1 top-1 flex gap-1">
-                  {coverFlags(track.title).map((f) => (
-                    <span
-                      key={f}
-                      className="rounded-[2px] bg-[var(--accent)] px-1 text-[9.5px] leading-[14px] text-white"
-                    >
-                      {f}
-                    </span>
-                  ))}
-                </span>
-              ) : null}
-              <CardDanmaku trackKey={track.key} />
-              {/* 时长压右下角，和 B 站一致 */}
-              <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white">
-                {formatDuration(track.duration_ms)}
-              </span>
-              {/* hover 才出现的播放态遮罩 */}
-              <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-150 group-hover:bg-black/25 group-hover:opacity-100">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-                  <Icon name={active && playing ? 'pause' : 'play'} size={18} />
-                </span>
-              </span>
-            </button>
-
-            <h3
-              className={[
-                'mt-2 line-clamp-2 text-[15px] leading-[1.4] transition-colors',
-                active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent)]',
-              ].join(' ')}
-              title={track.title}
-            >
-              {track.title}
-            </h3>
-
-            {track.views ? (
-              <div className="num mt-1.5 flex items-center gap-2 text-[13px] text-[var(--text-3)]">
-                {track.tname ? (
-                  <span
-                    className="rounded-[3px] px-1.5 text-[11.5px] leading-[16px] text-white"
-                    style={{ background: partitionColor(track.tname) }}
-                  >
-                    {track.tname}
-                  </span>
-                ) : null}
-                <span className="flex items-center gap-1">
-                  <Icon name="play" size={10} />
-                  {formatCount(track.views)}
-                </span>
-                {track.danmaku ? (
-                  <span className="flex items-center gap-1">
-                    <Icon name="queue" size={10} />
-                    {formatCount(track.danmaku)}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                title="点击复制 BV 号"
-                onClick={() => void copyText(track.key).then((ok) => ok && toastDone('已复制 BV 号'))}
-                className="num truncate font-mono text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-              >
-                {track.key}
-              </button>
-                              <button
+      <div className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]">
+        {tracks.map((track, index) => {
+          const active = track.key === activeKey
+          const inList = liked[track.key] ?? false
+          const coinCount = coins[track.key] ?? 0
+          const inFav = faved[track.key] ?? false
+          return (
+            <article key={track.key} data-track-card className="bili-card group">
+              <div className="relative">
+                <button
                   type="button"
-                  aria-label={`听 ${track.title}`}
-                  title="只听声音"
-                  onClick={() => void playContext(tracks.map((t) => t.key), index)}
-                  className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                  onClick={() => navigate({ kind: 'watch', track })}
+                  aria-label={`观看 ${track.title}`}
+                  className="relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
+                  style={{ aspectRatio: '16 / 10' }}
                 >
-                  <Icon name="play" size={11} />
-                  听
+                  <Cover cover={track.cover} title={track.title} className="bili-card-cover h-full w-full" />
+                  {track.tname ? (
+                    <span
+                      className="absolute left-1 top-1 rounded-[2px] px-1 text-[10px] leading-[15px] text-white"
+                      style={{ background: partitionColor(track.tname) }}
+                    >
+                      {track.tname}
+                    </span>
+                  ) : null}
+                  {coverFlags(track.title).length > 0 ? (
+                    <span className="absolute right-1 top-1 flex gap-1">
+                      {coverFlags(track.title).map((f) => (
+                        <span
+                          key={f}
+                          className="rounded-[2px] bg-black/65 px-1 text-[10px] leading-[15px] text-white"
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  <CardDanmaku trackKey={track.key} />
+                  <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white transition-opacity group-hover:opacity-0">
+                    {formatDuration(track.duration_ms)}
+                  </span>
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-150 group-hover:bg-black/20 group-hover:opacity-100">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                      <Icon name={active && playing ? 'pause' : 'play'} size={18} />
+                    </span>
+                  </span>
                 </button>
-            </div>
 
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-[14px] text-[var(--text-3)]">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <Avatar src={track.up_avatar ?? null} alt={track.artist} size={16} />
+                {/* 动作排压在封面上：放进正文会把卡片撑成六行，常驻显示又与「看视频」抢主次。 */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+                  <button
+                    type="button"
+                    aria-label={`听 ${track.title}`}
+                    title="只听声音"
+                    onClick={() => void playContext(tracks.map((t) => t.key), index)}
+                    className="bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] text-white/90 hover:bg-white/20 hover:text-white"
+                  >
+                    <Icon name="headphones" size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={inList ? '取消点赞' : '点赞'}
+                    aria-pressed={inList}
+                    title={inList ? '取消点赞' : '点赞'}
+                    onClick={() => void toggleLike(track)}
+                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
+                      inList ? 'text-[var(--accent)]' : 'text-white/90 hover:text-white'
+                    }`}
+                  >
+                    <BiliThumb size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={coinCount > 0 ? `已投 ${coinCount} 枚币` : '投币'}
+                    title={coinCount >= 2 ? '已经投满 2 枚' : '投币'}
+                    disabled={coinCount >= 2}
+                    onClick={() => setConfirming(track.key)}
+                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
+                      coinCount > 0 ? 'text-[#ffc46b]' : 'text-white/90 hover:text-white'
+                    } ${coinCount >= 2 ? 'cursor-default opacity-50' : ''}`}
+                  >
+                    <BiliCoin size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={inFav ? '取消收藏' : '收藏'}
+                    aria-pressed={inFav}
+                    title={inFav ? '取消收藏' : '收藏'}
+                    onClick={() => {
+                      if (inFav) void toggleFav(track)
+                      else setPicking(track)
+                    }}
+                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
+                      inFav ? 'text-[#ffc46b]' : 'text-white/90 hover:text-white'
+                    }`}
+                  >
+                    <BiliStar size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="稍后再看"
+                    title="稍后再看"
+                    onClick={() => void later(track)}
+                    className="bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] text-white/90 hover:bg-white/20 hover:text-white"
+                  >
+                    <Icon name="watchLater" size={13} />
+                  </button>
+                  <DownloadButton trackKey={track.key} size={13} />
+                  {extraAction ? extraAction(track) : null}
+                </div>
+              </div>
+
+              <h3
+                className={[
+                  'mt-2 line-clamp-2 min-h-[2.7em] text-[14px] leading-[1.35] transition-colors',
+                  active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent)]',
+                ].join(' ')}
+                title={track.title}
+              >
+                {track.title}
+              </h3>
+
+              <div className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
                 <button
                   type="button"
                   title={`看 ${track.artist} 的更多视频`}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })
-                  }}
-                  className="truncate hover:text-[var(--accent)] hover:underline"
+                  onClick={() => navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })}
+                  className="flex min-w-0 items-center gap-1 hover:text-[var(--accent)]"
                 >
-                  {track.artist}
+                  <Avatar src={track.up_avatar ?? null} alt={track.artist} size={14} />
+                  <span className="truncate">{track.artist}</span>
                 </button>
-              </span>
-              {/* 三连：赞 / 币 / 藏，都是真接口，不是装饰 */}
-              <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <button
-                  type="button"
-                  aria-label={(liked[track.key] ?? false) ? '取消点赞' : '点赞'}
-                  aria-pressed={liked[track.key] ?? false}
-                  title={(liked[track.key] ?? false) ? '取消点赞' : '点赞'}
-                  onClick={() => void toggleLike(track)}
-                  className={[
-                    'bili-icon-hover',
-                    liked[track.key] ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]',
-                  ].join(' ')}
-                >
-                  {(liked[track.key] ?? false) ? <BiliThumb size={12} /> : <Icon name="thumb" size={12} />}
-                </button>
-                <span className="h-2.5 w-px bg-[var(--line)]" />
-                <button
-                  type="button"
-                  aria-label={(coins[track.key] ?? 0) > 0 ? `已投 ${coins[track.key]} 枚币` : '投币'}
-                  title={
-                    (coins[track.key] ?? 0) >= 2
-                      ? '已经投满 2 枚'
-                      : (coins[track.key] ?? 0) > 0
-                        ? `已投 ${coins[track.key]} 枚，还能投 ${2 - (coins[track.key] ?? 0)} 枚`
-                        : '投币'
-                  }
-                  disabled={(coins[track.key] ?? 0) >= 2}
-                  onClick={() => setConfirming(track.key)}
-                  className={[
-                    'bili-icon-hover',
-                    (coins[track.key] ?? 0) > 0
-                      ? 'text-[#ffc46b]'
-                      : 'hover:text-[var(--accent)]',
-                    (coins[track.key] ?? 0) >= 2 ? 'cursor-default opacity-50' : '',
-                  ].join(' ')}
-                >
-                  <BiliCoin size={12} />
-                </button>
-                <span className="h-2.5 w-px bg-[var(--line)]" />
-                <button
-                  type="button"
-                  aria-label={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
-                  aria-pressed={faved[track.key] ?? false}
-                  title={(faved[track.key] ?? false) ? '取消收藏' : '收藏'}
-                  onClick={() => {
-                    if (faved[track.key]) void toggleFav(track)
-                    else setPicking(track)
-                  }}
-                  className={[
-                    'bili-icon-hover',
-                    faved[track.key] ? 'text-[#ffc46b]' : 'hover:text-[var(--accent)]',
-                  ].join(' ')}
-                >
-                  <BiliStar size={12} />
-                </button>
-                <span className="h-2.5 w-px bg-[var(--line)]" />
-                <button
-                  type="button"
-                  aria-label="稍后再看"
-                  title="稍后再看"
-                  onClick={() => void later(track)}
-                  className="bili-icon-hover hover:text-[var(--accent)]"
-                >
-                  <Icon name="watchLater" size={12} />
-                </button>
-                <span className="h-2.5 w-px bg-[var(--line)]" />
-                <DownloadButton trackKey={track.key} size={12} />
-                {extraAction ? (
+                {track.views ? (
                   <>
-                    <span className="h-2.5 w-px bg-[var(--line)]" />
-                    {extraAction(track)}
+                    <span aria-hidden>·</span>
+                    <span className="num shrink-0">{formatCount(track.views)}</span>
                   </>
                 ) : null}
-              </span>
-            </div>
-
-      {confirming === track.key ? (
-              <div className="mt-1 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[12px]">
-                <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
-                <button
-                  type="button"
-                  onClick={() => void doCoin(track)}
-                  className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
-                >
-                  投
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(null)}
-                  className="text-[var(--text-3)] hover:text-[var(--text-1)]"
-                >
-                  取消
-                </button>
               </div>
-            ) : null}
-          </article>
-        )
-      })}
-      {picking ? (
-        <FavPicker
-          open
-          busy={favBusy}
-          onClose={() => setPicking(null)}
-          onPick={(folderId) => void favTo(folderId)}
-        />
-      ) : null}
-    </div>
+
+              {confirming === track.key ? (
+                <div className="mt-1.5 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[12px]">
+                  <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
+                  <button
+                    type="button"
+                    onClick={() => void doCoin(track)}
+                    className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
+                  >
+                    投
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(null)}
+                    className="text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          )
+        })}
+        {picking ? (
+          <FavPicker open busy={favBusy} onClose={() => setPicking(null)} onPick={(folderId) => void favTo(folderId)} />
+        ) : null}
+      </div>
     </>
   )
 }
