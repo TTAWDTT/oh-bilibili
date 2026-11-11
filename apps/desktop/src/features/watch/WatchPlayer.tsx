@@ -297,12 +297,36 @@ export function WatchPlayer({
             const box = event.currentTarget.getBoundingClientRect()
             seekTo((event.clientX - box.left) / box.width)
           }}
+          // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
+          // 方向键按 5 秒走。缺这一段，读屏和纯键盘用户完全拖不动进度。
+          onKeyDown={(event) => {
+            if (!data.duration_ms) return
+            const step = event.shiftKey ? 30_000 : 5_000
+            const at = readPlayhead()
+            const keys: Record<string, number | undefined> = {
+              Home: 0,
+              // 正好落在 duration 上会被解码器当成越界忽略，留 1.5 秒。
+              End: Math.max(0, 1 - 1500 / data.duration_ms),
+              ArrowLeft: (at - step) / data.duration_ms,
+              ArrowDown: (at - step) / data.duration_ms,
+              ArrowRight: (at + step) / data.duration_ms,
+              ArrowUp: (at + step) / data.duration_ms,
+            }
+            const target = keys[event.key]
+            if (target === undefined) return
+            event.preventDefault()
+            seekTo(target)
+          }}
           className="group relative mb-1.5 h-3 cursor-pointer"
         >
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
           <span
             className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
             style={{ width: `${percent}%` }}
+          />
+          <span
+            className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            style={{ left: `${percent}%` }}
           />
         </div>
 
