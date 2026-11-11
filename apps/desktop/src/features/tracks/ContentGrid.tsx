@@ -1,7 +1,7 @@
-import { DownloadButton } from '../downloads/DownloadButton'
 import { formatCount } from '../../shared/lib/format'
 import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
+import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
@@ -14,7 +14,6 @@ import { formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
-import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { usePlayerStore } from '../player/playerStore'
 
 /** 从标题里认出分辨率与音质角标。B 站自己在封面右上角标这些。 */
@@ -71,12 +70,9 @@ type ContentGridProps = {
 export function ContentGrid({ tracks, activeKey, playing, extraAction }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
-  const liked = useReactionStore((state) => state.liked)
   const faved = useReactionStore((state) => state.faved)
-  const toggleLike = useReactionStore((state) => state.toggleLike)
   const toggleFav = useReactionStore((state) => state.toggleFav)
   const hydrate = useReactionStore((state) => state.hydrate)
-  const coins = useReactionStore((state) => state.coins)
   const addCoin = useReactionStore((state) => state.addCoin)
   const favToStore = useReactionStore((state) => state.favTo)
 
@@ -136,9 +132,6 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
       <div className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]">
         {tracks.map((track, index) => {
           const active = track.key === activeKey
-          const inList = liked[track.key] ?? false
-          const coinCount = coins[track.key] ?? 0
-          const inFav = faved[track.key] ?? false
           return (
             <article key={track.key} data-track-card className="bili-card group">
               <div className="relative">
@@ -181,68 +174,17 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                   </span>
                 </button>
 
-                {/* 动作排压在封面上：放进正文会把卡片撑成六行，常驻显示又与「看视频」抢主次。 */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
-                  <button
-                    type="button"
-                    aria-label={`听 ${track.title}`}
-                    title="只听声音"
-                    onClick={() => void playContext(tracks.map((t) => t.key), index)}
-                    className="bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] text-white/90 hover:bg-white/20 hover:text-white"
-                  >
-                    <Icon name="headphones" size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={inList ? '取消点赞' : '点赞'}
-                    aria-pressed={inList}
-                    title={inList ? '取消点赞' : '点赞'}
-                    onClick={() => void toggleLike(track)}
-                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
-                      inList ? 'text-[var(--accent)]' : 'text-white/90 hover:text-white'
-                    }`}
-                  >
-                    <BiliThumb size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={coinCount > 0 ? `已投 ${coinCount} 枚币` : '投币'}
-                    title={coinCount >= 2 ? '已经投满 2 枚' : '投币'}
-                    disabled={coinCount >= 2}
-                    onClick={() => setConfirming(track.key)}
-                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
-                      coinCount > 0 ? 'text-[#ffc46b]' : 'text-white/90 hover:text-white'
-                    } ${coinCount >= 2 ? 'cursor-default opacity-50' : ''}`}
-                  >
-                    <BiliCoin size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={inFav ? '取消收藏' : '收藏'}
-                    aria-pressed={inFav}
-                    title={inFav ? '取消收藏' : '收藏'}
-                    onClick={() => {
-                      if (inFav) void toggleFav(track)
-                      else setPicking(track)
-                    }}
-                    className={`bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20 ${
-                      inFav ? 'text-[#ffc46b]' : 'text-white/90 hover:text-white'
-                    }`}
-                  >
-                    <BiliStar size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="稍后再看"
-                    title="稍后再看"
-                    onClick={() => void later(track)}
-                    className="bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] text-white/90 hover:bg-white/20 hover:text-white"
-                  >
-                    <Icon name="watchLater" size={13} />
-                  </button>
-                  <DownloadButton trackKey={track.key} size={13} />
-                  {extraAction ? extraAction(track) : null}
-                </div>
+                <CardActions
+                  track={track}
+                  onListen={() => void playContext(tracks.map((t) => t.key), index)}
+                  onCoin={() => setConfirming(track.key)}
+                  onFav={() => {
+                    if (faved[track.key]) void toggleFav(track)
+                    else setPicking(track)
+                  }}
+                  onLater={() => void later(track)}
+                  extraAction={extraAction ? extraAction(track) : null}
+                />
               </div>
 
               <h3

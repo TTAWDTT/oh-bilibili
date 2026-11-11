@@ -20,6 +20,8 @@ const DARK_CONTEXT_FILES = [
   'features/watch/WatchView.tsx',
   // 播放器控制条浮在画面上，文字与描边都压在黑色视频画面上
   'features/watch/WatchPlayer.tsx',
+  // 卡片动作排压在封面图的黑色渐变上
+  'features/tracks/CardActions.tsx',
   'features/search/SearchBanner.tsx',
 ]
 
