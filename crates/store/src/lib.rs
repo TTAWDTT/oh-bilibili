@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -125,14 +125,17 @@ impl Library {
         });
         self.with(|conn| {
             conn.execute(
-                "INSERT INTO tracks (provider_key, title, artist, cover, duration_ms, accent_rgb)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                "INSERT INTO tracks (provider_key, title, artist, cover, duration_ms, accent_rgb, up_avatar, up_mid)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(provider_key) DO UPDATE SET
                    title = excluded.title,
                    artist = excluded.artist,
                    cover = excluded.cover,
                    duration_ms = excluded.duration_ms,
-                   accent_rgb = COALESCE(excluded.accent_rgb, tracks.accent_rgb)",
+                   accent_rgb = COALESCE(excluded.accent_rgb, tracks.accent_rgb),
+                   -- 头像与 uid 不是每条接口都带，别用 NULL 覆盖已有的。
+                   up_avatar = COALESCE(excluded.up_avatar, tracks.up_avatar),
+                   up_mid = COALESCE(excluded.up_mid, tracks.up_mid)",
                 params![
                     track.key.as_opaque(),
                     track.title,
@@ -140,6 +143,8 @@ impl Library {
                     track.cover,
                     track.duration.map(|d| d.0 as i64),
                     accent.map(|v| v as i64),
+                    track.up_avatar,
+                    track.up_mid.map(|v| v as i64),
                 ],
             )?;
             conn.query_row(
@@ -154,8 +159,7 @@ impl Library {
     pub fn track_by_key(&self, key: &TrackKey) -> Result<Option<Track>> {
         self.with(|conn| {
             conn.query_row(
-                "SELECT provider_key, title, artist, cover, duration_ms FROM tracks
-                 WHERE provider_key = ?1",
+                &format!("SELECT {TRACK_COLUMNS} FROM tracks WHERE provider_key = ?1"),
                 params![key.as_opaque()],
                 row_to_track,
             )
@@ -166,7 +170,7 @@ impl Library {
     pub fn track_by_key_id(&self, id: TrackId) -> Result<Option<Track>> {
         self.with(|conn| {
             conn.query_row(
-                "SELECT provider_key, title, artist, cover, duration_ms FROM tracks WHERE id = ?1",
+                &format!("SELECT {TRACK_COLUMNS} FROM tracks WHERE id = ?1"),
                 params![id.0],
                 row_to_track,
             )
@@ -182,8 +186,7 @@ impl Library {
             .unwrap_or(0);
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT provider_key, title, artist, cover, duration_ms FROM tracks
-                 WHERE id > ?1 ORDER BY id ASC LIMIT ?2",
+                &format!("SELECT {TRACK_COLUMNS} FROM tracks WHERE id > ?1 ORDER BY id ASC LIMIT ?2"),
             )?;
             let rows = stmt.query_map(params![after_id, limit], row_to_track)?;
             rows.collect()
@@ -251,9 +254,11 @@ impl Library {
     pub fn playlist_tracks(&self, playlist_id: i64) -> Result<Vec<Track>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms
-                 FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
-                 WHERE pt.playlist_id = ?1 ORDER BY pt.sort_key ASC",
+                &format!(
+                    "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, t.up_avatar, t.up_mid
+                     FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
+                     WHERE pt.playlist_id = ?1 ORDER BY pt.sort_key ASC"
+                ),
             )?;
             let rows = stmt.query_map(params![playlist_id], row_to_track)?;
             rows.collect()
@@ -362,9 +367,11 @@ impl Library {
     pub fn history(&self, limit: u32) -> Result<Vec<Track>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms
-                 FROM history h JOIN tracks t ON t.id = h.track_id
-                 ORDER BY h.played_at DESC, h.id DESC LIMIT ?1",
+                &format!(
+                    "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, t.up_avatar, t.up_mid
+                     FROM history h JOIN tracks t ON t.id = h.track_id
+                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?1"
+                ),
             )?;
             let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], row_to_track)?;
             rows.collect()
@@ -391,12 +398,14 @@ impl Library {
     pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, h.played_at
-                 FROM history h JOIN tracks t ON t.id = h.track_id
-                 ORDER BY h.played_at DESC, h.id DESC LIMIT ?1",
+                &format!(
+                    "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, t.up_avatar, t.up_mid, h.played_at
+                     FROM history h JOIN tracks t ON t.id = h.track_id
+                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?1"
+                ),
             )?;
             let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], |row| {
-                Ok((row_to_track(row)?, row.get::<_, i64>(5)?))
+                Ok((row_to_track(row)?, row.get::<_, i64>(7)?))
             })?;
             rows.collect()
         })
@@ -544,12 +553,15 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         accent: None,
         views: None,
         danmaku: None,
-        up_avatar: None,
-        up_mid: None,
+        up_avatar: row.get(5)?,
+        up_mid: row.get::<_, Option<i64>>(6)?.map(|v| v as u64),
         tname: None,
         typeid: None,
     })
 }
+
+/// `row_to_track` 认的列顺序。六处查询共用，加列时只改这一行。
+const TRACK_COLUMNS: &str = "provider_key, title, artist, cover, duration_ms, up_avatar, up_mid";
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -559,7 +571,7 @@ fn now_ms() -> i64 {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 3] = [r#"
+const MIGRATIONS: [&str; 4] = [r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -644,6 +656,13 @@ DELETE FROM history WHERE id NOT IN (
   SELECT MAX(id) FROM history GROUP BY track_id
 );
 CREATE UNIQUE INDEX idx_history_track ON history(track_id);
+"#, r#"
+-- v4：缓存 UP 主头像与 uid。
+--
+-- 历史页的卡片要从本地库读，但库里只有标题和封面，于是卡片只能显示
+-- 首字母圆圈，跟首页的真实头像对不上。这两列由写入方从接口带过来。
+ALTER TABLE tracks ADD COLUMN up_mid INTEGER;
+ALTER TABLE tracks ADD COLUMN up_avatar TEXT;
 "#];
 
 #[cfg(test)]
@@ -690,6 +709,32 @@ mod tests {
         assert_eq!(a, b);
         let c = l.upsert_track(&track("2")).unwrap();
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn 头像与_uid_能落库再读回() {
+        let l = lib();
+        let mut t = track("avatar");
+        t.up_mid = Some(42);
+        t.up_avatar = Some("https://i0.hdslb.com/face.jpg".into());
+        l.upsert_track(&t).unwrap();
+        let back = l.track_by_key(&t.key).unwrap().expect("应该读得到");
+        assert_eq!(back.up_mid, Some(42));
+        assert_eq!(back.up_avatar.as_deref(), Some("https://i0.hdslb.com/face.jpg"));
+    }
+
+    #[test]
+    fn 后一次写入没有头像时不覆盖已有的() {
+        let l = lib();
+        let mut t = track("keep-avatar");
+        t.up_avatar = Some("https://i0.hdslb.com/a.jpg".into());
+        l.upsert_track(&t).unwrap();
+        // 历史落库路径里的 Track 可能没有头像，不能把已有的冲掉。
+        let mut bare = track("keep-avatar");
+        bare.up_avatar = None;
+        l.upsert_track(&bare).unwrap();
+        let back = l.track_by_key(&t.key).unwrap().unwrap();
+        assert_eq!(back.up_avatar.as_deref(), Some("https://i0.hdslb.com/a.jpg"));
     }
 
     #[test]
