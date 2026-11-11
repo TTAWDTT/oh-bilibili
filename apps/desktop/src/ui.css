@@ -204,34 +204,6 @@
   animation: stage-line-breathe 4.5s ease-in-out infinite;
 }
 
-/* 常驻环境层：两团极淡的暖光缓慢漂移，30 秒一个来回。
-   静止界面需要「在呼吸」的证据，否则看起来像截图。 */
-.ambient-drift-a,
-.ambient-drift-b {
-  background: radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 68%);
-  filter: blur(80px);
-  opacity: 0.07;
-  will-change: transform;
-}
-
-.ambient-drift-a {
-  animation: ambient-a 34s ease-in-out infinite alternate;
-}
-
-.ambient-drift-b {
-  animation: ambient-b 41s ease-in-out infinite alternate;
-}
-
-@keyframes ambient-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(6%, 4%, 0) scale(1.12); }
-}
-
-@keyframes ambient-b {
-  from { transform: translate3d(0, 0, 0) scale(1.06); }
-  to { transform: translate3d(-7%, -5%, 0) scale(1); }
-}
-
 /* 顶栏的小电视：每 7 秒眨一次，和图标的眼睛节奏对齐 */
 .bili-tv-mark {
   display: inline-flex;
@@ -293,11 +265,6 @@
   --bili-pink: #ff6699;
 }
 
-/* 顶栏底部一条双色渐变，B 站网页端顶部也是粉色系的过渡。 */
-.bili-topline {
-  background: linear-gradient(90deg, var(--bili-pink) 0%, var(--bili-pink) 42%, var(--bili-blue) 100%);
-}
-
 /* 分区胶囊用蓝底描边，和粉色主按钮形成 B 站的双色识别 */
 .bili-tag-blue {
   color: var(--bili-blue);
@@ -346,21 +313,6 @@
 
 .bili-press:active {
   transform: scale(0.96);
-}
-
-/* 特色背景：极淡的蓝粉斜纹网格，只在大块留白处看得出来 */
-.bili-canvas {
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      color-mix(in oklab, var(--bili-blue) 4%, transparent) 0 1px,
-      transparent 1px 26px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      color-mix(in oklab, var(--bili-pink) 3%, transparent) 0 1px,
-      transparent 1px 26px
-    );
 }
 
 /* 页面切换：轻微上移淡入。240ms 足够短，切页不会觉得在等 */
@@ -507,21 +459,6 @@
 @keyframes bili-mascot-pop {
   from { opacity: 0; transform: translateY(4px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* 背景纹理加深：原来 3-4% 几乎看不见，提到 7-9% 才读得出是 B 站配色 */
-.bili-canvas {
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      color-mix(in oklab, var(--bili-blue) 9%, transparent) 0 1px,
-      transparent 1px 24px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      color-mix(in oklab, var(--bili-pink) 7%, transparent) 0 1px,
-      transparent 1px 24px
-    );
 }
 
 /* 搜索建议下拉：从输入框下方展开，带一点向下的滑入 */

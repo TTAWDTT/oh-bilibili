@@ -194,7 +194,13 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                 ].join(' ')}
                 title={track.title}
               >
-                {track.title}
+                <button
+                  type="button"
+                  onClick={() => navigate({ kind: 'watch', track })}
+                  className="line-clamp-2 text-left"
+                >
+                  {track.title}
+                </button>
               </h3>
 
               <div className="mt-1 flex items-center gap-1.5 text-[13px] text-[var(--text-3)]">
@@ -204,7 +210,7 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                   onClick={() => navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })}
                   className="flex min-w-0 items-center gap-1 hover:text-[var(--accent)]"
                 >
-                  <Avatar src={track.up_avatar ?? null} alt={track.artist} size={14} />
+                  <Avatar src={track.up_avatar ?? null} alt={track.artist} size={18} />
                   <span className="truncate">{track.artist}</span>
                 </button>
                 {track.views ? (

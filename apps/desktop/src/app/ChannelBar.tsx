@@ -53,9 +53,6 @@ export function ChannelBar() {
           </button>
         )
       })}
-      <div className="ml-auto flex items-center gap-2 pr-1">
-      </div>
-      <span className="bili-topline absolute inset-x-0 bottom-0 h-[2px] opacity-70" />
     </nav>
   )
 }

@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
-import { SearchBanner } from '../search/SearchBanner'
 import { usePlayerStore } from '../player/playerStore'
 
 /**
@@ -17,7 +15,6 @@ import { usePlayerStore } from '../player/playerStore'
  * 被拒时给明确文案和「换一批」，不假装有内容。
  */
 export function HomeView() {
-  const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const [items, setItems] = useState<Track[]>([])
@@ -87,11 +84,6 @@ export function HomeView() {
         </button>
       </div>
 
-      {/* 首页顶部一张主视觉，和 B 站网页端一致。 */}
-      <div className="mb-5 h-[200px]">
-        <SearchBanner />
-      </div>
-
       {error ? <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}
 
       {items.length > 0 ? (
@@ -99,15 +91,6 @@ export function HomeView() {
           tracks={items}
           activeKey={activeKey}
           playing={playing}
-          extraAction={(track) => (
-            <button
-              type="button"
-              onClick={() => navigate({ kind: 'watch', track })}
-              className="t press text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              看视频
-            </button>
-          )}
         />
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}

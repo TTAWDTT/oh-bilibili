@@ -33,7 +33,9 @@ pub fn items_from(value: &serde_json::Value) -> Vec<Track> {
                 accent: None,
                 views: v["stat"]["view"].as_u64(),
                 danmaku: v["stat"]["danmaku"].as_u64(),
-                up_avatar: None,
+                up_avatar: v["owner"]["face"]
+                    .as_str()
+                    .map(|f| f.replacen("http://", "https://", 1)),
                 up_mid: v["owner"]["mid"].as_u64(),
                 tname: v["tname"].as_str().map(|s| s.to_string()),
                 typeid: None,
@@ -53,7 +55,7 @@ mod tests {
             "data": { "item": [
                 { "bvid": "BV1xx", "title": "<em>标题</em>测试", "duration": 213,
                   "pic": "http://i0.hdslb.com/a.jpg",
-                  "owner": { "name": "UP", "mid": 42 },
+                  "owner": { "name": "UP", "mid": 42, "face": "http://i0.hdslb.com/f.jpg" },
                   "stat": { "view": 1234, "danmaku": 56 }, "tname": "音乐" },
                 { "bvid": "", "title": "没有 bvid 应该被丢掉" },
                 { "bvid": "BV1yy", "title": "" }
@@ -67,6 +69,7 @@ mod tests {
         assert_eq!(t.duration, Some(Millis(213_000)));
         assert_eq!(t.cover.as_deref(), Some("https://i0.hdslb.com/a.jpg"));
         assert_eq!(t.up_mid, Some(42));
+        assert_eq!(t.up_avatar.as_deref(), Some("https://i0.hdslb.com/f.jpg"));
         assert_eq!(t.views, Some(1234));
     }
 

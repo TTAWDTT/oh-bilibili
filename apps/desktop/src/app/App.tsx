@@ -21,8 +21,6 @@ import { MobileTabBar } from './MobileTabBar'
 import { MobileRailSheet } from './MobileRailSheet'
 import { DanmakuStrip } from './DanmakuStrip'
 import { BackToTop } from '../shared/ui/BackToTop'
-import { StageGlow } from './StageGlow'
-import { StatusBar } from './StatusBar'
 import { TitleBar } from './TitleBar'
 import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
@@ -133,7 +131,6 @@ export default function App() {
       >
         跳到主要内容
       </a>
-      <StageGlow />
       <TitleBar />
       <div className="hidden md:contents">
         <ChannelBar />
@@ -158,7 +155,6 @@ export default function App() {
 
       <BackToTop targetId="scroll-main" />
       <PlayerBar />
-      <StatusBar />
       <MobileTabBar />
       {railOpen ? <MobileRailSheet tab={rail ?? 'lyrics'} /> : null}
       <StageView />

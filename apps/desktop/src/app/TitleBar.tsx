@@ -14,11 +14,11 @@ import { Icon } from '../shared/ui/Icon'
 export function TitleBar() {
   const focusNonce = useAppStore((state) => state.searchFocus)
   const setQuery = useAppStore((state) => state.setHeroQuery)
-  const navigate = useAppStore((state) => state.navigate)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const auth = useAuthStore((state) => state.auth)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
+  const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const drag = useWindowDrag()
 
@@ -64,10 +64,13 @@ export function TitleBar() {
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder="搜索视频、UP 主"
           aria-label="顶栏搜索"
           className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
         />
+        {focused || text ? null : <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>}
         <button
           type="submit"
           className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
@@ -77,31 +80,6 @@ export function TitleBar() {
       </form>
 
       <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-3 [&>*]:pointer-events-auto">
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'downloads' })}
-          title="下载"
-          className="bili-icon-hover text-[var(--text-2)] hover:text-[var(--accent)]"
-        >
-          <Icon name="download" size={17} />
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'history' })}
-          title="历史"
-          className="bili-icon-hover text-[var(--text-2)] hover:text-[var(--accent)]"
-        >
-          <Icon name="clock" size={17} />
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'favs' })}
-          title="收藏夹"
-          className="bili-icon-hover text-[var(--text-2)] hover:text-[var(--accent)]"
-        >
-          <Icon name="bookmarkStar" size={17} />
-        </button>
-
         {auth?.user ? (
           <button type="button" onClick={() => setAuthOpen(true)} title={auth.user.uname} className="bili-press">
             <Avatar src={auth.user.avatar} alt={auth.user.uname} size={26} />

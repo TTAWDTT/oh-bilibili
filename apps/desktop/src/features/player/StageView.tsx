@@ -112,7 +112,6 @@ export function StageView() {
       {/* 浅色底：白色半透明压住封面，让文字在任何封面上都读得清 */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--ga0)' }} />
       <div className="pointer-events-none absolute inset-0 bg-white/55" />
-      <div className="bili-canvas pointer-events-none absolute inset-0 opacity-60" />
       <DanmakuLayer trackKey={track.key} />
 
       <button

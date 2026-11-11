@@ -74,7 +74,6 @@ export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hide
 
   return (
     <aside aria-label="播放右栏" className="flex h-full w-full flex-col overflow-hidden border-l border-hairline bg-[var(--panel)] md:w-[var(--rail-w)]">
-      <span className="bili-topline h-[2px] w-full opacity-70" hidden={hideHeader} />
       <div hidden={hideHeader} className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
         <div className="flex h-full items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />
