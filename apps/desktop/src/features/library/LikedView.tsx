@@ -1,4 +1,3 @@
-import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { useAppStore } from '../../app/appStore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
@@ -37,15 +36,13 @@ export function LikedView() {
         </PageTitle>
         {tracks.length === 0 ? (
           <div className="flex min-h-[320px] flex-1 items-center justify-center">
-            <div className="flex flex-col items-center gap-1">
-            <Mascot2233 height={180} />
             <EmptyState
+              mascot="heart"
               icon="heart"
               title="一个红心都没点，下次一定？"
-              detail="在任意歌曲上点一下红心，它会出现在这里。"
-              action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+              detail="在任意视频上点一下赞，它会出现在这里。"
+              action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
             />
-            </div>
           </div>
         ) : (
           <TrackList
