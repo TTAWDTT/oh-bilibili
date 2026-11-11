@@ -189,7 +189,7 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
 
               <h3
                 className={[
-                  'mt-2 line-clamp-2 min-h-[2.7em] text-[14px] leading-[1.35] transition-colors',
+                  'mt-2 line-clamp-2 min-h-[2.7em] text-[15px] leading-[1.35] transition-colors',
                   active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent)]',
                 ].join(' ')}
                 title={track.title}
@@ -197,7 +197,7 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                 {track.title}
               </h3>
 
-              <div className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
+              <div className="mt-1 flex items-center gap-1.5 text-[13px] text-[var(--text-3)]">
                 <button
                   type="button"
                   title={`看 ${track.artist} 的更多视频`}

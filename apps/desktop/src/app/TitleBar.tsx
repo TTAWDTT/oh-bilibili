@@ -49,9 +49,6 @@ export function TitleBar() {
           <Icon name="biliTv" size={19} />
         </span>
         <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
-        <span className="hidden rounded-[3px] border border-hairline px-1.5 text-[12px] text-[var(--text-3)] md:inline">
-          music
-        </span>
       </div>
 
       <form

@@ -7,6 +7,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Health } from '../../shared/lib/ipc'
 import { isTauri } from '../../shared/lib/runtime'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { FramedAvatar } from '../../shared/ui/FramedAvatar'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
@@ -90,6 +91,7 @@ export function SettingsView() {
 
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-2 md:px-8">
         <div className="mx-auto flex max-w-[720px] flex-col gap-3 py-4">
+          <PageTitle>设置</PageTitle>
           <div className="hidden md:block">
             <Section title="快捷键">
               <ShortcutTable />

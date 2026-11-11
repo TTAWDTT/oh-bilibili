@@ -7,6 +7,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import type { FavFolder } from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
@@ -210,7 +211,7 @@ export function FavFoldersView() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-      <h2 className="mb-4 text-[18px] font-semibold text-[var(--text-1)]">B 站收藏夹</h2>
+      <PageTitle>收藏夹</PageTitle>
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
         {folders.map((folder) => (
           <button

@@ -7,6 +7,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
+import { PageTitle } from '../../shared/ui/PageTitle'
 
 /**
  * 稍后再看。
@@ -67,7 +68,7 @@ export function WatchLaterView() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-1">
       <div className="mb-3 flex items-baseline gap-2">
-        <h2 className="text-[15px] font-medium">稍后再看</h2>
+        <PageTitle>稍后再看</PageTitle>
         <span className="num text-[12px] text-[var(--text-3)]">{tracks.length} 条</span>
       </div>
       <ContentGrid tracks={tracks} activeKey={activeKey} playing={playing} />

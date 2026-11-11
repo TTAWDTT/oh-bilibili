@@ -5,6 +5,7 @@ import type { Followed } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 
 /**
@@ -77,7 +78,7 @@ export function FollowingView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-3 flex items-baseline gap-2 px-1">
-        <h2 className="text-[15px] font-medium">我关注的人</h2>
+        <PageTitle>我关注的人</PageTitle>
         <span className="num text-[12px] text-[var(--text-3)]">{formatCount(total)}</span>
       </div>
       <div ref={boxRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-1 pb-4">

@@ -6,7 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { useAppStore } from '../../app/appStore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageHeader } from '../../shared/ui/PageHeader'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useLibraryStore } from '../library/libraryStore'
@@ -52,41 +52,33 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title={tracks ? `${name} · ${tracks.length} 首 · ${formatSpan(total)}` : name}
-        actions={
-          tracks !== null && tracks.length > 0 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => void playContext(keys, 0)}
-                className="t press flex items-center gap-2 rounded-[4px] bg-white h-8 px-4 text-[14px] font-medium text-black hover:bg-white/85"
-              >
-                <Icon name="play" size={13} />
-                播放全部
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate({ kind: 'search' })}
-                className="t press rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
-              >
-                去添加
-              </button>
-            </>
-          ) : null
-        }
-      />
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8 pt-4">
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'library' })}
-          className="t press flex items-center justify-center mb-3 flex w-fit items-center gap-1 pr-2 text-[14px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
+        <PageTitle
+          extra={tracks ? `${tracks.length} 首 · ${formatSpan(total)}` : null}
+          action={
+            tracks !== null && tracks.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void playContext(keys, 0)}
+                  className="t press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
+                >
+                  <Icon name="play" size={13} />
+                  播放全部
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate({ kind: 'search' })}
+                  className="t press h-8 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                >
+                  去添加
+                </button>
+              </>
+            ) : null
+          }
         >
-          <Icon name="chevronLeft" size={13} />
-          曲库
-        </button>
-
+          {name}
+        </PageTitle>
         <div className="flex min-h-0 flex-col">
           {tracks === null ? <TrackListSkeleton rows={6} /> : null}
 

@@ -6,6 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { toastDone, toastFailure } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { Skeleton } from '../../shared/ui/Skeleton'
 import { useDownloadsStore } from './downloadsStore'
@@ -53,6 +54,7 @@ export function DownloadsView() {
       
 
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+        <PageTitle>下载</PageTitle>
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (

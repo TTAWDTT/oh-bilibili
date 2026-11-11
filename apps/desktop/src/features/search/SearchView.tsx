@@ -216,7 +216,7 @@ export function SearchView() {
                   : status === 'loading'
                     ? '正在搜索…'
                     : status === 'ready'
-                      ? `为你找到 ${tracks.length} 首 · ${orderLabel[order]} · 第 ${page} 页`
+                      ? `为你找到 ${tracks.length} 个 · ${orderLabel[order]} · 第 ${page} 页`
                       : ''}
               </span>
               {status === 'loading' && tracks.length > 0 ? (
@@ -345,7 +345,7 @@ export function SearchView() {
                     正在加载更多…
                   </>
                 ) : (
-                  <span className="text-[var(--text-3)]">已加载 {tracks.length} 首 · 继续下滑查看更多</span>
+                  <span className="text-[var(--text-3)]">已加载 {tracks.length} 个 · 继续下滑查看更多</span>
                 )}
               </div>
             ) : null}

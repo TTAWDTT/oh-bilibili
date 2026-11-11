@@ -4,6 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { SearchBanner } from '../search/SearchBanner'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -69,8 +70,7 @@ export function HomeView() {
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
       <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-[17px] font-medium">发现</h2>
-        <span className="text-[12px] text-[var(--text-3)]">按你的观看习惯推荐</span>
+        <PageTitle>发现</PageTitle>
         <button
           type="button"
           onClick={() => {
@@ -81,7 +81,8 @@ export function HomeView() {
           }}
           className="t press ml-auto rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
         >
-          {loading ? '正在换…' : '换一批'}
+          {/* 首次加载时列表还没出现，那是「正在取」而不是「正在换」。 */}
+          {loading ? (items.length > 0 ? '正在换…' : '正在取…') : '换一批'}
         </button>
       </div>
 

@@ -4,7 +4,7 @@ import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageHeader } from '../../shared/ui/PageHeader'
+import { PageTitle } from '../../shared/ui/PageTitle'
 import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
 import { useLibraryStore } from './libraryStore'
@@ -32,20 +32,21 @@ export function LibraryView() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        actions={
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="t press flex items-center gap-2 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
-          >
-            <Icon name="plus" size={14} />
-            新建歌单
-          </button>
-        }
-      />
-
       <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+        <PageTitle
+          action={
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="t press flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              <Icon name="plus" size={14} />
+              新建歌单
+            </button>
+          }
+        >
+          曲库
+        </PageTitle>
         {playlists === null ? (
           <div className="mt-8">
             <PlaylistRowsSkeleton rows={4} />
@@ -57,7 +58,8 @@ export function LibraryView() {
               icon="library"
               title="还没有歌单"
               detail="建一个歌单，把歌按自己的顺序收起来。"
-              action={{ label: '新建歌单', onClick: () => setCreating(true) }}
+              /* 标题行已经有「新建歌单」，这里不再放第二个同样的按钮。 */
+              action={null}
             />
           </div>
         ) : (
