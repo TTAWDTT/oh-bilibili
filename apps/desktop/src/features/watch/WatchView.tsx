@@ -9,11 +9,15 @@ import { DanmakuField, toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { usePlayerStore } from '../player/playerStore'
+import { VolumeControl } from '../player/VolumeControl'
 import { CommentsPanel } from './CommentsPanel'
 import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+
+/** 观看页的倍速档位，和 B 站播放器一致。 */
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
 
 /**
  * 观看页。
@@ -57,6 +61,8 @@ export function WatchView({ track }: { track: Track }) {
   /** 这条视频在不在「稍后再看」里。按钮必须复述服务端的事实，不能只看点击过没有。 */
   const [saved, setSaved] = useState(false)
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
+  const setSpeed = usePlayerStore((state) => state.setSpeed)
   /**
    * 「引擎在不在放」。
    *
@@ -240,9 +246,10 @@ export function WatchView({ track }: { track: Track }) {
       if (v.paused) void v.play().catch(() => {})
       const drift = v.currentTime * 1000 - readPlayhead()
       if (Math.abs(drift) > 400) v.currentTime = readPlayhead() / 1000
+      if (v.playbackRate !== speed) v.playbackRate = speed
     }, 250)
     return () => window.clearInterval(timer)
-  }, [ready, track.key])
+  }, [ready, track.key, speed])
 
   // 挂载 shaka
   useEffect(() => {
@@ -458,6 +465,28 @@ export function WatchView({ track }: { track: Track }) {
             >
               弹
             </button>
+
+            {/* 倍速：跟着引擎走，音频变速，画面用同一个倍率跟随时钟。 */}
+            <button
+              type="button"
+              onClick={() => {
+                const i = SPEEDS.indexOf(speed as (typeof SPEEDS)[number])
+                void setSpeed(SPEEDS[(i + 1) % SPEEDS.length] ?? 1)
+              }}
+              title="播放倍速"
+              aria-label={`播放倍速 ${speed}x`}
+              className="t press num h-7 shrink-0 rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+            >
+              {speed}x
+            </button>
+
+            {/* 音量交给引擎：视频元素一直静音，能调的是真正发声的那一路。 */}
+            <span
+              className="flex shrink-0 items-center"
+              style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
+            >
+              <VolumeControl />
+            </span>
 
             {data && data.qualities.length > 0 ? (
               <div className="relative shrink-0">
