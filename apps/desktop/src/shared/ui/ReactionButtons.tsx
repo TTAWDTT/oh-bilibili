@@ -1,6 +1,5 @@
 import type { Track } from '../lib/contract'
 import { useReactionStore } from '../../features/reactions/reactionStore'
-import { Icon } from './Icon'
 import { BiliStar, BiliThumb } from './BiliTri'
 
 type ReactionButtonsProps = {
@@ -31,7 +30,9 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           liked ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        {liked ? <BiliThumb size={size} /> : <Icon name="heart" size={size} />}
+        {/* 同一个按钮不能按状态换形状：未赞是爱心、点完变大拇指，
+            用户会以为点到了别的按钮。三连在本产品里就是 B 站的三连。 */}
+        <BiliThumb size={size} />
       </button>
       <button
         type="button"
@@ -47,7 +48,7 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
           faved ? 'text-[#ffc46b]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        {faved ? <BiliStar size={size} /> : <Icon name="bookmark" size={size} />}
+        <BiliStar size={size} />
       </button>
     </div>
   )
