@@ -25,7 +25,38 @@ export function WatchView({ track }: { track: Track }) {
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
   const [related, setRelated] = useState<Track[]>([])
   const refresh = useReactionStore((st) => st.refresh)
+  // 点赞与收藏的计数偏移放在这里：画面上的三连和下方信息区是同一份状态，
+  // 各算一份就会出现「上面点了、下面的数字没动」。
+  const [likeDelta, setLikeDelta] = useState(0)
+  const [favDelta, setFavDelta] = useState(0)
+  const liked = useReactionStore((st) => st.liked[track.key] ?? false)
+  const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    setLikeDelta(0)
+    setFavDelta(0)
+  }, [track.key])
+
+  const like = (): void => {
+    const before = useReactionStore.getState().liked[track.key] ?? false
+    void useReactionStore
+      .getState()
+      .toggleLike(track)
+      .then((next) => {
+        if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
+      })
+  }
+
+  const fav = (): void => {
+    const before = useReactionStore.getState().faved[track.key] ?? false
+    void useReactionStore
+      .getState()
+      .toggleFav(track)
+      .then((next) => {
+        if (next !== null && next !== before) setFavDelta((n) => n + (next ? 1 : -1))
+      })
+  }
 
   // 取清单与档位
   useEffect(() => {
@@ -114,6 +145,13 @@ export function WatchView({ track }: { track: Track }) {
                 danmaku={danmaku}
                 onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
                 onBack={() => goBack()}
+                liked={liked}
+                faved={faved}
+                onLike={like}
+                onFav={fav}
+                onReplay={() => {
+                  void ipc.playerSeek(0).catch(() => {})
+                }}
               />
             </div>
           ) : (
@@ -129,6 +167,10 @@ export function WatchView({ track }: { track: Track }) {
               track={track}
               data={data}
               onPage={setPage}
+              likeDelta={likeDelta}
+              favDelta={favDelta}
+              onLike={like}
+              onFav={fav}
               onListen={(at) => {
                 void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
               }}

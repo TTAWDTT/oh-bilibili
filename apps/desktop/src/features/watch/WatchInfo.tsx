@@ -21,26 +21,31 @@ export function WatchInfo({
   data,
   onPage,
   onListen,
+  likeDelta,
+  favDelta,
+  onLike,
+  onFav,
 }: {
   track: Track
   data: WatchData
   onPage: (no: number) => void
   /** 把当前画面位置交给音频引擎，切到听模式。 */
   onListen: (atMs: number) => void
+  /** 点赞与收藏的计数偏移由观看页统一持有，这里只负责显示。 */
+  likeDelta: number
+  favDelta: number
+  onLike: () => void
+  onFav: () => void
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
-  const toggleLike = useReactionStore((st) => st.toggleLike)
-  const toggleFav = useReactionStore((st) => st.toggleFav)
   const addCoin = useReactionStore((st) => st.addCoin)
 
   const [saved, setSaved] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
   const [coinDelta, setCoinDelta] = useState(0)
-  const [likeDelta, setLikeDelta] = useState(0)
-  const [favDelta, setFavDelta] = useState(0)
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
 
@@ -49,8 +54,6 @@ export function WatchInfo({
     setSaved(false)
     setConfirmingCoin(false)
     setCoinDelta(0)
-    setLikeDelta(0)
-    setFavDelta(0)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -165,12 +168,7 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={liked}
-          onClick={() => {
-            const before = liked
-            void toggleLike(track).then((next) => {
-              if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
-            })
-          }}
+          onClick={onLike}
           className={triple(liked, 'left')}
           title={liked ? '取消点赞' : '点赞'}
         >
@@ -196,12 +194,7 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={faved}
-          onClick={() => {
-            const before = faved
-            void toggleFav(track).then((next) => {
-              if (next !== null && next !== before) setFavDelta((n) => n + (next ? 1 : -1))
-            })
-          }}
+          onClick={onFav}
           className={triple(faved, 'right')}
           title={faved ? '取消收藏' : '收藏'}
         >

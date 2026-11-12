@@ -10,7 +10,9 @@ import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
+import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import { BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
 /** 观看页的倍速档位，和 B 站播放器一致。 */
@@ -57,12 +59,23 @@ export function WatchPlayer({
   danmaku,
   onDanmakuSent,
   onBack,
+  onLike,
+  onFav,
+  onReplay,
+  liked,
+  faved,
 }: {
   track: Track
   data: WatchData
   danmaku: DanmakuItem[]
   onDanmakuSent: (item: DanmakuItem) => void
   onBack: () => void
+  /** 播完之后的收尾。B 站也是在这时候把三连与重播摆到画面上。 */
+  onLike: () => void
+  onFav: () => void
+  onReplay: () => void
+  liked: boolean
+  faved: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
@@ -85,6 +98,8 @@ export function WatchPlayer({
   const cinema = useAppStore((state) => state.cinema)
   const setCinema = useAppStore((state) => state.setCinema)
   const [playing, setPlaying] = useState(false)
+  /** 播到结尾就掀开三连面板。 */
+  const [finished, setFinished] = useState(false)
 
   const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
   const setSpeed = usePlayerStore((state) => state.setSpeed)
@@ -189,6 +204,7 @@ export function WatchPlayer({
       const sameTrack = snap?.track?.key === track.key
       const enginePlaying = sameTrack && snap?.phase === 'playing'
       setPlaying(enginePlaying)
+      setFinished(sameTrack && snap?.phase === 'ended')
       if (!sameTrack || !enginePlaying) {
         if (!v.paused) v.pause()
         return
@@ -351,6 +367,45 @@ export function WatchPlayer({
       {error ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {/* 播完掀开的三连。B 站视频放完也是这一张：UP 头像、一句邀请、三个按钮。 */}
+      {finished && !error ? (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/75 px-6 text-center text-white backdrop-blur-[2px]">
+          <Avatar src={data.owner_avatar ?? null} alt={data.owner} size={56} />
+          <div>
+            <div className="text-[15px]">{data.owner}</div>
+            <div className="mt-1 text-[13px] text-white/70">喜欢这个视频的话，给个三连吧</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {[
+              { on: liked, label: '点赞', run: onLike, icon: <BiliThumb size={16} /> },
+              { on: faved, label: '收藏', run: onFav, icon: <BiliStar size={16} /> },
+            ].map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={action.run}
+                className={`t press flex h-9 items-center gap-1.5 rounded-full border px-4 text-[13px] ${
+                  action.on
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-white/30 text-white hover:border-white/70'
+                }`}
+              >
+                {action.icon}
+                {action.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={onReplay}
+              className="t press flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent)] px-4 text-[13px] text-white hover:opacity-90"
+            >
+              <Icon name="refresh" size={15} />
+              重播
+            </button>
+          </div>
         </div>
       ) : null}
 
