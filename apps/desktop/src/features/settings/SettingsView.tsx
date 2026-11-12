@@ -103,7 +103,7 @@ export function SettingsView() {
           <Section title="账号">
             {user ? (
               <div className="flex flex-wrap items-center gap-4">
-                <Avatar src={user.avatar} alt={user.uname} size={72} />
+                <Avatar src={user.avatar} alt={user.uname} size={96} bordered={false} />
                 <div className="min-w-[200px] flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span

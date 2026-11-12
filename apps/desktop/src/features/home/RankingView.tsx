@@ -7,29 +7,14 @@ import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
-
-/** B 站排行榜的分区 rid。0 是全站，其余对应网页端那一排频道。 */
-const PARTS: { rid: number; name: string }[] = [
-  { rid: 0, name: '全站' },
-  { rid: 1, name: '动画' },
-  { rid: 3, name: '音乐' },
-  { rid: 129, name: '舞蹈' },
-  { rid: 4, name: '游戏' },
-  { rid: 36, name: '知识' },
-  { rid: 188, name: '科技' },
-  { rid: 160, name: '生活' },
-  { rid: 211, name: '美食' },
-  { rid: 119, name: '鬼畜' },
-  { rid: 5, name: '娱乐' },
-  { rid: 181, name: '影视' },
-]
+import { PARTS } from '../../shared/lib/biliParts'
 
 /**
  * 排行榜。读的是 B 站公开榜单，一次 100 条；名次就是接口返回的顺序。
  * 卡片左上角的名次用 B 站前三名的红 / 橙 / 黄。
  */
-export function RankingView() {
-  const [rid, setRid] = useState(0)
+export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
+  const [rid, setRid] = useState(initialRid)
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)

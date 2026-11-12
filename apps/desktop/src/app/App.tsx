@@ -74,7 +74,7 @@ function CurrentView({ view }: { view: View }) {
     case 'home':
       return <HomeView />
     case 'ranking':
-      return <RankingView />
+      return <RankingView initialRid={view.rid ?? 0} />
     case 'search':
       return <SearchView />
     case 'library':

@@ -7,6 +7,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
+import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 
 /**
@@ -86,6 +87,20 @@ export function HomeView() {
           {loading ? (items.length > 0 ? '正在换…' : '正在取…') : '换一批'}
         </button>
       </div>
+
+      {/* B 站首页的频道条。每一项都落到对应分区的排行榜，不摆点不动的装饰。 */}
+      <nav className="mb-3 flex items-center gap-0.5 overflow-x-auto border-b border-hairline pb-2">
+        {PARTS.filter((part) => part.rid !== 0).map((part) => (
+          <button
+            key={part.rid}
+            type="button"
+            onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+            className="t shrink-0 rounded-[4px] px-2.5 py-1 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
+          >
+            {part.name}
+          </button>
+        ))}
+      </nav>
 
       {error ? <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}
 
