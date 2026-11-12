@@ -558,6 +558,11 @@ async fn fav_covers(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn liked_videos(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<Track>, WireError> {
+    engine.liked_videos().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn unfav_from(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -822,6 +827,7 @@ pub fn run() {
             watch_later_set,
             fav_folders,
             fav_covers,
+            liked_videos,
             author_card,
             fav_tracks,
             unfav_from,

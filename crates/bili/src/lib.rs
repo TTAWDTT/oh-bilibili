@@ -309,6 +309,11 @@ impl Source {
         self.client.fav_covers(folder_id, limit).await
     }
 
+    /// 我赞过的视频。
+    pub async fn liked_videos(&self) -> Result<Vec<Track>, BiliError> {
+        self.client.liked_videos().await
+    }
+
     /// 把一条视频从指定收藏夹移出。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

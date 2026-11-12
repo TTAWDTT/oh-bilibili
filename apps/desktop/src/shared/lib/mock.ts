@@ -68,6 +68,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         .map((t) => t.cover)
         .filter((c): c is string => Boolean(c))
     }
+    case 'liked_videos':
+      return CATALOG.slice(0, 12)
     case 'fav_tracks': {
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40

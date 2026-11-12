@@ -453,6 +453,53 @@ impl Client {
             .collect())
     }
 
+    /// 我赞过的视频。空间页这一条接口一次返回列表，pn 参数不生效。
+    /// 未登录会返回 NeedsLogin。
+    pub async fn liked_videos(&self) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        use bilimusic_model::{Millis, Track, TrackKey};
+
+        let mid = self
+            .logged_in_mid()
+            .ok_or_else(|| BiliError::NeedsLogin("还没有登录".into()))?;
+        let v = self
+            .get_json(
+                &format!("{API}/x/space/like/video?vmid={mid}&pn=1&ps=50"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["list"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|m| {
+                let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+                let duration = m["duration"].as_u64().filter(|d| *d > 0);
+                Some(Track {
+                    key: TrackKey::from_provider(bvid),
+                    title: m["title"].as_str().unwrap_or_default().to_string(),
+                    artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+                    duration: duration.map(|d| Millis(d * 1000)),
+                    cover: m["pic"]
+                        .as_str()
+                        .map(|c| c.replacen("http://", "https://", 1)),
+                    accent: None,
+                    views: m["stat"]["view"].as_u64(),
+                    danmaku: m["stat"]["danmaku"].as_u64(),
+                    up_avatar: m["owner"]["face"]
+                        .as_str()
+                        .map(|f| f.replacen("http://", "https://", 1)),
+                    up_mid: m["owner"]["mid"].as_u64(),
+                    tname: m["tname"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string()),
+                    typeid: None,
+                })
+            })
+            .collect())
+    }
+
     /// 加入稍后再看。
     pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
         let csrf = self

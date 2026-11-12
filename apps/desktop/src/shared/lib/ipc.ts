@@ -201,6 +201,11 @@ export function favCovers(folderId: number, limit = 4): Promise<string[]> {
   return call<string[]>('fav_covers', { folder_id: folderId, limit })
 }
 
+/** 我赞过的视频（账号里的真实点赞）。 */
+export function likedVideos(): Promise<Track[]> {
+  return call<Track[]>('liked_videos', {})
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })

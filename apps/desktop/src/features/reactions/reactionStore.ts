@@ -11,7 +11,6 @@ type ReactionStore = {
   coins: Record<string, number>
   /** 已经从账号查过的 key，滚动时不再重复请求。 */
   known: Record<string, true>
-  likedTracks: Track[]
   /** 从账号拉一次真实互动状态，把心/星点亮。未登录会抛 needs_login。 */
   hydrate: (keys: string[]) => Promise<void>
   /** 无视缓存重新查一次。详情页用：打开时看到的必须是真的。 */
@@ -30,7 +29,6 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
   faved: {},
   coins: {},
   known: {},
-  likedTracks: [],
   hydrate: async (keys) => {
     // 只查没查过的：列表越滚越长时，总请求数等于「看过的视频数」而不是「渲染次数」
     const fresh = keys.filter((k) => !get().known[k])
@@ -83,9 +81,6 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
     }
     set((state) => ({
       liked: { ...state.liked, [track.key]: next },
-      likedTracks: next
-        ? [track, ...state.likedTracks.filter((item) => item.key !== track.key)]
-        : state.likedTracks.filter((item) => item.key !== track.key),
     }))
     return next
   },

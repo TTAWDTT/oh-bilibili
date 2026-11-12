@@ -394,3 +394,31 @@ async fn 收藏夹一页要多久() {
     assert!(!page.is_empty(), "应该读到内容");
     assert!(page[0].duration.is_some(), "时长应该来自列表接口");
 }
+
+#[tokio::test]
+#[ignore = "真实网络，用来核对赞过的视频"]
+async fn 赞过的视频带封面和分区() {
+    let source = Source::open().await.expect("Source");
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
+        println!("没有 cookies.json，跳过");
+        return;
+    };
+    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+    source.import_cookies(&pairs);
+    source.refresh_session().await.expect("刷新会话");
+
+    let list = source.liked_videos().await.expect("赞过的视频");
+    println!("赞过 {} 条", list.len());
+    let first = list.first().expect("至少一条");
+    println!(
+        "首条: {} / {} / {:?} / {}",
+        first.title.chars().take(18).collect::<String>(),
+        first.artist,
+        first.duration.map(|d| d.0),
+        first.tname.clone().unwrap_or_default()
+    );
+    assert!(first.cover.is_some(), "喜欢页的卡片要有封面");
+}
