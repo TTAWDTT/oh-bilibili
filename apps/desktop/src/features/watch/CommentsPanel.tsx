@@ -1,9 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
 import { useAuthStore } from '../auth/authStore'
+
+/** 把评论里的 [表情] 代号换成 B 站表情图，其余文字原样保留。 */
+function CommentText({ text, emotes }: { text: string; emotes: [string, string][] }) {
+  if (emotes.length === 0) return <>{text}</>
+  const map = new Map(emotes)
+  const nodes: ReactNode[] = []
+  let buffer = ''
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '[') {
+      const end = text.indexOf(']', i)
+      const code = end > i ? text.slice(i, end + 1) : ''
+      const url = code ? map.get(code) : undefined
+      if (url) {
+        if (buffer) {
+          nodes.push(buffer)
+          buffer = ''
+        }
+        nodes.push(
+          <img
+            key={`${i}-${code}`}
+            src={url}
+            alt={code}
+            title={code}
+            referrerPolicy="no-referrer"
+            className="mx-[1px] inline-block h-[20px] w-auto align-[-4px]"
+          />,
+        )
+        i = end
+        continue
+      }
+    }
+    buffer += text[i]
+  }
+  if (buffer) nodes.push(buffer)
+  return <>{nodes}</>
+}
 
 /** 一条评论，含楼中楼预览。一级评论可以回复。 */
 function CommentRow({
@@ -59,7 +96,7 @@ function CommentRow({
             ) : null}
           </div>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
-            {c.text}
+            <CommentText text={c.text} emotes={c.emotes} />
           </p>
         </div>
       </div>
@@ -186,6 +223,7 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
             author: me?.uname ?? '我',
             avatar: me?.avatar ?? null,
             text,
+            emotes: [],
             likes: 0,
             at: Math.floor(Date.now() / 1000),
             replies: [],

@@ -44,6 +44,8 @@ export type Comment = {
   author: string
   avatar: string | null
   text: string
+  /** 评论里的 B 站表情：代号（如 [doge]）到图片地址。 */
+  emotes: [string, string][]
   likes: number
   at: number
   replies: Comment[]

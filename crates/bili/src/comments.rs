@@ -4,6 +4,7 @@
 //! 因为 B 站改字段而悄悄读到空值。
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 一条评论。嵌套回复只带预览，展开要再请求。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -12,6 +13,8 @@ pub struct Comment {
     pub author: String,
     pub avatar: Option<String>,
     pub text: String,
+    /// 评论里的 B 站表情：原文代号（如 `[doge]`）到图片地址。
+    pub emotes: Vec<(String, String)>,
     pub likes: u32,
     /// Unix 秒。
     pub at: i64,
@@ -65,6 +68,14 @@ struct RawMember {
 struct RawContent {
     #[serde(default)]
     message: String,
+    #[serde(default)]
+    emote: Option<HashMap<String, RawEmote>>,
+}
+
+#[derive(Deserialize)]
+struct RawEmote {
+    #[serde(default)]
+    url: String,
 }
 
 fn to_comment(raw: RawReply) -> Comment {
@@ -85,6 +96,25 @@ fn to_comment(raw: RawReply) -> Comment {
         .take(3)
         .map(to_comment)
         .collect();
+    let (text, emotes) = raw
+        .content
+        .map(|c| {
+            let emotes = c
+                .emote
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|(code, e)| {
+                    let url = e.url.trim();
+                    if url.is_empty() {
+                        None
+                    } else {
+                        Some((code, url.replacen("http://", "https://", 1)))
+                    }
+                })
+                .collect();
+            (c.message, emotes)
+        })
+        .unwrap_or_default();
     Comment {
         id,
         author: raw.member.map(|m| m.uname).unwrap_or_default(),
@@ -95,7 +125,8 @@ fn to_comment(raw: RawReply) -> Comment {
                 a
             }
         }),
-        text: raw.content.map(|c| c.message).unwrap_or_default(),
+        text,
+        emotes,
         likes: raw.like,
         at: raw.ctime,
         replies,
