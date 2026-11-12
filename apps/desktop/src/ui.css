@@ -181,6 +181,12 @@
   animation: stage-rotate 26s linear infinite;
 }
 
+/* 暂停时冻结在当前角度，而不是跳回 0 度 */
+.stage-disc[data-playing='false'] > img,
+.stage-disc[data-playing='false'] > div {
+  animation-play-state: paused;
+}
+
 @keyframes stage-rotate {
   to {
     transform: rotate(360deg);

@@ -113,7 +113,10 @@ export function StageView() {
       {/* 浅色底：白色半透明压住封面，让文字在任何封面上都读得清 */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--ga0)' }} />
       <div className="pointer-events-none absolute inset-0 bg-white/55" />
-      <DanmakuLayer trackKey={track.key} />
+      {/* 弹幕压到内容下面：标题与歌词是这一屏要读的字，不能被弹幕盖住 */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <DanmakuLayer trackKey={track.key} />
+      </div>
 
       <button
         type="button"
@@ -127,7 +130,7 @@ export function StageView() {
       <DanmakuPanel />
 
       <div className="relative flex w-full max-w-[560px] flex-col items-center px-8">
-        <div className="stage-disc">
+        <div className="stage-disc" data-playing={snapshot?.phase === 'playing'}>
           <Cover
             cover={track.cover}
             title={track.title}
