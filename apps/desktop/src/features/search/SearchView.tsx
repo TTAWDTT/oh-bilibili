@@ -38,6 +38,7 @@ export function SearchView() {
   }
   const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
   const history = useSearchHistory((s) => s.items)
+  const clearHistory = useSearchHistory((s) => s.clear)
   /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
   const [hotWords, setHotWords] = useState<string[]>([])
   useEffect(() => {
@@ -181,6 +182,13 @@ export function SearchView() {
                 {word}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={clearHistory}
+              className="t ml-auto shrink-0 text-[11.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              清除
+            </button>
           </div>
         ) : null}
 
