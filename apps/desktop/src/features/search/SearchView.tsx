@@ -3,8 +3,10 @@ import { useAppStore } from '../../app/appStore'
 import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
+import { formatCount } from '../../shared/lib/format'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { usePlayerStore } from '../player/playerStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
@@ -26,6 +28,7 @@ export function SearchView() {
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[]>([])
+  const [users, setUsers] = useState<ipc.UserHit[]>([])
   const [status, setStatus] = useState<Status>('idle')
   const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
   const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
@@ -37,6 +40,7 @@ export function SearchView() {
     danmaku: '按弹幕数',
   }
   const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
+  const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   const clearHistory = useSearchHistory((s) => s.clear)
   /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
@@ -105,13 +109,17 @@ export function SearchView() {
     if (trimmed.length === 0) {
       setStatus('idle')
       setTracks([])
+      setUsers([])
       setError(null)
       return
     }
     const ticket = ++seq.current
     const handle = window.setTimeout(() => {
       setStatus('loading')
-      if (page === 1) setTracks([])
+      if (page === 1) {
+        setTracks([])
+        setUsers([])
+      }
       ipc
         .searchQ(
           trimmed,
@@ -129,6 +137,17 @@ export function SearchView() {
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setStatus('ready')
           setLoadingMore(false)
+          // UP 主单独一条搜索线。等视频结果落地再发，免得和 search_q 抢限速。
+          if (page === 1) {
+            void ipc
+              .searchUsers(trimmed, 1)
+              .then((list) => {
+                if (seq.current === ticket) setUsers(list.slice(0, 6))
+              })
+              .catch(() => {
+                if (seq.current === ticket) setUsers([])
+              })
+          }
         })
         .catch((cause: unknown) => {
           if (seq.current !== ticket) return
@@ -229,6 +248,42 @@ export function SearchView() {
           </div>
         ) : (
           <section className="mt-6">
+            {users.length > 0 ? (
+              <div className="mb-4">
+                <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {users.map((user) => (
+                    <button
+                      key={user.mid}
+                      type="button"
+                      onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
+                      className="bili-card bili-press flex w-[248px] shrink-0 items-center gap-2.5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 text-left hover:border-[var(--accent)]"
+                    >
+                      {user.face ? (
+                        <img
+                          src={user.face}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="h-10 w-10 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="h-10 w-10 shrink-0 rounded-full bg-[var(--panel-alt)]" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1">
+                          <span className="truncate text-[13px] text-[var(--text-1)]">{user.name}</span>
+                          {user.level > 0 ? <LevelBadge level={user.level} /> : null}
+                        </span>
+                        <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
+                          {formatCount(user.fans)} 粉丝 · {formatCount(user.videos)} 投稿
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mb-2 flex min-h-5 flex-wrap items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
               <span>
                 {status === 'error'

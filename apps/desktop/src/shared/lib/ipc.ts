@@ -189,7 +189,7 @@ export function authorCard(mid: number): Promise<AuthorCard> {
   return call<AuthorCard>('author_card', { mid })
 }
 
-export type FavFolder = { id: number; title: string; count: number }
+export type FavFolder = { id: number; title: string; count: number; cover: string | null }
 
 /** 当前账号的收藏夹。 */
 export function favFolders(): Promise<FavFolder[]> {
@@ -214,6 +214,21 @@ export function videoTags(key: string): Promise<string[]> {
 /** 评论表情面板：代号 → 图片。 */
 export function commentEmotes(): Promise<[string, string][]> {
   return call<[string, string][]>('comment_emotes', {})
+}
+
+export type UserHit = {
+  mid: number
+  name: string
+  face: string | null
+  fans: number
+  videos: number
+  sign: string
+  level: number
+}
+
+/** 搜 UP 主。 */
+export function searchUsers(keyword: string, page = 1): Promise<UserHit[]> {
+  return call<UserHit[]>('search_users', { keyword, page })
 }
 
 /** 排行榜。rid=0 是全站。 */

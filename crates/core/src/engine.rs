@@ -1244,7 +1244,7 @@ impl Engine {
         Ok(())
     }
 
-    pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, WireError> {
+    pub async fn fav_folders(&self) -> Result<Vec<bilimusic_bili::sync::FavFolder>, WireError> {
         Ok(self.source.fav_folders().await?)
     }
 
@@ -1266,6 +1266,14 @@ impl Engine {
 
     pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, WireError> {
         Ok(self.source.comment_emotes().await?)
+    }
+
+    pub async fn search_users(
+        &self,
+        keyword: &str,
+        page: u32,
+    ) -> Result<Vec<bilimusic_bili::sync::UserHit>, WireError> {
+        Ok(self.source.search_users(keyword, page).await?)
     }
 
     pub async fn ranking(&self, rid: u32) -> Result<Vec<Track>, WireError> {

@@ -127,11 +127,11 @@ export function FollowingView() {
 
   const show = (user: Followed, el: HTMLElement): void => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    // 停留一小会儿再出，扫过去的鼠标不弹名片
+    // 鼠标扫过整列时会一路触发，留一帧的延迟避免名片疯狂闪
     timerRef.current = window.setTimeout(() => {
       const rect = el.getBoundingClientRect()
       setHover({ user, anchor: { top: rect.top, left: rect.left, right: rect.right } })
-    }, 160)
+    }, 40)
   }
 
   const hide = (): void => {
@@ -181,8 +181,8 @@ export function FollowingView() {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'author', name: u.name, mid: u.mid })}
-                onMouseEnter={(event) => show(u, event.currentTarget)}
-                onMouseLeave={hide}
+                onPointerEnter={(event) => show(u, event.currentTarget)}
+                onPointerLeave={hide}
                 onFocus={(event) => show(u, event.currentTarget)}
                 onBlur={hide}
                 className="t press flex w-full items-center gap-2.5 rounded-[8px] border border-[var(--line)] px-2.5 py-2 text-left hover:bg-[var(--panel-alt)]"

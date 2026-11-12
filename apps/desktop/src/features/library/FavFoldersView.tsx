@@ -257,6 +257,7 @@ export function FavFoldersView() {
       <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
         {folders.map((folder) => {
           const shots = covers[folder.id]
+          const single = shots?.[0] ?? folder.cover
           return (
             <button
               key={folder.id}
@@ -264,22 +265,35 @@ export function FavFoldersView() {
               onClick={() => setPicked(folder)}
               className="bili-card bili-card-enter bili-press overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
             >
-              {/* 和 B 站一样用前四条视频拼 2×2 封面；没有封面的格子留底色 */}
-              <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
-                    {shots?.[i] ? (
+              {/* 列表接口自带一张封面，先铺上；四张拼图到了再换成 2×2。 */}
+              <span className="relative grid aspect-[16/10] w-full grid-cols-2 grid-rows-2 gap-px overflow-hidden bg-[var(--ga2)]">
+                {shots && shots.length >= 4 ? (
+                  shots.slice(0, 4).map((src, i) => (
+                    <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
                       <img
-                        src={shots[i]}
+                        src={src}
                         alt=""
                         aria-hidden
                         referrerPolicy="no-referrer"
                         loading="lazy"
                         className="h-full w-full object-cover"
                       />
-                    ) : null}
-                  </span>
-                ))}
+                    </span>
+                  ))
+                ) : single ? (
+                  <img
+                    src={single}
+                    alt=""
+                    aria-hidden
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    className="col-span-2 row-span-2 h-full w-full object-cover"
+                  />
+                ) : (
+                  Array.from({ length: 4 }, (_, i) => (
+                    <span key={i} className="block bg-[var(--ga1)]" />
+                  ))
+                )}
               </span>
               <span className="block px-3 py-2">
                 <span

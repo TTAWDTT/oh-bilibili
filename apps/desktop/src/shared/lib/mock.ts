@@ -36,6 +36,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
       return matched.slice((page - 1) * 8, page * 8)
     }
+    case 'search_users': {
+      const seen = new Map<number, string>()
+      for (const t of CATALOG) if (t.up_mid && t.artist) seen.set(t.up_mid, t.artist)
+      return [...seen].slice(0, 4).map(([mid, name], i) => ({
+        mid,
+        name,
+        face: null,
+        fans: 12000 * (i + 1),
+        videos: 40 + i * 7,
+        sign: '预览模式的占位签名',
+        level: 6,
+      }))
+    }
     case 'author_card': {
       const mid = num(args, 'mid')
       const owner = CATALOG.find((t) => t.up_mid === mid)
@@ -61,7 +74,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'fav_folders':
       // 预览用一个两页的收藏夹，方便验证「加载更多」。
-      return [{ id: 1, title: '默认收藏夹', count: 70 }]
+      return [{ id: 1, title: '默认收藏夹', count: 70, cover: CATALOG[0]?.cover ?? null }]
     case 'fav_covers': {
       const limit = Math.max(1, Math.trunc(num(args, 'limit')) || 4)
       return CATALOG.slice(0, limit)

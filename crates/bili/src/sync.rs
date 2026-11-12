@@ -5,9 +5,32 @@
 
 use crate::client::{Client, API};
 use crate::error::BiliError;
+use serde::{Deserialize, Serialize};
 
 /// 收藏夹名。产品要求固定这个名字，用户 B 站里能看到同一个夹子。
 pub const DEFAULT_FOLDER: &str = "哔哩哔哩 music";
+
+/// 搜索出来的 UP 主。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserHit {
+    pub mid: u64,
+    pub name: String,
+    pub face: Option<String>,
+    pub fans: u64,
+    pub videos: u64,
+    pub sign: String,
+    pub level: u8,
+}
+
+/// 收藏夹列表里的一项。B 站 web 端的收藏夹页就用 `created/list`，它自带每个夹子的封面。
+#[derive(Debug, Clone)]
+pub struct FavFolder {
+    pub id: i64,
+    pub title: String,
+    pub count: u32,
+    /// 夹子里最近一条视频的封面；空夹子没有。
+    pub cover: Option<String>,
+}
 
 /// UP 主名片。
 #[derive(Debug, Clone)]
@@ -181,14 +204,17 @@ impl Client {
         })
     }
 
-    /// 当前账号的收藏夹列表。返回 (media_id, 名字, 条目数)。
-    pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
+    /// 当前账号的收藏夹列表。
+    ///
+    /// 走 web 端的 `created/list`（`list-all` 不带封面）：一次请求就能给每个夹子配一张图，
+    /// 列表页不用先给用户看一片灰格子。四宫格拼图由 `fav_covers` 在后台补。
+    pub async fn fav_folders(&self) -> Result<Vec<FavFolder>, BiliError> {
         let mid = self
             .logged_in_mid()
             .ok_or_else(|| BiliError::NeedsLogin("还没有登录".into()))?;
         let v = self
             .get_json(
-                &format!("{API}/x/v3/fav/folder/created/list-all?up_mid={mid}&rid=0"),
+                &format!("{API}/x/v3/fav/folder/created/list?up_mid={mid}&pn=1&ps=100&web_location=333.1387"),
                 std::time::Duration::from_millis(400),
             )
             .await?;
@@ -198,11 +224,15 @@ impl Client {
         Ok(list
             .iter()
             .filter_map(|item| {
-                Some((
-                    item["id"].as_i64()?,
-                    item["title"].as_str()?.to_string(),
-                    item["media_count"].as_u64().unwrap_or(0) as u32,
-                ))
+                Some(FavFolder {
+                    id: item["id"].as_i64()?,
+                    title: item["title"].as_str()?.to_string(),
+                    count: item["media_count"].as_u64().unwrap_or(0) as u32,
+                    cover: item["cover"]
+                        .as_str()
+                        .filter(|c| !c.is_empty())
+                        .map(|c| c.replacen("http://", "https://", 1)),
+                })
             })
             .collect())
     }
@@ -214,6 +244,7 @@ impl Client {
         folder_id: i64,
         page: u32,
         ps: u32,
+        min_interval: std::time::Duration,
     ) -> Result<Vec<serde_json::Value>, BiliError> {
         let v = self
             .get_json(
@@ -221,7 +252,7 @@ impl Client {
                     "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps={ps}&pn={}&platform=web",
                     page.max(1)
                 ),
-                std::time::Duration::from_millis(400),
+                min_interval,
             )
             .await?;
         Ok(v["data"]["medias"].as_array().cloned().unwrap_or_default())
@@ -230,7 +261,7 @@ impl Client {
     /// 收藏夹列表用的封面拼图：取每个夹子最前面的几张封面。
     pub async fn fav_covers(&self, folder_id: i64, limit: u32) -> Result<Vec<String>, BiliError> {
         Ok(self
-            .fav_medias(folder_id, 1, limit.clamp(1, 20))
+            .fav_medias(folder_id, 1, limit.clamp(1, 20), std::time::Duration::from_millis(180))
             .await?
             .iter()
             .filter_map(|m| m["cover"].as_str().filter(|c| !c.is_empty()))
@@ -252,7 +283,7 @@ impl Client {
         use bilimusic_model::{Millis, Track, TrackKey};
 
         Ok(self
-            .fav_medias(folder_id, page, 40)
+            .fav_medias(folder_id, page, 40, std::time::Duration::from_millis(400))
             .await?
             .iter()
             .filter_map(|m| {
@@ -538,6 +569,48 @@ impl Client {
                 let code = e["text"].as_str()?.to_string();
                 let url = e["url"].as_str().filter(|u| u.starts_with("http"))?;
                 Some((code, url.to_string()))
+            })
+            .collect())
+    }
+
+    /// 搜 UP 主。和视频搜索同一个端点，只换 search_type。
+    pub async fn search_users(&self, keyword: &str, page: u32) -> Result<Vec<UserHit>, BiliError> {
+        let v = self
+            .signed_get(
+                &format!("{API}/x/web-interface/wbi/search/type"),
+                vec![
+                    ("search_type", "bili_user".to_string()),
+                    ("keyword", keyword.to_string()),
+                    ("page", page.max(1).to_string()),
+                    ("page_size", "20".to_string()),
+                ],
+                // 搜索接口连续请求会被限流成空结果，和 search_q 一样按 1 秒隔开
+                std::time::Duration::from_millis(1000),
+            )
+            .await?;
+        let Some(list) = v["data"]["result"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|m| {
+                let mid = m["mid"].as_u64()?;
+                let face = m["upic"].as_str().map(|u| {
+                    if let Some(rest) = u.strip_prefix("//") {
+                        format!("https://{rest}")
+                    } else {
+                        u.replacen("http://", "https://", 1)
+                    }
+                });
+                Some(UserHit {
+                    mid,
+                    name: m["uname"].as_str().unwrap_or_default().to_string(),
+                    face: face.filter(|u| !u.is_empty()),
+                    fans: m["fans"].as_u64().unwrap_or(0),
+                    videos: m["videos"].as_u64().unwrap_or(0),
+                    sign: m["usign"].as_str().unwrap_or_default().trim().to_string(),
+                    level: m["level"].as_u64().unwrap_or(0) as u8,
+                })
             })
             .collect())
     }

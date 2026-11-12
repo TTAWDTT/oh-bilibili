@@ -374,12 +374,13 @@ async fn 收藏夹一页要多久() {
     source.import_cookies(&pairs);
     source.refresh_session().await.expect("刷新会话");
     let folders = source.fav_folders().await.expect("收藏夹列表");
-    let (id, name, count) = folders
+    let folder = folders
         .iter()
-        .max_by_key(|(_, _, c)| *c)
-        .map(|(i, n, c)| (*i, n.clone(), *c))
+        .max_by_key(|f| f.count)
         .expect("至少一个收藏夹");
+    let (id, name, count) = (folder.id, folder.title.clone(), folder.count);
     println!("用收藏夹「{name}」({count} 个视频)");
+    assert!(folder.cover.is_some(), "收藏夹列表接口应该自带封面");
 
     let covers = source.fav_covers(id, 4).await.expect("前四张封面");
     println!("封面拼图 {} 张", covers.len());

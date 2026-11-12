@@ -534,6 +534,7 @@ struct FavFolderView {
     id: i64,
     title: String,
     count: u32,
+    cover: Option<String>,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -544,7 +545,12 @@ async fn fav_folders(
         .fav_folders()
         .await?
         .into_iter()
-        .map(|(id, title, count)| FavFolderView { id, title, count })
+        .map(|f| FavFolderView {
+            id: f.id,
+            title: f.title,
+            count: f.count,
+            cover: f.cover,
+        })
         .collect())
 }
 
@@ -569,6 +575,39 @@ async fn video_online(
 #[tauri::command(rename_all = "snake_case")]
 async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<Track>, WireError> {
     engine.ranking(rid).await
+}
+
+#[derive(Serialize)]
+struct UserHitView {
+    mid: u64,
+    name: String,
+    face: Option<String>,
+    fans: u64,
+    videos: u64,
+    sign: String,
+    level: u8,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn search_users(
+    engine: tauri::State<'_, Arc<Engine>>,
+    keyword: String,
+    page: u32,
+) -> Result<Vec<UserHitView>, WireError> {
+    Ok(engine
+        .search_users(&keyword, page)
+        .await?
+        .into_iter()
+        .map(|u| UserHitView {
+            mid: u.mid,
+            name: u.name,
+            face: u.face,
+            fans: u.fans,
+            videos: u.videos,
+            sign: u.sign,
+            level: u.level,
+        })
+        .collect())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -859,6 +898,7 @@ pub fn run() {
             liked_videos,
             video_tags,
             comment_emotes,
+            search_users,
             ranking,
             video_online,
             author_card,

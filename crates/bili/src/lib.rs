@@ -300,7 +300,7 @@ impl Source {
     }
 
     /// 收藏夹列表。
-    pub async fn fav_folders(&self) -> Result<Vec<(i64, String, u32)>, BiliError> {
+    pub async fn fav_folders(&self) -> Result<Vec<sync::FavFolder>, BiliError> {
         self.client.fav_folders().await
     }
 
@@ -322,6 +322,15 @@ impl Source {
     /// 评论表情面板。
     pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, BiliError> {
         self.client.comment_emotes().await
+    }
+
+    /// 搜 UP 主。
+    pub async fn search_users(
+        &self,
+        keyword: &str,
+        page: u32,
+    ) -> Result<Vec<sync::UserHit>, BiliError> {
+        self.client.search_users(keyword, page).await
     }
 
     /// 排行榜。
