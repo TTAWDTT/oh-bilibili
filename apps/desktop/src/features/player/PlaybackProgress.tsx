@@ -8,6 +8,7 @@ import { usePlayerStore } from './playerStore'
 export function PlaybackProgress() {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const seek = usePlayerStore((state) => state.seek)
+  const next = usePlayerStore((state) => state.next)
   const duration = snapshot?.duration_ms ?? 0
   const [now, setNow] = useState(() => readPlayhead())
   const [scrub, setScrub] = useState<number | null>(null)
@@ -43,6 +44,12 @@ export function PlaybackProgress() {
   const commit = (value: number): void => {
     if (duration <= 0) return
     setScrub(value)
+    // 拖到最右等于「这首听完了」。解码器不接受落在时长上的 seek
+    // （实测原地不动后从头重放），直接按切歌处理。
+    if (value > 0.999) {
+      void next().finally(() => setScrub(null))
+      return
+    }
     void seek(value * duration).finally(() => setScrub(null))
   }
 

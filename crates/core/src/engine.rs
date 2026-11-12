@@ -690,7 +690,23 @@ impl Engine {
     }
 
     pub fn seek(&self, position_ms: u64) -> PlayerSnapshot {
-        lock(&self.player).seek(position_ms);
+        // 正好落在曲目时长上的 seek 会被解码器拒掉（实测按 End 之后位置不动、
+        // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
+        // 播完该切歌仍由 reached_track_end 负责。
+        let duration = {
+            let st = lock(&self.state);
+            st.track()
+                .and_then(|k| lock(&self.known).get(k.as_opaque()).cloned())
+                .and_then(|t| t.duration)
+                .map(|d| d.0)
+                .unwrap_or(0)
+        };
+        let target = if duration > 1000 && position_ms >= duration - 1000 {
+            duration - 1000
+        } else {
+            position_ms
+        };
+        lock(&self.player).seek(target);
         self.snapshot()
     }
 
