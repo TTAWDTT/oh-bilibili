@@ -2,7 +2,8 @@ const SHORTCUTS: ReadonlyArray<{ keys: readonly string[]; label: string; detail:
   { keys: ['空格'], label: '播放 / 暂停', detail: '输入框里不触发，不会打断打字' },
   { keys: ['←', '→'], label: '快退 / 快进 5 秒', detail: '焦点在进度条上时交给滑块处理' },
   { keys: ['⌘', 'K'], label: '聚焦搜索框', detail: '任何页面都直接回到搜索' },
-  { keys: ['F'], label: '全屏播放', detail: '观看页有效' },
+  { keys: ['F'], label: '全屏播放', detail: '窗口进系统全屏' },
+  { keys: ['W'], label: '网页全屏', detail: '只铺满窗口，不切系统全屏' },
   { keys: ['Esc'], label: '退出全屏 / 关闭弹窗', detail: '都没有时收起右栏' },
 ]
 

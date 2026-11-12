@@ -38,7 +38,10 @@ export function useShortcuts(): void {
         // 先退出全屏，再收右栏。
         if (!dialogOpen) {
           const app = useAppStore.getState()
-          if (app.cinema) app.setCinema(false)
+          if (app.cinema) {
+            app.setCinema(false)
+            app.setOsFullscreen(false)
+          }
           else app.closeRail()
         }
         return
@@ -52,11 +55,25 @@ export function useShortcuts(): void {
         if (player.snapshot?.track) void player.toggle()
         return
       }
-      // F 只在观看页有意义：其他页面没有可放大的画面。
-      if (event.key.toLowerCase() === 'f' && useAppStore.getState().view.kind === 'watch') {
+      // F 全屏、W 网页全屏，和 B 站播放器同一套键位。
+      // 只在观看页有意义：其他页面没有可放大的画面。
+      const key = event.key.toLowerCase()
+      if ((key === 'f' || key === 'w') && useAppStore.getState().view.kind === 'watch') {
         event.preventDefault()
         const app = useAppStore.getState()
-        app.setCinema(!app.cinema)
+        if (key === 'f') {
+          if (app.osFullscreen) {
+            app.setCinema(false)
+            app.setOsFullscreen(false)
+          } else {
+            app.setCinema(true)
+            app.setOsFullscreen(true)
+          }
+        } else if (app.cinema && !app.osFullscreen) {
+          app.setCinema(false)
+        } else if (!app.cinema) {
+          app.setCinema(true)
+        }
         return
       }
       if (event.key === 'ArrowLeft') {

@@ -37,8 +37,13 @@ type AppStore = {
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
-  /** 观看页的全屏。窗口真全屏 + 隐藏应用外壳，不是把画面固定在页面里。 */
+  /**
+   * 观看页的「沉浸」布局：隐藏应用外壳，画面占满窗口。
+   * 网页全屏与全屏都会打开它，区别只在窗口要不要进系统全屏。
+   */
   cinema: boolean
+  /** 窗口是否进系统全屏。只有「全屏」把它打开，「网页全屏」不动窗口。 */
+  osFullscreen: boolean
   /** 搜索页要预填的作者名。点 UP 主时写入，搜索页消费后清空。 */
   authorQuery: string | null
   toasts: Toast[]
@@ -57,6 +62,7 @@ type AppStore = {
   setAuthOpen: (open: boolean) => void
   setStage: (open: boolean) => void
   setCinema: (on: boolean) => void
+  setOsFullscreen: (on: boolean) => void
   setAuthorQuery: (q: string | null) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
@@ -77,6 +83,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   mv: null,
   stage: false,
   cinema: false,
+  osFullscreen: false,
   authorQuery: null,
   toasts: [],
   navigate: (view) =>
@@ -85,13 +92,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
         return {}
       }
-      return { view, cinema: false, history: [...state.history, state.view].slice(-32) }
+      return { view, cinema: false, osFullscreen: false, history: [...state.history, state.view].slice(-32) }
     }),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)
-      if (!prev) return { view: { kind: 'home' }, cinema: false }
-      return { view: prev, cinema: false, history: state.history.slice(0, -1) }
+      if (!prev) return { view: { kind: 'home' }, cinema: false, osFullscreen: false }
+      return { view: prev, cinema: false, osFullscreen: false, history: state.history.slice(0, -1) }
     }),
   setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
@@ -104,6 +111,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setAuthOpen: (open) => set({ authOpen: open }),
   setStage: (open) => set({ stage: open }),
   setCinema: (on) => set({ cinema: on }),
+  setOsFullscreen: (on) => set({ osFullscreen: on }),
   setAuthorQuery: (q) => set({ authorQuery: q }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1

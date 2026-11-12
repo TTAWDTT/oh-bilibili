@@ -102,6 +102,8 @@ export function WatchPlayer({
   const [sending, setSending] = useState(false)
   const cinema = useAppStore((state) => state.cinema)
   const setCinema = useAppStore((state) => state.setCinema)
+  const osFullscreen = useAppStore((state) => state.osFullscreen)
+  const setOsFullscreen = useAppStore((state) => state.setOsFullscreen)
   const [playing, setPlaying] = useState(false)
   /** 播到结尾就掀开三连面板。 */
   const [finished, setFinished] = useState(false)
@@ -152,9 +154,16 @@ export function WatchPlayer({
     poke()
   }
 
-  // 元素全屏在 WKWebView 里会把 MSE 画面画成黑的，而且页面上的 transform
-  // 动画会把 fixed 后代钉在内容区里。全屏走窗口本身，播放器仍在正常布局里。
-  const toggleFullscreen = (): void => setCinema(!cinema)
+  /**
+   * 两种「铺满」，和 B 站播放器一一对应：
+   * - 网页全屏（W）：画面占满窗口，窗口本身不动，随时能拖走或切别的窗口
+   * - 全屏（F）：同上，另外让窗口进系统全屏
+   * 两者都靠隐藏应用外壳腾出空间；元素全屏在 WKWebView 里会把 MSE 画黑，不能用。
+   */
+  const setStageMode = (web: boolean, os: boolean): void => {
+    setCinema(web)
+    setOsFullscreen(os)
+  }
 
   useEffect(() => {
     // 首次挂载不要把用户自己开的窗口全屏关掉。
@@ -163,15 +172,16 @@ export function WatchPlayer({
       return
     }
     try {
-      void getCurrentWindow().setFullscreen(cinema).catch(() => {})
+      void getCurrentWindow().setFullscreen(osFullscreen).catch(() => {})
     } catch {
-      // 浏览器预览里没有 Tauri 窗口，CSS 全屏仍然生效。
+      // 浏览器预览里没有 Tauri 窗口。
     }
-  }, [cinema])
+  }, [osFullscreen])
 
   useEffect(() => {
     return () => {
       useAppStore.getState().setCinema(false)
+      useAppStore.getState().setOsFullscreen(false)
       try {
         void getCurrentWindow().setFullscreen(false).catch(() => {})
       } catch {
@@ -639,13 +649,27 @@ export function WatchPlayer({
             </div>
           ) : null}
 
+          {/* B 站播放器在这两个位置摆的是「网页全屏」和「全屏」。
+              桌面端也保留这个层次：前者只铺满窗口，后者再进系统全屏。 */}
           <button
             type="button"
-            onClick={() => void toggleFullscreen()}
-            aria-label="全屏"
+            onClick={() => setStageMode(!cinema, false)}
+            aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
+            title="网页全屏（W）"
+            className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+              cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
+            }`}
+          >
+            <Icon name="fullscreen" size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => (osFullscreen ? setStageMode(false, false) : setStageMode(true, true))}
+            aria-label={osFullscreen ? '退出全屏' : '全屏'}
+            title="全屏（F）"
             className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
-            <Icon name={cinema ? 'close' : 'fullscreen'} size={14} />
+            <Icon name={osFullscreen ? 'close' : 'fullscreen'} size={14} />
           </button>
         </div>
       </div>
