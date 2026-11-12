@@ -77,7 +77,10 @@ export function playerPrev(): Promise<PlayerSnapshot> {
 }
 
 export function playerSeek(positionMs: number): Promise<PlayerSnapshot> {
-  return call<PlayerSnapshot>('player_seek', { position_ms: positionMs })
+  // 进度条给的是「比例 × 时长」，天然带小数；Rust 侧是 u64，带小数过去
+  // 整条命令会被拒（实测拖到 100% 就弹「invalid type: floating point」）。
+  // 单位换算是这里的边界，四舍五入一次就够了。
+  return call<PlayerSnapshot>('player_seek', { position_ms: Math.max(0, Math.round(positionMs)) })
 }
 
 /** 设置播放倍速 0.5..2.0。 */
