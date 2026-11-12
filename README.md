@@ -63,7 +63,7 @@ chmod +x resources/yt-dlp
 ## 打包
 
 ```sh
-npm run bundle        # 产出 target/release/bundle/macos/BiliMusic.app，约 8.5MB
+npm run bundle        # 产出 target/release/bundle/macos/BiliMusic.app，约 54MB
 ```
 
 `.app` 未经签名，首次打开要右键 -> 打开。dmg 打包在本机无图形会话时会卡在 Finder AppleScript

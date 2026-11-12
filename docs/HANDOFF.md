@@ -4,8 +4,8 @@
 
 ## 一句话现状
 
-能跑通的桌面音乐播放器。搜索、播放、歌单、歌词、弹幕、下载、历史、收藏夹都能用，
-UI 按 B 站网页端的视觉语言做（浅色底、B 站粉、封面卡片、分区标签、三连按钮）。
+能跑通的 B 站桌面客户端。搜索、播放、歌单、歌词、弹幕、下载、历史、收藏夹都能用，
+UI 按 B 站网页端的视觉语言做（浅色底、B 站蓝、封面卡片、分区标签、三连按钮）。
 
 ## 怎么跑
 
@@ -14,7 +14,7 @@ cd bili-music
 npm install
 export PATH="$HOME/.cargo/bin:$PATH"   # Rust 是 --no-modify-path 装的
 npm run dev                            # 开发窗口
-npm run bundle                         # 打 .app（约 44MB，含 yt-dlp）
+npm run bundle                         # 打 .app（约 54MB，含 yt-dlp）
 ```
 
 只调界面用 `npm run web`（端口 1420，内存 mock，不碰真实接口）。
