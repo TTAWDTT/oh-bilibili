@@ -219,6 +219,12 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                     <span className="num shrink-0">{formatCount(track.views)}</span>
                   </>
                 ) : null}
+                {track.danmaku ? (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span className="num shrink-0">{formatCount(track.danmaku)} 弹幕</span>
+                  </>
+                ) : null}
               </div>
 
               {confirming === track.key ? (

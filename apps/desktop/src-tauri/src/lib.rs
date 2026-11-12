@@ -181,8 +181,11 @@ async fn watch_comments(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     page: u32,
+    hot: Option<bool>,
 ) -> Result<bilimusic_core::wire::CommentPage, WireError> {
-    engine.comments(&TrackKey::from_provider(key), page).await
+    engine
+        .comments(&TrackKey::from_provider(key), page, hot.unwrap_or(true))
+        .await
 }
 
 #[tauri::command(rename_all = "snake_case")]

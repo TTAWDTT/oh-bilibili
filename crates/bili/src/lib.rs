@@ -443,9 +443,12 @@ impl Source {
         &self,
         key: &TrackKey,
         page: u32,
+        hot: bool,
     ) -> Result<crate::comments::CommentPage, BiliError> {
         let detail = self.detail(key).await?;
         let per_page = 20u32;
+        // 2 是「按热度」，0 是「按时间」。这两档是 B 站网页上那一对按钮。
+        let sort = if hot { "2" } else { "0" };
         let value = self
             .client
             .signed_get(
@@ -453,7 +456,7 @@ impl Source {
                 vec![
                     ("type", "1".to_string()),
                     ("oid", detail.aid.to_string()),
-                    ("sort", "2".to_string()),
+                    ("sort", sort.to_string()),
                     ("ps", per_page.to_string()),
                     ("pn", page.to_string()),
                 ],

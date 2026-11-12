@@ -86,6 +86,8 @@ function CommentRow({
  * 不白屏，也不影响看视频。
  */
 export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; flow?: boolean }) {
+  /** B 站那一对按钮：热度优先，还是时间优先。 */
+  const [hot, setHot] = useState(true)
   const [items, setItems] = useState<Comment[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -122,14 +124,14 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow, hasMore, loading, page, trackKey])
 
-  const load = async (next: number): Promise<void> => {
+  const load = async (next: number, byHot = hot): Promise<void> => {
     if (loadingRef.current || next <= pageRef.current) return
     const seq = seqRef.current
     loadingRef.current = true
     setLoading(true)
     setError(null)
     try {
-      const res: CommentPage = await ipc.watchComments(trackKey, next)
+      const res: CommentPage = await ipc.watchComments(trackKey, next, byHot)
       if (seq !== seqRef.current) return
       setItems((prev) => (next === 1 ? res.items : [...prev, ...res.items]))
       setTotal(res.total)
@@ -154,9 +156,9 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
     setPage(0)
     pageRef.current = 0
     setHasMore(false)
-    void load(1)
+    void load(1, hot)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackKey])
+  }, [trackKey, hot])
 
   const onScroll = (): void => {
     const box = boxRef.current
@@ -221,6 +223,26 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
         <span className="num text-[12px] text-[var(--text-3)]">
           {total > 0 ? formatCount(total) : '—'}
         </span>
+        <div className="ml-auto flex items-center gap-1 text-[12px]">
+          {[
+            { on: true, label: '最热' },
+            { on: false, label: '最新' },
+          ].map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              aria-pressed={hot === option.on}
+              onClick={() => setHot(option.on)}
+              className={`t press rounded-[4px] px-2 py-0.5 ${
+                hot === option.on
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className={`border-b border-hairline pb-3 ${flow ? '' : 'px-3'}`}>
         {replyTo ? (

@@ -93,6 +93,8 @@ export function WatchPlayer({
   const danmakuSize = useDanmakuSettings((s) => s.size)
   const danmakuSpeed = useDanmakuSettings((s) => s.speed)
   const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
+  const patchDanmaku = useDanmakuSettings((s) => s.patch)
+  const [danmakuPanel, setDanmakuPanel] = useState(false)
 
   const poke = (): void => {
     setControls(true)
@@ -472,6 +474,49 @@ export function WatchPlayer({
           >
             弹
           </button>
+
+          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮，四项可调。 */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setDanmakuPanel((open) => !open)}
+              aria-expanded={danmakuPanel}
+              aria-label="弹幕设置"
+              title="弹幕设置"
+              className={`t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
+                danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
+              }`}
+            >
+              <Icon name="settings" size={14} />
+            </button>
+            {danmakuPanel ? (
+              <div className="absolute bottom-9 right-0 z-30 w-[196px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+                {(
+                  [
+                    { key: 'opacity', label: '不透明度', min: 0.2, max: 1, step: 0.1, value: danmakuOpacity },
+                    { key: 'size', label: '字号', min: 11, max: 20, step: 1, value: danmakuSize },
+                    { key: 'speed', label: '速度', min: 0.6, max: 2, step: 0.2, value: danmakuSpeed },
+                  ] as const
+                ).map((row) => (
+                  <label key={row.key} className="mb-2 block last:mb-0">
+                    <span className="flex items-center justify-between text-[11px] text-white/70">
+                      {row.label}
+                      <span className="num">{row.key === 'opacity' ? `${Math.round(row.value * 100)}%` : row.value}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={row.min}
+                      max={row.max}
+                      step={row.step}
+                      value={row.value}
+                      onChange={(event) => patchDanmaku({ [row.key]: Number(event.target.value) })}
+                      className="mt-1 w-full accent-[var(--accent)]"
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
           <button
             type="button"

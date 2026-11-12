@@ -86,6 +86,19 @@ export function WatchInfo({
         : 'border-[var(--line)] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
     ].join(' ')
 
+  /**
+   * 三连的三段。B 站把点赞/投币/收藏连成一排，中间没有缝；
+   * 分成三个独立胶囊就看不出它们是同一组动作。
+   */
+  const triple = (on: boolean, edge: 'left' | 'middle' | 'right'): string =>
+    [
+      't press flex h-9 items-center gap-1.5 border border-[var(--line)] px-4 text-[13px] first:border-l',
+      edge === 'left' ? 'rounded-l-[6px] border-r-0' : '',
+      edge === 'middle' ? 'border-r-0' : '',
+      edge === 'right' ? 'rounded-r-[6px]' : '',
+      on ? 'text-[var(--accent)]' : 'text-[var(--text-1)] hover:text-[var(--accent)]',
+    ].join(' ')
+
   return (
     <div className="pb-4 pt-4">
       {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
@@ -141,6 +154,7 @@ export function WatchInfo({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-stretch">
         <button
           type="button"
           aria-pressed={liked}
@@ -150,7 +164,8 @@ export function WatchInfo({
               if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
             })
           }}
-          className={pill(liked)}
+          className={triple(liked, 'left')}
+          title={liked ? '取消点赞' : '点赞'}
         >
           <BiliThumb size={15} />
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
@@ -165,7 +180,8 @@ export function WatchInfo({
             }
             setConfirmingCoin(true)
           }}
-          className={pill(coins > 0)}
+          className={triple(coins > 0, 'middle')}
+          title="投币"
         >
           <BiliCoin size={15} />
           {formatCount(data.stats.coins + coinDelta)}
@@ -179,11 +195,13 @@ export function WatchInfo({
               if (next !== null && next !== before) setFavDelta((n) => n + (next ? 1 : -1))
             })
           }}
-          className={pill(faved)}
+          className={triple(faved, 'right')}
+          title={faved ? '取消收藏' : '收藏'}
         >
           <BiliStar size={15} />
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>
+        </div>
         <button
           type="button"
           aria-pressed={saved}

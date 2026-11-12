@@ -506,8 +506,9 @@ impl Engine {
         &self,
         key: &TrackKey,
         page: u32,
+        hot: bool,
     ) -> Result<crate::wire::CommentPage, WireError> {
-        Ok(self.source.comments(key, page.max(1)).await?)
+        Ok(self.source.comments(key, page.max(1), hot).await?)
     }
 
     /// 发评论；`root` 与 `parent` 都为空时是评论，否则是回复。

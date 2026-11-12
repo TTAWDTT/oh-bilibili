@@ -337,8 +337,8 @@ export function homeFeed(fresh: number): Promise<Track[]> {
 }
 
 /** 取一页评论。 */
-export function watchComments(key: string, page: number): Promise<CommentPage> {
-  return invoke<CommentPage>('watch_comments', { key, page })
+export function watchComments(key: string, page: number, hot = true): Promise<CommentPage> {
+  return invoke<CommentPage>('watch_comments', { key, page, hot })
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
