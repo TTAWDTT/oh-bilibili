@@ -115,15 +115,6 @@ export function WatchPlayer({
   }, [cinema])
 
   useEffect(() => {
-    if (!cinema) return
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setCinema(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [cinema, setCinema])
-
-  useEffect(() => {
     return () => {
       useAppStore.getState().setCinema(false)
       try {

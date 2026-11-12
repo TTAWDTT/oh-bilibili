@@ -34,8 +34,13 @@ export function useShortcuts(): void {
         return
       }
       if (event.key === 'Escape') {
-        // 弹窗自己在 Modal 里处理 Esc，这里只负责没有弹窗时收起右栏。
-        if (!dialogOpen) useAppStore.getState().closeRail()
+        // 弹窗自己在 Modal 里处理 Esc，这里只负责没有弹窗时的收尾：
+        // 先退出全屏，再收右栏。
+        if (!dialogOpen) {
+          const app = useAppStore.getState()
+          if (app.cinema) app.setCinema(false)
+          else app.closeRail()
+        }
         return
       }
       if (dialogOpen || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
@@ -45,6 +50,13 @@ export function useShortcuts(): void {
       if (event.code === 'Space') {
         event.preventDefault()
         if (player.snapshot?.track) void player.toggle()
+        return
+      }
+      // F 只在观看页有意义：其他页面没有可放大的画面。
+      if (event.key.toLowerCase() === 'f' && useAppStore.getState().view.kind === 'watch') {
+        event.preventDefault()
+        const app = useAppStore.getState()
+        app.setCinema(!app.cinema)
         return
       }
       if (event.key === 'ArrowLeft') {
