@@ -433,7 +433,11 @@ impl Engine {
     ) -> Result<PlayerSnapshot, WireError> {
         *lock(&self.mode) = mode;
         if mode == crate::wire::PlayMode::Watch {
-            return Ok(self.snapshot());
+            let snapshot = self.snapshot();
+            // 模式本身也是快照的一部分。同一条已经加载好时不会走 play_key，
+            // 没有这条事件，界面就会一直以为还在看。
+            self.emit_state();
+            return Ok(snapshot);
         }
 
         // 要听哪一条：调用方给了就用它，否则用队列当前项。
@@ -457,12 +461,15 @@ impl Engine {
             if let Some(at) = at_ms.filter(|v| *v > 0) {
                 self.seek(at);
             }
+            self.emit_state();
             return Ok(snapshot);
         }
         if let Some(at) = at_ms.filter(|v| *v > 0) {
             self.seek(at);
         }
-        Ok(self.snapshot())
+        let snapshot = self.snapshot();
+        self.emit_state();
+        Ok(snapshot)
     }
 
     /// 给测试与手动触发用的进度上报。
