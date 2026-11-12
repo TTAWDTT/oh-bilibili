@@ -15,6 +15,8 @@ pub struct Comment {
     pub text: String,
     /// 评论里的 B 站表情：原文代号（如 `[doge]`）到图片地址。
     pub emotes: Vec<(String, String)>,
+    /// 评论者等级。B 站把 LV 牌挂在昵称后面。
+    pub level: u8,
     pub likes: u32,
     /// Unix 秒。
     pub at: i64,
@@ -62,6 +64,14 @@ struct RawMember {
     uname: String,
     #[serde(default)]
     avatar: String,
+    #[serde(default)]
+    level_info: Option<RawLevel>,
+}
+
+#[derive(Deserialize)]
+struct RawLevel {
+    #[serde(default)]
+    current_level: u64,
 }
 
 #[derive(Deserialize)]
@@ -89,6 +99,12 @@ fn to_comment(raw: RawReply) -> Comment {
         .as_ref()
         .map(|m| m.avatar.trim().to_string())
         .filter(|s| !s.is_empty());
+    let level = raw
+        .member
+        .as_ref()
+        .and_then(|m| m.level_info.as_ref())
+        .map(|l| l.current_level as u8)
+        .unwrap_or(0);
     let replies = raw
         .replies
         .unwrap_or_default()
@@ -127,6 +143,7 @@ fn to_comment(raw: RawReply) -> Comment {
         }),
         text,
         emotes,
+        level,
         likes: raw.like,
         at: raw.ctime,
         replies,

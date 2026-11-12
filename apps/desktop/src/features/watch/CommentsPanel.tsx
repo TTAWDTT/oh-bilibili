@@ -4,6 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
 /** 把评论里的 [表情] 代号换成 B 站表情图，其余文字原样保留。 */
@@ -71,6 +72,7 @@ function CommentRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
+            {c.level > 0 ? <LevelBadge level={c.level} /> : null}
             {c.likes > 0 ? (
               <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
                 {formatCount(c.likes)} 赞
@@ -224,6 +226,7 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
             avatar: me?.avatar ?? null,
             text,
             emotes: [],
+            level: me?.level ?? 0,
             likes: 0,
             at: Math.floor(Date.now() / 1000),
             replies: [],
