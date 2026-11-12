@@ -18,6 +18,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 export function HistoryView() {
   const [entries, setEntries] = useState<import('../../shared/lib/ipc').HistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmingClear, setConfirmingClear] = useState(false)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function HistoryView() {
     try {
       await ipc.historyClear()
       setEntries([])
+      setConfirmingClear(false)
       toastDone('历史已清空')
     } catch (e) {
       reportActionError('清空历史', e)
@@ -98,13 +100,33 @@ export function HistoryView() {
     <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <div className="mb-4 flex items-center justify-between">
         <PageTitle>历史</PageTitle>
-        <button
-          type="button"
-          onClick={() => void clearAll()}
-          className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        >
-          清空历史
-        </button>
+        {confirmingClear ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[var(--text-3)]">清空后无法恢复</span>
+            <button
+              type="button"
+              onClick={() => void clearAll()}
+              className="bili-press rounded-[6px] bg-[var(--danger)] px-3 py-1 text-[13px] text-white hover:opacity-90"
+            >
+              清空
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(false)}
+              className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+            >
+              取消
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingClear(true)}
+            className="bili-press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            清空历史
+          </button>
+        )}
       </div>
 
       {groups.map((group) => (
