@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
@@ -36,8 +38,8 @@ export function WatchPlayer({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
-  const stageRef = useRef<HTMLDivElement | null>(null)
   const hideTimer = useRef<number | null>(null)
+  const fullscreenSynced = useRef(false)
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
@@ -47,7 +49,8 @@ export function WatchPlayer({
   const [now, setNow] = useState(0)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
-  const [cinema, setCinema] = useState(false)
+  const cinema = useAppStore((state) => state.cinema)
+  const setCinema = useAppStore((state) => state.setCinema)
   const [playing, setPlaying] = useState(false)
 
   const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
@@ -94,20 +97,42 @@ export function WatchPlayer({
     poke()
   }
 
-  const toggleFullscreen = async (): Promise<void> => {
-    const box = stageRef.current
-    if (!box) return
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen()
-        return
-      }
-      await box.requestFullscreen()
-    } catch {
-      // WebView 不支持元素全屏时，用 CSS 铺满顶上
-      setCinema((on) => !on)
+  // 元素全屏在 WKWebView 里会把 MSE 画面画成黑的，而且页面上的 transform
+  // 动画会把 fixed 后代钉在内容区里。全屏走窗口本身，播放器仍在正常布局里。
+  const toggleFullscreen = (): void => setCinema(!cinema)
+
+  useEffect(() => {
+    // 首次挂载不要把用户自己开的窗口全屏关掉。
+    if (!fullscreenSynced.current) {
+      fullscreenSynced.current = true
+      return
     }
-  }
+    try {
+      void getCurrentWindow().setFullscreen(cinema).catch(() => {})
+    } catch {
+      // 浏览器预览里没有 Tauri 窗口，CSS 全屏仍然生效。
+    }
+  }, [cinema])
+
+  useEffect(() => {
+    if (!cinema) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setCinema(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [cinema, setCinema])
+
+  useEffect(() => {
+    return () => {
+      useAppStore.getState().setCinema(false)
+      try {
+        void getCurrentWindow().setFullscreen(false).catch(() => {})
+      } catch {
+        // 浏览器预览里没有 Tauri 窗口。
+      }
+    }
+  }, [])
 
   const sendDanmaku = async (): Promise<void> => {
     const text = draft.trim()
@@ -216,13 +241,12 @@ export function WatchPlayer({
 
   return (
     <div
-      ref={stageRef}
       onMouseMove={poke}
       onMouseLeave={() => setControls(false)}
       className={
         cinema
-          ? 'fixed inset-0 z-50 flex flex-col justify-center bg-black'
-          : 'relative aspect-video w-full shrink-0 bg-black md:max-h-[64vh]'
+          ? 'relative flex h-full w-full flex-col justify-center bg-black'
+          : 'relative aspect-video w-full shrink-0 bg-black'
       }
     >
       <video
@@ -437,7 +461,7 @@ export function WatchPlayer({
             aria-label="全屏"
             className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
-            <Icon name={cinema || document.fullscreenElement ? 'close' : 'fullscreen'} size={14} />
+            <Icon name={cinema ? 'close' : 'fullscreen'} size={14} />
           </button>
         </div>
       </div>

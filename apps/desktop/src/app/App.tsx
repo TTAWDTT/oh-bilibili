@@ -103,6 +103,7 @@ export default function App() {
   const view = useAppStore((state) => state.view)
   const rail = useAppStore((state) => state.rail)
   const setRail = useAppStore((state) => state.setRail)
+  const cinema = useAppStore((state) => state.cinema)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
 
@@ -137,7 +138,7 @@ export default function App() {
       >
         跳到主要内容
       </a>
-      <TitleBar />
+      {cinema ? null : <TitleBar />}
 
       <div className="relative z-10 flex min-h-0 flex-1">
         {showSidebar ? <Sidebar /> : null}

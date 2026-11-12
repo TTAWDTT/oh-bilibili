@@ -19,6 +19,7 @@ import { WatchPlayer } from './WatchPlayer'
  */
 export function WatchView({ track }: { track: Track }) {
   const goBack = useAppStore((s) => s.goBack)
+  const cinema = useAppStore((s) => s.cinema)
   const [data, setData] = useState<WatchData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
@@ -91,9 +92,14 @@ export function WatchView({ track }: { track: Track }) {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
             之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
-        <div data-scroll-root className="min-h-0 flex-1 overflow-y-auto px-6 pt-4">
+        <div
+          data-scroll-root
+          className={
+            cinema ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto px-6 pt-4'
+          }
+        >
           {data ? (
-            <div className="overflow-hidden rounded-[8px]">
+            <div className={cinema ? 'h-full' : 'overflow-hidden rounded-[8px]'}>
               <WatchPlayer
                 track={track}
                 data={data}
@@ -104,12 +110,12 @@ export function WatchView({ track }: { track: Track }) {
           ) : (
             <div className="aspect-video w-full shrink-0 bg-black" />
           )}
-          {error ? (
+          {!cinema && error ? (
             <p className="border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]">
               这条视频没打开：{error}
             </p>
           ) : null}
-          {data ? (
+          {!cinema && data ? (
             <WatchInfo
               track={track}
               data={data}
@@ -121,19 +127,23 @@ export function WatchView({ track }: { track: Track }) {
             />
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
-          <div className="border-t border-hairline md:hidden">
-            <RelatedAside items={related} />
-          </div>
-          <div className="border-t border-hairline">
-            <CommentsPanel trackKey={track.key} flow />
-          </div>
+          {!cinema ? (
+            <div className="border-t border-hairline md:hidden">
+              <RelatedAside items={related} />
+            </div>
+          ) : null}
+          {!cinema ? (
+            <div className="border-t border-hairline">
+              <CommentsPanel trackKey={track.key} flow />
+            </div>
+          ) : null}
         </div>
 
-        {/* 和音乐右栏同一个宽度变量。两处「右栏」宽度不一致，切换模式时中间
-            的画面会跟着跳一下。 */}
-        <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
-          <RelatedAside items={related} />
-        </aside>
+        {!cinema ? (
+          <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
+            <RelatedAside items={related} />
+          </aside>
+        ) : null}
       </div>
     </div>
   )
