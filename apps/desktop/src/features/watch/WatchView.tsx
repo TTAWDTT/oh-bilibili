@@ -105,6 +105,7 @@ export function WatchView({ track }: { track: Track }) {
                 data={data}
                 danmaku={danmaku}
                 onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
+                onBack={() => goBack()}
               />
             </div>
           ) : (
@@ -120,7 +121,6 @@ export function WatchView({ track }: { track: Track }) {
               track={track}
               data={data}
               onPage={setPage}
-              onBack={() => goBack()}
               onListen={(at) => {
                 void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
               }}

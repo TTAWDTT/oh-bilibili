@@ -16,10 +16,11 @@ type ReactionStore = {
   hydrate: (keys: string[]) => Promise<void>
   /** 无视缓存重新查一次。详情页用：打开时看到的必须是真的。 */
   refresh: (keys: string[]) => Promise<void>
-  toggleLike: (track: Track) => Promise<void>
-  toggleFav: (track: Track) => Promise<void>
-  /** 投币。成功后本地计数 +count，与账号一致。 */
-  addCoin: (track: Track, count: number) => Promise<void>
+  /** 点赞/取消点赞。返回服务端确认后的新状态；失败返回 null。 */
+  toggleLike: (track: Track) => Promise<boolean | null>
+  toggleFav: (track: Track) => Promise<boolean | null>
+  /** 投币。成功后本地计数 +count，与账号一致；返回是否真的成功。 */
+  addCoin: (track: Track, count: number) => Promise<boolean>
   /** 收进指定收藏夹后把本地状态点亮点。 */
   favTo: (track: Track, folderId: number | null) => Promise<void>
 }
@@ -78,7 +79,7 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
       await ipc.likeSet(track.key, next)
     } catch (cause) {
       toastFailure(next ? '喜欢' : '取消喜欢', cause)
-      return
+      return null
     }
     set((state) => ({
       liked: { ...state.liked, [track.key]: next },
@@ -86,6 +87,7 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
         ? [track, ...state.likedTracks.filter((item) => item.key !== track.key)]
         : state.likedTracks.filter((item) => item.key !== track.key),
     }))
+    return next
   },
   addCoin: async (track, count) => {
     const previous = get().coins[track.key] ?? 0
@@ -96,8 +98,10 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
         coins: { ...state.coins, [track.key]: Math.min(2, previous + count) },
         liked: { ...state.liked, [track.key]: true },
       }))
+      return true
     } catch (cause) {
       reportActionError('投币', cause)
+      return false
     }
   },
   favTo: async (track, folderId) => {
@@ -118,6 +122,8 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
     } catch (cause) {
       set((state) => ({ faved: { ...state.faved, [track.key]: previous } }))
       toastFailure(next ? '收藏' : '取消收藏', cause)
+      return null
     }
+    return next
   },
 }))

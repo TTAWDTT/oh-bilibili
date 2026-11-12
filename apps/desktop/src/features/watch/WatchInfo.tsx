@@ -20,13 +20,11 @@ export function WatchInfo({
   track,
   data,
   onPage,
-  onBack,
   onListen,
 }: {
   track: Track
   data: WatchData
   onPage: (no: number) => void
-  onBack: () => void
   /** 把当前画面位置交给音频引擎，切到听模式。 */
   onListen: (atMs: number) => void
 }) {
@@ -39,6 +37,10 @@ export function WatchInfo({
 
   const [saved, setSaved] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
+  /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
+  const [coinDelta, setCoinDelta] = useState(0)
+  const [likeDelta, setLikeDelta] = useState(0)
+  const [favDelta, setFavDelta] = useState(0)
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
 
@@ -46,6 +48,9 @@ export function WatchInfo({
     let cancelled = false
     setSaved(false)
     setConfirmingCoin(false)
+    setCoinDelta(0)
+    setLikeDelta(0)
+    setFavDelta(0)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -83,16 +88,8 @@ export function WatchInfo({
 
   return (
     <div className="pb-4 pt-4">
-      {/* 返回、标题、听视频排在同一行：单独一条只有箭头的工具栏看着像丢了内容。 */}
+      {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
       <div className="flex items-start gap-2">
-        <button
-          type="button"
-          aria-label="返回"
-          onClick={onBack}
-          className="t press mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] hover:bg-[var(--panel-alt)]"
-        >
-          <Icon name="chevronLeft" size={16} />
-        </button>
         <h1
           className="min-w-0 flex-1 text-[20px] font-medium leading-[1.35] text-[var(--text-1)]"
           title={track.title}
@@ -144,9 +141,19 @@ export function WatchInfo({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" aria-pressed={liked} onClick={() => void toggleLike(track)} className={pill(liked)}>
+        <button
+          type="button"
+          aria-pressed={liked}
+          onClick={() => {
+            const before = liked
+            void toggleLike(track).then((next) => {
+              if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
+            })
+          }}
+          className={pill(liked)}
+        >
           <BiliThumb size={15} />
-          {formatCount(data.stats.likes)}
+          {formatCount(Math.max(0, data.stats.likes + likeDelta))}
         </button>
         <button
           type="button"
@@ -161,11 +168,21 @@ export function WatchInfo({
           className={pill(coins > 0)}
         >
           <BiliCoin size={15} />
-          {formatCount(data.stats.coins)}
+          {formatCount(data.stats.coins + coinDelta)}
         </button>
-        <button type="button" aria-pressed={faved} onClick={() => void toggleFav(track)} className={pill(faved)}>
+        <button
+          type="button"
+          aria-pressed={faved}
+          onClick={() => {
+            const before = faved
+            void toggleFav(track).then((next) => {
+              if (next !== null && next !== before) setFavDelta((n) => n + (next ? 1 : -1))
+            })
+          }}
+          className={pill(faved)}
+        >
           <BiliStar size={15} />
-          {formatCount(data.stats.favorites)}
+          {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>
         <button
           type="button"
@@ -209,7 +226,9 @@ export function WatchInfo({
             type="button"
             onClick={() => {
               setConfirmingCoin(false)
-              void addCoin(track, 1)
+              void addCoin(track, 1).then((ok) => {
+                if (ok) setCoinDelta((n) => n + 1)
+              })
             }}
             className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
           >

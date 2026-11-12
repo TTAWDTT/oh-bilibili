@@ -8,7 +8,7 @@ import type { Health } from '../../shared/lib/ipc'
 import { isTauri } from '../../shared/lib/runtime'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { FramedAvatar } from '../../shared/ui/FramedAvatar'
+import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { ShortcutTable } from './ShortcutTable'
 
@@ -83,7 +83,7 @@ export function SettingsView() {
             {user ? (
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                  <FramedAvatar src={user.avatar} alt={user.uname} size={56} />
+                  <Avatar src={user.avatar} alt={user.uname} size={64} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
                       {user.uname}

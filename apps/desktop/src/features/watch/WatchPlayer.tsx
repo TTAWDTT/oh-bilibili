@@ -47,16 +47,23 @@ export function WatchPlayer({
   data,
   danmaku,
   onDanmakuSent,
+  onBack,
 }: {
   track: Track
   data: WatchData
   danmaku: DanmakuItem[]
   onDanmakuSent: (item: DanmakuItem) => void
+  onBack: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
   const fullscreenSynced = useRef(false)
+  /** 当前生效的变体高度，降档时用它找下一档。 */
+  const currentHeight = useRef<number>(0)
+  /** 出错后想降到的目标高度；为 0 表示按 shaka 的默认选择。 */
+  const wantHeight = useRef<number>(0)
+  const [retry, setRetry] = useState(0)
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
@@ -183,6 +190,13 @@ export function WatchPlayer({
     return () => window.clearInterval(timer)
   }, [ready, track.key, speed])
 
+  // 换一条视频就重置降档状态：上一部的重试次数不该带到这一部。
+  useEffect(() => {
+    currentHeight.current = 0
+    wantHeight.current = 0
+    setRetry(0)
+  }, [data.manifest_url])
+
   // 挂载 shaka
   useEffect(() => {
     const video = videoRef.current
@@ -202,15 +216,32 @@ export function WatchPlayer({
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
           const detail = event.detail as { handled?: boolean } | undefined
           if (detail?.handled) return
-          setError(describePlaybackError(event.detail))
+          // 这一档取不到就退一档。B 站的 1080P 分片偶尔会被 CDN 直接拒，
+          // 让用户自己去画质菜单里试是多余的；低一档几乎总能放。
+          const heights = [...new Set(data.qualities.map((q) => q.height))].sort((a, b) => b - a)
+          const lower = heights.find((h) => h < (currentHeight.current || heights[0]!))
+          if (lower !== undefined && !cancelled) {
+            wantHeight.current = lower
+            setRetry((n) => n + 1)
+            return
+          }
+          setError(describePlaybackError(detail))
         })
         video.muted = true
         video.volume = 0
         await player.load(data.manifest_url)
         // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
         // 否则按钮上只能显示兜底文案，用户不知道现在是多少。
+        if (wantHeight.current > 0) {
+          const match = player
+            .getVariantTracks()
+            .filter((t) => t.height === wantHeight.current)
+            .sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
+          if (match) player.selectVariantTrack(match, true)
+        }
         const activeVariant = player.getVariantTracks().find((t) => t.active)
         if (activeVariant) {
+          currentHeight.current = activeVariant.height
           const match = data.qualities.find((q) => q.height === activeVariant.height)
           if (match) setActiveId(match.id)
         }
@@ -229,7 +260,7 @@ export function WatchPlayer({
       playerRef.current = null
       void player?.destroy()
     }
-  }, [data])
+  }, [data, retry])
 
   // 换档。shaka 按变体轨道的高度匹配，B 站的画质 id 不直接出现在变体上。
   const pickQuality = (q: QualityOption): void => {
@@ -275,6 +306,17 @@ export function WatchPlayer({
         speed={danmakuSpeed}
         fade
       />
+      {/* 返回在左上角：这是所有视频客户端的第一直觉位置，
+          放在标题行里用户要先把视线移出画面才找得到。 */}
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="返回"
+        className="t press absolute left-3 top-3 z-20 flex h-8 items-center gap-1 rounded-full bg-black/45 pl-1.5 pr-3 text-[13px] text-white backdrop-blur hover:bg-black/60"
+      >
+        <Icon name="chevronLeft" size={16} />
+        返回
+      </button>
       {!ready && !error ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
           正在取流…
