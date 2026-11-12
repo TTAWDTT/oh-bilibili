@@ -557,7 +557,10 @@ export function WatchPlayer({
           <div className="relative shrink-0">
             <button
               type="button"
-              onClick={() => setDanmakuPanel((open) => !open)}
+              onClick={() => {
+                setQualityOpen(false)
+                setDanmakuPanel((open) => !open)
+              }}
               aria-expanded={danmakuPanel}
               aria-label="弹幕设置"
               title="弹幕设置"
@@ -621,7 +624,10 @@ export function WatchPlayer({
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setQualityOpen((open) => !open)}
+                onClick={() => {
+                  setDanmakuPanel(false)
+                  setQualityOpen((open) => !open)
+                }}
                 aria-expanded={qualityOpen}
                 className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
               >
