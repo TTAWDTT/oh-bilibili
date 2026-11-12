@@ -150,6 +150,8 @@ pub struct AuthUser {
     pub mid: u64,
     pub uname: String,
     pub avatar: Option<String>,
+    pub level: u8,
+    pub coins: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

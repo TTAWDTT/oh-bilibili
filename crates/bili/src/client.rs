@@ -27,6 +27,8 @@ pub struct NavState {
     pub mid: Option<u64>,
     pub uname: Option<String>,
     pub avatar: Option<String>,
+    pub level: u8,
+    pub coins: f64,
 }
 
 pub struct Client {
@@ -155,6 +157,8 @@ impl Client {
             mid: data["mid"].as_u64().filter(|m| *m > 0),
             uname: data["uname"].as_str().map(|s| s.to_string()),
             avatar: data["face"].as_str().map(|s| s.replacen("http://", "https://", 1)),
+            level: data["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
+            coins: data["money"].as_f64().unwrap_or(0.0),
         };
         if let Ok(mut guard) = self.nav.write() {
             *guard = nav.clone();

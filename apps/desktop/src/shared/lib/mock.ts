@@ -177,7 +177,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const elapsed = Date.now() - state.qr.startedAt
       if (elapsed >= state.qr.expiresIn) return { state: 'expired', auth: null } satisfies QrStatus
       if (elapsed >= 5200) {
-        state.auth = { logged_in: true, user: { mid: 4381285, uname: '夜航星', avatar: avatarArt() } }
+        state.auth = {
+          logged_in: true,
+          user: { mid: 4381285, uname: '夜航星', avatar: avatarArt(), level: 6, coins: 308.6 },
+        }
         if (!state.qr.confirmed) {
           state.qr.confirmed = true
           emit({ type: 'auth_changed', auth: state.auth })

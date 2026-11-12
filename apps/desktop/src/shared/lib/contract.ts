@@ -126,7 +126,13 @@ export type LyricDoc = {
   source: string
 }
 
-export type AuthUser = { mid: number; uname: string; avatar: string | null }
+export type AuthUser = {
+  mid: number
+  uname: string
+  avatar: string | null
+  level: number
+  coins: number
+}
 
 export type AuthSnapshot = { logged_in: boolean; user: AuthUser | null }
 

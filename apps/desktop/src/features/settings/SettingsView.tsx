@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { useAuthStore } from '../auth/authStore'
 import { toastDone, toastFailure } from '../../app/notice'
+import { formatCount } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import type { Health } from '../../shared/lib/ipc'
 import { isTauri } from '../../shared/lib/runtime'
@@ -10,6 +11,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { ShortcutTable } from './ShortcutTable'
 
 /**
@@ -35,7 +37,26 @@ export function SettingsView() {
   const [healthFailed, setHealthFailed] = useState(false)
   const [healthNonce, setHealthNonce] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  /** 粉丝与关注数。和 UP 名片同一条接口，读不到就不显示。 */
+  const [relation, setRelation] = useState<[number, number] | null>(null)
   const user = auth?.logged_in === true ? auth.user : null
+
+  useEffect(() => {
+    if (!user) {
+      setRelation(null)
+      return
+    }
+    let alive = true
+    void ipc
+      .spaceStat(user.mid)
+      .then(([fans, following]) => {
+        if (alive) setRelation([fans, following])
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [user?.mid])
 
   useEffect(() => {
     let alive = true
@@ -81,15 +102,35 @@ export function SettingsView() {
 
           <Section title="账号">
             {user ? (
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-4">
-                  <Avatar src={user.avatar} alt={user.uname} size={64} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[16px] text-[var(--text-1)]" title={user.uname}>
+              <div className="flex flex-wrap items-center gap-4">
+                <Avatar src={user.avatar} alt={user.uname} size={72} />
+                <div className="min-w-[200px] flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="truncate text-[17px] font-medium text-[var(--text-1)]"
+                      title={user.uname}
+                    >
                       {user.uname}
-                    </div>
-                    <div className="num mt-1 font-mono text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
+                    </span>
+                    <LevelBadge level={user.level} />
                   </div>
+                  <div className="num mt-1 font-mono text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
+                  <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-2)]">
+                    <span>{Number.isInteger(user.coins) ? user.coins : user.coins.toFixed(1)} 硬币</span>
+                    {relation ? <span>{formatCount(relation[0])} 粉丝</span> : null}
+                    {relation ? <span>{formatCount(relation[1])} 关注</span> : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void sync()}
+                    disabled={syncing}
+                    className="t press flex h-8 items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
+                  >
+                    <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
+                    {syncing ? '同步中…' : '立即同步'}
+                  </button>
                   <button
                     type="button"
                     onClick={() => void logout()}
@@ -99,15 +140,6 @@ export function SettingsView() {
                     退出
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void sync()}
-                  disabled={syncing}
-                  className="t press flex h-8 w-fit items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
-                >
-                  <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
-                  {syncing ? '同步中…' : '立即同步'}
-                </button>
               </div>
             ) : (
               <div>

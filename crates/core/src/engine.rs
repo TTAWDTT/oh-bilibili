@@ -1346,6 +1346,8 @@ impl Engine {
                 mid,
                 uname: nav.uname.unwrap_or_default(),
                 avatar: nav.avatar,
+                level: nav.level,
+                coins: nav.coins,
             }),
         }
     }
