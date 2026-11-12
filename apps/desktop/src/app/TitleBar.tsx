@@ -86,6 +86,7 @@ export function TitleBar() {
             type="button"
             onClick={() => navigate({ kind: 'settings' })}
             title={auth.user.uname}
+            aria-label="账号设置"
             className="bili-press"
           >
             <Avatar src={auth.user.avatar} alt={auth.user.uname} size={26} />

@@ -113,7 +113,7 @@ export function AuthModal() {
           {auth.user.avatar ? (
             <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-[var(--line)] object-cover" />
           ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-white/32 text-[18px] font-medium text-[var(--text-1)]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-[var(--panel-raised)] text-[18px] font-medium text-[var(--text-1)]">
               {auth.user.uname.slice(0, 1)}
             </span>
           )}
@@ -124,7 +124,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="t press rounded-[4px] bg-white h-8 px-4 text-[14px] font-medium text-black hover:bg-white/85"
+            className="t press h-8 shrink-0 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
           >
             完成
           </button>
@@ -151,7 +151,7 @@ export function AuthModal() {
             <button
               type="button"
               onClick={() => void start()}
-              className="t press flex items-center justify-center flex items-center gap-1 rounded-[4px] border border-[var(--line)] h-8 px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--line)] hover:text-[var(--text-1)]"
+              className="t press flex h-8 items-center gap-1 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:text-[var(--text-1)]"
             >
               <Icon name="refresh" size={12} />
               重新生成
