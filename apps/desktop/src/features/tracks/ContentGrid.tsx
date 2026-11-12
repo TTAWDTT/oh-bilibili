@@ -53,10 +53,20 @@ function partitionColor(name: string): string {
   return table[name] ?? '#9499a0'
 }
 
+/** 排行榜名次底色：1 红、2 橙、3 黄，其余半透明黑。 */
+function rankTone(rank: number): string {
+  if (rank === 1) return '#f25d8e'
+  if (rank === 2) return '#ff8f3f'
+  if (rank === 3) return '#f6c34a'
+  return 'rgba(0,0,0,0.6)'
+}
+
 type ContentGridProps = {
   tracks: Track[]
   activeKey: string | null
   playing: boolean
+  /** 排行榜：封面左上角改画名次，前三名用 B 站的红/橙/黄。 */
+  ranked?: boolean
   /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
   extraAction?: (track: Track) => React.ReactNode
   /** 已看进度 0~1。历史页用它画封面底部那条进度，没有就不画。 */
@@ -69,7 +79,7 @@ type ContentGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, extraAction, progress }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const faved = useReactionStore((state) => state.faved)
@@ -145,7 +155,14 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction, progress 
                   style={{ aspectRatio: '16 / 10' }}
                 >
                   <Cover cover={track.cover} title={track.title} className="bili-card-cover h-full w-full" />
-                  {track.tname ? (
+                  {ranked ? (
+                    <span
+                      className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-[4px] px-1 text-[13px] font-semibold text-white"
+                      style={{ background: rankTone(index + 1) }}
+                    >
+                      {index + 1}
+                    </span>
+                  ) : track.tname ? (
                     <span
                       className="absolute left-1 top-1 rounded-[2px] px-1 text-[10px] leading-[15px] text-white"
                       style={{ background: partitionColor(track.tname) }}

@@ -426,3 +426,20 @@ async fn 赞过的视频带封面和分区() {
     println!("标签 {:?}", tags);
     assert!(!tags.is_empty(), "视频页应该能读到标签");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 全站排行榜一次给一百条() {
+    let source = Source::open().await.expect("Source");
+    let list = source.ranking(0).await.expect("全站榜");
+    println!("全站榜 {} 条", list.len());
+    let first = list.first().expect("至少一条");
+    println!(
+        "榜首: {} / {} / {:?}",
+        first.title.chars().take(18).collect::<String>(),
+        first.artist,
+        first.duration.map(|d| d.0)
+    );
+    assert!(list.len() >= 90, "全站榜应接近 100 条");
+    assert!(first.cover.is_some(), "榜首要有封面");
+}

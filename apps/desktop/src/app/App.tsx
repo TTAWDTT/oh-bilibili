@@ -26,6 +26,7 @@ import { useBootstrap } from './useBootstrap'
 import { useShortcuts } from './useShortcuts'
 import { WatchView } from '../features/watch/WatchView'
 import { HomeView } from '../features/home/HomeView'
+import { RankingView } from '../features/home/RankingView'
 import { WatchLaterView } from '../features/library/WatchLaterView'
 import { FollowingView } from '../features/library/FollowingView'
 
@@ -39,6 +40,8 @@ function viewTitle(view: View): string {
   switch (view.kind) {
     case 'home':
       return '发现'
+    case 'ranking':
+      return '排行榜'
     case 'search':
       return '搜索'
     case 'library':
@@ -70,6 +73,8 @@ function CurrentView({ view }: { view: View }) {
   switch (view.kind) {
     case 'home':
       return <HomeView />
+    case 'ranking':
+      return <RankingView />
     case 'search':
       return <SearchView />
     case 'library':

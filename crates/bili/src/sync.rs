@@ -518,6 +518,49 @@ impl Client {
             .unwrap_or_default())
     }
 
+    /// 排行榜。公开接口，一次返回 100 条；rid=0 是全站。
+    pub async fn ranking(&self, rid: u32) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        use bilimusic_model::{Millis, Track, TrackKey};
+
+        let v = self
+            .get_json(
+                &format!("{API}/x/web-interface/ranking/v2?rid={rid}&type=all"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let Some(list) = v["data"]["list"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|m| {
+                let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+                let duration = m["duration"].as_u64().filter(|d| *d > 0);
+                Some(Track {
+                    key: TrackKey::from_provider(bvid),
+                    title: m["title"].as_str().unwrap_or_default().to_string(),
+                    artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+                    duration: duration.map(|d| Millis(d * 1000)),
+                    cover: m["pic"]
+                        .as_str()
+                        .map(|c| c.replacen("http://", "https://", 1)),
+                    accent: None,
+                    views: m["stat"]["view"].as_u64(),
+                    danmaku: m["stat"]["danmaku"].as_u64(),
+                    up_avatar: m["owner"]["face"]
+                        .as_str()
+                        .map(|f| f.replacen("http://", "https://", 1)),
+                    up_mid: m["owner"]["mid"].as_u64(),
+                    tname: m["tname"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string()),
+                    typeid: None,
+                })
+            })
+            .collect())
+    }
+
     /// 加入稍后再看。
     pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
         let csrf = self

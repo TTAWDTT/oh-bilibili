@@ -3,6 +3,7 @@ import { create } from 'zustand'
 
 export type View =
   | { kind: 'home' }
+  | { kind: 'ranking' }
   | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }

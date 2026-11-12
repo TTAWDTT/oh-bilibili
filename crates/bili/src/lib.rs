@@ -319,6 +319,11 @@ impl Source {
         self.client.video_tags(bvid).await
     }
 
+    /// 排行榜。
+    pub async fn ranking(&self, rid: u32) -> Result<Vec<Track>, BiliError> {
+        self.client.ranking(rid).await
+    }
+
     /// 把一条视频从指定收藏夹移出。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

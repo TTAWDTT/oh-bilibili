@@ -211,6 +211,11 @@ export function videoTags(key: string): Promise<string[]> {
   return call<string[]>('video_tags', { key })
 }
 
+/** 排行榜。rid=0 是全站。 */
+export function ranking(rid = 0): Promise<Track[]> {
+  return call<Track[]>('ranking', { rid })
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })

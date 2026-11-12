@@ -1264,6 +1264,14 @@ impl Engine {
         Ok(self.source.video_tags(&key.as_opaque()).await?)
     }
 
+    pub async fn ranking(&self, rid: u32) -> Result<Vec<Track>, WireError> {
+        let tracks = self.source.ranking(rid).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
+    }
+
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
         for t in &tracks {
