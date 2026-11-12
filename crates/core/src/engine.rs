@@ -1264,6 +1264,10 @@ impl Engine {
         Ok(self.source.video_tags(&key.as_opaque()).await?)
     }
 
+    pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, WireError> {
+        Ok(self.source.comment_emotes().await?)
+    }
+
     pub async fn ranking(&self, rid: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.ranking(rid).await?;
         for t in &tracks {

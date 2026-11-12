@@ -518,6 +518,30 @@ impl Client {
             .unwrap_or_default())
     }
 
+    /// 评论表情面板。取第一包「小黄脸」，颜文字没有图片，跳过。
+    pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/emote/user/panel/web?business=reply"),
+                std::time::Duration::from_millis(300),
+            )
+            .await?;
+        let Some(pkg) = v["data"]["packages"].as_array().and_then(|list| list.first()) else {
+            return Ok(Vec::new());
+        };
+        let Some(list) = pkg["emote"].as_array() else {
+            return Ok(Vec::new());
+        };
+        Ok(list
+            .iter()
+            .filter_map(|e| {
+                let code = e["text"].as_str()?.to_string();
+                let url = e["url"].as_str().filter(|u| u.starts_with("http"))?;
+                Some((code, url.to_string()))
+            })
+            .collect())
+    }
+
     /// 排行榜。公开接口，一次返回 100 条；rid=0 是全站。
     pub async fn ranking(&self, rid: u32) -> Result<Vec<bilimusic_model::Track>, BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};

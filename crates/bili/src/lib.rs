@@ -319,6 +319,11 @@ impl Source {
         self.client.video_tags(bvid).await
     }
 
+    /// 评论表情面板。
+    pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, BiliError> {
+        self.client.comment_emotes().await
+    }
+
     /// 排行榜。
     pub async fn ranking(&self, rid: u32) -> Result<Vec<Track>, BiliError> {
         self.client.ranking(rid).await

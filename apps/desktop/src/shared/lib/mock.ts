@@ -72,6 +72,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return CATALOG.slice(0, 12)
     case 'video_tags':
       return ['翻唱', '虚拟UP主', '音乐']
+    case 'comment_emotes':
+      return [
+        ['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png'],
+        ['[笑哭]', 'https://i0.hdslb.com/bfs/emote/c3043ba94bf4e6bc4d8e8a2d16c1a2c34e36b8bd.png'],
+      ]
     case 'ranking':
       return CATALOG.slice(0, 20)
     case 'video_online':

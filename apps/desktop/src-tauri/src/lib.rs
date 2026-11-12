@@ -572,6 +572,13 @@ async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn comment_emotes(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<(String, String)>, WireError> {
+    engine.comment_emotes().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn video_tags(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -851,6 +858,7 @@ pub fn run() {
             fav_covers,
             liked_videos,
             video_tags,
+            comment_emotes,
             ranking,
             video_online,
             author_card,

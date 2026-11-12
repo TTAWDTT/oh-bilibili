@@ -211,6 +211,11 @@ export function videoTags(key: string): Promise<string[]> {
   return call<string[]>('video_tags', { key })
 }
 
+/** 评论表情面板：代号 → 图片。 */
+export function commentEmotes(): Promise<[string, string][]> {
+  return call<[string, string][]>('comment_emotes', {})
+}
+
 /** 排行榜。rid=0 是全站。 */
 export function ranking(rid = 0): Promise<Track[]> {
   return call<Track[]>('ranking', { rid })

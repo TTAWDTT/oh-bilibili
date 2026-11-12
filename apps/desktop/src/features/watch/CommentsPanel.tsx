@@ -159,12 +159,31 @@ export function CommentsPanel({
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
   const [mine, setMine] = useState<Set<string>>(new Set())
+  /** 表情面板：代号 → 图片。第一次点开才取。 */
+  const [emotes, setEmotes] = useState<[string, string][] | null>(null)
+  const [emojiOpen, setEmojiOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
   const pageRef = useRef(0)
   const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
+
+  useEffect(() => {
+    if (!emojiOpen || emotes !== null) return
+    let alive = true
+    void ipc
+      .commentEmotes()
+      .then((list) => {
+        if (alive) setEmotes(list)
+      })
+      .catch(() => {
+        if (alive) setEmotes([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [emojiOpen, emotes])
 
   // 评论区跟着整页一起滚时不能再自己滚一屏，否则是「滚动里套滚动」。
   // 到底没有交给 IntersectionObserver：哨兵进入整页滚动容器的可视区就取下一页。
@@ -236,6 +255,7 @@ export function CommentsPanel({
       const rpid = await ipc.commentAdd(trackKey, text, replyTo?.id, replyTo?.id)
       setDraft('')
       setReplyTo(null)
+      setEmojiOpen(false)
       // 列表按热度排，刚发的没有热度，刷新也翻不到。把这条直接插到顶部，
       // 用户才看得到自己刚发的东西，也才有地方删。
       if (rpid) {
@@ -331,6 +351,51 @@ export function CommentsPanel({
             aria-label="发评论"
             className="h-8 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 text-[12px] outline-none focus:border-[var(--accent)]"
           />
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              aria-label="表情"
+              aria-expanded={emojiOpen}
+              onClick={() => setEmojiOpen((open) => !open)}
+              className={`t press h-8 rounded-[6px] px-2 text-[12px] ${
+                emojiOpen
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]'
+              }`}
+            >
+              表情
+            </button>
+            {emojiOpen ? (
+              <div className="absolute bottom-10 right-0 z-30 w-[304px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
+                {emotes === null ? (
+                  <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">正在读表情…</p>
+                ) : emotes.length === 0 ? (
+                  <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">表情没取到</p>
+                ) : (
+                  <div className="grid max-h-[220px] grid-cols-8 gap-1 overflow-y-auto">
+                    {emotes.map(([code, url]) => (
+                      <button
+                        key={code}
+                        type="button"
+                        title={code}
+                        aria-label={code}
+                        onClick={() => setDraft((draft) => draft + code)}
+                        className="flex h-8 items-center justify-center rounded-[4px] hover:bg-[var(--panel-alt)]"
+                      >
+                        <img
+                          src={url}
+                          alt={code}
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          className="h-6 w-6 object-contain"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => void submit()}
