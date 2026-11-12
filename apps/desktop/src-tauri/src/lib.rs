@@ -558,6 +558,15 @@ async fn fav_covers(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn video_online(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    cid: u64,
+) -> Result<u64, WireError> {
+    engine.online_count(&TrackKey::from_provider(key), cid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<Track>, WireError> {
     engine.ranking(rid).await
 }
@@ -843,6 +852,7 @@ pub fn run() {
             liked_videos,
             video_tags,
             ranking,
+            video_online,
             author_card,
             fav_tracks,
             unfav_from,

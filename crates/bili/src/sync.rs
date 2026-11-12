@@ -561,6 +561,17 @@ impl Client {
             .collect())
     }
 
+    /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
+    pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/player/v2?bvid={bvid}&cid={cid}"),
+                std::time::Duration::from_millis(300),
+            )
+            .await?;
+        Ok(v["data"]["online_count"].as_u64().unwrap_or(0))
+    }
+
     /// 加入稍后再看。
     pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
         let csrf = self

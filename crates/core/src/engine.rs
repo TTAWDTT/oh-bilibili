@@ -1272,6 +1272,10 @@ impl Engine {
         Ok(tracks)
     }
 
+    pub async fn online_count(&self, key: &TrackKey, cid: u64) -> Result<u64, WireError> {
+        Ok(self.source.online_count(&key.as_opaque(), cid).await?)
+    }
+
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
         for t in &tracks {

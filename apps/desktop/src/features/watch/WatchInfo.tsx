@@ -49,6 +49,8 @@ export function WatchInfo({
   const [saved, setSaved] = useState(false)
   /** 视频标签。公开接口，取不到就不显示这一行。 */
   const [tags, setTags] = useState<string[]>([])
+  /** 当前在看人数。取不到就不显示，不猜。 */
+  const [online, setOnline] = useState<number | null>(null)
   /** UP 主粉丝数。B 站把「粉丝 123.4万」挂在 UP 名字后面。 */
   const [fans, setFans] = useState<number | null>(null)
   /** 简介默认收两行，长简介给一个展开。 */
@@ -89,6 +91,23 @@ export function WatchInfo({
       cancelled = true
     }
   }, [track.key])
+
+  const cid = data.pages.find((p) => p.no === data.current_page)?.cid
+
+  useEffect(() => {
+    if (!cid) return
+    let cancelled = false
+    setOnline(null)
+    void ipc
+      .videoOnline(track.key, cid)
+      .then((count) => {
+        if (!cancelled) setOnline(count)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [track.key, cid])
 
   useEffect(() => {
     let cancelled = false
@@ -155,6 +174,9 @@ export function WatchInfo({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
         <span className="num">{formatCount(data.stats.views)} 播放</span>
         <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+        {online !== null && online > 0 ? (
+          <span className="num">{formatCount(online)} 人在看</span>
+        ) : null}
         {/* B 站这一行的尾巴是投稿日期，分区名跟在后面。 */}
         {data.pubdate > 0 ? <span className="num">{formatDate(data.pubdate)}</span> : null}
         {data.tname ? (

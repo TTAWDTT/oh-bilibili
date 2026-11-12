@@ -324,6 +324,11 @@ impl Source {
         self.client.ranking(rid).await
     }
 
+    /// 当前在看人数。
+    pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
+        self.client.online_count(bvid, cid).await
+    }
+
     /// 把一条视频从指定收藏夹移出。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

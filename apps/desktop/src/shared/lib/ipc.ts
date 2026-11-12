@@ -216,6 +216,11 @@ export function ranking(rid = 0): Promise<Track[]> {
   return call<Track[]>('ranking', { rid })
 }
 
+/** 当前在看人数。 */
+export function videoOnline(key: string, cid: number): Promise<number> {
+  return call<number>('video_online', { key, cid })
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })
