@@ -3,6 +3,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
+import { copyText } from '../../shared/lib/clipboard'
 import { toastDone } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -37,12 +38,14 @@ export function WatchInfo({
   const addCoin = useReactionStore((st) => st.addCoin)
 
   const [saved, setSaved] = useState(false)
+  const [confirmingCoin, setConfirmingCoin] = useState(false)
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setSaved(false)
+    setConfirmingCoin(false)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -153,7 +156,7 @@ export function WatchInfo({
               toastDone('已经投过两枚', 'B 站上限 2 枚')
               return
             }
-            void addCoin(track, 1)
+            setConfirmingCoin(true)
           }}
           className={pill(coins > 0)}
         >
@@ -184,11 +187,43 @@ export function WatchInfo({
           <Icon name="watchLater" size={14} />
           {saved ? '已加入' : '稍后再看'}
         </button>
-        <button type="button" className={pill(false)}>
+        <button
+          type="button"
+          title="复制视频链接"
+          aria-label="复制视频链接"
+          onClick={() => {
+            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+              toastDone(ok ? '链接已复制' : '复制失败'),
+            )
+          }}
+          className={pill(false)}
+        >
           <Icon name="copy" size={14} />
           {formatCount(data.stats.shares)}
         </button>
       </div>
+      {confirmingCoin ? (
+        <div className="mt-2 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1.5 text-[12px]">
+          <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmingCoin(false)
+              void addCoin(track, 1)
+            }}
+            className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
+          >
+            投
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingCoin(false)}
+            className="text-[var(--text-3)] hover:text-[var(--text-1)]"
+          >
+            取消
+          </button>
+        </div>
+      ) : null}
 
       {data.desc ? (
         <p className="mt-3 max-w-[820px] whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)]">
