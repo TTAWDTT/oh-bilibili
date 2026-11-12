@@ -87,12 +87,12 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
           onChange={(event) => setName(event.target.value)}
           placeholder="新建歌单并加入"
           aria-label="新歌单名"
-          className="t min-w-0 flex-1 rounded-[4px] border border-[var(--line)] bg-white/[0.03] px-3 py-1 text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-2)] focus:border-[var(--line)]"
+          className="t min-w-0 flex-1 rounded-[4px] border border-[var(--line)] bg-[var(--ga1)] px-3 py-1 text-[14px] text-[var(--text-1)] placeholder:text-[var(--text-2)] focus:border-[var(--accent)]"
         />
         <button
           type="submit"
           disabled={busy || name.trim().length === 0}
-          className="t press shrink-0 rounded-[4px] bg-white h-8 px-4 text-[14px] font-medium text-black hover:bg-white/85 disabled:cursor-default disabled:opacity-30"
+          className="t press h-8 shrink-0 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90 disabled:cursor-default disabled:opacity-30"
         >
           新建
         </button>
