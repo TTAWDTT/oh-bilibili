@@ -15,6 +15,7 @@ export function TitleBar() {
   const focusNonce = useAppStore((state) => state.searchFocus)
   const setQuery = useAppStore((state) => state.setHeroQuery)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
+  const navigate = useAppStore((state) => state.navigate)
   const auth = useAuthStore((state) => state.auth)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
@@ -81,7 +82,12 @@ export function TitleBar() {
 
       <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-3 [&>*]:pointer-events-auto">
         {auth?.user ? (
-          <button type="button" onClick={() => setAuthOpen(true)} title={auth.user.uname} className="bili-press">
+          <button
+            type="button"
+            onClick={() => navigate({ kind: 'settings' })}
+            title={auth.user.uname}
+            className="bili-press"
+          >
             <Avatar src={auth.user.avatar} alt={auth.user.uname} size={26} />
           </button>
         ) : (

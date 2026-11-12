@@ -96,8 +96,10 @@ export function AuthModal() {
   return (
     <Modal
       open={open}
-      title="扫码登录"
-      description="用手机 B 站扫码，或把登录链接复制到手机上打开。凭据只存本机，不上传。"
+      title={loggedIn ? '账号' : '扫码登录'}
+      description={
+        loggedIn ? null : '用手机 B 站扫码，或把登录链接复制到手机上打开。凭据只存本机，不上传。'
+      }
       onClose={() => setOpen(false)}
     >
       {!loggedIn ? (
