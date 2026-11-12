@@ -103,7 +103,9 @@ export default function App() {
   const view = useAppStore((state) => state.view)
   const rail = useAppStore((state) => state.rail)
   const setRail = useAppStore((state) => state.setRail)
-  const cinema = useAppStore((state) => state.cinema)
+  // 只有进系统全屏才藏标题栏。网页全屏要留着它：自定义标题栏里带着
+  // 关闭与最小化按钮，藏掉窗口就没法关了。
+  const osFullscreen = useAppStore((state) => state.osFullscreen)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
 
@@ -138,7 +140,7 @@ export default function App() {
       >
         跳到主要内容
       </a>
-      {cinema ? null : <TitleBar />}
+      {osFullscreen ? null : <TitleBar />}
 
       <div className="relative z-10 flex min-h-0 flex-1">
         {showSidebar ? <Sidebar /> : null}
