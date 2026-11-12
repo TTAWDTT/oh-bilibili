@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -17,17 +17,26 @@ import { HeroBanner } from './HeroBanner'
  * 首屏 12 条，滚到底再取下一批（fresh_idx 递增），不后台预取。
  * 被拒时给明确文案和「换一批」，不假装有内容。
  */
+
+/** 按会话记住这一屏：从视频页返回时，推荐流和滚动位置都要原样回来。 */
+const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop: number } = {
+  items: [],
+  fresh: 1,
+  nextFresh: 2,
+  scrollTop: 0,
+}
 export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
-  const [items, setItems] = useState<Track[]>([])
-  const [fresh, setFresh] = useState(1)
+  const [items, setItems] = useState<Track[]>(feedMemory.items)
+  const [fresh, setFresh] = useState(feedMemory.fresh)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
-  const nextFresh = useRef(2)
+  const nextFresh = useRef(feedMemory.nextFresh)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     if (append) setLoadingMore(true)
@@ -51,22 +60,38 @@ export function HomeView() {
   }, [])
 
   useEffect(() => {
-    nextFresh.current = 2
-    void load(1)
+    nextFresh.current = feedMemory.nextFresh
+    if (feedMemory.items.length === 0) void load(1)
   }, [load])
+
+  useLayoutEffect(() => {
+    const el = scrollerRef.current
+    if (el && feedMemory.items.length > 0) el.scrollTop = feedMemory.scrollTop
+  }, [])
+
+  useEffect(() => {
+    feedMemory.items = items
+  }, [items])
+
+  useEffect(() => {
+    feedMemory.fresh = fresh
+  }, [fresh])
 
   const more = (): void => {
     if (loading || loadingMore) return
     const next = nextFresh.current
     nextFresh.current = next + 1
+    feedMemory.nextFresh = next + 1
     void load(next, true)
   }
 
   return (
     <div
+      ref={scrollerRef}
       id="scroll-main"
       onScroll={(event) => {
         const el = event.currentTarget
+        feedMemory.scrollTop = el.scrollTop
         if (el.scrollHeight - el.scrollTop - el.clientHeight < 320) more()
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
@@ -79,6 +104,8 @@ export function HomeView() {
             const next = fresh + 1
             setFresh(next)
             nextFresh.current = 2
+            feedMemory.nextFresh = 2
+            feedMemory.scrollTop = 0
             void load(next)
           }}
           className="t press ml-auto rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
