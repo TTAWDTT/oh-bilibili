@@ -46,6 +46,10 @@ export function WatchInfo({
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
 
   const [saved, setSaved] = useState(false)
+  /** UP 主粉丝数。B 站把「粉丝 123.4万」挂在 UP 名字后面。 */
+  const [fans, setFans] = useState<number | null>(null)
+  /** 简介默认收两行，长简介给一个展开。 */
+  const [descOpen, setDescOpen] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
@@ -54,6 +58,8 @@ export function WatchInfo({
   useEffect(() => {
     let cancelled = false
     setSaved(false)
+    setFans(null)
+    setDescOpen(false)
     setConfirmingCoin(false)
     void ipc
       .watchLaterList()
@@ -70,6 +76,12 @@ export function WatchInfo({
     let cancelled = false
     setFollowed(null)
     if (!data.owner_mid) return
+    void ipc
+      .spaceStat(data.owner_mid)
+      .then(([fanCount]) => {
+        if (!cancelled) setFans(fanCount)
+      })
+      .catch(() => {})
     void ipc
       .relationFollowed(data.owner_mid)
       .then((on) => {
@@ -138,6 +150,11 @@ export function WatchInfo({
         <span className="flex min-w-0 items-center gap-2">
           <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
+          {fans !== null ? (
+            <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
+              粉丝 {formatCount(fans)}
+            </span>
+          ) : null}
         </span>
         {data.owner_mid && followed !== null ? (
           <button
@@ -262,9 +279,25 @@ export function WatchInfo({
       ) : null}
 
       {data.desc ? (
-        <p className="mt-3 max-w-[820px] whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)]">
-          {data.desc}
-        </p>
+        <div className="mt-3 max-w-[820px]">
+          <p
+            className={`whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)] ${
+              descOpen ? '' : 'line-clamp-2'
+            }`}
+          >
+            {data.desc}
+          </p>
+          {/* 长简介按 B 站收两行；短简介不需要那个按钮。 */}
+          {data.desc.length > 90 ? (
+            <button
+              type="button"
+              onClick={() => setDescOpen((open) => !open)}
+              className="t mt-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              {descOpen ? '收起' : '展开更多'}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {data.pages.length > 1 ? (
