@@ -72,3 +72,14 @@ export function formatDate(unixSeconds: number): string {
   if (d.getFullYear() === new Date().getFullYear()) return `${month}-${day}`
   return `${d.getFullYear()}-${month}-${day}`
 }
+
+/** 评论时间。B 站的口语写法：刚刚 / N 分钟前 / N 小时前 / N 天前，再往前后退到日期。 */
+export function formatRelative(unixSeconds: number): string {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return ''
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - unixSeconds))
+  if (seconds < 60) return '刚刚'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} 小时前`
+  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)} 天前`
+  return formatDate(unixSeconds)
+}

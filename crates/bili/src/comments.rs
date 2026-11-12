@@ -10,6 +10,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
+    /// 评论者 uid。和视频作者对上时，界面标「UP主」。
+    pub mid: u64,
     pub author: String,
     pub avatar: Option<String>,
     pub text: String,
@@ -60,12 +62,26 @@ struct RawReply {
 
 #[derive(Deserialize)]
 struct RawMember {
+    /// B 站这里给的是字符串（"946974"），按数字解析会把整页评论丢光。
+    #[serde(default, deserialize_with = "u64_from_any")]
+    mid: u64,
     #[serde(default)]
     uname: String,
     #[serde(default)]
     avatar: String,
     #[serde(default)]
     level_info: Option<RawLevel>,
+}
+
+fn u64_from_any<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+        .unwrap_or(0))
 }
 
 #[derive(Deserialize)]
@@ -99,6 +115,7 @@ fn to_comment(raw: RawReply) -> Comment {
         .as_ref()
         .map(|m| m.avatar.trim().to_string())
         .filter(|s| !s.is_empty());
+    let mid = raw.member.as_ref().map(|m| m.mid).unwrap_or(0);
     let level = raw
         .member
         .as_ref()
@@ -133,6 +150,7 @@ fn to_comment(raw: RawReply) -> Comment {
         .unwrap_or_default();
     Comment {
         id,
+        mid,
         author: raw.member.map(|m| m.uname).unwrap_or_default(),
         avatar: avatar.map(|a| {
             if a.starts_with("//") {
@@ -221,6 +239,44 @@ mod tests {
         assert_eq!(
             page.items[0].avatar.as_deref(),
             Some("https://i0.hdslb.com/a.jpg")
+        );
+    }
+
+    #[test]
+    fn mid用字符串给也能解析并带出等级与表情() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 1 },
+                "replies": [
+                    {
+                        "rpid_str": "333",
+                        "member": {
+                            "mid": "946974",
+                            "uname": "老咸鱼A",
+                            "level_info": { "current_level": 6 }
+                        },
+                        "content": {
+                            "message": "好看 [doge]",
+                            "emote": {
+                                "[doge]": { "url": "http://i0.hdslb.com/bfs/emote/doge.png" }
+                            }
+                        },
+                        "like": 1, "ctime": 1577835803
+                    }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        let c = &page.items[0];
+        assert_eq!(c.mid, 946974);
+        assert_eq!(c.level, 6);
+        assert_eq!(
+            c.emotes,
+            vec![(
+                "[doge]".to_string(),
+                "https://i0.hdslb.com/bfs/emote/doge.png".to_string()
+            )]
         );
     }
 

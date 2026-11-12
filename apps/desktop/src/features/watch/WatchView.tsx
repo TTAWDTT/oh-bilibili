@@ -200,7 +200,7 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {!cinema ? (
             <div className="border-t border-hairline">
-              <CommentsPanel trackKey={track.key} flow />
+              <CommentsPanel trackKey={track.key} ownerMid={data?.owner_mid ?? null} flow />
             </div>
           ) : null}
         </div>

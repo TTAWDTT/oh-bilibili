@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { formatCount } from '../../shared/lib/format'
+import { formatCount, formatRelative } from '../../shared/lib/format'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
@@ -47,11 +47,13 @@ function CommentText({ text, emotes }: { text: string; emotes: [string, string][
 function CommentRow({
   c,
   depth = 0,
+  ownerMid,
   onReply,
   onDelete,
 }: {
   c: Comment
   depth?: number
+  ownerMid?: number | null | undefined
   onReply?: (c: Comment) => void
   onDelete?: ((c: Comment) => void) | undefined
 }) {
@@ -73,11 +75,17 @@ function CommentRow({
           <div className="flex items-baseline gap-2">
             <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
+            {ownerMid && c.mid === ownerMid ? (
+              <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+                UP主
+              </span>
+            ) : null}
             {c.likes > 0 ? (
               <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
                 {formatCount(c.likes)} 赞
               </span>
             ) : null}
+            <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
             {depth === 0 && onReply ? (
               <button
                 type="button"
@@ -105,7 +113,12 @@ function CommentRow({
       {c.replies.length > 0 ? (
         <ul className="mt-1 pl-8">
           {c.replies.map((r) => (
-            <CommentRow key={r.id || `${c.id}-${r.author}-${r.text.slice(0, 8)}`} c={r} depth={depth + 1} />
+            <CommentRow
+              key={r.id || `${c.id}-${r.author}-${r.text.slice(0, 8)}`}
+              c={r}
+              depth={depth + 1}
+              ownerMid={ownerMid}
+            />
           ))}
           {c.reply_count > c.replies.length ? (
             <li className="mt-1 text-[11px] text-[var(--text-3)]">
@@ -124,7 +137,15 @@ function CommentRow({
  * 分页按需加载，滚动到底部自动取下一页。取不到内容时给明确文案，
  * 不白屏，也不影响看视频。
  */
-export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; flow?: boolean }) {
+export function CommentsPanel({
+  trackKey,
+  ownerMid = null,
+  flow = false,
+}: {
+  trackKey: string
+  ownerMid?: number | null
+  flow?: boolean
+}) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
   const [hot, setHot] = useState(true)
   const [items, setItems] = useState<Comment[]>([])
@@ -222,6 +243,7 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
         setItems((prev) => [
           {
             id: rpid,
+            mid: me?.mid ?? 0,
             author: me?.uname ?? '我',
             avatar: me?.avatar ?? null,
             text,
@@ -346,6 +368,7 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
             <CommentRow
               key={c.id}
               c={c}
+              ownerMid={ownerMid}
               onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
               onDelete={mine.has(c.id) ? remove : undefined}
             />

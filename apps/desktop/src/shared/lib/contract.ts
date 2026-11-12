@@ -41,6 +41,8 @@ export type Followed = {
 
 export type Comment = {
   id: string
+  /** 评论者 uid，用来标「UP主」。 */
+  mid: number
   author: string
   avatar: string | null
   text: string
