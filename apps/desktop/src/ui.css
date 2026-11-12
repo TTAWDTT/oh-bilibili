@@ -239,13 +239,6 @@
   --bili-pink: #ff6699;
 }
 
-/* 分区胶囊用蓝底描边，和粉色主按钮形成 B 站的双色识别 */
-.bili-tag-blue {
-  color: var(--bili-blue);
-  border: 1px solid color-mix(in oklab, var(--bili-blue) 45%, transparent);
-  background: color-mix(in oklab, var(--bili-blue) 8%, transparent);
-}
-
 /* ── 灵动感 ─────────────────────────────────────────
  * B 站的界面是「轻快」的：hover 有小抬升，按下有回弹，卡片进场错峰。
  * 全部用 transform 与 opacity，不动布局，所以不会掉帧。

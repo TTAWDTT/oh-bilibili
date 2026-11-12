@@ -391,6 +391,8 @@ impl Engine {
                 shares: detail.meta.shares,
                 replies: detail.meta.replies,
             },
+            pubdate: detail.meta.pubdate,
+            tname: detail.track.tname.clone(),
             pages: detail.pages.clone(),
             current_page: page_no,
             manifest_url,
@@ -509,6 +511,11 @@ impl Engine {
         hot: bool,
     ) -> Result<crate::wire::CommentPage, WireError> {
         Ok(self.source.comments(key, page.max(1), hot).await?)
+    }
+
+    /// 搜索页的热搜榜。取不到就返回空表，界面退回内置建议。
+    pub async fn hot_search(&self) -> Vec<String> {
+        self.source.hot_search().await.unwrap_or_default()
     }
 
     /// 发评论；`root` 与 `parent` 都为空时是评论，否则是回复。

@@ -341,6 +341,11 @@ export function watchComments(key: string, page: number, hot = true): Promise<Co
   return invoke<CommentPage>('watch_comments', { key, page, hot })
 }
 
+/** 搜索页热搜榜。游客可用；失败时返回空表。 */
+export function hotSearch(): Promise<string[]> {
+  return invoke<string[]>('hot_search')
+}
+
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
 export function watchOpen(key: string, page?: number): Promise<WatchView> {
   return invoke<WatchView>('watch_open', { key, page: page ?? null })

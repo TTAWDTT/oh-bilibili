@@ -93,7 +93,7 @@ export function LibraryView() {
                     })}
                   </span>
                   <span className="block px-3 py-2">
-                    <span className="line-clamp-1 block text-[14px] font-medium text-[var(--text-1)]" title={playlist.name}>
+                    <span className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]" title={playlist.name}>
                       {playlist.name}
                     </span>
                     <span className="num mt-0.5 block text-[12px] text-[var(--text-3)]">

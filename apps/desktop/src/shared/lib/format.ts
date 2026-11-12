@@ -59,3 +59,16 @@ export function formatCount(n: number): string {
   if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
   return String(n)
 }
+
+/**
+ * 投稿日期。B 站视频页写 `2025-03-12`；只有当年才省掉年份。
+ * 输入是 Unix 秒。
+ */
+export function formatDate(unixSeconds: number): string {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return ''
+  const d = new Date(unixSeconds * 1000)
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  if (d.getFullYear() === new Date().getFullYear()) return `${month}-${day}`
+  return `${d.getFullYear()}-${month}-${day}`
+}

@@ -188,6 +188,12 @@ async fn watch_comments(
         .await
 }
 
+/// 搜索页热搜榜。拿不到就是空表，界面会用内置建议。
+#[tauri::command(rename_all = "snake_case")]
+async fn hot_search(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<String>, WireError> {
+    Ok(engine.hot_search().await)
+}
+
 #[tauri::command(rename_all = "snake_case")]
 async fn comment_add(
     engine: tauri::State<'_, Arc<Engine>>,
@@ -758,6 +764,7 @@ pub fn run() {
             mv_source,
             watch_open,
             watch_comments,
+            hot_search,
             comment_add,
             comment_del,
             home_feed,

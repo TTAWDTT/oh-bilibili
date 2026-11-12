@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
-import { formatCount } from '../../shared/lib/format'
+import { formatCount, formatDate } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { toastDone } from '../../app/notice'
@@ -121,6 +121,13 @@ export function WatchInfo({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
         <span className="num">{formatCount(data.stats.views)} 播放</span>
         <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+        {/* B 站这一行的尾巴是投稿日期，分区名跟在后面。 */}
+        {data.pubdate > 0 ? <span className="num">{formatDate(data.pubdate)}</span> : null}
+        {data.tname ? (
+          <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px] text-[var(--text-2)]">
+            {data.tname}
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">

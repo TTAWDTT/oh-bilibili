@@ -38,6 +38,21 @@ export function SearchView() {
   }
   const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
   const history = useSearchHistory((s) => s.items)
+  /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
+  const [hotWords, setHotWords] = useState<string[]>([])
+  useEffect(() => {
+    let cancelled = false
+    void ipc
+      .hotSearch()
+      .then((list) => {
+        if (!cancelled) setHotWords(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const trending = hotWords.length > 0 ? hotWords : SUGGESTIONS
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
   const heroQuery = useAppStore((state) => state.heroQuery)
@@ -148,50 +163,61 @@ export function SearchView() {
       >
         {/* 搜索框在顶栏，这里只呈现结果。 */}
 
-        {trimmed.length === 0 ? (
-          <div className="bili-suggest relative z-20 -mt-1 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center gap-2">
-              <span className="bili-tag-blue rounded-[3px] px-1.5 text-[12px] leading-[17px]">热门</span>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                {SUGGESTIONS.map((word) => (
-                  <button
-                    key={word}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => pick(word)}
-                    className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
-                  >
-                    {word}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {history.length > 0 ? (
-              <div className="mt-2.5 flex items-center gap-2 border-t border-[var(--line)] pt-2.5">
-                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-3)]">历史</span>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  {history.slice(0, 6).map((word) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pick(word)}
-                      className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+        {/* 只有搜索历史就没有可展示的了（热搜在下面有整块榜单，
+            这里再排一遍同样的词就是重复）。 */}
+        {trimmed.length === 0 && history.length > 0 ? (
+          <div className="bili-suggest relative z-20 -mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
+            <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-3)]">
+              历史
+            </span>
+            {history.slice(0, 8).map((word) => (
+              <button
+                key={word}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(word)}
+                className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+              >
+                {word}
+              </button>
+            ))}
           </div>
         ) : null}
 
         {trimmed.length === 0 ? (
-          <div className="mt-2">
-            {/* 搜索页只放「接着看什么」。大 banner、排行榜、分区入口
-                是首页的东西，摆在搜索页会让人以为这里是首页。 */}
+          <div className="mt-2 pb-10">
             <ContinueListening />
+
+            {/* 热搜榜。B 站搜索页左侧就是这份榜单，带名次；这里铺成两列，
+                页面的空档也就填上了。 */}
+            <div className="mt-9">
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-[14px] font-medium text-[var(--text-1)]">热搜</h2>
+                <span className="text-[12px] text-[var(--text-3)]">大家都在搜</span>
+              </div>
+              <ol className="mt-3 grid grid-cols-1 gap-x-8 gap-y-1.5 md:grid-cols-2 xl:grid-cols-3">
+                {trending.map((word, index) => (
+                  <li key={`${word}-${index}`}>
+                    <button
+                      type="button"
+                      onClick={() => pick(word)}
+                      className="t flex w-full items-baseline gap-2.5 rounded-[4px] py-1 text-left hover:bg-[var(--panel-alt)]"
+                    >
+                      <span
+                        className={`num w-4 shrink-0 text-right text-[13px] ${
+                          index < 3 ? 'text-[var(--bili-pink)]' : 'text-[var(--text-3)]'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--text-1)]">
+                        {word}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         ) : (
           <section className="mt-6">
@@ -295,7 +321,7 @@ export function SearchView() {
                 {(() => {
                   const words = [
                     ...history.filter((w) => w !== trimmed),
-                    ...SUGGESTIONS.filter((w) => w !== trimmed),
+                    ...trending.filter((w) => w !== trimmed),
                   ].slice(0, 5)
                   if (words.length === 0) return null
                   return (

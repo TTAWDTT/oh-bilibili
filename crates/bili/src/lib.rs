@@ -466,6 +466,30 @@ impl Source {
         Ok(crate::comments::page_from(&value, page, per_page))
     }
 
+    /// 搜索页的热搜榜。B 站搜索页左栏就是这份榜单，带名次。
+    ///
+    /// 游客也能拿到，不需要登录；失败就返回空表，由界面退回内置建议。
+    pub async fn hot_search(&self) -> Result<Vec<String>, BiliError> {
+        let value = self
+            .client
+            .get_json_allowing_guest(
+                &format!("{}/x/web-interface/search/square?limit=12", client::API),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let list = value["data"]["trending"]["list"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item["show_name"].as_str())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(list)
+    }
+
     /// 发一条评论，或回复某一条。
     ///
     /// 回复时 `root` 是楼中楼的根评论，`parent` 是被回复的那条；不传就是一级评论。
@@ -895,7 +919,12 @@ mod wire {
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1)),
             up_mid: data["owner"]["mid"].as_u64(),
-            tname: data["tname"].as_str().map(|s| s.to_string()),
+            // 有些投稿的 tname 是空串（分区被隐藏或已下线），
+            // 保留成 Some("") 会让界面上多出一个空标签。
+            tname: data["tname"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.to_string()),
             typeid: data["tid"].as_u64().map(|v| v as u32),
         };
         Ok(TrackDetail {

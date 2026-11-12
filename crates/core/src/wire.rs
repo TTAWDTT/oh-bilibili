@@ -189,6 +189,10 @@ pub struct WatchView {
     pub owner_avatar: Option<String>,
     /// 汇总统计。
     pub stats: WatchStats,
+    /// 投稿时间（Unix 秒）。B 站视频页把日期写在播放/弹幕那一行后面。
+    pub pubdate: i64,
+    /// 分区名，例如「游戏」。列表接口不一定带，所以是可选的。
+    pub tname: Option<String>,
     /// 分P 列表，单 P 视频只有一条。
     pub pages: Vec<bilimusic_bili::PageRef>,
     /// 当前在放的分P 序号（从 1 开始）。

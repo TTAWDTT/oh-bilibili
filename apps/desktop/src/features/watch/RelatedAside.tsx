@@ -30,7 +30,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
               <Cover cover={item.cover} title={item.title} className="h-full w-full" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 block text-[13px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+              <span className="line-clamp-2 text-[13px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                 {item.title}
               </span>
               <span className="num mt-1 block truncate text-[12px] text-[var(--text-3)]">

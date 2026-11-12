@@ -69,7 +69,7 @@ export function RelatedList({ trackKey }: { trackKey: string }) {
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="line-clamp-2 block text-[13px] leading-[1.35] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                <span className="line-clamp-2 text-[13px] leading-[1.35] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                   {track.title}
                 </span>
                 <span className="num mt-0.5 flex items-center gap-1 text-[11.5px] text-[var(--text-3)]">

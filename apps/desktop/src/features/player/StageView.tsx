@@ -196,7 +196,7 @@ export function StageView() {
                     className="h-full w-full"
                   />
                 </span>
-                <span className="mt-1 line-clamp-1 block text-[12px] text-[var(--text-2)] group-hover:text-[var(--accent)]">
+                <span className="mt-1 line-clamp-1 text-[12px] text-[var(--text-2)] group-hover:text-[var(--accent)]">
                   {item.title}
                 </span>
               </button>

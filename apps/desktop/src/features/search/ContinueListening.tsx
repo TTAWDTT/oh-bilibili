@@ -55,7 +55,7 @@ export function ContinueListening() {
                 {formatDuration(track.duration_ms)}
               </span>
             </span>
-            <span className="mt-1.5 line-clamp-1 block text-[14px] text-[var(--text-1)]">{track.title}</span>
+            <span className="mt-1.5 line-clamp-1 text-[14px] text-[var(--text-1)]">{track.title}</span>
             <span className="block truncate text-[12px] text-[var(--text-3)]">{track.artist}</span>
           </button>
         ))}

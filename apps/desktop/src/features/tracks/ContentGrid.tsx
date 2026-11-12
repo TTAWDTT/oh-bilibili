@@ -65,7 +65,7 @@ type ContentGridProps = {
  * B 站风格的封面卡片网格。
  *
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
- * 16:10 封面、圆角 6px、时长压右下角、标题两行、UP 主一行灰字，hover 时标题变粉。
+ * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
 export function ContentGrid({ tracks, activeKey, playing, extraAction }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
@@ -164,8 +164,20 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                     </span>
                   ) : null}
                   <CardDanmaku trackKey={track.key} />
-                  <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[12px] leading-[15px] text-white transition-opacity group-hover:opacity-0">
-                    {formatDuration(track.duration_ms)}
+                  {/* B 站卡片的两枚角标：左下一行带三角的播放量，右下一格时长。
+                      播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
+                  <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+                    <span className="num flex min-w-0 items-center gap-1">
+                      {track.views ? (
+                        <>
+                          <Icon name="play" size={10} className="shrink-0" />
+                          <span className="truncate">{formatCount(track.views)}</span>
+                        </>
+                      ) : null}
+                    </span>
+                    <span className="num shrink-0 rounded-[2px] bg-black/60 px-1 [text-shadow:none]">
+                      {formatDuration(track.duration_ms)}
+                    </span>
                   </span>
                   <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-150 group-hover:bg-black/20 group-hover:opacity-100">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
@@ -213,18 +225,6 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                   <Avatar src={track.up_avatar ?? null} alt={track.artist} size={18} />
                   <span className="truncate">{track.artist}</span>
                 </button>
-                {track.views ? (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span className="num shrink-0">{formatCount(track.views)}</span>
-                  </>
-                ) : null}
-                {track.danmaku ? (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span className="num shrink-0">{formatCount(track.danmaku)} 弹幕</span>
-                  </>
-                ) : null}
               </div>
 
               {confirming === track.key ? (
