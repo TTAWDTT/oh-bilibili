@@ -23,19 +23,26 @@ export function FollowingView() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const boxRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const loadingRef = useRef(false)
+  const pageRef = useRef(0)
 
   const load = async (next: number): Promise<void> => {
+    if (loadingRef.current || next <= pageRef.current) return
+    loadingRef.current = true
     setLoading(true)
     setError(null)
     try {
       const [list, count] = await ipc.following(next)
       setItems((prev) => (next === 1 ? list : [...prev, ...list]))
       setTotal(count)
+      pageRef.current = next
       setPage(next)
       if (list.length === 0 || (next * 20) >= count) setDone(true)
     } catch (e) {
       setError(toWireError(e).message)
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }
@@ -45,11 +52,22 @@ export function FollowingView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const onScroll = (): void => {
+  // 关注列表可能一页装不满窗口（328 个关注、一屏能放 20 个时的常态），
+  // 这时 scrollHeight 不超过 clientHeight，滚动事件永远不会触发。
+  // 用 sentinel 观察，内容不够高也会继续取下一页。
+  useEffect(() => {
     const box = boxRef.current
-    if (!box || loading || done) return
-    if (box.scrollHeight - box.scrollTop - box.clientHeight < 240) void load(page + 1)
-  }
+    const sentinel = sentinelRef.current
+    if (!box || !sentinel || page === 0 || done) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void load(page + 1)
+      },
+      { root: box, rootMargin: '240px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [page, done, loading])
 
   if (error) {
     return (
@@ -78,7 +96,6 @@ export function FollowingView() {
   return (
     <div
       ref={boxRef}
-      onScroll={onScroll}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <PageTitle extra={formatCount(total)}>我关注的人</PageTitle>
@@ -113,6 +130,7 @@ export function FollowingView() {
           ))}
         </ul>
         {loading ? <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取…</p> : null}
+        <div ref={sentinelRef} aria-hidden className="h-px" />
         {done && items.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
