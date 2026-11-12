@@ -367,6 +367,20 @@ impl Library {
         })
     }
 
+    /// 只更新已存在的那条历史的位置，不新增行。
+    ///
+    /// 播放中每隔几秒回写一次，历史卡片的进度条才是「看到哪」而不是「从哪开始」。
+    pub fn set_history_position(&self, provider_key: &str, position_ms: u64) -> Result<()> {
+        self.with(|conn| {
+            conn.execute(
+                "UPDATE history SET position_ms = ?2
+                 WHERE track_id = (SELECT id FROM tracks WHERE provider_key = ?1)",
+                params![provider_key, position_ms as i64],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn history(&self, limit: u32) -> Result<Vec<Track>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
@@ -860,6 +874,17 @@ mod tests {
         l.set_setting("volume", "0.5").unwrap();
         l.set_setting("volume", "0.8").unwrap();
         assert_eq!(l.get_setting("volume").unwrap().as_deref(), Some("0.8"));
+    }
+
+    #[test]
+    fn 历史位置能回写() {
+        let l = lib();
+        let a = l.upsert_track(&track("BVpos")).unwrap();
+        l.push_history(a, 0).unwrap();
+        l.set_history_position("BVBVpos", 42_500).unwrap();
+        let rows = l.history_with_time(10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].2, 42_500, "回写之后读到的应该是新位置");
     }
 
     #[test]

@@ -885,8 +885,21 @@ impl Engine {
                 };
                 // 卡住的计数：连续几次发现「在播但时钟停了」才动手，避免误判
                 let mut stalled = 0u32;
+                // 每 5 秒把当前位置写回历史，卡片上的进度条才不会永远停在起点。
+                let mut ticks = 0u32;
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(400));
+                    ticks += 1;
+                    if ticks >= 12 {
+                        ticks = 0;
+                        let key = engine.snapshot().track.map(|t| t.key);
+                        if let Some(k) = key {
+                            let at = engine.snapshot().position_ms;
+                            let _ = engine
+                                .library
+                                .set_history_position(k.as_opaque(), at);
+                        }
+                    }
                     if engine.reached_track_end() {
                         // 真的唱完了：切下一首；失败就停在 ended，别空转
                         if rt.block_on(engine.next()).is_err() {
