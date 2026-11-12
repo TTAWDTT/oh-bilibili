@@ -500,6 +500,24 @@ impl Client {
             .collect())
     }
 
+    /// 视频标签。公开接口，不需要 WBI。
+    pub async fn video_tags(&self, bvid: &str) -> Result<Vec<String>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/tag/archive/tags?bvid={bvid}"),
+                std::time::Duration::from_millis(300),
+            )
+            .await?;
+        Ok(v["data"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|t| t["tag_name"].as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
     /// 加入稍后再看。
     pub async fn watch_later_add(&self, aid: u64) -> Result<(), BiliError> {
         let csrf = self

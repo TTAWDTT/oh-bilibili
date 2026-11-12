@@ -206,6 +206,11 @@ export function likedVideos(): Promise<Track[]> {
   return call<Track[]>('liked_videos', {})
 }
 
+/** 视频标签。 */
+export function videoTags(key: string): Promise<string[]> {
+  return call<string[]>('video_tags', { key })
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })

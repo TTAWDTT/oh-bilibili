@@ -70,6 +70,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'liked_videos':
       return CATALOG.slice(0, 12)
+    case 'video_tags':
+      return ['翻唱', '虚拟UP主', '音乐']
     case 'fav_tracks': {
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40

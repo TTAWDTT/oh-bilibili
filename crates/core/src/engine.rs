@@ -1260,6 +1260,10 @@ impl Engine {
         Ok(tracks)
     }
 
+    pub async fn video_tags(&self, key: &TrackKey) -> Result<Vec<String>, WireError> {
+        Ok(self.source.video_tags(&key.as_opaque()).await?)
+    }
+
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
         for t in &tracks {

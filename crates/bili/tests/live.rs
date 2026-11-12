@@ -421,4 +421,8 @@ async fn 赞过的视频带封面和分区() {
         first.tname.clone().unwrap_or_default()
     );
     assert!(first.cover.is_some(), "喜欢页的卡片要有封面");
+
+    let tags = source.video_tags(&first.key.as_opaque()).await.expect("视频标签");
+    println!("标签 {:?}", tags);
+    assert!(!tags.is_empty(), "视频页应该能读到标签");
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount, formatDate } from '../../shared/lib/format'
@@ -46,6 +47,8 @@ export function WatchInfo({
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
 
   const [saved, setSaved] = useState(false)
+  /** 视频标签。公开接口，取不到就不显示这一行。 */
+  const [tags, setTags] = useState<string[]>([])
   /** UP 主粉丝数。B 站把「粉丝 123.4万」挂在 UP 名字后面。 */
   const [fans, setFans] = useState<number | null>(null)
   /** 简介默认收两行，长简介给一个展开。 */
@@ -54,10 +57,12 @@ export function WatchInfo({
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
+  const setHeroQuery = useAppStore((state) => state.setHeroQuery)
 
   useEffect(() => {
     let cancelled = false
     setSaved(false)
+    setTags([])
     setFans(null)
     setDescOpen(false)
     setConfirmingCoin(false)
@@ -65,6 +70,19 @@ export function WatchInfo({
       .watchLaterList()
       .then((list) => {
         if (!cancelled) setSaved(list.some((t) => t.key === track.key))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [track.key])
+
+  useEffect(() => {
+    let cancelled = false
+    void ipc
+      .videoTags(track.key)
+      .then((list) => {
+        if (!cancelled) setTags(list)
       })
       .catch(() => {})
     return () => {
@@ -297,6 +315,21 @@ export function WatchInfo({
               {descOpen ? '收起' : '展开更多'}
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {tags.length > 0 ? (
+        <div className="mt-2 flex max-w-[820px] flex-wrap items-center gap-1.5">
+          {tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setHeroQuery(tag)}
+              className="t rounded-[3px] bg-[var(--panel-raised)] px-2 text-[12px] leading-[22px] text-[var(--text-2)] hover:text-[var(--accent)]"
+            >
+              {tag}
+            </button>
+          ))}
         </div>
       ) : null}
 

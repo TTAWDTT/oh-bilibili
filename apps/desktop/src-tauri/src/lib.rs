@@ -558,6 +558,14 @@ async fn fav_covers(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn video_tags(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<String>, WireError> {
+    engine.video_tags(&TrackKey::from_provider(key)).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn liked_videos(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<Track>, WireError> {
     engine.liked_videos().await
 }
@@ -828,6 +836,7 @@ pub fn run() {
             fav_folders,
             fav_covers,
             liked_videos,
+            video_tags,
             author_card,
             fav_tracks,
             unfav_from,
