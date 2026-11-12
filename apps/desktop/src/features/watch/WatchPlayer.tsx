@@ -130,6 +130,12 @@ export function WatchPlayer({
   const patchDanmaku = useDanmakuSettings((s) => s.patch)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
 
+  /** 引擎可能停在另一条视频上（比如这条没打开），别把别人的时间当成本条。 */
+  const localPlayhead = (): number => {
+    const snap = usePlayerStore.getState().snapshot
+    return snap?.track?.key === track.key ? readPlayhead() : 0
+  }
+
   const poke = (): void => {
     setControls(true)
     if (hideTimer.current) window.clearTimeout(hideTimer.current)
@@ -164,7 +170,7 @@ export function WatchPlayer({
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
     if (!controls) return
-    const timer = window.setInterval(() => setNow(Math.round(readPlayhead())), 500)
+    const timer = window.setInterval(() => setNow(Math.round(localPlayhead())), 500)
     return () => window.clearInterval(timer)
   }, [controls])
 
@@ -226,7 +232,7 @@ export function WatchPlayer({
     const text = draft.trim()
     if (!text || sending) return
     setSending(true)
-    const at = Math.round(readPlayhead())
+    const at = Math.round(localPlayhead())
     try {
       await ipc.danmakuSend(track.key, text, at)
       setDraft('')
@@ -387,7 +393,7 @@ export function WatchPlayer({
       />
       <DanmakuField
         items={danmaku}
-        position={() => Math.round(readPlayhead())}
+        position={() => Math.round(localPlayhead())}
         playing={playing}
         enabled={danmakuOn}
         opacity={danmakuOpacity}
@@ -542,7 +548,7 @@ export function WatchPlayer({
           onKeyDown={(event) => {
             if (!data.duration_ms) return
             const step = event.shiftKey ? 30_000 : 5_000
-            const at = readPlayhead()
+            const at = localPlayhead()
             const keys: Record<string, number | undefined> = {
               Home: 0,
               // 正好落在 duration 上会被解码器当成越界忽略，留 1.5 秒。
