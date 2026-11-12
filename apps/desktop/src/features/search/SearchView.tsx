@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -19,19 +19,45 @@ const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
+type SearchMemory = {
+  key: string
+  tracks: Track[]
+  users: ipc.UserHit[]
+  page: number
+  scrollTop: number
+}
+
+/** 搜索结果按查询条件缓存：从视频页返回时不该重新搜一遍，也不该跳回顶部。 */
+let searchMemory: SearchMemory | null = null
+
+function searchKey(query: string, partition: string, order: string, duration: number): string {
+  return [query, partition, order, duration].join('\u0000')
+}
 
 export function SearchView() {
   const storeQuery = useAppStore((state) => state.currentQuery)
   const [query, setQuery] = useState(storeQuery)
-  const [page, setPage] = useState(1)
+  const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
+  const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
+  const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
+
+  const bootKey = searchKey(query.trim(), partition, order, duration)
+  const restoreRef = useRef<SearchMemory | null | undefined>(undefined)
+  if (restoreRef.current === undefined) {
+    restoreRef.current =
+      searchMemory && searchMemory.key === bootKey && searchMemory.tracks.length > 0 ? searchMemory : null
+  }
+  const restored = restoreRef.current
+  const [page, setPage] = useState(restored?.page ?? 1)
+  const [tracks, setTracks] = useState<Track[]>(restored?.tracks ?? [])
+  const [users, setUsers] = useState<ipc.UserHit[]>(restored?.users ?? [])
+  const [dataKey, setDataKey] = useState(restored?.key ?? '')
+  const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
+  const skipFirstFetch = useRef(restored !== null)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
-  const [tracks, setTracks] = useState<Track[]>([])
-  const [users, setUsers] = useState<ipc.UserHit[]>([])
-  const [status, setStatus] = useState<Status>('idle')
-  const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
-  const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
   // 统计行要说实话：用户选了「最多播放」，这里就不能还写着「按标题匹配排序」。
   const orderLabel: Record<typeof order, string> = {
     totalrank: '综合排序',
@@ -39,7 +65,6 @@ export function SearchView() {
     pubdate: '按发布时间',
     danmaku: '按弹幕数',
   }
-  const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   const clearHistory = useSearchHistory((s) => s.clear)
@@ -98,6 +123,28 @@ export function SearchView() {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
 
+  useLayoutEffect(() => {
+    const el = scrollerRef.current
+    if (el && restored) el.scrollTop = restored.scrollTop
+  }, [restored])
+
+  // 只把属于当前查询的结果写进缓存，避免新关键词挂上旧结果。
+  useEffect(() => {
+    if (trimmed.length === 0) {
+      searchMemory = null
+      return
+    }
+    const key = searchKey(trimmed, partition, order, duration)
+    if (dataKey !== key) return
+    if (!searchMemory || searchMemory.key !== key) {
+      searchMemory = { key, tracks, users, page, scrollTop: 0 }
+    } else {
+      searchMemory.tracks = tracks
+      searchMemory.users = users
+      searchMemory.page = page
+    }
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, page])
+
   // ⌘K 只在自增时抢焦点，用户自己点进来的渲染不会被打断。
   useEffect(() => {
     if (focusSeq === 0) return
@@ -111,6 +158,11 @@ export function SearchView() {
       setTracks([])
       setUsers([])
       setError(null)
+      searchMemory = null
+      return
+    }
+    if (skipFirstFetch.current) {
+      skipFirstFetch.current = false
       return
     }
     const ticket = ++seq.current
@@ -119,6 +171,8 @@ export function SearchView() {
       if (page === 1) {
         setTracks([])
         setUsers([])
+        setDataKey('')
+        scrollerRef.current?.scrollTo({ top: 0 })
       }
       ipc
         .searchQ(
@@ -135,6 +189,7 @@ export function SearchView() {
           if (seq.current !== ticket) return
           if (page === 1) pushHistory(trimmed)
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
+          setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
           setLoadingMore(false)
           // UP 主单独一条搜索线。等视频结果落地再发，免得和 search_q 抢限速。
@@ -169,9 +224,11 @@ export function SearchView() {
 
 
       <div
+        ref={scrollerRef}
         id="scroll-main"
         onScroll={(event) => {
           const el = event.currentTarget
+          if (searchMemory) searchMemory.scrollTop = el.scrollTop
           if (loadingMore || status !== 'ready' || tracks.length === 0) return
           // 距离底部不到 240px 就预取下一页，做得像 B 站那样无感。
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
