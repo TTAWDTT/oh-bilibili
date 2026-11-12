@@ -19,6 +19,23 @@ const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
 const DRIFT_MS = 400
 
 /**
+ * 把 shaka 的错误对象翻成一句人话。
+ *
+ * 直接 `String(e)` 会把整个对象、内部地址与压缩后的堆栈糊在画面上，
+ * 用户看到的是 `shaka.util.Error { "severity": 2, ... }`。这既看不懂，
+ * 也不该出现在产品里。
+ */
+function describePlaybackError(e: unknown): string {
+  const detail = e as { data?: unknown[]; code?: number } | null
+  const status = typeof detail?.data?.[2] === 'number' ? (detail.data[2] as number) : null
+  if (status === 403) return '这一档画面的地址被拒了，换一档画质或稍后再试。'
+  if (status === 404) return '这段画面取不到了，稍后再试。'
+  if (detail?.code === 1001 || detail?.code === 1002) return '连不上 B 站的视频服务器，检查一下网络。'
+  if (detail?.code === 1006) return '这条视频的编码本机不支持。'
+  return '这条视频没播起来，换一条或稍后再试。'
+}
+
+/**
  * 观看页的播放器：画面、弹幕层、悬浮控制条。
  *
  * 声音只有一个发声者，就是音频引擎。视频元素始终静音，只负责画面，
@@ -185,7 +202,7 @@ export function WatchPlayer({
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
           const detail = event.detail as { handled?: boolean } | undefined
           if (detail?.handled) return
-          setError(`播放失败：${String(event.detail ?? '未知错误')}`)
+          setError(describePlaybackError(event.detail))
         })
         video.muted = true
         video.volume = 0
@@ -203,7 +220,7 @@ export function WatchPlayer({
         }
         setReady(true)
       } catch (e) {
-        if (!cancelled) setError(`播放失败：${String(e)}`)
+        if (!cancelled) setError(describePlaybackError(e))
       }
     })()
     return () => {
@@ -266,9 +283,6 @@ export function WatchPlayer({
       {error ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">
           <span>{error}</span>
-          <span className="text-white/60">
-            可能的原因：这条内容没有 DASH 视频轨，或本机播放器不支持 MSE。
-          </span>
         </div>
       ) : null}
 
