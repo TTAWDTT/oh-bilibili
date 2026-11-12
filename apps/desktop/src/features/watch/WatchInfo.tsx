@@ -23,8 +23,10 @@ export function WatchInfo({
   onListen,
   likeDelta,
   favDelta,
+  coinDelta,
   onLike,
   onFav,
+  onCoin,
 }: {
   track: Track
   data: WatchData
@@ -34,18 +36,18 @@ export function WatchInfo({
   /** 点赞与收藏的计数偏移由观看页统一持有，这里只负责显示。 */
   likeDelta: number
   favDelta: number
+  coinDelta: number
   onLike: () => void
   onFav: () => void
+  onCoin: () => void
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
-  const addCoin = useReactionStore((st) => st.addCoin)
 
   const [saved, setSaved] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
-  const [coinDelta, setCoinDelta] = useState(0)
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
 
@@ -53,7 +55,6 @@ export function WatchInfo({
     let cancelled = false
     setSaved(false)
     setConfirmingCoin(false)
-    setCoinDelta(0)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -244,9 +245,7 @@ export function WatchInfo({
             type="button"
             onClick={() => {
               setConfirmingCoin(false)
-              void addCoin(track, 1).then((ok) => {
-                if (ok) setCoinDelta((n) => n + 1)
-              })
+              onCoin()
             }}
             className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
           >

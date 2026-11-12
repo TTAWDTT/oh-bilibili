@@ -166,7 +166,7 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                   <CardDanmaku trackKey={track.key} />
                   {/* B 站卡片的两枚角标：左下一行带三角的播放量，右下一格时长。
                       播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
-                  <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+                  <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                     <span className="num flex min-w-0 items-center gap-1">
                       {track.views ? (
                         <>

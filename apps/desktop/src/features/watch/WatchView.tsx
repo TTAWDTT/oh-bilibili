@@ -29,6 +29,8 @@ export function WatchView({ track }: { track: Track }) {
   // 各算一份就会出现「上面点了、下面的数字没动」。
   const [likeDelta, setLikeDelta] = useState(0)
   const [favDelta, setFavDelta] = useState(0)
+  const [coinDelta, setCoinDelta] = useState(0)
+  const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
@@ -36,6 +38,7 @@ export function WatchView({ track }: { track: Track }) {
   useEffect(() => {
     setLikeDelta(0)
     setFavDelta(0)
+    setCoinDelta(0)
   }, [track.key])
 
   const like = (): void => {
@@ -45,6 +48,15 @@ export function WatchView({ track }: { track: Track }) {
       .toggleLike(track)
       .then((next) => {
         if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
+      })
+  }
+
+  const coin = (): void => {
+    void useReactionStore
+      .getState()
+      .addCoin(track, 1)
+      .then((ok) => {
+        if (ok) setCoinDelta((n) => n + 1)
       })
   }
 
@@ -149,6 +161,8 @@ export function WatchView({ track }: { track: Track }) {
                 faved={faved}
                 onLike={like}
                 onFav={fav}
+                onCoin={coin}
+                coins={coins}
                 onReplay={() => {
                   void ipc.playerSeek(0).catch(() => {})
                 }}
@@ -169,6 +183,8 @@ export function WatchView({ track }: { track: Track }) {
               onPage={setPage}
               likeDelta={likeDelta}
               favDelta={favDelta}
+              coinDelta={coinDelta}
+              onCoin={coin}
               onLike={like}
               onFav={fav}
               onListen={(at) => {

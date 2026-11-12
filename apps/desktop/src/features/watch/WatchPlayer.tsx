@@ -12,7 +12,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
-import { BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
+import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
 /** 观看页的倍速档位，和 B 站播放器一致。 */
@@ -61,9 +61,11 @@ export function WatchPlayer({
   onBack,
   onLike,
   onFav,
+  onCoin,
   onReplay,
   liked,
   faved,
+  coins,
 }: {
   track: Track
   data: WatchData
@@ -73,9 +75,12 @@ export function WatchPlayer({
   /** 播完之后的收尾。B 站也是在这时候把三连与重播摆到画面上。 */
   onLike: () => void
   onFav: () => void
+  /** 已投出去的币数，0/1/2。三连里投币要按真实状态置灰。 */
+  onCoin: () => void
   onReplay: () => void
   liked: boolean
   faved: boolean
+  coins: number
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
@@ -381,17 +386,25 @@ export function WatchPlayer({
           <div className="flex items-center gap-2">
             {[
               { on: liked, label: '点赞', run: onLike, icon: <BiliThumb size={16} /> },
+              {
+                on: coins > 0,
+                label: coins >= 2 ? '已投满' : '投币',
+                run: onCoin,
+                icon: <BiliCoin size={16} />,
+                disabled: coins >= 2,
+              },
               { on: faved, label: '收藏', run: onFav, icon: <BiliStar size={16} /> },
             ].map((action) => (
               <button
                 key={action.label}
                 type="button"
                 onClick={action.run}
+                disabled={action.disabled}
                 className={`t press flex h-9 items-center gap-1.5 rounded-full border px-4 text-[13px] ${
                   action.on
                     ? 'border-[var(--accent)] text-[var(--accent)]'
                     : 'border-white/30 text-white hover:border-white/70'
-                }`}
+                } disabled:cursor-default disabled:opacity-50`}
               >
                 {action.icon}
                 {action.label}
@@ -424,7 +437,7 @@ export function WatchPlayer({
             onKeyDown={(event) => {
               if (event.key === 'Enter') void sendDanmaku()
             }}
-            placeholder="发条弹幕"
+            placeholder="发一条友善的弹幕"
             aria-label="发弹幕"
             className="h-7 min-w-0 flex-1 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
           />
@@ -504,7 +517,7 @@ export function WatchPlayer({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void sendDanmaku()
               }}
-              placeholder="发条弹幕"
+              placeholder="发一条友善的弹幕"
               aria-label="发弹幕"
               className="h-7 w-[150px] shrink-0 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
             />
