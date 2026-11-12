@@ -1,18 +1,48 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed } from '../../shared/lib/contract'
+import type { AuthorCard } from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
+import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+
+/** 名片按 mid 缓存，同一个 UP 反复悬停不再打接口。 */
+const cards = new Map<number, Promise<AuthorCard>>()
+
+function authorCardOf(mid: number): Promise<AuthorCard> {
+  let card = cards.get(mid)
+  if (!card) {
+    card = ipc.authorCard(mid)
+    cards.set(mid, card)
+    card.catch(() => cards.delete(mid))
+  }
+  return card
+}
+
+type Hover = { user: Followed; anchor: { top: number; left: number; right: number } }
+
+/** 名片贴在被悬停的卡片右侧；右边放不下就翻到左侧，再夹进窗口。 */
+function popoverStyle(anchor: Hover['anchor']): { left: number; top: number; width: number } {
+  const width = 320
+  const gap = 10
+  let left = anchor.right + gap
+  if (left + width > window.innerWidth - 8) left = anchor.left - width - gap
+  if (left < 8) left = 8
+  const top = Math.min(Math.max(anchor.top, 8), Math.max(8, window.innerHeight - 196))
+  return { left, top, width }
+}
 
 /**
  * 我关注的人。
  *
  * 只读：不做关注/取关，因为那会给真实 UP 主发通知。
- * 点一个进他的主页，和 B 站的空间页入口一致。
+ * 点一个进他的主页，和 B 站的空间页入口一致；悬停出名片，和 B 站关注列表一致。
  */
 export function FollowingView() {
   const navigate = useAppStore((s) => s.navigate)
@@ -22,10 +52,13 @@ export function FollowingView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [hover, setHover] = useState<Hover | null>(null)
+  const [loaded, setLoaded] = useState<Record<number, AuthorCard>>({})
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
   const pageRef = useRef(0)
+  const timerRef = useRef<number | null>(null)
 
   const load = async (next: number): Promise<void> => {
     if (loadingRef.current || next <= pageRef.current) return
@@ -69,6 +102,44 @@ export function FollowingView() {
     return () => observer.disconnect()
   }, [page, done, loading])
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  const mid = hover?.user.mid
+
+  useEffect(() => {
+    if (!mid || loaded[mid]) return
+    let alive = true
+    void authorCardOf(mid)
+      .then((card) => {
+        if (alive) setLoaded((prev) => ({ ...prev, [mid]: card }))
+      })
+      .catch(() => {
+        // 名片取不到就只显示列表里已有的头像、昵称与签名
+      })
+    return () => {
+      alive = false
+    }
+  }, [mid, loaded])
+
+  const show = (user: Followed, el: HTMLElement): void => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    // 停留一小会儿再出，扫过去的鼠标不弹名片
+    timerRef.current = window.setTimeout(() => {
+      const rect = el.getBoundingClientRect()
+      setHover({ user, anchor: { top: rect.top, left: rect.left, right: rect.right } })
+    }, 160)
+  }
+
+  const hide = (): void => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    timerRef.current = null
+    setHover(null)
+  }
+
   if (error) {
     return (
       <EmptyState
@@ -93,9 +164,12 @@ export function FollowingView() {
     )
   }
 
+  const card = hover ? loaded[hover.user.mid] : undefined
+
   return (
     <div
       ref={boxRef}
+      onScroll={hide}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <PageTitle extra={formatCount(total)}>我关注的人</PageTitle>
@@ -106,6 +180,10 @@ export function FollowingView() {
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'author', name: u.name, mid: u.mid })}
+                onMouseEnter={(event) => show(u, event.currentTarget)}
+                onMouseLeave={hide}
+                onFocus={(event) => show(u, event.currentTarget)}
+                onBlur={hide}
                 className="t press flex w-full items-center gap-2.5 rounded-[8px] border border-[var(--line)] px-2.5 py-2 text-left hover:bg-[var(--panel-alt)]"
               >
                 {u.face ? (
@@ -135,6 +213,44 @@ export function FollowingView() {
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
       </div>
+      {hover
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[60] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
+              style={popoverStyle(hover.anchor)}
+            >
+              <div className="flex items-start gap-2.5">
+                <Avatar src={hover.user.face} alt={hover.user.name} size={48} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[15px] font-medium text-[var(--text-1)]">
+                      {hover.user.name}
+                    </span>
+                    {card ? <LevelBadge level={card.level} /> : null}
+                  </div>
+                  {card ? (
+                    <div className="num mt-1 flex items-center gap-3 whitespace-nowrap text-[12px] text-[var(--text-3)]">
+                      <span>{formatCount(card.fans)} 粉丝</span>
+                      <span>{formatCount(card.videos)} 投稿</span>
+                    </div>
+                  ) : null}
+                  {card?.official ? (
+                    <span className="mt-1 inline-block max-w-full truncate rounded-[2px] bg-[var(--accent-soft)] px-1 align-top text-[11px] leading-[16px] text-[var(--accent)]">
+                      {card.official}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {card?.sign || hover.user.sign ? (
+                <p className="mt-2 line-clamp-2 text-[12px] leading-[18px] text-[var(--text-2)]">
+                  {card?.sign || hover.user.sign}
+                </p>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

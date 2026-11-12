@@ -207,6 +207,37 @@ impl Client {
             .collect())
     }
 
+    /// 收藏夹一页的原始条目。`ps` 是每页条数：列表页要 40 条，
+    /// 封面拼图只要前 4 条，不必把整页都拉回来。
+    async fn fav_medias(
+        &self,
+        folder_id: i64,
+        page: u32,
+        ps: u32,
+    ) -> Result<Vec<serde_json::Value>, BiliError> {
+        let v = self
+            .get_json(
+                &format!(
+                    "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps={ps}&pn={}&platform=web",
+                    page.max(1)
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(v["data"]["medias"].as_array().cloned().unwrap_or_default())
+    }
+
+    /// 收藏夹列表用的封面拼图：取每个夹子最前面的几张封面。
+    pub async fn fav_covers(&self, folder_id: i64, limit: u32) -> Result<Vec<String>, BiliError> {
+        Ok(self
+            .fav_medias(folder_id, 1, limit.clamp(1, 20))
+            .await?
+            .iter()
+            .filter_map(|m| m["cover"].as_str().filter(|c| !c.is_empty()))
+            .map(|c| c.replacen("http://", "https://", 1))
+            .collect())
+    }
+
     /// 某个收藏夹里的视频 bvid 列表。
     /// 收藏夹里的视频。
     ///
@@ -220,19 +251,9 @@ impl Client {
     ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};
 
-        let v = self
-            .get_json(
-                &format!(
-                    "{API}/x/v3/fav/resource/list?media_id={folder_id}&ps=40&pn={}&platform=web",
-                    page.max(1)
-                ),
-                std::time::Duration::from_millis(400),
-            )
-            .await?;
-        let Some(list) = v["data"]["medias"].as_array() else {
-            return Ok(Vec::new());
-        };
-        Ok(list
+        Ok(self
+            .fav_medias(folder_id, page, 40)
+            .await?
             .iter()
             .filter_map(|m| {
                 let bvid = m["bvid"].as_str()?.to_string();

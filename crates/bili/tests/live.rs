@@ -381,6 +381,10 @@ async fn 收藏夹一页要多久() {
         .expect("至少一个收藏夹");
     println!("用收藏夹「{name}」({count} 个视频)");
 
+    let covers = source.fav_covers(id, 4).await.expect("前四张封面");
+    println!("封面拼图 {} 张", covers.len());
+    assert!(!covers.is_empty(), "收藏夹列表页应该有封面可拼");
+
     let t0 = Instant::now();
     let page = source.fav_tracks(id, 1).await.expect("一页");
     println!("第一页 {} 条，耗时 {} ms", page.len(), t0.elapsed().as_millis());

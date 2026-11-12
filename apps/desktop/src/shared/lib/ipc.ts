@@ -196,6 +196,11 @@ export function favFolders(): Promise<FavFolder[]> {
   return call<FavFolder[]>('fav_folders', {})
 }
 
+/** 收藏夹列表页的四宫格封面。 */
+export function favCovers(folderId: number, limit = 4): Promise<string[]> {
+  return call<string[]>('fav_covers', { folder_id: folderId, limit })
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })

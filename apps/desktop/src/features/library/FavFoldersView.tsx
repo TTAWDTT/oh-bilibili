@@ -14,6 +14,9 @@ import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
+/** 封面拼图按夹子缓存，来回切页不用重取。 */
+const coverCache = new Map<number, string[]>()
+
 /**
  * B 站收藏夹。读的是你账号里真实存在的收藏夹，不是本地伪造的歌单。
  *
@@ -21,6 +24,7 @@ import { usePlayerStore } from '../player/playerStore'
  */
 export function FavFoldersView() {
   const [folders, setFolders] = useState<FavFolder[] | null>(null)
+  const [covers, setCovers] = useState<Record<number, string[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<FavFolder | null>(null)
   const [tracks, setTracks] = useState<Track[] | null>(null)
@@ -47,6 +51,35 @@ export function FavFoldersView() {
       cancelled = true
     }
   }, [])
+
+  // 收藏夹列表接口不带封面，B 站网页端是逐个夹子再取前几条拼四宫格。
+  // 先出灰格子，封面到了再补，不为了等图把整页卡住。
+  useEffect(() => {
+    if (!folders) return
+    let alive = true
+    const cached: Record<number, string[]> = {}
+    for (const folder of folders) {
+      const hit = coverCache.get(folder.id)
+      if (hit) cached[folder.id] = hit
+    }
+    setCovers(cached)
+    const queue = folders.filter((f) => f.count > 0 && !coverCache.has(f.id)).map((f) => f.id)
+    const worker = async (): Promise<void> => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        try {
+          const list = await ipc.favCovers(id, 4)
+          coverCache.set(id, list)
+          if (alive) setCovers((prev) => ({ ...prev, [id]: list }))
+        } catch {
+          // 单个夹子的封面取不到就留灰格子，不影响打开夹子
+        }
+      }
+    }
+    void Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker))
+    return () => {
+      alive = false
+    }
+  }, [folders])
 
   useEffect(() => {
     if (!picked) {
@@ -220,24 +253,48 @@ export function FavFoldersView() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <PageTitle>收藏夹</PageTitle>
-      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-        {folders.map((folder) => (
-          <button
-            key={folder.id}
-            type="button"
-            onClick={() => setPicked(folder)}
-            className="t flex items-center justify-between gap-3 rounded-[4px] border border-[var(--line)] px-3 py-2 text-left hover:border-[var(--accent)]"
-          >
-            <span className="min-w-0">
-              <span className="block truncate text-[14px] text-[var(--text-1)]" title={folder.title}>
-                {folder.title}
+      <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+        {folders.map((folder) => {
+          const shots = covers[folder.id]
+          return (
+            <button
+              key={folder.id}
+              type="button"
+              onClick={() => setPicked(folder)}
+              className="bili-card bili-card-enter bili-press overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
+            >
+              {/* 和 B 站一样用前四条视频拼 2×2 封面；没有封面的格子留底色 */}
+              <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
+                    {shots?.[i] ? (
+                      <img
+                        src={shots[i]}
+                        alt=""
+                        aria-hidden
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : null}
+                  </span>
+                ))}
               </span>
-              <span className="num block text-[12px] text-[var(--text-3)]">{folder.count} 个视频</span>
-            </span>
-            <Icon name="chevronRight" size={13} className="shrink-0 text-[var(--text-3)]" />
-          </button>
-        ))}
-      </div>
+              <span className="block px-3 py-2">
+                <span
+                  className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]"
+                  title={folder.title}
+                >
+                  {folder.title}
+                </span>
+                <span className="num mt-0.5 block text-[12px] text-[var(--text-3)]">
+                  {folder.count} 个视频
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </section>
     </div>
   )
 }

@@ -549,6 +549,15 @@ async fn fav_folders(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn fav_covers(
+    engine: tauri::State<'_, Arc<Engine>>,
+    folder_id: i64,
+    limit: u32,
+) -> Result<Vec<String>, WireError> {
+    engine.fav_covers(folder_id, limit).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn unfav_from(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
@@ -812,6 +821,7 @@ pub fn run() {
             relation_followed,
             watch_later_set,
             fav_folders,
+            fav_covers,
             author_card,
             fav_tracks,
             unfav_from,

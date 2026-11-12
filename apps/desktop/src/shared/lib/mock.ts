@@ -62,6 +62,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'fav_folders':
       // 预览用一个两页的收藏夹，方便验证「加载更多」。
       return [{ id: 1, title: '默认收藏夹', count: 70 }]
+    case 'fav_covers': {
+      const limit = Math.max(1, Math.trunc(num(args, 'limit')) || 4)
+      return CATALOG.slice(0, limit)
+        .map((t) => t.cover)
+        .filter((c): c is string => Boolean(c))
+    }
     case 'fav_tracks': {
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40

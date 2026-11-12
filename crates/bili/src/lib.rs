@@ -304,6 +304,11 @@ impl Source {
         self.client.fav_folders().await
     }
 
+    /// 收藏夹列表页的四宫格封面。
+    pub async fn fav_covers(&self, folder_id: i64, limit: u32) -> Result<Vec<String>, BiliError> {
+        self.client.fav_covers(folder_id, limit).await
+    }
+
     /// 把一条视频从指定收藏夹移出。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

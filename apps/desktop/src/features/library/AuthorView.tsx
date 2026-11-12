@@ -7,6 +7,7 @@ import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
@@ -18,11 +19,6 @@ import { usePlayerStore } from '../player/playerStore'
  * 主的全部投稿和总数。没有 mid 时退回「按作者名搜索」的结果聚合，那种情况下
  * 界面会标注数据来源，不假装是完整投稿列表。
  */
-/** 等级徽章配色。B 站 LV1 灰、LV2 绿、LV3 蓝、LV4 青、LV5 紫、LV6 红。 */
-function levelColor(level: number): string {
-  return ['#9499a0', '#9499a0', '#7fa93b', '#3fa8d6', '#2fb3a8', '#a674d9', '#e23a5e'][level] ?? '#9499a0'
-}
-
 export function AuthorView({ name, mid }: { name: string; mid?: number | null }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
@@ -134,15 +130,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
             <h2 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
               {name}
             </h2>
-            {card && card.level > 0 ? (
-              <span
-                className="shrink-0 rounded-[3px] px-1.5 text-[11.5px] font-semibold leading-[18px] text-white"
-                style={{ background: levelColor(card.level) }}
-                title={`LV${card.level}`}
-              >
-                LV{card.level}
-              </span>
-            ) : null}
+            {card ? <LevelBadge level={card.level} /> : null}
           </div>
           <button
             type="button"

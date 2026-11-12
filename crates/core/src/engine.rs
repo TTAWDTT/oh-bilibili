@@ -1241,6 +1241,10 @@ impl Engine {
         Ok(self.source.fav_folders().await?)
     }
 
+    pub async fn fav_covers(&self, folder_id: i64, limit: u32) -> Result<Vec<String>, WireError> {
+        Ok(self.source.fav_covers(folder_id, limit).await?)
+    }
+
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
         for t in &tracks {
