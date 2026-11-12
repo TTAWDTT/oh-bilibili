@@ -202,7 +202,9 @@ export function SearchView() {
                   : status === 'loading'
                     ? '正在搜索…'
                     : status === 'ready'
-                      ? `为你找到 ${tracks.length} 个 · ${orderLabel[order]} · 第 ${page} 页`
+                      // 说「已加载」而不是「为你找到」：这个数字随滚动增长，
+                      // 写成结果总数就是把两件事混成一句谎话。
+                      ? `已加载 ${tracks.length} 个 · ${orderLabel[order]} · 第 ${page} 页`
                       : ''}
               </span>
               {status === 'loading' && tracks.length > 0 ? (
