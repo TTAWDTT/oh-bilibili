@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { formatDuration } from '../../shared/lib/format'
 import type { Track } from '../../shared/lib/contract'
+import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Equalizer } from '../../shared/ui/Equalizer'
 import { Skeleton } from '../../shared/ui/Skeleton'
@@ -75,6 +76,11 @@ function QueueRow({
           </>
         )}
       </span>
+      <Cover
+        cover={track.cover}
+        title={track.title}
+        className="h-[30px] w-[48px] shrink-0 rounded-[3px] border border-hairline"
+      />
       <span className="min-w-0 flex-1">
         <span
           className={['block truncate text-[14px] leading-[1.5]', active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] group-hover:text-[var(--text-1)]'].join(' ')}
