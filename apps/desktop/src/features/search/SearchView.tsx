@@ -148,7 +148,7 @@ export function SearchView() {
       >
         {/* 搜索框在顶栏，这里只呈现结果。 */}
 
-        {trimmed.length === 0 && history.length > 0 ? (
+        {trimmed.length === 0 ? (
           <div className="bili-suggest relative z-20 -mt-1 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
             <div className="flex items-center gap-2">
               <span className="bili-tag-blue rounded-[3px] px-1.5 text-[12px] leading-[17px]">热门</span>
@@ -189,23 +189,9 @@ export function SearchView() {
 
         {trimmed.length === 0 ? (
           <div className="mt-2">
-            {/* 搜索页只放「接着看什么」和「搜什么」。大 banner、排行榜、分区入口
+            {/* 搜索页只放「接着看什么」。大 banner、排行榜、分区入口
                 是首页的东西，摆在搜索页会让人以为这里是首页。 */}
             <ContinueListening />
-
-            <div className="mt-7 text-[13px] text-[var(--text-3)]">大家都在搜</div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              {SUGGESTIONS.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  onClick={() => pick(suggestion)}
-                  className="t press rounded-full border border-[var(--line)] px-3 py-1 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           <section className="mt-6">

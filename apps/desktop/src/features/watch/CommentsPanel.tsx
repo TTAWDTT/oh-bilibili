@@ -99,6 +99,9 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
   const [mine, setMine] = useState<Set<string>>(new Set())
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const loadingRef = useRef(false)
+  const pageRef = useRef(0)
+  const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
 
   // 评论区跟着整页一起滚时不能再自己滚一屏，否则是「滚动里套滚动」。
@@ -120,25 +123,36 @@ export function CommentsPanel({ trackKey, flow = false }: { trackKey: string; fl
   }, [flow, hasMore, loading, page, trackKey])
 
   const load = async (next: number): Promise<void> => {
+    if (loadingRef.current || next <= pageRef.current) return
+    const seq = seqRef.current
+    loadingRef.current = true
     setLoading(true)
     setError(null)
     try {
       const res: CommentPage = await ipc.watchComments(trackKey, next)
+      if (seq !== seqRef.current) return
       setItems((prev) => (next === 1 ? res.items : [...prev, ...res.items]))
       setTotal(res.total)
+      pageRef.current = next
       setPage(res.page)
       setHasMore(res.has_more)
     } catch (e) {
       setError(toWireError(e).message)
     } finally {
-      setLoading(false)
+      if (seq === seqRef.current) {
+        loadingRef.current = false
+        setLoading(false)
+      }
     }
   }
 
   useEffect(() => {
+    seqRef.current += 1
+    loadingRef.current = false
     setItems([])
     setTotal(0)
     setPage(0)
+    pageRef.current = 0
     setHasMore(false)
     void load(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
