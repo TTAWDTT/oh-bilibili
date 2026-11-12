@@ -12,6 +12,7 @@ import { DanmakuLayer } from './DanmakuLayer'
 import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
 import { VideoInfo } from './VideoInfo'
+import { PlaybackProgress } from './PlaybackProgress'
 import { usePlayerStore } from './playerStore'
 
 /**
@@ -96,7 +97,7 @@ export function StageView() {
   return (
     <div
       {...swipe}
-      className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden"
+      className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden md:pb-[168px]"
       style={{ background: 'var(--ga0)' }}
     >
       {/* 背景：同一张封面铺满并重度模糊，画面颜色全部来自这张图 */}
@@ -168,6 +169,10 @@ export function StageView() {
           <button type="button" aria-label="下一首" onClick={() => void next()} className="t press hover:text-[var(--text-1)]">
             <Icon name="next" size={22} />
           </button>
+        </div>
+
+        <div className="mt-4 w-full max-w-[420px] px-4">
+          <PlaybackProgress />
         </div>
 
         <div className="mt-3 text-[var(--accent)]">
