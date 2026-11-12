@@ -10,7 +10,8 @@ function isWireError(value: unknown): value is WireError {
 
 /** 命令失败与后台事件共用 WireError；其余任何抛出物都在这里收敛成同一种形状。 */
 export function toWireError(cause: unknown): WireError {
-  if (isWireError(cause)) return cause
+  // Rust 侧也会把 reqwest 原文塞进 WireError，签名 URL 一样不能进界面。
+  if (isWireError(cause)) return { ...cause, message: explainTransport(cause.message) }
   if (cause instanceof Error) return { class: 'internal', message: explainTransport(cause.message) }
   if (typeof cause === 'string') return { class: 'internal', message: explainTransport(cause) }
   return { class: 'internal', message: '发生了未预期的错误' }

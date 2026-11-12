@@ -8,6 +8,7 @@ import { readPlayhead } from '../../shared/lib/playhead'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useDanmakuSettings } from '../player/danmakuSettings'
+import { useAutoplay } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -63,6 +64,8 @@ export function WatchPlayer({
   onFav,
   onCoin,
   onReplay,
+  next,
+  onNext,
   liked,
   faved,
   coins,
@@ -78,6 +81,9 @@ export function WatchPlayer({
   /** 已投出去的币数，0/1/2。三连里投币要按真实状态置灰。 */
   onCoin: () => void
   onReplay: () => void
+  /** 相关推荐里的下一个，播完给个出口。 */
+  next: Track | null
+  onNext: (track: Track) => void
   liked: boolean
   faved: boolean
   coins: number
@@ -107,6 +113,12 @@ export function WatchPlayer({
   const [playing, setPlaying] = useState(false)
   /** 播到结尾就掀开三连面板。 */
   const [finished, setFinished] = useState(false)
+  /** 自动连播的倒计时；关掉开关或没有下一个时为空。 */
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const autoplay = useAutoplay((state) => state.enabled)
+  const setAutoplay = useAutoplay((state) => state.setEnabled)
+  const onNextRef = useRef(onNext)
+  onNextRef.current = onNext
 
   const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
   const setSpeed = usePlayerStore((state) => state.setSpeed)
@@ -128,6 +140,26 @@ export function WatchPlayer({
       if (hideTimer.current) window.clearTimeout(hideTimer.current)
     }
   }, [])
+
+  // 播完自动进下一个：倒计时期间随时可以手动跳或关掉自动连播。
+  useEffect(() => {
+    if (!finished || !next || !autoplay) {
+      setCountdown(null)
+      return
+    }
+    let left = 5
+    setCountdown(left)
+    const timer = window.setInterval(() => {
+      left -= 1
+      setCountdown(left)
+      if (left <= 0) window.clearInterval(timer)
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [finished, next, autoplay])
+
+  useEffect(() => {
+    if (countdown === 0 && finished && next) onNextRef.current(next)
+  }, [countdown, finished, next])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
@@ -428,7 +460,40 @@ export function WatchPlayer({
               <Icon name="refresh" size={15} />
               重播
             </button>
+            {next ? (
+              <button
+                type="button"
+                onClick={() => onNext(next)}
+                className="t press flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-4 text-[13px] text-white hover:border-white/70"
+              >
+                <Icon name="play" size={14} />
+                下一个
+              </button>
+            ) : null}
           </div>
+          {next ? (
+            <div className="flex flex-col items-center gap-1.5">
+              {autoplay && countdown !== null ? (
+                <button
+                  type="button"
+                  onClick={() => onNext(next)}
+                  className="t max-w-full truncate text-[12px] text-white/65 hover:text-white"
+                  title={next.title}
+                >
+                  {countdown} 秒后自动播放：{next.title}
+                </button>
+              ) : null}
+              <label className="flex items-center gap-1.5 text-[12px] text-white/55">
+                <input
+                  type="checkbox"
+                  checked={autoplay}
+                  onChange={(event) => setAutoplay(event.target.checked)}
+                  className="accent-[var(--accent)]"
+                />
+                自动连播
+              </label>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

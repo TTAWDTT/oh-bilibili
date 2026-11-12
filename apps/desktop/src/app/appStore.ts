@@ -51,6 +51,8 @@ type AppStore = {
   /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
   history: View[]
   navigate: (view: View) => void
+  /** 换一条视频但不进历史：观看页里点相关推荐或自动连播，返回该回到来的那一页。 */
+  replace: (view: View) => void
   /** 回上一层；没有历史就回发现页。 */
   goBack: () => void
   setRail: (tab: RailTab | null) => void
@@ -95,6 +97,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
       return { view, cinema: false, osFullscreen: false, history: [...state.history, state.view].slice(-32) }
     }),
+  replace: (view) => set({ view, cinema: false, osFullscreen: false }),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)

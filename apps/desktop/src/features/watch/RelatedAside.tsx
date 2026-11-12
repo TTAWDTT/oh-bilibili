@@ -5,7 +5,7 @@ import { Cover } from '../../shared/ui/Cover'
 
 /** 观看页右栏：相关推荐。条目全来自接口，点击进入它自己的观看页。 */
 export function RelatedAside({ items }: { items: Track[] }) {
-  const navigate = useAppStore((s) => s.navigate)
+  const replace = useAppStore((s) => s.replace)
   if (items.length === 0) return null
 
   return (
@@ -19,7 +19,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
           <button
             key={item.key}
             type="button"
-            onClick={() => navigate({ kind: 'watch', track: item })}
+            onClick={() => replace({ kind: 'watch', track: item })}
             title={item.title}
             className="group flex items-start gap-2 text-left"
           >

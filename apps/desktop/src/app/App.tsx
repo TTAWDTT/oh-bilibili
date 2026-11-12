@@ -94,7 +94,7 @@ function CurrentView({ view }: { view: View }) {
     case 'settings':
       return <SettingsView />
     case 'watch':
-      return <WatchView track={view.track} />
+      return <WatchView key={view.track.key} track={view.track} />
     case 'watchLater':
       return <WatchLaterView />
     case 'following':

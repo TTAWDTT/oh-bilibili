@@ -8,6 +8,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { PARTS } from '../../shared/lib/biliParts'
+import { useAppStore } from '../../app/appStore'
 
 /**
  * 排行榜。读的是 B 站公开榜单，一次 100 条；名次就是接口返回的顺序。
@@ -15,6 +16,7 @@ import { PARTS } from '../../shared/lib/biliParts'
  */
 export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   const [rid, setRid] = useState(initialRid)
+  const replace = useAppStore((s) => s.replace)
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +55,11 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
             key={part.rid}
             type="button"
             aria-pressed={part.rid === rid}
-            onClick={() => setRid(part.rid)}
+            onClick={() => {
+              setRid(part.rid)
+              // 记进当前视图：从视频页返回时还落在同一个分区
+              replace({ kind: 'ranking', rid: part.rid })
+            }}
             className={`t press rounded-[4px] px-3 py-1 text-[13px] ${
               part.rid === rid
                 ? 'bg-[var(--accent)] text-white'

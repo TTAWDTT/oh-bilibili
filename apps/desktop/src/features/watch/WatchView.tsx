@@ -19,6 +19,7 @@ import { WatchPlayer } from './WatchPlayer'
  */
 export function WatchView({ track }: { track: Track }) {
   const goBack = useAppStore((s) => s.goBack)
+  const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
   const [data, setData] = useState<WatchData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +35,7 @@ export function WatchView({ track }: { track: Track }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
+  const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
     setLikeDelta(0)
@@ -86,7 +88,7 @@ export function WatchView({ track }: { track: Track }) {
     return () => {
       cancelled = true
     }
-  }, [track.key, page])
+  }, [track.key, page, nonce])
 
   // 离开这一页就停掉声音。切到「听」时引擎已经把模式改成 listen，
   // 那边的 close_watch 不会误停用户主动选的后台播放。
@@ -166,15 +168,24 @@ export function WatchView({ track }: { track: Track }) {
                 onReplay={() => {
                   void ipc.playerSeek(0).catch(() => {})
                 }}
+                next={related[0] ?? null}
+                onNext={(nextTrack) => replace({ kind: 'watch', track: nextTrack })}
               />
             </div>
           ) : (
             <div className="aspect-video w-full shrink-0 bg-black" />
           )}
           {!cinema && error ? (
-            <p className="border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]">
-              这条视频没打开：{error}
-            </p>
+            <div className="flex items-center gap-3 border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]">
+              <span className="min-w-0 flex-1">这条视频没打开：{error}</span>
+              <button
+                type="button"
+                onClick={() => setNonce((n) => n + 1)}
+                className="t shrink-0 text-[var(--accent)]"
+              >
+                重试
+              </button>
+            </div>
           ) : null}
           {!cinema && data ? (
             <WatchInfo
