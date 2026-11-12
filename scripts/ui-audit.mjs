@@ -22,6 +22,8 @@ const DARK_CONTEXT_FILES = [
   'features/watch/WatchPlayer.tsx',
   // 卡片动作排压在封面图的黑色渐变上
   'features/tracks/CardActions.tsx',
+  // 发现页轮播的标题与按钮压在封面图上，白字是唯一可读的选择
+  'features/home/HeroBanner.tsx',
 ]
 
 // 封面上的字母字画在图片上，白色是对的，不参与浅色主题检查

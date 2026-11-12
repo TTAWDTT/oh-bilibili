@@ -6,6 +6,8 @@ import { ContentGrid } from '../tracks/ContentGrid'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
+import { useAppStore } from '../../app/appStore'
+import { HeroBanner } from './HeroBanner'
 
 /**
  * 发现页。
@@ -15,6 +17,7 @@ import { usePlayerStore } from '../player/playerStore'
  * 被拒时给明确文案和「换一批」，不假装有内容。
  */
 export function HomeView() {
+  const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const [items, setItems] = useState<Track[]>([])
@@ -85,6 +88,8 @@ export function HomeView() {
       </div>
 
       {error ? <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}
+
+      <HeroBanner tracks={items} onOpen={(track) => navigate({ kind: 'watch', track })} />
 
       {items.length > 0 ? (
         <ContentGrid
