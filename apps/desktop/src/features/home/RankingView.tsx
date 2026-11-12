@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -33,10 +33,13 @@ export function RankingView() {
   const [nonce, setNonce] = useState(0)
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
+    // 换分区就是换一份榜，停在上一份的滚动位置会读到一半。
+    scrollRef.current?.scrollTo({ top: 0 })
     setTracks(null)
     setError(null)
     void ipc
@@ -53,7 +56,11 @@ export function RankingView() {
   }, [rid, nonce])
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+    <div
+      ref={scrollRef}
+      id="scroll-main"
+      className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+    >
       <PageTitle extra={tracks ? String(tracks.length) : undefined}>排行榜</PageTitle>
       <div className="mb-4 flex flex-wrap gap-1">
         {PARTS.map((part) => (

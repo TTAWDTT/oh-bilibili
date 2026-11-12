@@ -97,7 +97,10 @@ export function HistoryView() {
   }
 
   return (
-    <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+    <div
+      id="scroll-main"
+      className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+    >
       <div className="mb-4 flex items-center justify-between">
         <PageTitle>历史</PageTitle>
         {confirmingClear ? (

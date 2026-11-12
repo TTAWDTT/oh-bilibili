@@ -52,7 +52,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
+      <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
         <PageTitle
           extra={tracks ? `${tracks.length} 首 · ${formatSpan(total)}` : null}
           action={

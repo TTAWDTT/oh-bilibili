@@ -150,6 +150,7 @@ export function FavFoldersView() {
     return (
       <div
         ref={scrollRef}
+        id="scroll-main"
         onScroll={(event) => {
           const el = event.currentTarget
           // 离底部还有 600px 就预取下一页，滚动时不会等
@@ -251,7 +252,7 @@ export function FavFoldersView() {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+    <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <PageTitle>收藏夹</PageTitle>
       <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
         {folders.map((folder) => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAppStore } from '../../app/appStore'
 import { Icon } from './Icon'
 
 /**
@@ -8,14 +9,19 @@ import { Icon } from './Icon'
  */
 export function BackToTop({ targetId }: { targetId: string }) {
   const [show, setShow] = useState(false)
+  // 换页会换一个滚动容器；只在挂载时绑一次会绑到已卸载的节点上。
+  const viewKind = useAppStore((state) => state.view.kind)
 
   useEffect(() => {
+    setShow(false)
     const el = document.getElementById(targetId)
     if (!el) return
     const onScroll = (): void => setShow(el.scrollTop > el.clientHeight)
     el.addEventListener('scroll', onScroll, { passive: true })
+    // 切页后新容器可能还没量出高度，挂载时先按当前滚动位置补一次
+    onScroll()
     return () => el.removeEventListener('scroll', onScroll)
-  }, [targetId])
+  }, [targetId, viewKind])
 
   if (!show) return null
 

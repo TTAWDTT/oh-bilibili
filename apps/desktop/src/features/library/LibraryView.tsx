@@ -32,7 +32,10 @@ export function LibraryView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+      <div
+        id="scroll-main"
+        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+      >
         <PageTitle
           action={
             <button

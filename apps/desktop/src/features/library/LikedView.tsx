@@ -58,7 +58,7 @@ export function LikedView() {
 
   if (tracks === null) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+      <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
         <PageTitle>喜欢</PageTitle>
         <div className="mt-4">
           <CardGridSkeleton cards={8} />
@@ -79,7 +79,7 @@ export function LikedView() {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
+    <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <PageTitle
         extra={String(tracks.length)}
         action={
