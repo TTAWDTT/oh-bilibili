@@ -723,6 +723,7 @@ pub fn run() {
             let db_path = dir.join("library.sqlite");
 
             let engine = Engine::new(&db_path)?;
+            mv::apply_env_failures();
             let mv_port = mv::spawn(engine.cookie_header(), engine.clone())
                 .map_err(|e| format!("MV 代理起不来：{e}"))?;
             app.manage(MvPort(mv_port));

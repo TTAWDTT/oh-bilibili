@@ -10,7 +10,32 @@
 use bilimusic_core::engine::Engine;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
+/// 故障注入：接下来 N 条分片请求直接回 403。
+///
+/// 降档重试只有在 CDN 真的拒了某一档时才触发，而这种拒绝是偶发的，
+/// 没法靠「等它自己出现」来验证。这个计数只在显式设置时非零，
+/// 平时恒为 0，不改变正常行为。
+static FAIL_NEXT: AtomicUsize = AtomicUsize::new(0);
+
+/// 让接下来 `count` 条分片请求返回 403，用于验证降档。
+pub fn fail_next_streams(count: usize) {
+    FAIL_NEXT.store(count, Ordering::SeqCst);
+}
+
+/// 启动时读 `BILIMUSIC_FAIL_STREAMS`。
+///
+/// 这是验证降档的唯一办法——CDN 拒分片是偶发的，不注入就永远等不到。
+/// 不设这个变量时行为完全不变。
+pub fn apply_env_failures() {
+    if let Ok(raw) = std::env::var("BILIMUSIC_FAIL_STREAMS") {
+        if let Ok(n) = raw.trim().parse::<usize>() {
+            fail_next_streams(n);
+        }
+    }
+}
 
 const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -110,6 +135,15 @@ fn handle(
 
     // 复用同一个 client：DASH 一次播放要拉几十个分片，每个都重建 client
     // 等于每个分片都重新做一次 DNS + TLS 握手，画面就会一顿一顿的。
+    if FAIL_NEXT
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+        .is_ok()
+    {
+        let _ = stream.write_all(
+            b"HTTP/1.1 403 Forbidden\r\ncontent-length: 0\r\naccess-control-allow-origin: *\r\nconnection: close\r\n\r\n",
+        );
+        return Ok(());
+    }
     let mut req = client
         .get(&target)
         .header("User-Agent", UA)
