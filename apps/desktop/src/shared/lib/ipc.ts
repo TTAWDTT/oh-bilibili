@@ -136,7 +136,7 @@ export function libraryAdd(playlistId: number, key: string): Promise<null> {
   return call<null>('library_add', { playlist_id: playlistId, key })
 }
 
-export type HistoryEntry = { track: Track; played_at: number }
+export type HistoryEntry = { track: Track; played_at: number; position_ms: number }
 
 /** 带播放时间的历史，用于按日期分组。 */
 export function libraryHistoryTimed(limit: number): Promise<HistoryEntry[]> {

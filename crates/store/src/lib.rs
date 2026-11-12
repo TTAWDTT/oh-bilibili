@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -352,13 +352,16 @@ impl Library {
     }
 
     /// 记录一次播放。
-    pub fn push_history(&self, track_id: TrackId) -> Result<()> {
+    pub fn push_history(&self, track_id: TrackId, position_ms: u64) -> Result<()> {
         self.with(|conn| {
             conn.execute(
                 // 同一首歌只保留最近一次：历史是「上次看到哪」，不是播放流水。
-                "INSERT INTO history (track_id, played_at) VALUES (?1, ?2)
-                 ON CONFLICT(track_id) DO UPDATE SET played_at = excluded.played_at",
-                params![track_id.0, now_ms()],
+                // 位置一起更新，历史卡片才能画出那条播放进度。
+                "INSERT INTO history (track_id, played_at, position_ms) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(track_id) DO UPDATE SET
+                   played_at = excluded.played_at,
+                   position_ms = excluded.position_ms",
+                params![track_id.0, now_ms(), position_ms as i64],
             )?;
             Ok(())
         })
@@ -395,17 +398,21 @@ impl Library {
     }
 
     /// 带播放时间的历史。前端要按「今天 / 昨天 / 更早」分组，得知道每条什么时候播的。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>> {
+    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
                 &format!(
-                    "SELECT t.provider_key, t.title, t.artist, t.cover, t.duration_ms, t.up_avatar, t.up_mid, h.played_at
+                    "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms
                      FROM history h JOIN tracks t ON t.id = h.track_id
                      ORDER BY h.played_at DESC, h.id DESC LIMIT ?1"
                 ),
             )?;
             let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], |row| {
-                Ok((row_to_track(row)?, row.get::<_, i64>(7)?))
+                Ok((
+                    row_to_track(row)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, i64>(8)?.max(0) as u64,
+                ))
             })?;
             rows.collect()
         })
@@ -571,7 +578,7 @@ fn now_ms() -> i64 {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 4] = [r#"
+const MIGRATIONS: [&str; 5] = [r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -663,6 +670,10 @@ CREATE UNIQUE INDEX idx_history_track ON history(track_id);
 -- 首字母圆圈，跟首页的真实头像对不上。这两列由写入方从接口带过来。
 ALTER TABLE tracks ADD COLUMN up_mid INTEGER;
 ALTER TABLE tracks ADD COLUMN up_avatar TEXT;
+"#, r#"
+-- v5：历史要记「看到哪了」。B 站的历史卡片底下有一条播放进度，
+-- 只有时间没有位置的话，卡片永远看起来像没看过。
+ALTER TABLE history ADD COLUMN position_ms INTEGER NOT NULL DEFAULT 0;
 "#];
 
 #[cfg(test)]
@@ -814,11 +825,11 @@ mod tests {
         let l = lib();
         let a = l.upsert_track(&track("BV1a")).unwrap();
         let b = l.upsert_track(&track("BV1b")).unwrap();
-        l.push_history(a).unwrap();
-        l.push_history(b).unwrap();
+        l.push_history(a, 0).unwrap();
+        l.push_history(b, 0).unwrap();
         // 真正的播放之间隔着秒，这里也要隔开一毫秒，否则 played_at 并列看不出顺序。
         std::thread::sleep(std::time::Duration::from_millis(2));
-        l.push_history(a).unwrap();
+        l.push_history(a, 0).unwrap();
         // 同一个视频只留一条，重播的是把时间往前挪。
         let repeated = l.history(10).unwrap();
         assert_eq!(repeated.len(), 2);
@@ -856,9 +867,9 @@ mod tests {
         let l = lib();
         let a = l.upsert_track(&track("1")).unwrap();
         let b = l.upsert_track(&track("2")).unwrap();
-        l.push_history(a).unwrap();
+        l.push_history(a, 0).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        l.push_history(b).unwrap();
+        l.push_history(b, 0).unwrap();
         let h = l.history(10).unwrap();
         assert_eq!(h[0].title, "歌 2");
     }

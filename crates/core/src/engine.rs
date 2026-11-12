@@ -286,7 +286,11 @@ impl Engine {
                 let storing = self.track_of(key)?;
                 let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
                 // 每次真正进入播放才记一条历史，切歌失败不记。
-                self.library.push_history(track_id).map_err(WireError::from)?;
+                // 位置一起写进去：历史卡片上的进度条画的是这一格。
+                let at = self.snapshot().position_ms;
+                self.library
+                    .push_history(track_id, at)
+                    .map_err(WireError::from)?;
                 self.emit(AppEvent::NowPlaying {
                     track: self.track_of(key)?,
                     index: self.queue.lock().ok().and_then(|q| q.index()),
@@ -1139,7 +1143,7 @@ impl Engine {
     }
 
     /// 带播放时间的历史，用于按日期分组。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64)>, WireError> {
+    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>, WireError> {
         Ok(self.library.history_with_time(limit)?)
     }
 

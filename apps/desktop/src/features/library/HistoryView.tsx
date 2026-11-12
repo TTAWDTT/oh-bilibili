@@ -117,6 +117,12 @@ export function HistoryView() {
             tracks={group.items.map((e) => e.track)}
             activeKey={snapshot?.track?.key ?? null}
             playing={snapshot?.phase === 'playing'}
+            progress={(track) => {
+              const entry = group.items.find((e) => e.track.key === track.key)
+              const duration = track.duration_ms
+              if (!entry || !duration || entry.position_ms <= 0) return null
+              return entry.position_ms / duration
+            }}
             extraAction={(track) => (
               <button
                 type="button"

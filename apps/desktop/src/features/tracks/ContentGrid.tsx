@@ -59,6 +59,8 @@ type ContentGridProps = {
   playing: boolean
   /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
   extraAction?: (track: Track) => React.ReactNode
+  /** 已看进度 0~1。历史页用它画封面底部那条进度，没有就不画。 */
+  progress?: (track: Track) => number | null
 }
 
 /**
@@ -67,7 +69,7 @@ type ContentGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, extraAction }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, extraAction, progress }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const faved = useReactionStore((state) => state.faved)
@@ -166,6 +168,18 @@ export function ContentGrid({ tracks, activeKey, playing, extraAction }: Content
                   <CardDanmaku trackKey={track.key} />
                   {/* B 站卡片的两枚角标：左下一行带三角的播放量，右下一格时长。
                       播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
+                  {(() => {
+                    const ratio = progress?.(track) ?? null
+                    if (ratio === null || ratio <= 0 || ratio >= 1) return null
+                    return (
+                      <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/45">
+                        <span
+                          className="block h-full bg-[var(--accent)]"
+                          style={{ width: `${Math.round(ratio * 100)}%` }}
+                        />
+                      </span>
+                    )
+                  })()}
                   <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                     <span className="num flex min-w-0 items-center gap-1">
                       {track.views ? (

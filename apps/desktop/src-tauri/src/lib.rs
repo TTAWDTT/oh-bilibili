@@ -393,6 +393,8 @@ struct HistoryEntryView {
     track: Track,
     /// 播放时刻，Unix 毫秒。
     played_at: i64,
+    /// 上次看到的位置，毫秒。历史卡片底下的进度条用它。
+    position_ms: u64,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -416,7 +418,11 @@ fn library_history_timed(
     Ok(engine
         .history_with_time(limit)?
         .into_iter()
-        .map(|(track, played_at)| HistoryEntryView { track, played_at })
+        .map(|(track, played_at, position_ms)| HistoryEntryView {
+            track,
+            played_at,
+            position_ms,
+        })
         .collect())
 }
 
