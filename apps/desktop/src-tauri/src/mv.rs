@@ -60,7 +60,12 @@ fn query(url: &str, key: &str) -> Option<String> {
         .map(percent_decode)
 }
 
-fn handle(mut stream: TcpStream, cookie: &str, engine: &Engine) -> std::io::Result<()> {
+fn handle(
+    mut stream: TcpStream,
+    cookie: &str,
+    engine: &Engine,
+    client: &reqwest::blocking::Client,
+) -> std::io::Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
@@ -103,10 +108,8 @@ fn handle(mut stream: TcpStream, cookie: &str, engine: &Engine) -> std::io::Resu
         bilimusic_core::tickets::Payload::Url(u) => u,
     };
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(std::io::Error::other)?;
+    // 复用同一个 client：DASH 一次播放要拉几十个分片，每个都重建 client
+    // 等于每个分片都重新做一次 DNS + TLS 握手，画面就会一顿一顿的。
     let mut req = client
         .get(&target)
         .header("User-Agent", UA)
@@ -149,14 +152,21 @@ fn handle(mut stream: TcpStream, cookie: &str, engine: &Engine) -> std::io::Resu
 pub fn spawn(cookie: String, engine: Arc<Engine>) -> std::io::Result<u16> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
+    // 连接池开着，同一台 CDN 的分片请求复用同一条连接。
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .pool_max_idle_per_host(16)
+        .build()
+        .map_err(std::io::Error::other)?;
     std::thread::Builder::new()
         .name("bilimusic-mv-proxy".into())
         .spawn(move || {
             for stream in listener.incoming().flatten() {
                 let cookie = cookie.clone();
                 let engine = engine.clone();
+                let client = client.clone();
                 std::thread::spawn(move || {
-                    let _ = handle(stream, &cookie, &engine);
+                    let _ = handle(stream, &cookie, &engine, &client);
                 });
             }
         })?;

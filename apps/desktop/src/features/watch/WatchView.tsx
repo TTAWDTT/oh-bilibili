@@ -45,6 +45,14 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key, page])
 
+  // 离开这一页就停掉声音。切到「听」时引擎已经把模式改成 listen，
+  // 那边的 close_watch 不会误停用户主动选的后台播放。
+  useEffect(() => {
+    return () => {
+      void ipc.closeWatch().catch(() => {})
+    }
+  }, [])
+
   // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。
   useEffect(() => {
     let cancelled = false

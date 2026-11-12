@@ -306,6 +306,11 @@ export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<Pl
   return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
+/** 离开观看页，停掉这条视频的声音。 */
+export function closeWatch(): Promise<PlayerSnapshot> {
+  return invoke<PlayerSnapshot>('close_watch')
+}
+
 /** UP 主投稿。返回 (列表, 总数)。 */
 export function spaceVideos(mid: number, page: number): Promise<[Track[], number]> {
   return invoke<[Track[], number]>('space_videos', { mid, page })

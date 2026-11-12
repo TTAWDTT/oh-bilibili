@@ -15,8 +15,17 @@ import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
 /** 观看页的倍速档位，和 B 站播放器一致。 */
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
-/** 画面与声音允许的偏差。超过就拉回，低于就让它自己跑，避免每帧 seek。 */
-const DRIFT_MS = 400
+/**
+ * 音画偏差的三段处理。
+ *
+ * 硬 seek 会让 MSE 丢掉已缓冲的分片、立刻重新拉流，观感就是「一顿」。
+ * 所以只有偏差大到看得出来（>1.2 秒）才 seek；几百毫秒的偏差靠轻微改变
+ * 画面播放速度慢慢追，观众察觉不到，缓冲区也不会被打断。
+ */
+const DRIFT_SEEK_MS = 1200
+const DRIFT_NUDGE_MS = 250
+/** 追偏差时最多把画面速度改这么多，再多就看得出来变速了。 */
+const NUDGE_RATIO = 0.06
 
 /**
  * 把 shaka 的错误对象翻成一句人话。
@@ -184,8 +193,18 @@ export function WatchPlayer({
       }
       if (v.paused) void v.play().catch(() => {})
       const head = readPlayhead()
-      if (Math.abs(v.currentTime * 1000 - head) > DRIFT_MS) v.currentTime = head / 1000
-      if (v.playbackRate !== speed) v.playbackRate = speed
+      const drift = v.currentTime * 1000 - head
+      if (Math.abs(drift) > DRIFT_SEEK_MS) {
+        v.currentTime = head / 1000
+        v.playbackRate = speed
+        return
+      }
+      // 画面跑快了就放慢一点，落后就加快一点；偏差回到阈值内就恢复原速。
+      const wanted =
+        Math.abs(drift) > DRIFT_NUDGE_MS
+          ? speed * (drift > 0 ? 1 - NUDGE_RATIO : 1 + NUDGE_RATIO)
+          : speed
+      if (Math.abs(v.playbackRate - wanted) > 0.001) v.playbackRate = wanted
     }, 250)
     return () => window.clearInterval(timer)
   }, [ready, track.key, speed])

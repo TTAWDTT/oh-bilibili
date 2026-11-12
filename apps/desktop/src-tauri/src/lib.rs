@@ -124,6 +124,12 @@ async fn set_mode(
     engine.set_mode(mode, at_ms, target.as_ref()).await
 }
 
+/// 离开观看页。看模式下必须停掉声音，否则退出后视频还在后台放。
+#[tauri::command(rename_all = "snake_case")]
+fn close_watch(engine: tauri::State<'_, Arc<Engine>>) -> PlayerSnapshot {
+    engine.close_watch()
+}
+
 /// UP 主投稿。
 #[tauri::command(rename_all = "snake_case")]
 async fn space_videos(
@@ -756,6 +762,7 @@ pub fn run() {
             space_videos,
             space_stat,
             set_mode,
+            close_watch,
             search_q,
             player_state,
             player_play,

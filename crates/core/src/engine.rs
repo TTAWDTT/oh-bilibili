@@ -404,6 +404,21 @@ impl Engine {
     ///
     /// 从「看」切到「听」时，界面把画面当前的位置传进来，音频引擎从那里接着放。
     /// 位置因此不需要在两处各存一份：画面读它时用同一份时钟。
+    /// 离开观看页。看模式下的声音就是这条视频的，页都退了还出声等于没关掉；
+    /// 听模式必须留着，那是用户主动选的后台播放。
+    pub fn close_watch(&self) -> PlayerSnapshot {
+        if *lock(&self.mode) != crate::wire::PlayMode::Watch {
+            return self.snapshot();
+        }
+        lock(&self.player).stop();
+        {
+            let mut st = lock(&self.state);
+            *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
+        }
+        self.emit_state();
+        self.snapshot()
+    }
+
     pub async fn set_mode(
         self: &Arc<Self>,
         mode: crate::wire::PlayMode,
