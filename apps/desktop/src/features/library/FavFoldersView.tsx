@@ -29,6 +29,7 @@ export function FavFoldersView() {
   const [exhausted, setExhausted] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
+  const navigate = useAppStore((state) => state.navigate)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const playContext = usePlayerStore((state) => state.playContext)
 
@@ -138,10 +139,11 @@ export function FavFoldersView() {
               {picked.count} 个视频
             </span>
           </h2>
-          {/* 播放全部：把当前已加载的曲目按顺序塞进队列，从第一首开始放 */}
+          {/* 播放全部：把当前已加载的曲目按顺序塞进队列，从第一首开始放。
+              空收藏夹里它没有可播的东西，摆一个灰按钮只是噪声。 */}
+          {tracks && tracks.length > 0 ? (
           <button
             type="button"
-            disabled={!tracks || tracks.length === 0}
             onClick={() => {
               if (!tracks || tracks.length === 0) return
               void playContext(
@@ -149,16 +151,22 @@ export function FavFoldersView() {
                 0,
               )
             }}
-            className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white disabled:opacity-40"
+            className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white"
           >
             <Icon name="play" size={13} />
             播放全部
           </button>
+          ) : null}
         </div>
         {tracks === null ? (
           <TrackListSkeleton rows={6} />
         ) : tracks.length === 0 ? (
-          <EmptyState mascot="hug" icon="biliTv" title="这个收藏夹是空的" detail="去 B 站收几个视频再来。" action={null} />
+          <EmptyState
+            mascot="hug"
+            icon="biliTv"
+            title="这个收藏夹是空的"
+            action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
+          />
         ) : (
           <>
             <ContentGrid
@@ -204,7 +212,7 @@ export function FavFoldersView() {
         icon="biliTv"
         title="还没有收藏夹"
         detail="在 B 站建一个收藏夹，这里就能读到。"
-        action={null}
+        action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
       />
     )
   }
