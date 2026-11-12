@@ -221,6 +221,9 @@ export function WatchPlayer({
           const heights = [...new Set(data.qualities.map((q) => q.height))].sort((a, b) => b - a)
           const lower = heights.find((h) => h < (currentHeight.current || heights[0]!))
           if (lower !== undefined && !cancelled) {
+            // 先记下这一档，下一次失败才会继续往下退；
+            // 否则 load 在选轨之前就失败时会永远停在同一档来回重试。
+            currentHeight.current = lower
             wantHeight.current = lower
             setRetry((n) => n + 1)
             return
@@ -238,6 +241,8 @@ export function WatchPlayer({
             .filter((t) => t.height === wantHeight.current)
             .sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
           if (match) player.selectVariantTrack(match, true)
+          // 没有匹配到就没有「退档成功」可言，别再把它当成当前档。
+          else wantHeight.current = 0
         }
         const activeVariant = player.getVariantTracks().find((t) => t.active)
         if (activeVariant) {
