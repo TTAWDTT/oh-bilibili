@@ -269,15 +269,17 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取更多投稿…</p>
       ) : null}
 
-      <div className="mt-6 flex justify-center">
-        <button
-          type="button"
-          onClick={() => setAuthorQuery(name)}
-          className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        >
-          在搜索里找他更多的投稿 →
-        </button>
-      </div>
+      {isFallback ? (
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setAuthorQuery(name)}
+            className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            在搜索里找他更多的投稿 →
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
