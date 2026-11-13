@@ -477,6 +477,40 @@ async fn 置顶评论排在第一页最前() {
 }
 
 #[tokio::test]
+#[ignore = "真实网络"]
+async fn 评论带粉丝牌() {
+    let source = Source::open().await.expect("Source");
+    // BV1kZWX62ENY（影视飓风）：UP 主自己的评论戴着「飓风」粉丝牌。
+    let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
+    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    let medaled: Vec<_> = page
+        .items
+        .iter()
+        .filter_map(|c| c.medal.as_ref().map(|m| (c, m)))
+        .collect();
+    println!(
+        "第一页 {} 条，带粉丝牌 {} 条：",
+        page.items.len(),
+        medaled.len()
+    );
+    for (c, m) in &medaled {
+        println!(
+            "  {} 【{} {}级】{}",
+            c.author,
+            m.name,
+            m.level,
+            c.text.chars().take(16).collect::<String>()
+        );
+    }
+    let up = medaled
+        .iter()
+        .find(|(c, m)| c.mid == 946974 && m.name == "飓风")
+        .expect("UP 主自己的评论应该戴「飓风」粉丝牌");
+    assert_eq!(up.1.level, 18, "UP 的粉丝牌应该是 18 级");
+    assert!(!medaled.is_empty(), "至少一条评论带粉丝牌");
+}
+
+#[tokio::test]
 #[ignore = "真实网络，核对合集"]
 async fn 合集带全部集数与封面() {
     let source = Source::open().await.expect("Source");

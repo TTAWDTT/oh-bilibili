@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as ipc from '../../shared/lib/ipc'
-import type { Comment, CommentPage } from '../../shared/lib/contract'
+import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { thumbUrl } from '../../shared/lib/thumb'
@@ -47,6 +47,35 @@ function CommentText({ text, emotes }: { text: string; emotes: [string, string][
   return <>{nodes}</>
 }
 
+/** 接口给的是 0xAARRGGBB，取低 24 位当 CSS 颜色。 */
+function medalColor(value: number): string {
+  return `#${(value & 0xffffff).toString(16).padStart(6, '0')}`
+}
+
+/** B 站粉丝牌：名字一段渐变胶囊，右侧等级块。 */
+function CommentMedalBadge({ medal }: { medal: CommentMedal }) {
+  return (
+    <span
+      className="flex h-4 shrink-0 items-center overflow-hidden whitespace-nowrap rounded-[2px] border text-[10px] leading-[14px]"
+      style={{
+        borderColor: medalColor(medal.color_border),
+        background: `linear-gradient(90deg, ${medalColor(medal.color)}, ${medalColor(medal.color_end)})`,
+      }}
+      title={`${medal.name} ${medal.level}`}
+    >
+      <span className="px-1" style={{ color: medalColor(medal.color_name) }}>
+        {medal.name}
+      </span>
+      <span
+        className="flex h-full items-center px-1"
+        style={{ background: medalColor(medal.level_bg), color: medalColor(medal.color_level) }}
+      >
+        {medal.level}
+      </span>
+    </span>
+  )
+}
+
 /** 一条评论，含楼中楼预览。一级评论可以回复。 */
 function CommentRow({
   c,
@@ -77,6 +106,7 @@ function CommentRow({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
+            {c.medal ? <CommentMedalBadge medal={c.medal} /> : null}
             <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
             {c.pinned ? (
@@ -302,6 +332,7 @@ export function CommentsPanel({
             replies: [],
             reply_count: 0,
             pinned: false,
+            medal: null,
           },
           ...prev,
         ])

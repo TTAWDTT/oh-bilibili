@@ -28,6 +28,22 @@ pub struct Comment {
     pub reply_count: u32,
     /// UP 主置顶。B 站在置顶评论上挂一个「UP主觉得很赞」的位置标记。
     pub pinned: bool,
+    /// 评论者戴的粉丝牌。没戴时为 None。
+    pub medal: Option<CommentMedal>,
+}
+
+/// 粉丝牌（接口里的 `member.fans_detail`）。颜色是 0xAARRGGBB，
+/// 界面取低 24 位当 `#rrggbb`。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommentMedal {
+    pub name: String,
+    pub level: u32,
+    pub color: u32,
+    pub color_end: u32,
+    pub color_border: u32,
+    pub color_name: u32,
+    pub color_level: u32,
+    pub level_bg: u32,
 }
 
 /// 一页评论。
@@ -73,6 +89,8 @@ struct RawMember {
     avatar: String,
     #[serde(default)]
     level_info: Option<RawLevel>,
+    #[serde(default)]
+    fans_detail: Option<RawFansDetail>,
 }
 
 fn u64_from_any<'de, D>(deserializer: D) -> Result<u64, D::Error>
@@ -90,6 +108,26 @@ where
 struct RawLevel {
     #[serde(default)]
     current_level: u64,
+}
+
+#[derive(Deserialize)]
+struct RawFansDetail {
+    #[serde(default)]
+    medal_name: String,
+    #[serde(default)]
+    level: u32,
+    #[serde(default)]
+    medal_color: u32,
+    #[serde(default)]
+    medal_color_end: u32,
+    #[serde(default)]
+    medal_color_border: u32,
+    #[serde(default)]
+    medal_color_name: u32,
+    #[serde(default)]
+    medal_color_level: u32,
+    #[serde(default)]
+    medal_level_bg_color: u32,
 }
 
 #[derive(Deserialize)]
@@ -124,6 +162,21 @@ fn to_comment(raw: RawReply) -> Comment {
         .and_then(|m| m.level_info.as_ref())
         .map(|l| l.current_level as u8)
         .unwrap_or(0);
+    let medal = raw
+        .member
+        .as_ref()
+        .and_then(|m| m.fans_detail.as_ref())
+        .filter(|f| !f.medal_name.is_empty() && f.level > 0)
+        .map(|f| CommentMedal {
+            name: f.medal_name.clone(),
+            level: f.level,
+            color: f.medal_color,
+            color_end: f.medal_color_end,
+            color_border: f.medal_color_border,
+            color_name: f.medal_color_name,
+            color_level: f.medal_color_level,
+            level_bg: f.medal_level_bg_color,
+        });
     let replies = raw
         .replies
         .unwrap_or_default()
@@ -169,6 +222,7 @@ fn to_comment(raw: RawReply) -> Comment {
         replies,
         reply_count: raw.rcount,
         pinned: false,
+        medal,
     }
 }
 
@@ -350,6 +404,55 @@ mod tests {
         assert_eq!(page.total, 0);
         assert!(page.items.is_empty());
         assert!(!page.has_more);
+    }
+
+    #[test]
+    fn 有粉丝详情时解析出名字等级与颜色() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 2 },
+                "replies": [
+                    {
+                        "rpid_str": "444",
+                        "member": {
+                            "mid": "946974",
+                            "uname": "影视飓风",
+                            "fans_detail": {
+                                "medal_name": "飓风",
+                                "level": 18,
+                                "medal_color": 4294503408u32,
+                                "medal_color_end": 4294503408u32,
+                                "medal_color_border": 4289423504u32,
+                                "medal_color_name": 4289423504u32,
+                                "medal_color_level": 4292452534u32,
+                                "medal_level_bg_color": 16777215u32
+                            }
+                        },
+                        "content": { "message": "带粉丝牌" }
+                    },
+                    {
+                        "rpid_str": "555",
+                        "member": { "uname": "普通观众" },
+                        "content": { "message": "没戴" }
+                    }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        let medal = page.items[0]
+            .medal
+            .as_ref()
+            .expect("带 fans_detail 的评论要有粉丝牌");
+        assert_eq!(medal.name, "飓风");
+        assert_eq!(medal.level, 18);
+        assert_eq!(medal.color, 0xfff8ebf0);
+        assert_eq!(medal.color_end, 0xfff8ebf0);
+        assert_eq!(medal.color_border, 0xffab6890);
+        assert_eq!(medal.color_name, 0xffab6890);
+        assert_eq!(medal.color_level, 0xffd9a0b6);
+        assert_eq!(medal.level_bg, 0x00ffffff);
+        assert!(page.items[1].medal.is_none(), "没给 fans_detail 时不该有粉丝牌");
     }
 
     #[test]

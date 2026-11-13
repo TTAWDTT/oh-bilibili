@@ -39,6 +39,18 @@ export type Followed = {
   sign: string
 }
 
+/** 粉丝牌。颜色是接口原样的 0xAARRGGBB。 */
+export type CommentMedal = {
+  name: string
+  level: number
+  color: number
+  color_end: number
+  color_border: number
+  color_name: number
+  color_level: number
+  level_bg: number
+}
+
 export type Comment = {
   id: string
   /** 评论者 uid，用来标「UP主」。 */
@@ -56,6 +68,8 @@ export type Comment = {
   reply_count: number
   /** UP 主置顶。B 站在这类评论上挂一个位置标记。 */
   pinned: boolean
+  /** 评论者戴的粉丝牌。 */
+  medal: CommentMedal | null
 }
 
 export type CommentPage = {
