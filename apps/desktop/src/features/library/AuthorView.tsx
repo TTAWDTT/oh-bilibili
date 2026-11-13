@@ -120,7 +120,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }, [name, mid, order])
 
-  /** 往下滚到底再取下一页；空间接口一页 30 条。 */
+  /** 往下滚到底再取下一页；空间接口一页 50 条。 */
   const loadMore = async (): Promise<void> => {
     if (!mid || loadingRef.current || isFallback || !tracks || tracks.length >= total) return
     loadingRef.current = true

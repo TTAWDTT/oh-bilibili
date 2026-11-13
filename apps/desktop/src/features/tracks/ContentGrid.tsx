@@ -5,7 +5,7 @@ import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
@@ -107,24 +107,9 @@ type ContentGridProps = {
 export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, note, highlight }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
-  const faved = useReactionStore((state) => state.faved)
   const toggleFav = useReactionStore((state) => state.toggleFav)
-  const hydrate = useReactionStore((state) => state.hydrate)
   const addCoin = useReactionStore((state) => state.addCoin)
   const favToStore = useReactionStore((state) => state.favTo)
-
-  // 把当前列表的真实点赞/收藏状态拉回来。
-  //
-  // 不截断：只查前 20 条时，第 21 条之后的卡片即使已点赞也会显示成未点赞——
-  // 这是实测发现的（滚到后面看到的全是灰心）。重复请求由 store 的 known 集合挡住，
-  // 所以总请求数等于「看过的视频数」，不随滚动次数增长。
-  useEffect(() => {
-    const keys = tracks.map((t) => t.key)
-    if (keys.length === 0) return
-    void hydrate(keys).catch(() => {
-      // 未登录或限流时保持现状，不打扰用户
-    })
-  }, [tracks, hydrate])
 
   /** 稍后再看：写进 B 站账号的待看列表。 */
   const later = async (track: Track): Promise<void> => {
@@ -252,8 +237,8 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                   track={track}
                   onListen={() => void playContext(tracks.map((t) => t.key), index)}
                   onCoin={() => setConfirming(track.key)}
-                  onFav={() => {
-                    if (faved[track.key]) void toggleFav(track)
+                  onFav={(isFaved) => {
+                    if (isFaved) void toggleFav(track)
                     else setPicking(track)
                   }}
                   onLater={() => void later(track)}

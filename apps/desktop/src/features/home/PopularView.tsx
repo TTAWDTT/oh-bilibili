@@ -62,8 +62,10 @@ export function PopularView() {
       .popular(page)
       .then(([list, end]) => {
         nextPage.current = page + 1
-        noMore.current = end
-        setTracks((prev) => [...(prev ?? []), ...list])
+        // 实测翻到第 11 页时接口回空列表但 no_more 仍是 false；
+        // 只看 no_more 的话，深预取会对着空页无限翻下去。
+        noMore.current = end || list.length === 0
+        if (list.length > 0) setTracks((prev) => [...(prev ?? []), ...list])
       })
       .catch((cause) => setError(toWireError(cause).message))
       .finally(() => {

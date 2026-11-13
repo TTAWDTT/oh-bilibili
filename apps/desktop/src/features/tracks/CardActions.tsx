@@ -22,7 +22,7 @@ export function CardActions({
   track: Track
   onListen: () => void
   onCoin: () => void
-  onFav: () => void
+  onFav: (faved: boolean) => void
   onLater: () => void
   extraAction?: React.ReactNode
 }) {
@@ -30,13 +30,19 @@ export function CardActions({
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const toggleLike = useReactionStore((st) => st.toggleLike)
+  const hydrate = useReactionStore((st) => st.hydrate)
 
   const item =
     'bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20'
   const off = 'text-white/90 hover:text-white'
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100"
+      // 互动状态只在这排动作真正被用到时查。整页/预取时逐条查 relation，
+      // 会把串行闸门占满，翻页反而被拖慢。
+      onPointerEnter={() => void hydrate([track.key]).catch(() => {})}
+    >
       <button type="button" aria-label={`听 ${track.title}`} title="只听声音" onClick={onListen} className={`${item} ${off}`}>
         <Icon name="headphones" size={13} />
       </button>
@@ -65,7 +71,7 @@ export function CardActions({
         aria-label={faved ? '取消收藏' : '收藏'}
         aria-pressed={faved}
         title={faved ? '取消收藏' : '收藏'}
-        onClick={onFav}
+        onClick={() => onFav(faved)}
         className={`${item} ${faved ? 'text-[var(--coin)]' : off}`}
       >
         <BiliStar size={13} />

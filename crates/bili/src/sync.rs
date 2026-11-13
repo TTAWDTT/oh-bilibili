@@ -359,7 +359,7 @@ impl Client {
                 vec![
                     ("mid", mid.to_string()),
                     ("pn", page.max(1).to_string()),
-                    ("ps", "30".to_string()),
+                    ("ps", "50".to_string()),
                     ("order", order.to_string()),
                 ],
                 std::time::Duration::from_millis(400),

@@ -1271,8 +1271,6 @@ impl Engine {
                 // 单条失败跳过，不拖垮整批
                 Err(_) => {}
             }
-            // 接口有频率限制，逐条之间留间隔
-            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
         }
         Ok(out)
     }
