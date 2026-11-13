@@ -71,7 +71,22 @@ export function TitleBar() {
           aria-label="顶栏搜索"
           className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
         />
-        {focused || text ? null : <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>}
+        {text ? (
+          <button
+            type="button"
+            aria-label="清空搜索"
+            title="清空"
+            onClick={() => {
+              setText('')
+              inputRef.current?.focus()
+            }}
+            className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+          >
+            <Icon name="close" size={12} />
+          </button>
+        ) : focused ? null : (
+          <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>
+        )}
         <button
           type="submit"
           className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
