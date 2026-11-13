@@ -35,6 +35,8 @@ export function Cover({ cover, title, className, width }: CoverProps) {
            所以必须显式不发 Referer。缺这一条，封面在真机上全部裂图。 */
         referrerPolicy="no-referrer"
         loading="lazy"
+        // 解码放到别的线程：一屏几十张封面时，同步解码会卡住滚动的那一帧。
+        decoding="async"
         className={`${className} cover-frame object-cover`}
         onError={() => setBroken(true)}
       />
