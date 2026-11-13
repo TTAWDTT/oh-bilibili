@@ -9,6 +9,7 @@ import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
 /** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
@@ -72,8 +73,8 @@ export function WatchInfo({
   const [tags, setTags] = useState<string[]>([])
   /** 当前在看人数。取不到就不显示，不猜。 */
   const [online, setOnline] = useState<number | null>(null)
-  /** UP 主粉丝数。B 站把「粉丝 123.4万」挂在 UP 名字后面。 */
-  const [fans, setFans] = useState<number | null>(null)
+  /** UP 主名片：粉丝、等级、认证。B 站把「粉丝 123.4万」挂在名字后面。 */
+  const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   /** 简介默认收两行，长简介给一个展开。 */
   const [descOpen, setDescOpen] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
@@ -90,7 +91,7 @@ export function WatchInfo({
     let cancelled = false
     setSaved(false)
     setTags([])
-    setFans(null)
+    setCard(null)
     setDescOpen(false)
     setConfirmingCoin(false)
     void ipc
@@ -138,10 +139,11 @@ export function WatchInfo({
     let cancelled = false
     setFollowed(null)
     if (!data.owner_mid) return
+    // 一张 card 同时给出粉丝、等级和认证，比先查 relation/stat 再补一次请求划算。
     void ipc
-      .spaceStat(data.owner_mid)
-      .then(([fanCount]) => {
-        if (!cancelled) setFans(fanCount)
+      .authorCard(data.owner_mid)
+      .then((next) => {
+        if (!cancelled) setCard(next)
       })
       .catch(() => {})
     void ipc
@@ -252,9 +254,19 @@ export function WatchInfo({
         <span className="flex min-w-0 items-center gap-2">
           <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
-          {fans !== null ? (
+          {card ? <LevelBadge level={card.level} /> : null}
+          {card?.official_type != null ? (
+            <span
+              title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}
+              className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-white"
+              style={{ background: card.official_type === 1 ? 'var(--accent)' : '#ffb027' }}
+            >
+              <Icon name="check" size={10} />
+            </span>
+          ) : null}
+          {card !== null ? (
             <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
-              粉丝 {formatCount(fans)}
+              粉丝 {formatCount(card.fans)}
             </span>
           ) : null}
         </span>

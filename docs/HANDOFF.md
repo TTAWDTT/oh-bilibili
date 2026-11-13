@@ -118,6 +118,8 @@ model  ← bili / store / audio
 | 关注悬浮名片 | 悬停或键盘聚焦卡片出名片：LV、粉丝、投稿、认证、签名；右列名片自动向左翻 |
 | 关注列表徽章 | 关注接口自带 `official_verify` / `vip` / `attribute` / `special`：名字后显示个人（黄）/ 机构（蓝）认证勾，互关标「互关」，特别关注在头像角上挂金色星，悬停名片补「大会员」粉标 |
 | 空态与补货 | 空态 CTA 改成 B 站蓝主按钮（去搜索 / 去发现 / 去登录）；列表补货统一成「小电视 + 正在加载更多…」，搜索、热门、关注共用同一个紧凑 loader |
+| 观看页 UP 资料 | UP 名字后面挂 UL 等级牌与认证勾（个人黄 / 机构蓝）。数据来自 `x/web-interface/card` 一次请求（粉丝、等级、认证、投稿都在里面），替掉了原来的 `x/relation/stat`，请求数不变 |
+| 网页预览（`npm run web`） | 之前有 11 个命令直接调 `invoke`，浏览器里必崩（发现页只显示一行 `Cannot read properties of undefined`）。现在全部走 `call`，配套补了 `home_feed`、`watch_open`、`watch_comments`、`following`、`space_videos` 等 mock，发现/搜索/观看/关注四页都能在浏览器里看 |
 | 搜索 UP 主徽章 | 搜索结果顶部的 UP 主卡带认证勾（个人黄 / 机构蓝，`official_verify.type`）与粉色「直播中」（`is_live`）；真机搜「英雄联盟」前三张卡都是蓝勾 + 直播中，LPL 官方号只有勾 |
 | 观看页简介 | 简介里的 http/https 链接改成 B 站蓝可点，点开走系统浏览器（`open_external` 只放行 http/https）；长 URL 自动断行，尾随省略号会被去掉；「展开更多」也改成蓝链接 |
 | 视频标签 | 标签从灰底灰字改成 B 站蓝底蓝字，悬停加深，不再和正文混在一起 |

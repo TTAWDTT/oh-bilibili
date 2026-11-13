@@ -113,7 +113,8 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     cover: REAL_COVERS[seed.title] ?? coverArt(seed.title, hueFor(key), index),
     up_avatar: REAL_AVATARS[seed.title] ?? null,
     // 播放量按名次递减，排行榜才有真实感；不是随机数。
-    views: 9_800_000 - index * 420_000,
+    // 目录有三四十条，线性递减会减成负数；到底之后按最低值兜住。
+    views: Math.max(12_000, 9_800_000 - index * 260_000),
     danmaku: 42_000 - index * 1_800,
     tname: '音乐',
     typeid: 3,

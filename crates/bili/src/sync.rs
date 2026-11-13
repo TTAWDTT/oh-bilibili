@@ -49,6 +49,8 @@ pub struct AuthorCard {
     pub fans: u64,
     pub sign: String,
     pub official: Option<String>,
+    /// 认证类型：0 个人、1 机构；None 未认证。徽章颜色靠它区分。
+    pub official_type: Option<i8>,
     /// 用户等级 0..6。就在 card 接口里，不用另调 acc/info（那条会被限流成 -799）。
     pub level: u8,
     /// 投稿总数。
@@ -220,7 +222,14 @@ impl Client {
                 .unwrap_or_default(),
             fans: v["data"]["follower"].as_u64().unwrap_or(0),
             sign: card["sign"].as_str().unwrap_or_default().to_string(),
-            official: card["Official"]["title"].as_str().map(|s| s.to_string()),
+            official: card["Official"]["title"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string()),
+            official_type: card["Official"]["type"]
+                .as_i64()
+                .filter(|t| (0..=1).contains(t))
+                .map(|t| t as i8),
             // 等级就在 card 里，不需要另调 acc/info（那条会被限流成 -799）。
             level: card["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
             videos: v["data"]["archive_count"].as_u64().unwrap_or(0),

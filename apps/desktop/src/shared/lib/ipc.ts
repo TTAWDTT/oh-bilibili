@@ -180,6 +180,8 @@ export type AuthorCard = {
   fans: number
   sign: string
   official: string | null
+  /** 0 个人、1 机构；null 未认证。 */
+  official_type?: number | null
   level: number
   videos: number
   likes: number
@@ -374,12 +376,12 @@ export function mvSource(key: string): Promise<string> {
 
 /** 切换看/听。从看到听时传画面当前位置。 */
 export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<PlayerSnapshot> {
-  return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
+  return call<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
 /** 离开观看页，停掉这条视频的声音。带上 key，换片时旧页面的清理不会掐掉新视频。 */
 export function closeWatch(key: string): Promise<PlayerSnapshot> {
-  return invoke<PlayerSnapshot>('close_watch', { key })
+  return call<PlayerSnapshot>('close_watch', { key })
 }
 
 /** UP 主投稿。返回 (列表, 总数)。`order`：pubdate 最新、click 最多播放、stow 最多收藏。 */
@@ -388,47 +390,47 @@ export function spaceVideos(
   page: number,
   order: 'pubdate' | 'click' | 'stow' = 'pubdate',
 ): Promise<[Track[], number]> {
-  return invoke<[Track[], number]>('space_videos', { mid, page, order })
+  return call<[Track[], number]>('space_videos', { mid, page, order })
 }
 
 /** UP 主粉丝与关注数。 */
 export function spaceStat(mid: number): Promise<[number, number]> {
-  return invoke<[number, number]>('space_stat', { mid })
+  return call<[number, number]>('space_stat', { mid })
 }
 
 /** 我关注的人。返回 (列表, 总数)。 */
 export function following(page: number): Promise<[Followed[], number]> {
-  return invoke<[Followed[], number]>('following', { page })
+  return call<[Followed[], number]>('following', { page })
 }
 
 /** 稍后再看列表。 */
 export function watchLaterList(): Promise<Track[]> {
-  return invoke<Track[]>('watch_later_list')
+  return call<Track[]>('watch_later_list', {})
 }
 
 /** 首页推荐。风控拒绝时返回空列表。 */
 export function homeFeed(fresh: number): Promise<Track[]> {
-  return invoke<Track[]>('home_feed', { fresh })
+  return call<Track[]>('home_feed', { fresh })
 }
 
 /** 取一页评论。 */
 export function watchComments(key: string, page: number, hot = true): Promise<CommentPage> {
-  return invoke<CommentPage>('watch_comments', { key, page, hot })
+  return call<CommentPage>('watch_comments', { key, page, hot })
 }
 
 /** 取一页楼中楼。`root` 是一级评论的 rpid。 */
 export function watchReplies(key: string, root: string, page: number): Promise<CommentPage> {
-  return invoke<CommentPage>('watch_replies', { key, root, page })
+  return call<CommentPage>('watch_replies', { key, root, page })
 }
 
 /** 搜索页热搜榜。游客可用；失败时返回空表。 */
 export function hotSearch(): Promise<string[]> {
-  return invoke<string[]>('hot_search')
+  return call<string[]>('hot_search', {})
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
 export function watchOpen(key: string, page?: number): Promise<WatchView> {
-  return invoke<WatchView>('watch_open', { key, page: page ?? null })
+  return call<WatchView>('watch_open', { key, page: page ?? null })
 }
 
 export function authStatus(): Promise<AuthSnapshot> {

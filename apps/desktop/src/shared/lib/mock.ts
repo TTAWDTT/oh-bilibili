@@ -1,10 +1,29 @@
 import type { DownloadView, QrStatus } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
 import { bool, num, sleep, str } from './mockArgs'
-import { emit, ensureClock, fail, playlistOf, state, trackOf } from './mockEngine'
+import { emit, ensureClock, fail, playlistOf, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
 
 export { mockSubscribe } from './mockEngine'
+
+const COMMENT_SEEDS: { author: string; mid: number; text: string; level: number; medal: string | null }[] = [
+  { author: 'UP主本人', mid: 90000, text: '置顶：这条在预览模式里用来验置顶标记。', level: 6, medal: null },
+  { author: '耳机党', mid: 90002, text: '前奏一响，DNA 动了。', level: 5, medal: '周杰伦' },
+  { author: '夜航船', mid: 90003, text: '第五遍循环，还是这首。', level: 3, medal: null },
+]
+
+const FOLLOW_SEEDS: {
+  name: string
+  sign: string
+  official: number | null
+  vip: boolean
+  mutual: boolean
+  special: boolean
+}[] = [
+  { name: '造梦阿瑄', sign: '每周五更新', official: 0, vip: true, mutual: true, special: true },
+  { name: '传送门研究所', sign: '音乐区 UP 主', official: 1, vip: false, mutual: false, special: false },
+  { name: '不睡觉的鹿', sign: '翻唱 / 混音', official: null, vip: false, mutual: false, special: false },
+]
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
@@ -47,6 +66,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         videos: 40 + i * 7,
         sign: '预览模式的占位签名',
         level: 6,
+        // 前后两条各带一种认证，第三条挂直播，预览里能核对徽章。
+        official: i === 0 ? 1 : i === 3 ? 0 : null,
+        verify: i === 0 ? '机构认证' : i === 3 ? '个人认证' : '',
+        live: i === 2,
       }))
     }
     case 'author_card': {
@@ -59,6 +82,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         // 按 mid 造一个稳定的粉丝数，同一个 UP 每次一样
         fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
         sign: '这里是 B 站的占位签名，真机走真实接口。',
+        official_type: 1,
         official: null,
         level: 6,
         videos: 952,
@@ -127,6 +151,143 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
+    case 'set_mode': {
+      state.mode = str(args, 'mode') === 'watch' ? 'watch' : 'listen'
+      return snapshot()
+    }
+    case 'close_watch': {
+      // 真实应用里离开观看页会停声音；预览也照做，否则退回列表还在响。
+      if (state.mode === 'watch') {
+        state.mode = 'listen'
+        if (state.phase === 'playing') state.phase = 'paused'
+      }
+      return snapshot()
+    }
+    case 'home_feed': {
+      const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
+      const size = 30
+      const start = (fresh * size) % CATALOG.length
+      return CATALOG.slice(start, start + size)
+    }
+    case 'hot_search':
+      return ['周杰伦', '晴天', '纯音乐', '夜空中最亮的星', '起风了', '海底']
+    case 'watch_open': {
+      const track = findTrack(str(args, 'key'))
+      if (!track) throw fail('input', '预览模式没有这条视频')
+      return {
+        key: track.key,
+        desc: '预览模式的简介：这里放 UP 主写的正文，链接会做成可点的。',
+        owner: track.artist,
+        owner_mid: track.up_mid ?? null,
+        owner_avatar: track.up_avatar ?? null,
+        stats: {
+          views: track.views ?? 0,
+          danmaku: 233,
+          likes: 1200,
+          coins: 88,
+          favorites: 166,
+          shares: 7,
+          replies: 12,
+        },
+        pubdate: Math.floor(Date.now() / 1000) - 86400,
+        tname: track.tname ?? null,
+        pages: [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }],
+        current_page: 1,
+        season: null,
+        // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
+        manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
+        duration_ms: track.duration_ms ?? 30_000,
+        qualities: [{ id: 80, label: '1080P', height: 1080, bandwidth: 2_400_000 }],
+        audio_quality: 192,
+      }
+    }
+    case 'watch_comments': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      if (page > 2) return { total: 6, page, items: [], has_more: false }
+      return {
+        total: 6,
+        page,
+        has_more: page < 2,
+        items: COMMENT_SEEDS.map((seed, i) => ({
+          id: `${page}-${i}`,
+          mid: seed.mid,
+          author: seed.author,
+          avatar: null,
+          text: seed.text,
+          emotes: [],
+          level: seed.level,
+          likes: 30 - i * 3,
+          at: Math.floor(Date.now() / 1000) - i * 600,
+          replies: [],
+          reply_count: 0,
+          pinned: i === 0,
+          medal: seed.medal
+            ? {
+                name: seed.medal,
+                level: 12,
+                color: 0xff87a1bc,
+                color_end: 0xff3d3d3d,
+                color_border: 0xff87a1bc,
+                color_name: 0xffffffff,
+                color_level: 0xffffffff,
+                level_bg: 0xff3d3d3d,
+              }
+            : null,
+        })),
+      }
+    }
+    case 'watch_replies': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      return {
+        total: 2,
+        page,
+        has_more: false,
+        items:
+          page === 1
+            ? [
+                {
+                  id: 'r1',
+                  mid: 90001,
+                  author: '楼里的路人',
+                  avatar: null,
+                  text: '这条是楼中楼预览数据。',
+                  emotes: [],
+                  level: 4,
+                  likes: 2,
+                  at: Math.floor(Date.now() / 1000) - 300,
+                  replies: [],
+                  reply_count: 0,
+                  pinned: false,
+                  medal: null,
+                },
+              ]
+            : [],
+      }
+    }
+    case 'following': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      const users = FOLLOW_SEEDS.map((seed, i) => ({
+        mid: 5000 + i,
+        name: seed.name,
+        face: null,
+        sign: seed.sign,
+        official: seed.official,
+        vip: seed.vip,
+        mutual: seed.mutual,
+        special: seed.special,
+      }))
+      return [page === 1 ? users : [], users.length]
+    }
+    case 'space_videos': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      const size = 50
+      const start = (page - 1) * size
+      return [CATALOG.slice(start, start + size), CATALOG.length]
+    }
+    case 'space_stat':
+      return [36, 1_240_000]
+    case 'watch_later_list':
+      return CATALOG.slice(0, 9)
     case 'danmaku_send':
       return null
     case 'danmaku_colored': {

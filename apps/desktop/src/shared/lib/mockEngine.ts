@@ -8,6 +8,8 @@ export type MockState = {
   keys: string[]
   index: number | null
   phase: PlayerPhase
+  /** 观看页打开时是 watch，退回列表就回到 listen。 */
+  mode: 'listen' | 'watch'
   position: number
   duration: number
   volume: number
@@ -29,6 +31,7 @@ export const state: MockState = {
   keys: [],
   index: null,
   phase: 'idle',
+  mode: 'listen',
   position: 0,
   duration: 0,
   volume: 0.72,
@@ -108,7 +111,7 @@ export function snapshot(): PlayerSnapshot {
   return {
     phase: state.phase,
     track,
-    mode: 'listen',
+    mode: state.mode,
     position_ms: Math.round(state.position),
     duration_ms: state.duration,
     volume: state.volume,
