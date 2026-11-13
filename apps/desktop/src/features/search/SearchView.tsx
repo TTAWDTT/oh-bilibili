@@ -528,10 +528,7 @@ export function SearchView() {
             {status === 'ready' && tracks.length > 0 ? (
               <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[13px] text-[var(--text-3)]">
                 {loadingMore ? (
-                  <>
-                    <span className="bili-tv-mark text-[var(--accent)]">◌</span>
-                    正在加载更多…
-                  </>
+                  <BiliLoader compact label="正在加载更多…" />
                 ) : (
                   <span className="text-[var(--text-3)]">已加载 {tracks.length} 个 · 继续下滑查看更多</span>
                 )}

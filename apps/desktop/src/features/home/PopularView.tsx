@@ -8,6 +8,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { PREFETCH_PX } from '../../shared/lib/prefetch'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 
 /**
  * 热门。B 站的综合热门（popular/all）：按时间往下翻，一次 50 条，没有名次。
@@ -128,7 +129,7 @@ export function PopularView() {
               </button>
             </div>
           ) : loadingMore ? (
-            <p className="py-4 text-center text-[12px] text-[var(--text-3)]">正在加载更多…</p>
+            <BiliLoader compact label="正在加载更多…" />
           ) : null}
         </>
       )}

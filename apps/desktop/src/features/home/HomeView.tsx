@@ -10,6 +10,7 @@ import { useAppStore } from '../../app/appStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { HOME_PREFETCH_PX } from '../../shared/lib/prefetch'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 
 /**
  * 发现页。
@@ -170,9 +171,7 @@ export function HomeView() {
         />
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
-      {loadingMore ? (
-        <p className="py-4 text-center text-[12px] text-[var(--text-3)]">正在加载更多…</p>
-      ) : null}
+      {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
     </div>
   )
 }
