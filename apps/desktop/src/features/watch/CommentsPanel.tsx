@@ -4,6 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
+import { thumbUrl } from '../../shared/lib/thumb'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
@@ -62,7 +63,7 @@ function CommentRow({
       <div className="flex items-start gap-2">
         {c.avatar ? (
           <img
-            src={c.avatar}
+            src={thumbUrl(c.avatar, 48, 48) ?? c.avatar}
             alt=""
             loading="lazy"
             referrerPolicy="no-referrer"

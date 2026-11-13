@@ -4,6 +4,7 @@ import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { formatCount } from '../../shared/lib/format'
+import { thumbUrl } from '../../shared/lib/thumb'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
@@ -334,7 +335,7 @@ export function SearchView() {
                     >
                       {user.face ? (
                         <img
-                          src={user.face}
+                          src={thumbUrl(user.face, 80, 80) ?? user.face}
                           alt=""
                           loading="lazy"
                           referrerPolicy="no-referrer"
