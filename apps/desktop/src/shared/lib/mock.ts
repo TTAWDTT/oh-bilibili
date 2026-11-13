@@ -208,11 +208,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'watch_comments': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
-      if (page > 2) return { total: 6, page, items: [], has_more: false }
+      // 预览只造一页评论：第二页再回同一批，界面上就会原样重复一遍。
+      if (page > 1) return { total: COMMENT_SEEDS.length, page, items: [], has_more: false }
       return {
-        total: 6,
+        total: COMMENT_SEEDS.length,
         page,
-        has_more: page < 2,
+        has_more: false,
         items: COMMENT_SEEDS.map((seed, i) => ({
           id: `${page}-${i}`,
           mid: seed.mid,
