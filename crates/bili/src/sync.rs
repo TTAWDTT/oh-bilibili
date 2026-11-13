@@ -337,13 +337,19 @@ impl Client {
     ///
     /// 走 `space/wbi/arc/search`，**必须 WBI 签名**：不签名会返回 `-403 访问权限不足`，
     /// 而不走 wbi 的老接口 `space/arc/search` 会一直 `-799` 限流。
+    /// 排序：`pubdate` 最新、`click` 最多播放、`stow` 最多收藏，和空间页那排一致。
     pub async fn space_videos(
         &self,
         mid: u64,
         page: u32,
+        order: &str,
     ) -> Result<(Vec<bilimusic_model::Track>, u32), BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};
 
+        let order = match order {
+            "click" | "stow" | "pubdate" => order,
+            _ => "pubdate",
+        };
         let v = self
             .signed_get(
                 &format!("{API}/x/space/wbi/arc/search"),
@@ -351,7 +357,7 @@ impl Client {
                     ("mid", mid.to_string()),
                     ("pn", page.max(1).to_string()),
                     ("ps", "30".to_string()),
-                    ("order", "pubdate".to_string()),
+                    ("order", order.to_string()),
                 ],
                 std::time::Duration::from_millis(400),
             )

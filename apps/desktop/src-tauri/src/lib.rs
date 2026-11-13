@@ -140,8 +140,9 @@ async fn space_videos(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
     page: u32,
+    order: String,
 ) -> Result<(Vec<Track>, u32), WireError> {
-    engine.space_videos(mid, page).await
+    engine.space_videos(mid, page, &order).await
 }
 
 /// UP 主粉丝与关注数。

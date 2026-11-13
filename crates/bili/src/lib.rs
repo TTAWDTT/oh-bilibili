@@ -262,8 +262,9 @@ impl Source {
         &self,
         mid: u64,
         page: u32,
+        order: &str,
     ) -> Result<(Vec<Track>, u32), BiliError> {
-        self.client.space_videos(mid, page).await
+        self.client.space_videos(mid, page, order).await
     }
 
     /// UP 主粉丝与关注数。

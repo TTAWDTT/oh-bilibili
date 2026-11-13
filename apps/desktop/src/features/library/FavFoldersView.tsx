@@ -103,6 +103,14 @@ export function FavFoldersView() {
     }
   }, [picked])
 
+  // 首屏或切夹后如果还不满两屏，先把后面的补上：否则用户一进来就要撞到底部。
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!picked || !el || tracks === null || exhausted || loadingMore) return
+    if (el.scrollHeight - el.clientHeight < 1600) void loadMore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks, picked])
+
   /** 从当前收藏夹移出一条。成功后从列表里去掉，不用整页刷新。 */
   const removeOne = async (track: Track): Promise<void> => {
     if (!picked) return
@@ -146,16 +154,17 @@ export function FavFoldersView() {
   }
   if (folders === null) return <BiliTvLoading label="正在读 B 站收藏夹" />
 
+  /** 离底部不到约两屏就补一页；补完如果还不到两屏，下一次滚动会继续补。 */
+  const pullMore = (el: HTMLDivElement): void => {
+    if (!exhausted && el.scrollHeight - el.scrollTop - el.clientHeight < 1600) void loadMore()
+  }
+
   if (picked) {
     return (
       <div
         ref={scrollRef}
         id="scroll-main"
-        onScroll={(event) => {
-          const el = event.currentTarget
-          // 离底部还有 600px 就预取下一页，滚动时不会等
-          if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) void loadMore()
-        }}
+        onScroll={(event) => pullMore(event.currentTarget)}
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
       >
         <button

@@ -196,7 +196,8 @@ export function CommentsPanel({
       (entries) => {
         if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load(page + 1)
       },
-      { root: root instanceof Element ? root : null, rootMargin: '240px' },
+      // 评论一页 20 条，提前一屏多就开始取，滚起来才不会一顿一顿
+      { root: root instanceof Element ? root : null, rootMargin: '900px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()

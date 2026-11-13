@@ -122,6 +122,8 @@ export function SearchView() {
   const focusSeq = useAppStore((state) => state.searchFocus)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
+  /** 上一页返回空就说明到底了；否则自动补齐会对着空页无限重试。 */
+  const reachedEnd = useRef(false)
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
@@ -188,6 +190,7 @@ export function SearchView() {
         .then((next) => {
           if (seq.current !== ticket) return
           if (page === 1) pushHistory(trimmed)
+          reachedEnd.current = next.length === 0
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
@@ -213,6 +216,17 @@ export function SearchView() {
     return () => window.clearTimeout(handle)
   }, [trimmed, page, nonce, order, partition, duration])
 
+  // 首屏之后自动补齐：滚到底时下一页往往已经在路上，继续滚也不会停。
+  useEffect(() => {
+    if (status !== 'ready' || loadingMore || tracks.length === 0 || reachedEnd.current) return
+    const el = scrollerRef.current
+    if (!el) return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1200) {
+      setLoadingMore(true)
+      setPage((p) => p + 1)
+    }
+  }, [tracks, status, loadingMore])
+
   const pick = (value: string): void => {
     setQuery(value)
     setPage(1)
@@ -230,8 +244,9 @@ export function SearchView() {
           const el = event.currentTarget
           if (searchMemory) searchMemory.scrollTop = el.scrollTop
           if (loadingMore || status !== 'ready' || tracks.length === 0) return
-          // 距离底部不到 240px 就预取下一页，做得像 B 站那样无感。
-          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
+          // 提前约两屏就预取下一页：等到贴近底部再发请求，
+          // 用户会看到「滑到底 → 转圈 → 才有内容」，那就是卡。
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 1200) {
             setLoadingMore(true)
             setPage((p) => p + 1)
           }

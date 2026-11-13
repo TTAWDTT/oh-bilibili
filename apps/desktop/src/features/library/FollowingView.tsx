@@ -96,7 +96,8 @@ export function FollowingView() {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void load(page + 1)
       },
-      { root: box, rootMargin: '240px' },
+      // 提前约两屏就取下一页；贴到底再取会明显等
+      { root: box, rootMargin: '1200px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()

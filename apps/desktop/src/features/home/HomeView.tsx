@@ -37,6 +37,8 @@ export function HomeView() {
   /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
   const nextFresh = useRef(feedMemory.nextFresh)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
+  const exhausted = useRef(false)
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     if (append) setLoadingMore(true)
@@ -44,12 +46,20 @@ export function HomeView() {
     setError(null)
     try {
       const list = await ipc.homeFeed(next)
+      let added = list.length
       setItems((prev) => {
         if (!append) return list
         // 推荐流会重复推同一条，按 key 去重后再追加。
         const seen = new Set(prev.map((t) => t.key))
-        return [...prev, ...list.filter((t) => !seen.has(t.key))]
+        const fresh = list.filter((t) => !seen.has(t.key))
+        added = fresh.length
+        return [...prev, ...fresh]
       })
+      // 全是重复或空响应：继续自动补会原地打转，记下来并告诉用户。
+      if (append && added === 0) {
+        exhausted.current = true
+        setError('这一轮的推荐已经到底了，换一批看看。')
+      }
       if (list.length === 0) setError('这次没拿到推荐，换一批试试。')
     } catch (e) {
       setError(toWireError(e).message)
@@ -85,6 +95,15 @@ export function HomeView() {
     void load(next, true)
   }
 
+  // 加载完一批后如果还没填满两屏，就继续取，别让用户撞到底才开始等。
+  useEffect(() => {
+    if (loading || loadingMore || items.length === 0 || exhausted.current) return
+    const el = scrollerRef.current
+    if (!el) return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1400) more()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, loading, loadingMore])
+
   return (
     <div
       ref={scrollerRef}
@@ -92,7 +111,8 @@ export function HomeView() {
       onScroll={(event) => {
         const el = event.currentTarget
         feedMemory.scrollTop = el.scrollTop
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < 320) more()
+        // 提前约两屏预取；贴到底再取就会出现「划到底等半天」。
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 1400) more()
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
@@ -106,6 +126,7 @@ export function HomeView() {
             nextFresh.current = 2
             feedMemory.nextFresh = 2
             feedMemory.scrollTop = 0
+            exhausted.current = false
             void load(next)
           }}
           className="t press ml-auto rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"

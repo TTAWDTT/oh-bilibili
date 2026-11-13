@@ -491,13 +491,14 @@ impl Engine {
         Ok(self.source.report_progress(key, played_secs, start_ts).await?)
     }
 
-    /// UP 主投稿。
+    /// UP 主投稿。`order`：pubdate 最新、click 最多播放、stow 最多收藏。
     pub async fn space_videos(
         &self,
         mid: u64,
         page: u32,
+        order: &str,
     ) -> Result<(Vec<bilimusic_model::Track>, u32), WireError> {
-        Ok(self.source.space_videos(mid, page).await?)
+        Ok(self.source.space_videos(mid, page, order).await?)
     }
 
     /// UP 主粉丝与关注数。

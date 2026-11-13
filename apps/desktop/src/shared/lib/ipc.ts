@@ -363,9 +363,13 @@ export function closeWatch(key: string): Promise<PlayerSnapshot> {
   return invoke<PlayerSnapshot>('close_watch', { key })
 }
 
-/** UP 主投稿。返回 (列表, 总数)。 */
-export function spaceVideos(mid: number, page: number): Promise<[Track[], number]> {
-  return invoke<[Track[], number]>('space_videos', { mid, page })
+/** UP 主投稿。返回 (列表, 总数)。`order`：pubdate 最新、click 最多播放、stow 最多收藏。 */
+export function spaceVideos(
+  mid: number,
+  page: number,
+  order: 'pubdate' | 'click' | 'stow' = 'pubdate',
+): Promise<[Track[], number]> {
+  return invoke<[Track[], number]>('space_videos', { mid, page, order })
 }
 
 /** UP 主粉丝与关注数。 */

@@ -1,7 +1,7 @@
 import { toastDone, toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import { toWireError } from '../../shared/lib/errors'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
@@ -29,6 +29,12 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const [total, setTotal] = useState(0)
   /** 是否退回了搜索聚合。界面要如实标注这一点。 */
   const [isFallback, setIsFallback] = useState(false)
+  /** 排序：B 站空间页那三档。 */
+  const [order, setOrder] = useState<'pubdate' | 'click' | 'stow'>('pubdate')
+  const [page, setPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const sentinel = useRef<HTMLDivElement | null>(null)
 
   // 粉丝数与签名走 card 接口，公开可见。
   useEffect(() => {
@@ -66,9 +72,12 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   useEffect(() => {
     let cancelled = false
     setTracks(null)
+    setPage(1)
+    setIsFallback(false)
+    scroller.current?.scrollTo({ top: 0 })
     if (mid) {
       void ipc
-        .spaceVideos(mid, 1)
+        .spaceVideos(mid, 1, order)
         .then(([list, total]) => {
           if (cancelled) return
           setTracks(list)
@@ -104,7 +113,37 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     return () => {
       cancelled = true
     }
-  }, [name, mid])
+  }, [name, mid, order])
+
+  /** 往下滚到底再取下一页；空间接口一页 30 条。 */
+  const loadMore = async (): Promise<void> => {
+    if (!mid || loadingMore || isFallback || !tracks || tracks.length >= total) return
+    setLoadingMore(true)
+    try {
+      const [list] = await ipc.spaceVideos(mid, page + 1, order)
+      setTracks((prev) => [...(prev ?? []), ...list])
+      setPage((n) => n + 1)
+    } catch {
+      // 取不到就停在已加载的那一页，不假装到底
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  useEffect(() => {
+    const box = scroller.current
+    const mark = sentinel.current
+    if (!box || !mark || isFallback) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore()
+      },
+      { root: box, rootMargin: '1200px' },
+    )
+    observer.observe(mark)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, tracks, order, isFallback])
 
   if (tracks === null) return <TrackListSkeleton rows={6} />
   if (tracks.length === 0) {
@@ -123,6 +162,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   return (
     <div
+      ref={scroller}
       id="scroll-main"
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
@@ -184,11 +224,46 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         </div>
       </header>
 
+      {/* 排序只在拿到了完整投稿列表时才有意义；搜索聚合下按比例排序是假的。 */}
+      {mid && !isFallback ? (
+        <div className="mb-3 flex items-center gap-1">
+          {(
+            [
+              ['pubdate', '最新发布'],
+              ['click', '最多播放'],
+              ['stow', '最多收藏'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={order === value}
+              onClick={() => setOrder(value)}
+              className={`t press rounded-[4px] px-3 py-1 text-[13px] ${
+                order === value
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--text-3)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="num ml-auto text-[12px] text-[var(--text-3)]">
+            已加载 {tracks.length} / {total}
+          </span>
+        </div>
+      ) : null}
+
       <ContentGrid
         tracks={tracks}
         activeKey={snapshot?.track?.key ?? null}
         playing={snapshot?.phase === 'playing'}
       />
+
+      <div ref={sentinel} aria-hidden className="h-px" />
+      {loadingMore ? (
+        <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取更多投稿…</p>
+      ) : null}
 
       <div className="mt-6 flex justify-center">
         <button
