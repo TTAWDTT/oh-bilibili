@@ -380,6 +380,14 @@ export function SearchView() {
                         <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
                           {formatCount(user.fans)} 粉丝 · {formatCount(user.videos)} 投稿
                         </span>
+                        {user.sign ? (
+                          <span
+                            className="mt-0.5 block truncate text-[11px] text-[var(--text-3)]"
+                            title={user.sign}
+                          >
+                            {user.sign}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   ))}
