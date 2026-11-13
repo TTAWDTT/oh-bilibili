@@ -12,6 +12,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
+import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { ShortcutTable } from './ShortcutTable'
 
 /**
@@ -33,6 +34,7 @@ export function SettingsView() {
   const auth = useAuthStore((state) => state.auth)
   const logout = useAuthStore((state) => state.logout)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
+  const navigate = useAppStore((state) => state.navigate)
   const [health, setHealth] = useState<Health | null>(null)
   const [healthFailed, setHealthFailed] = useState(false)
   const [healthNonce, setHealthNonce] = useState(0)
@@ -102,43 +104,63 @@ export function SettingsView() {
 
           <Section title="账号">
             {user ? (
-              <div className="flex flex-wrap items-center gap-4">
-                <Avatar src={user.avatar} alt={user.uname} size={96} bordered={false} />
-                <div className="min-w-[200px] flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className="truncate text-[17px] font-medium text-[var(--text-1)]"
-                      title={user.uname}
-                    >
-                      {user.uname}
-                    </span>
-                    <LevelBadge level={user.level} />
-                  </div>
-                  <div className="num mt-1 font-mono text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
-                  <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-2)]">
-                    <span>{Number.isInteger(user.coins) ? user.coins : user.coins.toFixed(1)} 硬币</span>
-                    {relation ? <span>{formatCount(relation[0])} 粉丝</span> : null}
-                    {relation ? <span>{formatCount(relation[1])} 关注</span> : null}
-                  </div>
+              <div className="overflow-hidden rounded-[6px] border border-[var(--line)]">
+                <div
+                  className="relative h-[88px] overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(115deg, color-mix(in srgb, var(--bili-pink) 23%, white), color-mix(in srgb, var(--bili-pink) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
+                  }}
+                >
+                  <Mascot2233 height={192} className="pointer-events-none absolute -bottom-[68px] right-5 opacity-20" />
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void sync()}
-                    disabled={syncing}
-                    className="t press flex h-8 items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
-                  >
-                    <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
-                    {syncing ? '同步中…' : '立即同步'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void logout()}
-                    className="t press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                  >
-                    <Icon name="logout" size={13} />
-                    退出
-                  </button>
+                <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
+                  <div className="relative -mt-10 shrink-0 rounded-full bg-white p-[5px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--bili-pink)_25%,white),0_3px_12px_rgba(255,102,153,0.12)]">
+                    <Avatar src={user.avatar} alt={user.uname} size={120} bordered={false} />
+                  </div>
+                  <div className="min-w-0 flex-[1_1_240px] pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="min-w-0 truncate text-[19px] font-semibold text-[var(--text-1)]"
+                        title={user.uname}
+                      >
+                        {user.uname}
+                      </span>
+                      <LevelBadge level={user.level} />
+                    </div>
+                    <div className="num mt-1 text-[12px] text-[var(--text-2)]">UID {user.mid}</div>
+                    <div className="num mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-[var(--text-2)]">
+                      <span><span className="font-medium text-[var(--text-1)]">{Number.isInteger(user.coins) ? user.coins : user.coins.toFixed(1)}</span> 硬币</span>
+                      {relation ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(relation[0])}</span> 粉丝</span> : null}
+                      {relation ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(relation[1])}</span> 关注</span> : null}
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate({ kind: 'author', name: user.uname, mid: user.mid })}
+                        className="t press flex h-8 items-center justify-center gap-2 rounded-[6px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
+                      >
+                        <Icon name="user" size={14} />
+                        个人空间
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sync()}
+                        disabled={syncing}
+                        className="t press flex h-8 items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
+                      >
+                        <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
+                        {syncing ? '同步中…' : '立即同步'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void logout()}
+                        className="t press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      >
+                        <Icon name="logout" size={13} />
+                        退出
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
