@@ -34,9 +34,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
 
   switch (command) {
     case 'search_q': {
-      const query = str(args, 'query').trim()
+      const raw = str(args, 'query').trim()
+      // 预览用开关：关键词以「限流」开头时，第 2 页起报错，
+      // 用来验证翻页失败后的「重试这一页」入口。
+      const simulateFailure = raw.startsWith('限流')
+      const query = simulateFailure ? raw.slice(2) : raw
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       await sleep(140)
+      if (simulateFailure && page > 1) throw fail('internal', '预览：模拟翻页被限流')
       // 时长筛选：mock 的曲目都在 30 秒内，只做「10 分钟以下」这一档的语义
       // duration 是可选参数，未选时传 null，不能走会抛错的 num()
       const dur = typeof args.duration === 'number' ? args.duration : 0

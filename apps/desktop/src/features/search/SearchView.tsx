@@ -61,6 +61,8 @@ export function SearchView() {
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState(false)
+  /** 结果已经翻到头。ref 不能触发渲染，底部要据此换掉「继续下滑查看更多」。 */
+  const [ended, setEnded] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   // 统计行要说实话：用户选了「最多播放」，这里就不能还写着「按标题匹配排序」。
@@ -210,6 +212,7 @@ export function SearchView() {
         setTracks([])
         setDataKey('')
         setMoreError(false)
+        setEnded(false)
         scrollerRef.current?.scrollTo({ top: 0 })
       }
       ipc
@@ -227,6 +230,7 @@ export function SearchView() {
           if (seq.current !== ticket) return
           if (page === 1) pushHistory(trimmed)
           reachedEnd.current = next.length === 0
+          setEnded(next.length === 0)
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
@@ -563,6 +567,8 @@ export function SearchView() {
                   >
                     没加载出来，重试这一页
                   </button>
+                ) : ended ? (
+                  <span className="text-[var(--text-3)]">到底了</span>
                 ) : (
                   <span className="text-[var(--text-3)]">已加载 {tracks.length} 个 · 继续下滑查看更多</span>
                 )}
