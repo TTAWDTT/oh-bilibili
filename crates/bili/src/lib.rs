@@ -367,6 +367,11 @@ impl Source {
         self.client.popular(page).await
     }
 
+    /// 入站必刷：标题、官方文案与每条视频的推荐语。
+    pub async fn precious(&self) -> Result<(String, String, Vec<sync::PreciousItem>), BiliError> {
+        self.client.precious().await
+    }
+
     /// 当前在看人数。
     pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
         self.client.online_count(bvid, cid).await

@@ -655,6 +655,38 @@ impl Client {
         Ok((tracks_from_list(&v["data"]["list"]), no_more))
     }
 
+    /// 入站必刷：B 站给新用户的首屏片单。
+    ///
+    /// 传 `page_size` 没用，一次就把全部条目给回来。每条附一句 `achievement`，
+    /// 是 B 站自己写的推荐语，不是我们编的说明。
+    pub async fn precious(&self) -> Result<(String, String, Vec<PreciousItem>), BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/web-interface/popular/precious?page_size=20&page=1"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let data = &v["data"];
+        let items = data["list"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| {
+                        Some(PreciousItem {
+                            track: track_from_item(m)?,
+                            note: m["achievement"].as_str().unwrap_or_default().to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok((
+            data["title"].as_str().unwrap_or_default().to_string(),
+            data["explain"].as_str().unwrap_or_default().to_string(),
+            items,
+        ))
+    }
+
     /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
     pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
         let v = self
@@ -806,40 +838,48 @@ impl Client {
     }
 }
 
-/// `data.list` 里的视频卡片。排行榜与综合热门是同一个形状，共用这一份解析。
-fn tracks_from_list(list: &serde_json::Value) -> Vec<bilimusic_model::Track> {
+/// 入站必刷的一条：视频本身加上 B 站给它的推荐语。
+#[derive(Debug, Clone)]
+pub struct PreciousItem {
+    pub track: bilimusic_model::Track,
+    pub note: String,
+}
+
+/// `data.list` 里的一条视频卡片。排行榜、综合热门与入站必刷是同一个形状，共用这一份解析。
+fn track_from_item(m: &serde_json::Value) -> Option<bilimusic_model::Track> {
     use bilimusic_model::{Millis, Track, TrackKey};
 
+    let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+    let duration = m["duration"].as_u64().filter(|d| *d > 0);
+    Some(Track {
+        key: TrackKey::from_provider(bvid),
+        title: m["title"].as_str().unwrap_or_default().to_string(),
+        artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+        duration: duration.map(|d| Millis(d * 1000)),
+        cover: m["pic"]
+            .as_str()
+            .map(|c| c.replacen("http://", "https://", 1)),
+        accent: None,
+        views: m["stat"]["view"].as_u64(),
+        danmaku: m["stat"]["danmaku"].as_u64(),
+        up_avatar: m["owner"]["face"]
+            .as_str()
+            .map(|f| f.replacen("http://", "https://", 1)),
+        up_mid: m["owner"]["mid"].as_u64(),
+        tname: m["tname"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string()),
+        typeid: None,
+    })
+}
+
+/// `data.list` 解析成曲目。没有 bvid 的条目跳过。
+fn tracks_from_list(list: &serde_json::Value) -> Vec<bilimusic_model::Track> {
     let Some(list) = list.as_array() else {
         return Vec::new();
     };
-    list.iter()
-        .filter_map(|m| {
-            let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
-            let duration = m["duration"].as_u64().filter(|d| *d > 0);
-            Some(Track {
-                key: TrackKey::from_provider(bvid),
-                title: m["title"].as_str().unwrap_or_default().to_string(),
-                artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
-                duration: duration.map(|d| Millis(d * 1000)),
-                cover: m["pic"]
-                    .as_str()
-                    .map(|c| c.replacen("http://", "https://", 1)),
-                accent: None,
-                views: m["stat"]["view"].as_u64(),
-                danmaku: m["stat"]["danmaku"].as_u64(),
-                up_avatar: m["owner"]["face"]
-                    .as_str()
-                    .map(|f| f.replacen("http://", "https://", 1)),
-                up_mid: m["owner"]["mid"].as_u64(),
-                tname: m["tname"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string()),
-                typeid: None,
-            })
-        })
-        .collect()
+    list.iter().filter_map(track_from_item).collect()
 }
 
 #[cfg(test)]

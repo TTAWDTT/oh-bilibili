@@ -94,6 +94,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return CATALOG.slice(0, 20)
     case 'popular':
       return [CATALOG.slice(0, 20), false]
+    case 'precious':
+      return {
+        title: '入站必刷',
+        explain: '预览模式',
+        items: CATALOG.slice(0, 12).map((track) => ({ track, note: '预览模式的推荐语' })),
+      }
     case 'video_online':
       return 128
     case 'fav_tracks': {

@@ -124,6 +124,7 @@ model  ← bili / store / audio
 | 视频标签 | `x/tag/archive/tags` 返回 10 个标签（攻略 / 模拟经营 / 水商…），观看页渲染成可点标签行，点击转为搜索 |
 | 搜索标题高亮 | 结果卡片标题按关键词按字面切段，命中片段标 B 站搜索粉 `#fb7299`、无背景；大小写不敏感、关键词不当正则（`(` 这类字符安全）；实测搜「夜」出 2 个 mark，hover 时标题转 accent 而粉字不动 |
 | 综合热门 | `x/web-interface/popular?pn=&ps=50` 未签名可读，`no_more` 标到底；实测 pn=1..4 各 50 条不重复，pn=21 起 no_more=true。与排行榜共用同一份 `data.list` 解析 |
+| 入站必刷 | `x/web-interface/popular/precious` 未签名可读，一次返回 98 条（`page_size` 不生效）；`data.title` / `data.explain` 原样作页面标题与副文案，98 条全部带 `achievement` 推荐语。单条解析抽成 `track_from_item`，热门/榜单/必刷共用 |
 | 排行榜 | rid=0 返回 100 条，榜首《崩坏：星穹铁道》动画短片显示 25:00；前三名角标配色与分区切换正常 |
 | 在线人数 | `x/player/v2` 的 online_count 返回 1，观看页显示「1 人在看」；0 或失败时不显示 |
 | 评论表情 | `content.emote` 的代号渲染成 20px 图片，评论结尾不再出现 [doge] 一类原文 |

@@ -479,6 +479,23 @@ async fn 热门榜能翻页() {
 }
 
 #[tokio::test]
+#[ignore = "真实网络"]
+async fn 入站必刷带推荐语() {
+    let source = Source::open().await.expect("Source");
+    let (title, explain, items) = source.precious().await.expect("入站必刷");
+    println!("\n{title}：{explain}（{} 条）", items.len());
+    for item in items.iter().take(3) {
+        println!("  {} / {}", item.track.title, item.note);
+    }
+    assert!(!title.is_empty(), "标题不该为空");
+    assert!(items.len() >= 90, "一次应该给接近 98 条，实际 {}", items.len());
+    assert!(
+        items.iter().all(|item| !item.note.is_empty()),
+        "每条都应该带 B 站写的推荐语"
+    );
+}
+
+#[tokio::test]
 #[ignore = "真实网络，核对 UP 主置顶评论"]
 async fn 置顶评论排在第一页最前() {
     let source = Source::open().await.expect("Source");

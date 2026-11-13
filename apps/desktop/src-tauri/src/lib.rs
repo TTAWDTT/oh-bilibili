@@ -603,6 +603,13 @@ async fn popular(
     engine.popular(page).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn precious(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<bilimusic_core::wire::PreciousView, WireError> {
+    engine.precious().await
+}
+
 #[derive(Serialize)]
 struct UserHitView {
     mid: u64,
@@ -930,6 +937,7 @@ pub fn run() {
             search_users,
             ranking,
             popular,
+            precious,
             video_online,
             author_card,
             fav_tracks,

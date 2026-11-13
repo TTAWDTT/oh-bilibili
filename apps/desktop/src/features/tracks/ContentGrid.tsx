@@ -92,6 +92,8 @@ type ContentGridProps = {
   extraAction?: (track: Track) => React.ReactNode
   /** 已看进度 0~1。历史页用它画封面底部那条进度，没有就不画。 */
   progress?: (track: Track) => number | null
+  /** 卡片推荐语，渲染在 UP 主下面一行。入站必刷用它，其它页面不传。 */
+  note?: (track: Track) => string | null
   /** 搜索页传当前关键词，标题里命中的片段标粉；其它页面不传。 */
   highlight?: string
 }
@@ -102,7 +104,7 @@ type ContentGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, highlight }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, note, highlight }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const faved = useReactionStore((state) => state.faved)
@@ -167,6 +169,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
       <div className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]">
         {tracks.map((track, index) => {
           const active = track.key === activeKey
+          const noteText = note?.(track) ?? null
           return (
             <article key={track.key} data-track-card className="bili-card group">
               <div className="relative">
@@ -285,6 +288,10 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                   <span className="truncate">{track.artist}</span>
                 </button>
               </div>
+
+              {noteText ? (
+                <p className="mt-0.5 line-clamp-1 text-[12px] text-[var(--text-3)]">{noteText}</p>
+              ) : null}
 
               {confirming === track.key ? (
                 <div className="mt-1.5 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1 text-[12px]">

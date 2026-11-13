@@ -28,6 +28,7 @@ import { WatchView } from '../features/watch/WatchView'
 import { HomeView } from '../features/home/HomeView'
 import { RankingView } from '../features/home/RankingView'
 import { PopularView } from '../features/home/PopularView'
+import { PreciousView } from '../features/home/PreciousView'
 import { WatchLaterView } from '../features/library/WatchLaterView'
 import { FollowingView } from '../features/library/FollowingView'
 
@@ -45,6 +46,8 @@ function viewTitle(view: View): string {
       return '排行榜'
     case 'popular':
       return '热门'
+    case 'precious':
+      return '入站必刷'
     case 'search':
       return '搜索'
     case 'library':
@@ -80,6 +83,8 @@ function CurrentView({ view }: { view: View }) {
       return <RankingView initialRid={view.rid ?? 0} />
     case 'popular':
       return <PopularView />
+    case 'precious':
+      return <PreciousView />
     case 'search':
       return <SearchView />
     case 'library':

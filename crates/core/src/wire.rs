@@ -145,6 +145,22 @@ pub struct SeasonEpisodeView {
     pub current: bool,
 }
 
+/// 入站必刷。`explain` 是 B 站官方文案，原样透传。
+/// `PreciousItemView` 故意不带 `Default`：`Track` 没有默认值，编不出来。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PreciousView {
+    pub title: String,
+    pub explain: String,
+    pub items: Vec<PreciousItemView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PreciousItemView {
+    pub track: Track,
+    /// 这条视频的推荐语。
+    pub note: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VideoMetaView {
     pub desc: String,

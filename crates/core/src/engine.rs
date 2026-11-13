@@ -1343,6 +1343,25 @@ impl Engine {
         Ok((tracks, no_more))
     }
 
+    /// 入站必刷。返回标题、官方文案与带推荐语的条目。
+    pub async fn precious(&self) -> Result<crate::wire::PreciousView, WireError> {
+        let (title, explain, items) = self.source.precious().await?;
+        for item in &items {
+            self.remember(&item.track);
+        }
+        Ok(crate::wire::PreciousView {
+            title,
+            explain,
+            items: items
+                .into_iter()
+                .map(|item| crate::wire::PreciousItemView {
+                    track: item.track,
+                    note: item.note,
+                })
+                .collect(),
+        })
+    }
+
     pub async fn online_count(&self, key: &TrackKey, cid: u64) -> Result<u64, WireError> {
         Ok(self.source.online_count(&key.as_opaque(), cid).await?)
     }

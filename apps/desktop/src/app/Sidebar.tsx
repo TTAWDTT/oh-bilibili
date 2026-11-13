@@ -17,6 +17,7 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'home' }, label: '发现', icon: 'biliTv' },
       { view: { kind: 'ranking' }, label: '排行', icon: 'rank' },
       { view: { kind: 'popular' }, label: '热门', icon: 'rank' },
+      { view: { kind: 'precious' }, label: '入站必刷', icon: 'heart' },
       { view: { kind: 'search' }, label: '搜索', icon: 'search' },
     ],
   },

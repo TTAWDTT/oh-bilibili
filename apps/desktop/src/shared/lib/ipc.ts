@@ -8,6 +8,7 @@ import type { CommentPage, Followed, PlayMode, WatchView,
   QrChallenge,
   QrStatus,
   QueueView,
+  PreciousView,
   RepeatMode,
   SearchPage,
   Track,
@@ -239,6 +240,11 @@ export function ranking(rid = 0): Promise<Track[]> {
 /** 综合热门。一次 50 条，第二个返回值表示是否到底。 */
 export function popular(page = 1): Promise<[Track[], boolean]> {
   return call<[Track[], boolean]>('popular', { page })
+}
+
+/** 入站必刷。一次取完，每条带一句 B 站写的推荐语。 */
+export function precious(): Promise<PreciousView> {
+  return call<PreciousView>('precious', {})
 }
 
 /** 当前在看人数。 */

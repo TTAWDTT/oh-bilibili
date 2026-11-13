@@ -133,6 +133,19 @@ export type SeasonEpisodeView = {
   current: boolean
 }
 
+export type PreciousView = {
+  title: string
+  /** B 站的官方文案，原样展示。 */
+  explain: string
+  items: PreciousItemView[]
+}
+
+export type PreciousItemView = {
+  track: Track
+  /** 这条视频的推荐语。 */
+  note: string
+}
+
 export type QualityOption = {
   id: number
   label: string
