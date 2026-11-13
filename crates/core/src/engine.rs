@@ -514,7 +514,11 @@ impl Engine {
         page: u32,
         order: &str,
     ) -> Result<(Vec<bilimusic_model::Track>, u32), WireError> {
-        Ok(self.source.space_videos(mid, page, order).await?)
+        let (tracks, total) = self.source.space_videos(mid, page, order).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok((tracks, total))
     }
 
     /// UP 主粉丝与关注数。
@@ -532,12 +536,20 @@ impl Engine {
 
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<bilimusic_model::Track>, WireError> {
-        Ok(self.source.watch_later_list().await?)
+        let tracks = self.source.watch_later_list().await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
     }
 
     /// 首页推荐。风控拒绝时返回空列表，界面显示「换一批」。
     pub async fn home_feed(&self, fresh: u32) -> Result<Vec<bilimusic_model::Track>, WireError> {
-        Ok(self.source.home_feed(fresh).await?)
+        let tracks = self.source.home_feed(fresh).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
     }
 
     /// 取一页评论。取不到不该挡住看视频。
@@ -653,6 +665,10 @@ impl Engine {
         })
     }
 
+    /// 按列表里的 key 组播放队列。
+    ///
+    /// keys 必须来自已经 remember 过曲目的列表接口；这里不逐条取详情，
+    /// 否则从稍后再看播放全部会先发几十个详情请求。
     pub async fn play_context(
         self: &Arc<Self>,
         keys: &[String],

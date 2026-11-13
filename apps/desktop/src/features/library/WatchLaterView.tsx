@@ -21,6 +21,7 @@ export function WatchLaterView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
+  const playContext = usePlayerStore((s) => s.playContext)
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,7 +84,21 @@ export function WatchLaterView() {
       id="scroll-main"
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
-      <PageTitle extra={`${tracks.length} 个`}>稍后再看</PageTitle>
+      <PageTitle
+        extra={`${tracks.length} 个`}
+        action={
+          <button
+            type="button"
+            onClick={() => void playContext(tracks.map((t) => t.key), 0)}
+            className="t press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
+          >
+            <Icon name="play" size={13} />
+            播放全部
+          </button>
+        }
+      >
+        稍后再看
+      </PageTitle>
       <ContentGrid
         tracks={tracks}
         activeKey={activeKey}
