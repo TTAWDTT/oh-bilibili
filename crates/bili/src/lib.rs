@@ -468,8 +468,9 @@ impl Source {
             .signed_get(
                 &format!("{}/x/web-interface/wbi/index/top/feed/rcmd", client::API),
                 vec![
-                    // 一屏取 20 条：12 条在桌面宽屏上只铺两行，下面空一大片。
-                    ("ps", "20".to_string()),
+                    // 一次取 30 条（接口上限）：只取 12 条时界面补齐两屏要连发三次，
+                    // 用户每次划过一屏都要等一轮网络往返。
+                    ("ps", "30".to_string()),
                     ("fresh_type", "3".to_string()),
                     ("fresh_idx", fresh.to_string()),
                     ("feed_version", "V8".to_string()),
