@@ -53,6 +53,7 @@ export function SearchView() {
   const [page, setPage] = useState(restored?.page ?? 1)
   const [tracks, setTracks] = useState<Track[]>(restored?.tracks ?? [])
   const [users, setUsers] = useState<ipc.UserHit[]>(restored?.users ?? [])
+  const [usersQuery, setUsersQuery] = useState(restored?.users.length ? query.trim() : '')
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
   const skipFirstFetch = useRef(restored !== null)
@@ -120,6 +121,7 @@ export function SearchView() {
   }, [authorQuery, setAuthorQuery])
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
+  const usersSeq = useRef(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const focusSeq = useAppStore((state) => state.searchFocus)
   const snapshot = usePlayerStore((state) => state.snapshot)
@@ -140,14 +142,15 @@ export function SearchView() {
     }
     const key = searchKey(trimmed, partition, order, duration)
     if (dataKey !== key) return
+    const currentUsers = usersQuery === trimmed ? users : []
     if (!searchMemory || searchMemory.key !== key) {
-      searchMemory = { key, tracks, users, page, scrollTop: 0 }
+      searchMemory = { key, tracks, users: currentUsers, page, scrollTop: 0 }
     } else {
       searchMemory.tracks = tracks
-      searchMemory.users = users
+      searchMemory.users = currentUsers
       searchMemory.page = page
     }
-  }, [trimmed, partition, order, duration, dataKey, tracks, users, page])
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersQuery, page])
 
   // ⌘K 只在自增时抢焦点，用户自己点进来的渲染不会被打断。
   useEffect(() => {
@@ -156,11 +159,39 @@ export function SearchView() {
     inputRef.current?.select()
   }, [focusSeq])
 
+  // UP 主属于关键词，视频翻页和筛选不能作废它；先排队以免被视频预取挡住。
+  useEffect(() => {
+    if (usersQuery === trimmed) return
+    const ticket = ++usersSeq.current
+    if (trimmed.length === 0) {
+      setUsers([])
+      setUsersQuery('')
+      return
+    }
+    const handle = window.setTimeout(() => {
+      void ipc
+        .searchUsers(trimmed, 1)
+        .then((list) => {
+          if (usersSeq.current !== ticket) return
+          setUsers(list.slice(0, 6))
+          setUsersQuery(trimmed)
+        })
+        .catch(() => {
+          if (usersSeq.current !== ticket) return
+          setUsers([])
+          setUsersQuery(trimmed)
+        })
+    }, 320)
+    return () => {
+      window.clearTimeout(handle)
+      usersSeq.current += 1
+    }
+  }, [trimmed, usersQuery])
+
   useEffect(() => {
     if (trimmed.length === 0) {
       setStatus('idle')
       setTracks([])
-      setUsers([])
       setError(null)
       searchMemory = null
       return
@@ -175,7 +206,6 @@ export function SearchView() {
       if (page === 1) {
         setStatus('loading')
         setTracks([])
-        setUsers([])
         setDataKey('')
         scrollerRef.current?.scrollTo({ top: 0 })
       }
@@ -198,17 +228,6 @@ export function SearchView() {
           setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
           setLoadingMore(false)
-          // UP 主单独一条搜索线。等视频结果落地再发，免得和 search_q 抢限速。
-          if (page === 1) {
-            void ipc
-              .searchUsers(trimmed, 1)
-              .then((list) => {
-                if (seq.current === ticket) setUsers(list.slice(0, 6))
-              })
-              .catch(() => {
-                if (seq.current === ticket) setUsers([])
-              })
-          }
         })
         .catch((cause: unknown) => {
           if (seq.current !== ticket) return
@@ -331,7 +350,7 @@ export function SearchView() {
           </div>
         ) : (
           <section className="mt-6">
-            {users.length > 0 ? (
+            {usersQuery === trimmed && users.length > 0 ? (
               <div className="mb-4">
                 <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
                 <div className="flex gap-2 overflow-x-auto pb-1">
