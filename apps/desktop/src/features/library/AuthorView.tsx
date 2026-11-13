@@ -6,6 +6,8 @@ import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
+import { Icon } from '../../shared/ui/Icon'
+import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
@@ -174,62 +176,75 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
-      <header className="mb-6 flex items-center gap-4">
-        <Avatar src={avatar} alt={name} size={64} />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
-              {name}
-            </h2>
-            {card ? <LevelBadge level={card.level} /> : null}
+      <header className="mb-6 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div
+          className="relative h-[88px] overflow-hidden rounded-t-[7px]"
+          style={{
+            background: 'linear-gradient(115deg, color-mix(in srgb, var(--bili-pink) 23%, white), color-mix(in srgb, var(--bili-pink) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
+          }}
+        >
+          <Mascot2233 height={176} className="pointer-events-none absolute -bottom-[62px] -right-3 opacity-15 sm:right-5" />
+        </div>
+        <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
+          <div className="relative -mt-9 shrink-0 rounded-full bg-white p-[4px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--bili-pink)_25%,white),0_3px_12px_rgba(255,102,153,0.12)]">
+            <Avatar src={avatar} alt={name} size={88} bordered={false} />
           </div>
-          {isSelf ? null : (
-            <button
-              type="button"
-              onClick={() => void follow()}
-              className={[
-                'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[14px]',
-                followed
-                  ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                  : 'bg-[var(--accent)] text-white',
-              ].join(' ')}
-            >
-              {followed ? '已关注' : '+ 关注'}
-            </button>
-          )}
-
-          {card?.official ? (
-            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
-              {card.official}
-            </span>
-          ) : null}
-          {card?.sign ? (
-            <p className="mt-1.5 line-clamp-1 text-[13px] text-[var(--text-2)]" title={card.sign}>
-              {card.sign}
-            </p>
-          ) : null}
-
-          <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-3)]">
-            {card ? (
-              <>
-                <span>{formatCount(card.fans)} 粉丝</span>
-                <span>{formatCount(card.videos)} 投稿</span>
-                <span>{formatCount(card.likes)} 获赞</span>
-                <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
-                  {isFallback
-                    ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
-                    : `共 ${formatCount(total)} 个投稿`}
-                </span>
-              </>
-            ) : (
-              <>
-                <span>{tracks.length} 个投稿</span>
-                <span>{formatCount(views)} 累计播放</span>
-                <span className="rounded-[2px] bg-[var(--panel-raised)] px-1.5 leading-[16px]">
-                  来自搜索结果，不是完整投稿列表
-                </span>
-              </>
-            )}
+          <div className="min-w-0 max-w-full flex-[1_1_240px] pt-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex min-w-0 max-w-full items-center gap-2">
+                <h2 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
+                  {name}
+                </h2>
+                {card ? <LevelBadge level={card.level} /> : null}
+              </div>
+              {isSelf ? null : (
+                <button
+                  type="button"
+                  onClick={() => void follow()}
+                  className={[
+                    't press ml-auto flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
+                    followed
+                      ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                      : 'bg-[var(--accent)] text-white hover:opacity-90',
+                  ].join(' ')}
+                >
+                  <Icon name={followed ? 'check' : 'plus'} size={14} />
+                  {followed ? '已关注' : '关注'}
+                </button>
+              )}
+            </div>
+            {card?.official ? (
+              <span className="mt-2 inline-flex max-w-full items-center gap-1 break-words rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
+                {card.official}
+              </span>
+            ) : null}
+            {card?.sign ? (
+              <p className="mt-2 line-clamp-2 break-words text-[13px] text-[var(--text-2)]" title={card.sign}>
+                {card.sign}
+              </p>
+            ) : null}
+            <div className="num mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[var(--text-3)]">
+              {card ? (
+                <>
+                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>
+                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span>
+                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>
+                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px]">
+                    {isFallback
+                      ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
+                      : `共 ${formatCount(total)} 个投稿`}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>{tracks.length} 个投稿</span>
+                  <span>{formatCount(views)} 累计播放</span>
+                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px]">
+                    来自搜索结果，不是完整投稿列表
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
