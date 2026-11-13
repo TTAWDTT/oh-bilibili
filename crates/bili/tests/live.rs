@@ -444,3 +444,34 @@ async fn 全站排行榜一次给一百条() {
     assert!(list.len() >= 90, "全站榜应接近 100 条");
     assert!(first.cover.is_some(), "榜首要有封面");
 }
+
+#[tokio::test]
+#[ignore = "真实网络，核对 UP 主置顶评论"]
+async fn 置顶评论排在第一页最前() {
+    let source = Source::open().await.expect("Source");
+    // 必须带登录态：游客只回 4 条，测不出真实的 20 条分页。
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
+        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+        source.import_cookies(&pairs);
+        let _ = source.refresh_session().await;
+    } else {
+        println!("没有 cookies.json，跳过");
+        return;
+    }
+    // BV1kZWX62ENY（影视飓风）的 UP 主置顶是一条「我在这里」。
+    let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
+    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    assert!(page.items.len() >= 10, "登录态下一页应该接近 20 条，实际 {}", page.items.len());
+    let pinned = page.items.iter().filter(|c| c.pinned).count();
+    println!("第一页 {} 条，置顶 {} 条", page.items.len(), pinned);
+    assert!(pinned <= 1, "最多一条置顶");
+    if let Some(first) = page.items.first() {
+        println!("首条: {} / {} / 赞 {}", first.author, first.text.chars().take(20).collect::<String>(), first.likes);
+        if pinned == 1 {
+            assert!(first.pinned, "置顶必须排在最前");
+        }
+    }
+}

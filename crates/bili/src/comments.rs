@@ -26,6 +26,8 @@ pub struct Comment {
     pub replies: Vec<Comment>,
     /// 楼中楼总数，比预览多时界面显示「共 N 条回复」。
     pub reply_count: u32,
+    /// UP 主置顶。B 站在置顶评论上挂一个「UP主觉得很赞」的位置标记。
+    pub pinned: bool,
 }
 
 /// 一页评论。
@@ -166,6 +168,7 @@ fn to_comment(raw: RawReply) -> Comment {
         at: raw.ctime,
         replies,
         reply_count: raw.rcount,
+        pinned: false,
     }
 }
 
@@ -174,15 +177,47 @@ fn to_comment(raw: RawReply) -> Comment {
 pub fn page_from(value: &serde_json::Value, page: u32, per_page: u32) -> CommentPage {
     let data = &value["data"];
     let total = data["page"]["count"].as_u64().unwrap_or(0) as u32;
-    let items: Vec<Comment> = data["replies"]
+    // UP 主置顶：rpid 在 `data.upper.top.rpid`（`upper.rpid` 是旧的空壳）。
+    // 这条可能出现在普通分页里，也可能只在 `top_replies` 里，两种都要覆盖：
+    // 先按 rpid 把列表里那条标成置顶，没有的话再从 `top_replies` 补一条到最前。
+    let top = &data["upper"]["top"];
+    let pinned_id = top["rpid_str"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| top["rpid"].as_u64().map(|n| n.to_string()))
+        .or_else(|| {
+            data["upper"]["rpid_str"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        });
+    let parse = |r: &serde_json::Value| -> Option<Comment> {
+        let mut c = to_comment(serde_json::from_value::<RawReply>(r.clone()).ok()?);
+        c.pinned = Some(&c.id) == pinned_id.as_ref();
+        Some(c)
+    };
+    let mut items: Vec<Comment> = data["replies"]
         .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|r| serde_json::from_value::<RawReply>(r.clone()).ok())
-                .map(to_comment)
-                .collect()
-        })
+        .map(|list| list.iter().filter_map(parse).collect())
         .unwrap_or_default();
+    // 第 1 页把置顶挪到最前；它已经在列表里时只挪位置，不新增一条。
+    if page <= 1 {
+        if let Some(top) = data["top_replies"].as_array() {
+            for raw in top {
+                let Some(mut c) = parse(raw) else { continue };
+                c.pinned = true;
+                match items.iter().position(|x| x.id == c.id) {
+                    Some(i) => {
+                        let mut existing = items.remove(i);
+                        existing.pinned = true;
+                        items.insert(0, existing);
+                    }
+                    None => items.insert(0, c),
+                }
+            }
+        }
+    }
     let loaded = page.saturating_mul(per_page);
     CommentPage {
         total,
@@ -240,6 +275,35 @@ mod tests {
             page.items[0].avatar.as_deref(),
             Some("https://i0.hdslb.com/a.jpg")
         );
+    }
+
+    #[test]
+    fn up主置顶的那条排在第一页最前并带标记() {
+        // 真实结构：置顶评论在 top_replies，upper.rpid 指向它，普通分页里没有它。
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 900 },
+                "upper": { "rpid_str": "999", "rpid": 999 },
+                "top_replies": [
+                    { "rpid_str": "999", "member": { "mid": 42, "uname": "UP" },
+                      "content": { "message": "我在这里" }, "like": 10, "ctime": 1 }
+                ],
+                "replies": [
+                    { "rpid_str": "111", "member": { "mid": 7, "uname": "观众" },
+                      "content": { "message": "普通评论" }, "like": 1, "ctime": 2 }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        assert_eq!(page.items.len(), 2, "置顶不该和普通列表重复");
+        assert_eq!(page.items[0].id, "999");
+        assert!(page.items[0].pinned, "第一条应该是置顶");
+        assert!(!page.items[1].pinned);
+        // 第 2 页不再重复塞置顶
+        let later = page_from(&value, 2, 20);
+        assert_eq!(later.items.len(), 1);
+        assert!(!later.items[0].pinned);
     }
 
     #[test]

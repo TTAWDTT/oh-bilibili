@@ -76,6 +76,11 @@ function CommentRow({
           <div className="flex items-baseline gap-2">
             <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
+            {c.pinned ? (
+              <span className="shrink-0 rounded-[2px] bg-[#fb7299] px-1 text-[10px] leading-[15px] text-white">
+                置顶
+              </span>
+            ) : null}
             {ownerMid && c.mid === ownerMid ? (
               <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 UP主
@@ -275,6 +280,7 @@ export function CommentsPanel({
             at: Math.floor(Date.now() / 1000),
             replies: [],
             reply_count: 0,
+            pinned: false,
           },
           ...prev,
         ])

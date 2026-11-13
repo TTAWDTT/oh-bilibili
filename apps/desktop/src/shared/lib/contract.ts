@@ -54,6 +54,8 @@ export type Comment = {
   at: number
   replies: Comment[]
   reply_count: number
+  /** UP 主置顶。B 站在这类评论上挂一个位置标记。 */
+  pinned: boolean
 }
 
 export type CommentPage = {
