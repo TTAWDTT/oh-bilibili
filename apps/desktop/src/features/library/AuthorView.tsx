@@ -121,8 +121,13 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     setLoadingMore(true)
     try {
       const [list] = await ipc.spaceVideos(mid, page + 1, order)
-      setTracks((prev) => [...(prev ?? []), ...list])
-      setPage((n) => n + 1)
+      if (list.length === 0) {
+        // 接口提前到底：把总数对齐，观察器就不会一直重试同一页
+        setTotal(tracks.length)
+      } else {
+        setTracks((prev) => [...(prev ?? []), ...list])
+        setPage((n) => n + 1)
+      }
     } catch {
       // 取不到就停在已加载的那一页，不假装到底
     } finally {

@@ -7,6 +7,9 @@ use crate::client::{Client, API};
 use crate::error::BiliError;
 use serde::{Deserialize, Serialize};
 
+/// 关注列表每页条数。接口上限 50，超过也只回 50。
+pub const FOLLOW_PAGE_SIZE: u32 = 50;
+
 /// 收藏夹名。产品要求固定这个名字，用户 B 站里能看到同一个夹子。
 pub const DEFAULT_FOLDER: &str = "哔哩哔哩 music";
 
@@ -424,8 +427,10 @@ impl Client {
             .ok_or_else(|| BiliError::NeedsLogin("没有登录".into()))?;
         let v = self
             .get_json(
+                // 实测这个接口最多给到 ps=50（传 100 也只回 50），
+                // 一次取满 50 条能把翻页请求数砍掉一半多。
                 &format!(
-                    "{API}/x/relation/followings?vmid={mid}&pn={}&ps=20&order=desc",
+                    "{API}/x/relation/followings?vmid={mid}&pn={}&ps={FOLLOW_PAGE_SIZE}&order=desc",
                     page.max(1)
                 ),
                 std::time::Duration::from_millis(400),

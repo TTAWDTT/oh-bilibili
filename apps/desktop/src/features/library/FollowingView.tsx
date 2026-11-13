@@ -71,7 +71,8 @@ export function FollowingView() {
       setTotal(count)
       pageRef.current = next
       setPage(next)
-      if (list.length === 0 || (next * 20) >= count) setDone(true)
+      // 每页 50 条（接口上限），到这里才知道是不是真到底
+      if (list.length === 0 || next * 50 >= count) setDone(true)
     } catch (e) {
       setError(toWireError(e).message)
     } finally {

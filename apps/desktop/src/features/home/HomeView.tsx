@@ -55,12 +55,14 @@ export function HomeView() {
         added = fresh.length
         return [...prev, ...fresh]
       })
-      // 全是重复或空响应：继续自动补会原地打转，记下来并告诉用户。
-      if (append && added === 0) {
+      // 空响应或整页重复：继续取只会原地打转，记下来并告诉用户。
+      if (list.length === 0) {
+        if (append) exhausted.current = true
+        setError(append ? '这一轮的推荐已经到底了，换一批看看。' : '这次没拿到推荐，换一批试试。')
+      } else if (append && added === 0) {
         exhausted.current = true
         setError('这一轮的推荐已经到底了，换一批看看。')
       }
-      if (list.length === 0) setError('这次没拿到推荐，换一批试试。')
     } catch (e) {
       setError(toWireError(e).message)
     } finally {
@@ -88,7 +90,8 @@ export function HomeView() {
   }, [fresh])
 
   const more = (): void => {
-    if (loading || loadingMore) return
+    // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
+    if (loading || loadingMore || exhausted.current) return
     const next = nextFresh.current
     nextFresh.current = next + 1
     feedMemory.nextFresh = next + 1

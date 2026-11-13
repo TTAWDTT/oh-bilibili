@@ -243,7 +243,8 @@ export function SearchView() {
         onScroll={(event) => {
           const el = event.currentTarget
           if (searchMemory) searchMemory.scrollTop = el.scrollTop
-          if (loadingMore || status !== 'ready' || tracks.length === 0) return
+          // 到底之后不再翻页：滚动会一直触发，不挡住就是无限空请求。
+          if (loadingMore || status !== 'ready' || tracks.length === 0 || reachedEnd.current) return
           // 提前约两屏就预取下一页：等到贴近底部再发请求，
           // 用户会看到「滑到底 → 转圈 → 才有内容」，那就是卡。
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 1200) {
