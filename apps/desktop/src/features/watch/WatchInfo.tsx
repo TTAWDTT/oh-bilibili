@@ -204,6 +204,7 @@ export function WatchInfo({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
         <span className="num">{formatCount(data.stats.views)} 播放</span>
         <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+        <span className="num">{formatCount(data.stats.replies)} 评论</span>
         {online !== null && online > 0 ? (
           <span className="num">{formatCount(online)} 人在看</span>
         ) : null}
@@ -214,6 +215,19 @@ export function WatchInfo({
             {data.tname}
           </span>
         ) : null}
+        {/* B 站视频页在统计行尾巴挂着 BV 号，点一下就是分享链接。 */}
+        <button
+          type="button"
+          title="复制 BV 号与链接"
+          onClick={() => {
+            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+              toastDone(ok ? `已复制 ${track.key}` : '复制失败'),
+            )
+          }}
+          className="num rounded-[3px] px-1.5 leading-[18px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+        >
+          {track.key}
+        </button>
       </div>
 
       <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
