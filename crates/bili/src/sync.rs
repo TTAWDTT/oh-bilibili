@@ -53,6 +53,8 @@ pub struct AuthorCard {
     pub official_type: Option<i8>,
     /// 用户等级 0..6。就在 card 接口里，不用另调 acc/info（那条会被限流成 -799）。
     pub level: u8,
+    /// 大会员（`card.vip.vipStatus == 1`）。
+    pub vip: bool,
     /// 投稿总数。
     pub videos: u64,
     /// 累计获赞。
@@ -250,6 +252,7 @@ impl Client {
                 .map(|t| t as i8),
             // 等级就在 card 里，不需要另调 acc/info（那条会被限流成 -799）。
             level: card["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
+            vip: card["vip"]["vipStatus"].as_u64() == Some(1),
             videos: v["data"]["archive_count"].as_u64().unwrap_or(0),
             likes: v["data"]["like_num"].as_u64().unwrap_or(0),
         })

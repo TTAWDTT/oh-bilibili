@@ -183,6 +183,8 @@ export type AuthorCard = {
   /** 0 个人、1 机构；null 未认证。 */
   official_type?: number | null
   level: number
+  /** 大会员。 */
+  vip?: boolean
   videos: number
   likes: number
 }

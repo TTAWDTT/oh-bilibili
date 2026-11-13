@@ -526,6 +526,7 @@ struct AuthorCardView {
     official: Option<String>,
     official_type: Option<i8>,
     level: u8,
+    vip: bool,
     videos: u64,
     likes: u64,
 }
@@ -544,6 +545,7 @@ async fn author_card(
         official: c.official,
         official_type: c.official_type,
         level: c.level,
+        vip: c.vip,
         videos: c.videos,
         likes: c.likes,
     })

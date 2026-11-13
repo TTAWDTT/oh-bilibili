@@ -255,6 +255,11 @@ export function WatchInfo({
           <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
           {card ? <LevelBadge level={card.level} /> : null}
+          {card?.vip ? (
+            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+              大会员
+            </span>
+          ) : null}
           {card?.official_type != null ? (
             <span
               title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}

@@ -96,6 +96,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
         sign: '这里是 B 站的占位签名，真机走真实接口。',
         official_type: 1,
+        vip: true,
         official: null,
         level: 6,
         videos: 952,
