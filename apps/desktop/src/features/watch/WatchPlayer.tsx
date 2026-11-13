@@ -38,6 +38,27 @@ const DRIFT_LAG_SEEK_MS = 2500
 /** 追偏差时最多把画面速度改这么多，再多就看得出来变速了。 */
 const NUDGE_RATIO = 0.06
 
+/** 发弹幕可选的颜色，取 B 站播放器那排常用色。 */
+const DANMAKU_COLORS: { name: string; value: number }[] = [
+  { name: '白', value: 0xffffff },
+  { name: '红', value: 0xfe0302 },
+  { name: '橙', value: 0xff9104 },
+  { name: '黄', value: 0xffd302 },
+  { name: '绿', value: 0x00cd00 },
+  { name: '蓝', value: 0x00a1d6 },
+  { name: '紫', value: 0xa020f0 },
+  { name: '黑', value: 0x000000 },
+]
+
+/** 弹幕位置：B 站的 mode 参数。 */
+const DANMAKU_MODES: { name: string; value: number }[] = [
+  { name: '滚动', value: 1 },
+  { name: '顶部', value: 5 },
+  { name: '底部', value: 4 },
+]
+
+const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '0')}`
+
 /**
  * 把 shaka 的错误对象翻成一句人话。
  *
@@ -113,6 +134,10 @@ export function WatchPlayer({
   const [qualityOpen, setQualityOpen] = useState(false)
   const [now, setNow] = useState(0)
   const [draft, setDraft] = useState('')
+  /** 发弹幕时用的颜色与位置，和 B 站播放器那排按钮一致。 */
+  const [draftColor, setDraftColor] = useState(0xffffff)
+  const [draftMode, setDraftMode] = useState(1)
+  const [draftPicker, setDraftPicker] = useState(false)
   const [sending, setSending] = useState(false)
   const cinema = useAppStore((state) => state.cinema)
   const setCinema = useAppStore((state) => state.setCinema)
@@ -245,9 +270,9 @@ export function WatchPlayer({
     setSending(true)
     const at = Math.round(localPlayhead())
     try {
-      await ipc.danmakuSend(track.key, text, at)
+      await ipc.danmakuSend(track.key, text, at, draftMode, draftColor)
       setDraft('')
-      onDanmakuSent({ at, text, color: 'var(--text-1)' })
+      onDanmakuSent({ at, text, color: cssColor(draftColor) })
       poke()
     } catch {
       // 发不出去就留着草稿，不假装成功
@@ -636,12 +661,67 @@ export function WatchPlayer({
             />
             <button
               type="button"
+              onClick={() => setDraftPicker((open) => !open)}
+              aria-expanded={draftPicker}
+              aria-label="弹幕颜色与位置"
+              title="弹幕颜色与位置"
+              className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+                draftPicker ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
+              }`}
+            >
+              <span
+                className="block h-3.5 w-3.5 rounded-full border border-white/60"
+                style={{ background: cssColor(draftColor) }}
+              />
+            </button>
+            <button
+              type="button"
               onClick={() => void sendDanmaku()}
               disabled={!draft.trim() || sending}
               className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
             >
               发送
             </button>
+            {draftPicker ? (
+              <div className="absolute bottom-9 right-2 z-30 w-[212px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+                <div className="mb-2 flex items-center justify-between text-[11px] text-white/70">
+                  <span>颜色</span>
+                  <span>{DANMAKU_MODES.find((m) => m.value === draftMode)?.name}</span>
+                </div>
+                <div className="grid grid-cols-8 gap-1.5">
+                  {DANMAKU_COLORS.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      aria-label={`弹幕颜色 ${color.name}`}
+                      aria-pressed={draftColor === color.value}
+                      onClick={() => setDraftColor(color.value)}
+                      className={`h-4 w-4 rounded-full border ${
+                        draftColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
+                      }`}
+                      style={{ background: cssColor(color.value) }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-1.5">
+                  {DANMAKU_MODES.map((mode) => (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      aria-pressed={draftMode === mode.value}
+                      onClick={() => setDraftMode(mode.value)}
+                      className={`t press flex-1 rounded-[4px] py-1 text-[11px] ${
+                        draftMode === mode.value
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-white/10 text-white/80 hover:bg-white/20'
+                      }`}
+                    >
+                      {mode.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <button

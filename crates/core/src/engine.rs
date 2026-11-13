@@ -1522,6 +1522,8 @@ impl Engine {
         key: &TrackKey,
         text: &str,
         progress_ms: u64,
+        mode: u64,
+        color: u32,
     ) -> Result<(), WireError> {
         let trimmed = text.trim();
         if trimmed.is_empty() {
@@ -1531,7 +1533,12 @@ impl Engine {
         if trimmed.chars().count() > 100 {
             return Err(WireError::input("text", "弹幕最多 100 字"));
         }
-        self.source.send_danmaku(key, trimmed, progress_ms).await?;
+        if !matches!(mode, 1 | 4 | 5) {
+            return Err(WireError::input("mode", "弹幕位置只有滚动、顶部、底部"));
+        }
+        self.source
+            .send_danmaku(key, trimmed, progress_ms, mode, color)
+            .await?;
         Ok(())
     }
 

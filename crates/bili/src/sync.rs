@@ -95,12 +95,15 @@ impl Client {
     ///
     /// 走 `x/v2/dm/post`，需要 bili_jct 当 csrf。B 站对弹幕有审核与频率限制，
     /// 失败时把它的原话透出来，不要自己编一个「发送失败」盖掉原因。
+    /// `mode` 是 B 站的弹幕位置：1 滚动、4 底部、5 顶部。`color` 是十进制 RGB。
     pub async fn send_danmaku(
         &self,
         cid: u64,
         bvid: &str,
         text: &str,
         progress_ms: u64,
+        mode: u64,
+        color: u32,
     ) -> Result<(), BiliError> {
         let csrf = self
             .csrf()
@@ -111,9 +114,9 @@ impl Client {
             ("msg", text.to_string()),
             ("bvid", bvid.to_string()),
             ("progress", progress_ms.to_string()),
-            ("mode", "1".to_string()),
+            ("mode", mode.to_string()),
             ("fontsize", "25".to_string()),
-            ("color", "16777215".to_string()),
+            ("color", color.to_string()),
             ("pool", "0".to_string()),
             ("csrf", csrf),
         ];

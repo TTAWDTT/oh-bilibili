@@ -738,9 +738,11 @@ async fn danmaku_send(
     key: String,
     text: String,
     progress_ms: u64,
+    mode: u64,
+    color: u32,
 ) -> Result<(), WireError> {
     engine
-        .danmaku_send(&TrackKey::from_provider(key), &text, progress_ms)
+        .danmaku_send(&TrackKey::from_provider(key), &text, progress_ms, mode, color)
         .await
 }
 

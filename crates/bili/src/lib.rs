@@ -409,10 +409,12 @@ impl Source {
         key: &TrackKey,
         text: &str,
         progress_ms: u64,
+        mode: u64,
+        color: u32,
     ) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;
         self.client
-            .send_danmaku(detail.cid, &key.as_opaque(), text, progress_ms)
+            .send_danmaku(detail.cid, &key.as_opaque(), text, progress_ms, mode, color)
             .await
     }
 

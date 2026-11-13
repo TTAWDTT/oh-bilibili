@@ -318,8 +318,15 @@ export function related(key: string): Promise<Track[]> {
 
 /** 带颜色的弹幕：时间、文本、十进制 RGB。 */
 /** 发一条弹幕，落在 progress_ms 这一刻。 */
-export function danmakuSend(key: string, text: string, progressMs: number): Promise<null> {
-  return call<null>('danmaku_send', { key, text, progress_ms: progressMs })
+/** `mode`：1 滚动、4 底部、5 顶部；`color` 是十进制 RGB。 */
+export function danmakuSend(
+  key: string,
+  text: string,
+  progressMs: number,
+  mode = 1,
+  color = 0xffffff,
+): Promise<null> {
+  return call<null>('danmaku_send', { key, text, progress_ms: progressMs, mode, color })
 }
 
 export function danmakuColored(key: string): Promise<[number, string, number][]> {
