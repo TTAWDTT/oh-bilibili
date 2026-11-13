@@ -56,6 +56,8 @@ export function FollowingView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  /** 翻页没取到：停在已加载的人，链子别再自动往下撞。 */
+  const [failed, setFailed] = useState(false)
   const [hover, setHover] = useState<Hover | null>(null)
   const [loaded, setLoaded] = useState<Record<number, AuthorCard>>({})
   const boxRef = useRef<HTMLDivElement | null>(null)
@@ -74,10 +76,14 @@ export function FollowingView() {
       setTotal(count)
       pageRef.current = next
       setPage(next)
+      setFailed(false)
       // 每页 50 条（接口上限），到这里才知道是不是真到底
       if (list.length === 0 || next * 50 >= count) setDone(true)
     } catch (e) {
-      setError(toWireError(e).message)
+      // 第一页失败才是「关注列表没取到」；翻页失败只是这一段没取到，
+      // 把已经拿到的人留在屏幕上，给个重试，别整页换成错误态。
+      if (next === 1) setError(toWireError(e).message)
+      else setFailed(true)
     } finally {
       loadingRef.current = false
       setLoading(false)
@@ -93,10 +99,10 @@ export function FollowingView() {
   // （328 个关注、一屏能放 20 个），光靠滚动事件永远触发不了。
   useEffect(() => {
     const box = boxRef.current
-    if (!box || page === 0 || done) return
+    if (!box || page === 0 || done || failed) return
     if (box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) void load(page + 1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, done, loading])
+  }, [page, done, loading, failed])
 
   useEffect(() => {
     return () => {
@@ -169,7 +175,7 @@ export function FollowingView() {
       onScroll={() => {
         hide()
         const box = boxRef.current
-        if (box && !done && box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) {
+        if (box && !done && !failed && box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) {
           void load(page + 1)
         }
       }}
@@ -237,6 +243,17 @@ export function FollowingView() {
           ))}
         </ul>
         {loading ? <BiliLoader compact label="正在取…" /> : null}
+        {failed && !loading ? (
+          <div className="flex justify-center py-2">
+            <button
+              type="button"
+              onClick={() => void load(page + 1)}
+              className="t press text-[12px] text-[var(--accent)] hover:underline"
+            >
+              没取到，重试
+            </button>
+          </div>
+        ) : null}
         {done && items.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
