@@ -56,8 +56,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return matched.slice((page - 1) * 8, page * 8)
     }
     case 'search_users': {
+      const keyword = str(args, 'keyword').trim()
       const seen = new Map<number, string>()
-      for (const t of CATALOG) if (t.up_mid && t.artist) seen.set(t.up_mid, t.artist)
+      for (const t of CATALOG) {
+        if (!t.up_mid || !t.artist) continue
+        if (keyword && !t.artist.includes(keyword) && !keyword.includes(t.artist)) continue
+        seen.set(t.up_mid, t.artist)
+      }
       return [...seen].slice(0, 4).map(([mid, name], i) => ({
         mid,
         name,

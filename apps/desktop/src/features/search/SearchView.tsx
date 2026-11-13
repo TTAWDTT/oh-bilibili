@@ -514,10 +514,10 @@ export function SearchView() {
 
                 {/* 给几条可点的替代词：优先用搜过的历史，其次用内置建议 */}
                 {(() => {
-                  const words = [
-                    ...history.filter((w) => w !== trimmed),
-                    ...trending.filter((w) => w !== trimmed),
-                  ].slice(0, 5)
+                  // 历史和热搜会撞词，去重后再截：一排「试试」里出现两次同一个词很像 bug。
+                  const words = [...new Set([...history, ...trending])]
+                    .filter((w) => w !== trimmed)
+                    .slice(0, 5)
                   if (words.length === 0) return null
                   return (
                     <div className="-mt-8 flex flex-wrap items-center justify-center gap-1.5">
