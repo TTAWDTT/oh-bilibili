@@ -465,9 +465,9 @@ export function WatchPlayer({
         type="button"
         onClick={onBack}
         aria-label="返回"
-        className="t press absolute left-3 top-3 z-20 flex h-8 items-center gap-1 rounded-full bg-black/45 pl-1.5 pr-3 text-[13px] text-white backdrop-blur hover:bg-black/60"
+        className="t press absolute left-3 top-3 z-30 flex h-9 items-center gap-1.5 rounded-full bg-white/90 pl-2 pr-3.5 text-[13.5px] font-medium text-[var(--text-1)] shadow-[0_2px_12px_rgba(0,0,0,0.22)] ring-1 ring-black/5 backdrop-blur hover:bg-white"
       >
-        <Icon name="chevronLeft" size={16} />
+        <Icon name="chevronLeft" size={17} className="text-[var(--accent)]" />
         返回
       </button>
       {!ready && !error ? (
