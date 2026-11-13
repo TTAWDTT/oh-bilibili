@@ -32,6 +32,8 @@ export function HomeView() {
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const [items, setItems] = useState<Track[]>(feedMemory.items)
+  /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
+  const itemsRef = useRef<Track[]>(feedMemory.items)
   const [fresh, setFresh] = useState(feedMemory.fresh)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,22 +52,22 @@ export function HomeView() {
     setError(null)
     try {
       const list = await ipc.homeFeed(next)
-      let added = list.length
-      setItems((prev) => {
-        if (!append) return list
-        // 推荐流会重复推同一条，按 key 去重后再追加。
-        const seen = new Set(prev.map((t) => t.key))
-        const fresh = list.filter((t) => !seen.has(t.key))
-        added = fresh.length
-        return [...prev, ...fresh]
-      })
-      // 空响应或整页重复：继续取只会原地打转，记下来并告诉用户。
+      // 推荐流会重复推同一条，按 key 去重后再追加。
+      const base = append ? itemsRef.current : []
+      const seen = new Set(base.map((t) => t.key))
+      const fresh = append ? list.filter((t) => !seen.has(t.key)) : list
+      // 整批都是见过的：继续取只会原地打转，而且新数组会让预取 effect 再跑一轮。
+      if (append && fresh.length === 0) {
+        exhausted.current = true
+        setError('这一轮的推荐已经到底了，换一批看看。')
+        return
+      }
+      const merged = [...base, ...fresh]
+      itemsRef.current = merged
+      setItems(merged)
       if (list.length === 0) {
         if (append) exhausted.current = true
         setError(append ? '这一轮的推荐已经到底了，换一批看看。' : '这次没拿到推荐，换一批试试。')
-      } else if (append && added === 0) {
-        exhausted.current = true
-        setError('这一轮的推荐已经到底了，换一批看看。')
       }
     } catch (e) {
       setError(toWireError(e).message)
@@ -131,6 +133,7 @@ export function HomeView() {
           type="button"
           onClick={() => {
             const next = fresh + 1
+            itemsRef.current = []
             setFresh(next)
             nextFresh.current = 2
             feedMemory.nextFresh = 2

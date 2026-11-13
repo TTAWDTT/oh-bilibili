@@ -119,6 +119,7 @@ model  ← bili / store / audio
 | 关注列表徽章 | 关注接口自带 `official_verify` / `vip` / `attribute` / `special`：名字后显示个人（黄）/ 机构（蓝）认证勾，互关标「互关」，特别关注在头像角上挂金色星，悬停名片补「大会员」粉标 |
 | 空态与补货 | 空态 CTA 改成 B 站蓝主按钮（去搜索 / 去发现 / 去登录）；列表补货统一成「小电视 + 正在加载更多…」，搜索、热门、关注共用同一个紧凑 loader |
 | 观看页 UP 资料 | UP 名字后面挂 UL 等级牌与认证勾（个人黄 / 机构蓝）。数据来自 `x/web-interface/card` 一次请求（粉丝、等级、认证、投稿都在里面），替掉了原来的 `x/relation/stat`，请求数不变 |
+| 发现页推荐去重 | 之前「本批新增了几条」写在 `setItems` 的 updater 里，React 延后执行时读到的是旧值，整批重复也判不到「到底」；同时 `[...prev]` 每次都新建数组，把预取 effect 又踢起来，形成「取一批 → 渲染 → 再取」的循环（预览控制台实测 100 条 `Maximum update depth exceeded`）。现在去重在 setState 之外按 key 现算，重复批直接标记到底 |
 | 卡片渲染成本 | 预取挖到二十页后，搜索页一次挂上千张卡。以前每次 APPEND 都要重建整列元素树（约 4 万个节点对象），现在卡片抽成 `memo` 组件、回调用 `useCallback` 固定，翻页只渲染新来的 50 张；「听」要用的整列 key 走 ref，避免回调随 `tracks` 换新把 memo 全部作废 |
 | 网页预览（`npm run web`） | 之前有 11 个命令直接调 `invoke`，浏览器里必崩（发现页只显示一行 `Cannot read properties of undefined`）。现在全部走 `call`，配套补了 `home_feed`、`watch_open`、`watch_comments`、`following`、`space_videos` 等 mock，发现/搜索/观看/关注四页都能在浏览器里看 |
 | 搜索 UP 主徽章 | 搜索结果顶部的 UP 主卡带认证勾（个人黄 / 机构蓝，`official_verify.type`）与粉色「直播中」（`is_live`）；真机搜「英雄联盟」前三张卡都是蓝勾 + 直播中，LPL 官方号只有勾 |
