@@ -34,8 +34,10 @@ export function useShortcuts(): void {
     const onKey = (event: KeyboardEvent): void => {
       // 只看真正显示出来的弹窗：移动端右栏一直挂在 DOM 里（md:hidden），
       // 按 querySelector 算的话，只要在播放（右栏存在）快捷键就全废。
+      // 用 getClientRects 判断可见：弹窗是 position: fixed，offsetParent 恒为 null，
+      // 按 offsetParent 判会把「正开着弹窗」当成没有弹窗。
       const dialogOpen = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].some(
-        (el) => el.offsetParent !== null,
+        (el) => el.getClientRects().length > 0,
       )
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
