@@ -301,6 +301,8 @@ export function CommentsPanel({
   const [mine, setMine] = useState<Set<string>>(new Set())
   /** 表情面板：代号 → 图片。第一次点开才取。 */
   const [emotes, setEmotes] = useState<[string, string][] | null>(null)
+  /** 图挂了的代号。表情图来自远端，个别 404 时不该在面板里留一个碎图。 */
+  const [brokenEmotes, setBrokenEmotes] = useState<ReadonlySet<string>>(new Set())
   const [emojiOpen, setEmojiOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -534,7 +536,9 @@ export function CommentsPanel({
                   <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">表情没取到</p>
                 ) : (
                   <div className="grid max-h-[220px] grid-cols-8 gap-1 overflow-y-auto">
-                    {emotes.map(([code, url]) => (
+                    {emotes
+                      .filter(([code]) => !brokenEmotes.has(code))
+                      .map(([code, url]) => (
                       <button
                         key={code}
                         type="button"
@@ -548,6 +552,9 @@ export function CommentsPanel({
                           alt={code}
                           referrerPolicy="no-referrer"
                           loading="lazy"
+                          onError={() =>
+                            setBrokenEmotes((prev) => new Set(prev).add(code))
+                          }
                           className="h-6 w-6 object-contain"
                         />
                       </button>

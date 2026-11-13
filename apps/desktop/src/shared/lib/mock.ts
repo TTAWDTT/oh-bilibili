@@ -120,10 +120,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'video_tags':
       return ['翻唱', '虚拟UP主', '音乐']
     case 'comment_emotes':
-      return [
-        ['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png'],
-        ['[笑哭]', 'https://i0.hdslb.com/bfs/emote/c3043ba94bf4e6bc4d8e8a2d16c1a2c34e36b8bd.png'],
-      ]
+      // 只放一张确认能取到的图；编出来的 hash 在面板里就是一个碎图标。
+      return [['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png']]
     case 'ranking':
       return CATALOG.slice(0, 20)
     case 'popular':
