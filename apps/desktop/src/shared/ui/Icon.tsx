@@ -278,6 +278,14 @@ const ICONS = {
       <path d="M12 7.8c1.4 0 4.6-.3 4.6-2.3a1.9 1.9 0 0 0-3.2-1.3c-.9.9-1.4 2.2-1.4 3.6Z" />
     </>
   ),
+  /** 每周必看：日历。 */
+  calendar: (
+    <>
+      <path d="M4.2 6.6h15.6a1.2 1.2 0 0 1 1.2 1.2v11a1.2 1.2 0 0 1-1.2 1.2H4.2A1.2 1.2 0 0 1 3 18.8v-11a1.2 1.2 0 0 1 1.2-1.2Z" />
+      <path d="M3 10.8h18" />
+      <path d="M8 3.8v4.2M16 3.8v4.2" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof ICONS

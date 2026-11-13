@@ -606,6 +606,21 @@ async fn popular(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn weekly_issues(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<bilimusic_core::wire::WeeklyIssueView>, WireError> {
+    engine.weekly_issues().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn weekly_issue(
+    engine: tauri::State<'_, Arc<Engine>>,
+    number: u32,
+) -> Result<bilimusic_core::wire::WeeklyPage, WireError> {
+    engine.weekly_issue(number).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn precious(
     engine: tauri::State<'_, Arc<Engine>>,
 ) -> Result<bilimusic_core::wire::PreciousView, WireError> {
@@ -961,6 +976,8 @@ pub fn run() {
             ranking,
             popular,
             precious,
+            weekly_issues,
+            weekly_issue,
             video_online,
             author_card,
             fav_tracks,

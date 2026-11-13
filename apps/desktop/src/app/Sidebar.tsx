@@ -18,6 +18,7 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'ranking' }, label: '排行', icon: 'rank' },
       { view: { kind: 'popular' }, label: '热门', icon: 'flame' },
       { view: { kind: 'precious' }, label: '入站必刷', icon: 'gift' },
+      { view: { kind: 'weekly' }, label: '每周必看', icon: 'calendar' },
       { view: { kind: 'search' }, label: '搜索', icon: 'search' },
     ],
   },

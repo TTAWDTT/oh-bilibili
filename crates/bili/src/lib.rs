@@ -371,6 +371,16 @@ impl Source {
         self.client.popular(page).await
     }
 
+    /// 每周必看：期数列表（公开接口，不需要 wbi）。
+    pub async fn weekly_issues(&self) -> Result<Vec<sync::WeeklyIssue>, BiliError> {
+        self.client.weekly_issues().await
+    }
+
+    /// 每周必看：某一期的片单。
+    pub async fn weekly_issue(&self, number: u32) -> Result<sync::WeeklyIssuePage, BiliError> {
+        self.client.weekly_issue(number).await
+    }
+
     /// 入站必刷：标题、官方文案与每条视频的推荐语。
     pub async fn precious(&self) -> Result<(String, String, Vec<sync::PreciousItem>), BiliError> {
         self.client.precious().await

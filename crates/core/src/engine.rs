@@ -1357,6 +1357,32 @@ impl Engine {
         Ok((tracks, no_more))
     }
 
+    /// 每周必看的期数列表。
+    pub async fn weekly_issues(&self) -> Result<Vec<crate::wire::WeeklyIssueView>, WireError> {
+        let list = self.source.weekly_issues().await?;
+        Ok(list
+            .into_iter()
+            .map(|issue| crate::wire::WeeklyIssueView {
+                number: issue.number,
+                subject: issue.subject,
+                name: issue.name,
+            })
+            .collect())
+    }
+
+    /// 每周必看某一期的片单。
+    pub async fn weekly_issue(&self, number: u32) -> Result<crate::wire::WeeklyPage, WireError> {
+        let page = self.source.weekly_issue(number).await?;
+        for t in &page.tracks {
+            self.remember(t);
+        }
+        Ok(crate::wire::WeeklyPage {
+            subject: page.subject,
+            label: page.label,
+            tracks: page.tracks,
+        })
+    }
+
     /// 入站必刷。返回标题、官方文案与带推荐语的条目。
     pub async fn precious(&self) -> Result<crate::wire::PreciousView, WireError> {
         let (title, explain, items) = self.source.precious().await?;

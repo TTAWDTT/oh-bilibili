@@ -6,6 +6,7 @@ export type View =
   | { kind: 'ranking'; rid?: number }
   | { kind: 'popular' }
   | { kind: 'precious' }
+  | { kind: 'weekly' }
   | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }

@@ -249,6 +249,28 @@ export function popular(page = 1): Promise<[Track[], boolean]> {
 }
 
 /** 入站必刷。一次取完，每条带一句 B 站写的推荐语。 */
+export type WeeklyIssue = {
+  number: number
+  subject: string
+  name: string
+}
+
+export type WeeklyPage = {
+  subject: string
+  label: string
+  tracks: Track[]
+}
+
+/** 每周必看的期数列表。 */
+export function weeklyIssues(): Promise<WeeklyIssue[]> {
+  return call<WeeklyIssue[]>('weekly_issues', {})
+}
+
+/** 每周必看某一期的片单。 */
+export function weeklyIssue(number: number): Promise<WeeklyPage> {
+  return call<WeeklyPage>('weekly_issue', { number })
+}
+
 export function precious(): Promise<PreciousView> {
   return call<PreciousView>('precious', {})
 }

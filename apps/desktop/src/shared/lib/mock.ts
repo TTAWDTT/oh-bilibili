@@ -128,6 +128,21 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return CATALOG.slice(0, 20)
     case 'popular':
       return [CATALOG.slice(0, 20), false]
+    case 'weekly_issues':
+      return Array.from({ length: 8 }, (_, i) => ({
+        number: 399 - i,
+        subject: `第 ${399 - i} 期的主题`,
+        name: `2026第${399 - i}期`,
+      }))
+    case 'weekly_issue': {
+      const number = Math.max(1, Math.trunc(num(args, 'number')))
+      await sleep(120)
+      return {
+        subject: `第 ${number} 期的主题`,
+        label: `第${number}期`,
+        tracks: CATALOG.slice(0, 12),
+      }
+    }
     case 'precious':
       return {
         title: '入站必刷',

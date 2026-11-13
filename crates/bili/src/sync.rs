@@ -59,6 +59,24 @@ pub struct AuthorCard {
     pub likes: u64,
 }
 
+/// 每周必看的一期。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WeeklyIssue {
+    pub number: u32,
+    pub subject: String,
+    pub name: String,
+    pub cover: Option<String>,
+}
+
+/// 一期点开之后的片单。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WeeklyIssuePage {
+    pub subject: String,
+    pub label: String,
+    pub cover: Option<String>,
+    pub tracks: Vec<bilimusic_model::Track>,
+}
+
 /// 把 `03:45` / `1:02:03` 解析成毫秒。UP 主投稿列表里时长是字符串。
 fn parse_mmss(text: &str) -> Option<u64> {
     let parts: Vec<&str> = text.split(':').collect();
@@ -697,6 +715,56 @@ impl Client {
             .await?;
         let no_more = v["data"]["no_more"].as_bool().unwrap_or(false);
         Ok((tracks_from_list(&v["data"]["list"]), no_more))
+    }
+
+    /// 每周必看的一期列表。
+    pub async fn weekly_issues(&self) -> Result<Vec<WeeklyIssue>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/web-interface/popular/series/list"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(v["data"]["list"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| {
+                        Some(WeeklyIssue {
+                            number: m["number"].as_u64()? as u32,
+                            subject: m["subject"].as_str().unwrap_or_default().to_string(),
+                            name: m["name"].as_str().unwrap_or_default().to_string(),
+                            cover: None,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// 某一期的片单。
+    pub async fn weekly_issue(&self, number: u32) -> Result<WeeklyIssuePage, BiliError> {
+        let v = self
+            .signed_get(
+                &format!("{API}/x/web-interface/popular/series/one"),
+                vec![
+                    ("number", number.to_string()),
+                    ("web_location", "333.976".to_string()),
+                ],
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        // 这一期自己的标题、期号封面都在 `config` 里，`data` 顶层只有 config / list / reminder。
+        let config = &v["data"]["config"];
+        Ok(WeeklyIssuePage {
+            subject: config["subject"].as_str().unwrap_or_default().to_string(),
+            label: config["label"].as_str().unwrap_or_default().to_string(),
+            cover: config["cover"]
+                .as_str()
+                .filter(|c| !c.is_empty())
+                .map(|c| c.replacen("http://", "https://", 1)),
+            tracks: tracks_from_list(&v["data"]["list"]),
+        })
     }
 
     /// 入站必刷：B 站给新用户的首屏片单。

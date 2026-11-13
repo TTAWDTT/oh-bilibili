@@ -146,6 +146,22 @@ pub struct SeasonEpisodeView {
 }
 
 /// 入站必刷。`explain` 是 B 站官方文案，原样透传。
+/// 每周必看的一期（列表用）。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WeeklyIssueView {
+    pub number: u32,
+    pub subject: String,
+    pub name: String,
+}
+
+/// 每周必看某一期的片单。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WeeklyPage {
+    pub subject: String,
+    pub label: String,
+    pub tracks: Vec<Track>,
+}
+
 /// `PreciousItemView` 故意不带 `Default`：`Track` 没有默认值，编不出来。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PreciousView {
