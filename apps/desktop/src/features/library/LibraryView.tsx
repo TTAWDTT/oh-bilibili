@@ -7,6 +7,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
+import { thumbUrl } from '../../shared/lib/thumb'
 import { useLibraryStore } from './libraryStore'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -99,10 +100,12 @@ export function LibraryView() {
                         <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
                           {cover ? (
                             <img
-                              src={cover}
+                              src={thumbUrl(cover, 320, 180) ?? cover}
                               alt=""
                               aria-hidden
                               referrerPolicy="no-referrer"
+                              loading="lazy"
+                              decoding="async"
                               className="h-full w-full object-cover"
                             />
                           ) : null}
