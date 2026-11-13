@@ -179,7 +179,24 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return CATALOG.slice(0, 5)
     case 'set_mode': {
       state.mode = str(args, 'mode') === 'watch' ? 'watch' : 'listen'
-      return snapshot()
+      // 「听视频」切到听模式时会带上当前曲目与位置：真实引擎从这里接着放，
+      // 预览也要接上，否则回到列表就变成「还没有在播放」。
+      const key = str(args, 'key')
+      const at = num(args, 'at_ms')
+      if (key && state.mode === 'listen') {
+        const track = findTrack(key)
+        if (track) {
+          state.keys = [key]
+          state.index = 0
+          state.duration = track.duration_ms ?? 30_000
+          state.position = Number.isFinite(at) ? at : 0
+          state.phase = 'playing'
+        }
+      }
+      // 真实引擎切模式后会推一条 state 事件；界面靠它更新底部播放条与右栏。
+      const next = snapshot()
+      emit({ type: 'state', snapshot: next })
+      return next
     }
     case 'close_watch': {
       // 真实应用里离开观看页会停声音；预览也照做，否则退回列表还在响。
