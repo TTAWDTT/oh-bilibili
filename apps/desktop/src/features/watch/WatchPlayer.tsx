@@ -13,6 +13,7 @@ import { useAutoplay } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
@@ -471,8 +472,8 @@ export function WatchPlayer({
         返回
       </button>
       {!ready && !error ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
-          正在取流…
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
+          <BiliLoader label="正在取流…" />
         </div>
       ) : null}
       {error ? (
