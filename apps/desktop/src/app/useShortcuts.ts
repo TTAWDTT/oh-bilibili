@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { usePlayerStore } from '../features/player/playerStore'
+import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import { readPlayhead } from '../shared/lib/playhead'
 import { useAppStore } from './appStore'
 
@@ -11,6 +12,9 @@ function isTextEntry(element: Element | null): boolean {
   return TEXT_ENTRY.has(element.tagName) || element.isContentEditable || element.getAttribute('role') === 'textbox'
 }
 
+/** 静音前的音量：按 M 恢复时用它，避免恢复成 0。 */
+let lastVolume = 0.72
+
 function seekBy(delta: number): void {
   const player = usePlayerStore.getState()
   const duration = player.snapshot?.duration_ms ?? 0
@@ -21,13 +25,18 @@ function seekBy(delta: number): void {
 }
 
 /**
- * 全局快捷键：空格播放/暂停、←/→ 快退快进 5 秒、Esc 收栏、⌘K 搜歌。
+ * 全局快捷键：空格播放/暂停、←/→ 快退快进 5 秒、↑/↓ 音量、D 弹幕、M 静音、
+ * F/W 全屏、Esc 收栏、⌘K 搜歌。
  * 放在 window 上而不是某个组件里，这样焦点在页面任何角落都成立。
  */
 export function useShortcuts(): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      const dialogOpen = document.querySelector('[role="dialog"]') !== null
+      // 只看真正显示出来的弹窗：移动端右栏一直挂在 DOM 里（md:hidden），
+      // 按 querySelector 算的话，只要在播放（右栏存在）快捷键就全废。
+      const dialogOpen = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].some(
+        (el) => el.offsetParent !== null,
+      )
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         useAppStore.getState().focusSearch()
@@ -82,6 +91,26 @@ export function useShortcuts(): void {
       } else if (event.key === 'ArrowRight') {
         event.preventDefault()
         seekBy(5_000)
+      } else if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && player.snapshot?.track) {
+        // 音量跟 B 站播放器一致：上下键各 5%。
+        event.preventDefault()
+        const step = event.key === 'ArrowUp' ? 0.05 : -0.05
+        void player.setVolume(Math.min(1, Math.max(0, (player.snapshot.volume ?? 0) + step)))
+      } else if (key === 'd') {
+        // D 开关弹幕，B 站播放器的默认键位。
+        event.preventDefault()
+        const danmaku = useDanmakuSettings.getState()
+        danmaku.setEnabled(!danmaku.enabled)
+      } else if (key === 'm' && player.snapshot?.track) {
+        // M 静音；再按一次回到静音前的音量。
+        event.preventDefault()
+        const current = player.snapshot.volume ?? 0
+        if (current > 0.001) {
+          lastVolume = current
+          void player.setVolume(0)
+        } else {
+          void player.setVolume(lastVolume)
+        }
       }
     }
 
