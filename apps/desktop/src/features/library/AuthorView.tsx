@@ -11,6 +11,7 @@ import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
+import { useAuthStore } from '../auth/authStore'
 import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /**
@@ -25,6 +26,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const snapshot = usePlayerStore((state) => state.snapshot)
   const navigate = useAppStore((state) => state.navigate)
   const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+  const me = useAuthStore((state) => state.auth?.user ?? null)
   const [followed, setFollowed] = useState(false)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
   const [total, setTotal] = useState(0)
@@ -160,6 +162,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   const avatar = card?.face || tracks.find((t) => t.up_avatar)?.up_avatar || null
   const views = tracks.reduce((sum, t) => sum + (t.views ?? 0), 0)
+  const isSelf = mid != null && me?.mid === mid
 
   return (
     <div
@@ -180,18 +183,20 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
             </h2>
             {card ? <LevelBadge level={card.level} /> : null}
           </div>
-          <button
-            type="button"
-            onClick={() => void follow()}
-            className={[
-              'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[14px]',
-              followed
-                ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                : 'bg-[var(--accent)] text-white',
-            ].join(' ')}
-          >
-            {followed ? '已关注' : '+ 关注'}
-          </button>
+          {isSelf ? null : (
+            <button
+              type="button"
+              onClick={() => void follow()}
+              className={[
+                'mt-2 flex items-center gap-1 rounded-[4px] px-3 py-1 text-[14px]',
+                followed
+                  ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                  : 'bg-[var(--accent)] text-white',
+              ].join(' ')}
+            >
+              {followed ? '已关注' : '+ 关注'}
+            </button>
+          )}
 
           {card?.official ? (
             <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
