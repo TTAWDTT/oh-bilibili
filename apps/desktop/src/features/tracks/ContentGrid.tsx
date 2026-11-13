@@ -61,6 +61,27 @@ function rankTone(rank: number): string {
   return 'rgba(0,0,0,0.6)'
 }
 
+/** 搜索结果标题高亮：按字面切段，命中片段用 B 站搜索页那个粉，默认的 mark 黄底去掉。 */
+function highlightTitle(title: string, keyword: string | undefined): React.ReactNode {
+  const needle = keyword?.trim().toLowerCase() ?? ''
+  if (needle.length === 0) return title
+  const haystack = title.toLowerCase()
+  const parts: React.ReactNode[] = []
+  let cursor = 0
+  for (let hit = haystack.indexOf(needle); hit !== -1; hit = haystack.indexOf(needle, cursor)) {
+    if (hit > cursor) parts.push(title.slice(cursor, hit))
+    parts.push(
+      <mark key={hit} className="bg-transparent text-[#fb7299]">
+        {title.slice(hit, hit + needle.length)}
+      </mark>,
+    )
+    cursor = hit + needle.length
+  }
+  if (parts.length === 0) return title
+  parts.push(title.slice(cursor))
+  return parts
+}
+
 type ContentGridProps = {
   tracks: Track[]
   activeKey: string | null
@@ -71,6 +92,8 @@ type ContentGridProps = {
   extraAction?: (track: Track) => React.ReactNode
   /** 已看进度 0~1。历史页用它画封面底部那条进度，没有就不画。 */
   progress?: (track: Track) => number | null
+  /** 搜索页传当前关键词，标题里命中的片段标粉；其它页面不传。 */
+  highlight?: string
 }
 
 /**
@@ -79,7 +102,7 @@ type ContentGridProps = {
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, highlight }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const faved = useReactionStore((state) => state.faved)
@@ -247,7 +270,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                   onClick={() => navigate({ kind: 'watch', track })}
                   className="line-clamp-2 text-left"
                 >
-                  {track.title}
+                  {highlightTitle(track.title, highlight)}
                 </button>
               </h3>
 

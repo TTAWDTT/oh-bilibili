@@ -494,6 +494,7 @@ export function SearchView() {
                 tracks={tracks}
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}
+                highlight={trimmed}
               />
             ) : null}
 
