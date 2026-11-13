@@ -9,7 +9,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
+import { HOME_PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /**
  * 发现页。
@@ -109,7 +109,7 @@ export function HomeView() {
     if (loading || loadingMore || items.length === 0 || exhausted.current) return
     const el = scrollerRef.current
     if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < HOME_PREFETCH_PX) more()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, loading, loadingMore])
 
@@ -120,7 +120,7 @@ export function HomeView() {
       onScroll={(event) => {
         const el = event.currentTarget
         feedMemory.scrollTop = el.scrollTop
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < HOME_PREFETCH_PX) more()
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
