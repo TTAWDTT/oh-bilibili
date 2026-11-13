@@ -182,6 +182,9 @@ export function WatchPlayer({
     return () => window.clearInterval(timer)
   }, [controls])
 
+  /** 上一次单击的时间。双击时要把那次误触发的暂停收回来。 */
+  const lastClickAt = useRef(0)
+
   const togglePlay = (): void => {
     void ipc.playerToggle().catch(() => {
       // 没加载起来时点播放不该静默失败，但也不该假装成功
@@ -406,7 +409,17 @@ export function WatchPlayer({
         ref={videoRef}
         muted
         playsInline
-        onClick={togglePlay}
+        onClick={(event) => {
+          // 双击的第二下不再当成暂停，否则双击全屏会顺手把视频停下来。
+          if (event.detail > 1) return
+          lastClickAt.current = Date.now()
+          togglePlay()
+        }}
+        onDoubleClick={() => {
+          // 双击：B 站是网页全屏（不动系统窗口），再双击退出。
+          if (Date.now() - lastClickAt.current < 500) togglePlay()
+          setStageMode(!cinema, false)
+        }}
         className="h-full w-full cursor-pointer object-contain"
         aria-label="视频画面"
       />
