@@ -300,6 +300,7 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={liked}
+          aria-label={liked ? '取消点赞' : '点赞'}
           onPointerDown={startHold}
           onPointerUp={endHold}
           onPointerLeave={endHold}
@@ -323,6 +324,7 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={coins > 0}
+          aria-label="投币"
           onClick={() => {
             if (coins >= 2) {
               toastDone('已经投过两枚', 'B 站上限 2 枚')
@@ -339,6 +341,7 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={faved}
+          aria-label={faved ? '取消收藏' : '收藏'}
           onClick={onFav}
           className={triple(faved, 'right')}
           title={faved ? '取消收藏' : '收藏'}
