@@ -397,6 +397,11 @@ export function watchComments(key: string, page: number, hot = true): Promise<Co
   return invoke<CommentPage>('watch_comments', { key, page, hot })
 }
 
+/** 取一页楼中楼。`root` 是一级评论的 rpid。 */
+export function watchReplies(key: string, root: string, page: number): Promise<CommentPage> {
+  return invoke<CommentPage>('watch_replies', { key, root, page })
+}
+
 /** 搜索页热搜榜。游客可用；失败时返回空表。 */
 export function hotSearch(): Promise<string[]> {
   return invoke<string[]>('hot_search')

@@ -281,6 +281,30 @@ pub fn page_from(value: &serde_json::Value, page: u32, per_page: u32) -> Comment
     }
 }
 
+/// 从 `x/v2/reply/reply` 的响应里取一页楼中楼。
+pub fn replies_page_from(value: &serde_json::Value, page: u32, per_page: u32) -> CommentPage {
+    let data = &value["data"];
+    let total = data["page"]["count"].as_u64().unwrap_or(0) as u32;
+    let items: Vec<Comment> = data["replies"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|r| {
+                    serde_json::from_value::<RawReply>(r.clone())
+                        .ok()
+                        .map(to_comment)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    CommentPage {
+        total,
+        page,
+        has_more: page.saturating_mul(per_page) < total,
+        items,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,5 +493,37 @@ mod tests {
         let page = page_from(&raw, 1, 20);
         assert_eq!(page.items[0].replies.len(), 3);
         assert_eq!(page.items[0].reply_count, 3);
+    }
+
+    #[test]
+    fn 楼中楼一页能解析出回复与还有更多() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 25, "size": 20, "num": 1 },
+                "replies": [
+                    {
+                        "rpid_str": "777",
+                        "member": { "mid": "11", "uname": "甲" },
+                        "content": { "message": "第一条回复" },
+                        "like": 3,
+                        "ctime": 100
+                    },
+                    {
+                        "rpid_str": "888",
+                        "member": { "mid": "12", "uname": "乙" },
+                        "content": { "message": "第二条回复" },
+                        "like": 1,
+                        "ctime": 101
+                    }
+                ]
+            }
+        });
+        let page = replies_page_from(&value, 1, 20);
+        assert_eq!(page.total, 25);
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.items[0].author, "甲");
+        assert_eq!(page.items[1].text, "第二条回复");
+        assert!(page.has_more);
     }
 }

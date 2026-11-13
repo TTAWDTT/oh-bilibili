@@ -5,6 +5,7 @@ import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contra
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { thumbUrl } from '../../shared/lib/thumb'
+import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
@@ -80,16 +81,61 @@ function CommentMedalBadge({ medal }: { medal: CommentMedal }) {
 function CommentRow({
   c,
   depth = 0,
+  trackKey,
   ownerMid,
   onReply,
   onDelete,
 }: {
   c: Comment
   depth?: number
+  trackKey: string
   ownerMid?: number | null | undefined
   onReply?: (c: Comment) => void
   onDelete?: ((c: Comment) => void) | undefined
 }) {
+  const [repliesOpen, setRepliesOpen] = useState(false)
+  const [loadedReplies, setLoadedReplies] = useState<Comment[]>([])
+  const [repliesPage, setRepliesPage] = useState(0)
+  const [repliesHasMore, setRepliesHasMore] = useState(false)
+  const [repliesLoading, setRepliesLoading] = useState(false)
+  const [repliesError, setRepliesError] = useState(false)
+
+  const loadReplies = async (next: number): Promise<void> => {
+    if (repliesLoading) return
+    setRepliesLoading(true)
+    setRepliesError(false)
+    try {
+      const res = await ipc.watchReplies(trackKey, c.id, next)
+      if (next === 1) {
+        setLoadedReplies(res.items)
+        setRepliesOpen(true)
+      } else {
+        setLoadedReplies((prev) => [...prev, ...res.items])
+      }
+      setRepliesPage(res.page)
+      setRepliesHasMore(res.has_more)
+    } catch {
+      setRepliesError(true)
+    } finally {
+      setRepliesLoading(false)
+    }
+  }
+
+  const toggleReplies = (): void => {
+    if (repliesOpen) {
+      setRepliesOpen(false)
+      setRepliesError(false)
+      return
+    }
+    if (repliesPage > 0) {
+      setRepliesOpen(true)
+      return
+    }
+    void loadReplies(1)
+  }
+
+  const shownReplies = depth === 0 && repliesOpen ? loadedReplies : c.replies
+
   return (
     <li className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}>
       <div className="flex items-start gap-2">
@@ -149,19 +195,76 @@ function CommentRow({
           </p>
         </div>
       </div>
-      {c.replies.length > 0 ? (
+      {c.replies.length > 0 || (depth === 0 && c.reply_count > 0) ? (
         <ul className="mt-1 pl-8">
-          {c.replies.map((r) => (
+          {shownReplies.map((r) => (
             <CommentRow
               key={r.id || `${c.id}-${r.author}-${r.text.slice(0, 8)}`}
               c={r}
               depth={depth + 1}
+              trackKey={trackKey}
               ownerMid={ownerMid}
             />
           ))}
-          {c.reply_count > c.replies.length ? (
-            <li className="mt-1 text-[11px] text-[var(--text-3)]">
-              共 {formatCount(c.reply_count)} 条回复
+          {depth === 0 && (c.reply_count > c.replies.length || repliesOpen) ? (
+            <li className="mt-1 flex flex-wrap items-center gap-3 text-[11px]">
+              {repliesOpen ? (
+                <>
+                  {repliesHasMore ? (
+                    repliesLoading ? (
+                      <span className="text-[var(--text-3)]">正在取回复…</span>
+                    ) : repliesError ? (
+                      <button
+                        type="button"
+                        onClick={() => void loadReplies(repliesPage + 1)}
+                        className="t press text-[var(--accent)] hover:opacity-80"
+                      >
+                        回复没取到，重试
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void loadReplies(repliesPage + 1)}
+                        className="t press inline-flex items-center gap-1 text-[var(--accent)] hover:opacity-80"
+                      >
+                        展开更多回复
+                        <Icon name="chevronLeft" size={11} className="rotate-90" />
+                      </button>
+                    )
+                  ) : repliesLoading ? (
+                    <span className="text-[var(--text-3)]">正在取回复…</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-expanded
+                    onClick={toggleReplies}
+                    className="t press inline-flex items-center gap-1 text-[var(--accent)] hover:opacity-80"
+                  >
+                    收起
+                    <Icon name="chevronLeft" size={11} className="-rotate-90" />
+                  </button>
+                </>
+              ) : repliesLoading ? (
+                <span className="text-[var(--text-3)]">正在取回复…</span>
+              ) : repliesError ? (
+                <button
+                  type="button"
+                  onClick={toggleReplies}
+                  className="t press text-[var(--accent)] hover:opacity-80"
+                >
+                  回复没取到，重试
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  onClick={toggleReplies}
+                  className="t press inline-flex items-center gap-1 text-[var(--accent)] hover:opacity-80"
+                >
+                  共 {formatCount(c.reply_count)} 条回复
+                  <Icon name="chevronLeft" size={11} className="rotate-90" />
+                </button>
+              )}
             </li>
           ) : null}
         </ul>
@@ -493,6 +596,7 @@ export function CommentsPanel({
             <CommentRow
               key={c.id}
               c={c}
+              trackKey={trackKey}
               ownerMid={ownerMid}
               onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
               onDelete={mine.has(c.id) ? remove : undefined}

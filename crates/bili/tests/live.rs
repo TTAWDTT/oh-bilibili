@@ -529,3 +529,64 @@ async fn 合集带全部集数与封面() {
     assert!(first.duration_ms > 0, "时长要能显示在列表里");
     assert!(first.views.unwrap_or(0) > 0, "播放量要能显示在列表里");
 }
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 楼中楼能翻页() {
+    let source = Source::open().await.expect("Source");
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
+        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+        source.import_cookies(&pairs);
+        let _ = source.refresh_session().await;
+    }
+
+    let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
+    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    let root = page
+        .items
+        .iter()
+        .max_by_key(|c| c.reply_count)
+        .expect("第一页要有评论");
+    println!("选中的一级评论：{} / {} 条回复", root.author, root.reply_count);
+    assert!(
+        root.reply_count >= 40,
+        "样本至少要有两页回复，实际 {}",
+        root.reply_count
+    );
+
+    let first = source
+        .comment_replies(&key, &root.id, 1)
+        .await
+        .expect("第一页楼中楼");
+    let second = source
+        .comment_replies(&key, &root.id, 2)
+        .await
+        .expect("第二页楼中楼");
+    println!(
+        "pn=1 {} 条，pn=2 {} 条，总数 {}，has_more {} / {}",
+        first.items.len(),
+        second.items.len(),
+        first.total,
+        first.has_more,
+        second.has_more
+    );
+    assert_eq!(first.items.len(), 20);
+    assert_eq!(second.items.len(), 20);
+    assert_eq!(first.total, second.total);
+    assert_eq!(first.has_more, 20 < first.total);
+    assert_eq!(second.has_more, 40 < second.total);
+
+    let mut ids = std::collections::HashSet::new();
+    for reply in first.items.iter().chain(&second.items) {
+        assert!(ids.insert(reply.id.clone()), "回复 id 重复：{}", reply.id);
+    }
+    let head = first.items.first().expect("第一页有回复");
+    println!(
+        "首条回复：{} / {}",
+        head.author,
+        head.text.chars().take(20).collect::<String>()
+    );
+}

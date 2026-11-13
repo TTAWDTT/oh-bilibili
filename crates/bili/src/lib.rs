@@ -532,6 +532,32 @@ impl Source {
         Ok(crate::comments::page_from(&value, page, per_page))
     }
 
+    /// 取一页楼中楼。`root` 是一级评论的 rpid。
+    pub async fn comment_replies(
+        &self,
+        key: &TrackKey,
+        root: &str,
+        page: u32,
+    ) -> Result<crate::comments::CommentPage, BiliError> {
+        let detail = self.detail(key).await?;
+        let per_page = 20u32;
+        let value = self
+            .client
+            .get_json(
+                &format!(
+                    "{}/x/v2/reply/reply?type=1&oid={}&root={}&pn={}&ps={}",
+                    client::API,
+                    detail.aid,
+                    root,
+                    page,
+                    per_page
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(crate::comments::replies_page_from(&value, page, per_page))
+    }
+
     /// 搜索页的热搜榜。B 站搜索页左栏就是这份榜单，带名次。
     ///
     /// 游客也能拿到，不需要登录；失败就返回空表，由界面退回内置建议。

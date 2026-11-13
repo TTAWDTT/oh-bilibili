@@ -550,6 +550,19 @@ impl Engine {
         Ok(self.source.comments(key, page.max(1), hot).await?)
     }
 
+    /// 取一页楼中楼。
+    pub async fn comment_replies(
+        &self,
+        key: &TrackKey,
+        root: &str,
+        page: u32,
+    ) -> Result<crate::wire::CommentPage, WireError> {
+        Ok(self
+            .source
+            .comment_replies(key, root, page.max(1))
+            .await?)
+    }
+
     /// 搜索页的热搜榜。取不到就返回空表，界面退回内置建议。
     pub async fn hot_search(&self) -> Vec<String> {
         self.source.hot_search().await.unwrap_or_default()
