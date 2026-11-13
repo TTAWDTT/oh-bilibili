@@ -126,6 +126,25 @@ pub enum PlayMode {
 }
 
 /// 视频详情视图，字段与 TS 契约逐一对应。
+/// 观看页右栏的合集。字段与 TS 契约逐一对应。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SeasonView {
+    pub id: u64,
+    pub title: String,
+    pub episodes: Vec<SeasonEpisodeView>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SeasonEpisodeView {
+    pub key: String,
+    pub title: String,
+    pub cover: Option<String>,
+    pub duration_ms: u64,
+    pub views: Option<u64>,
+    /// 当前正在看的就是这一集。
+    pub current: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VideoMetaView {
     pub desc: String,
@@ -199,6 +218,8 @@ pub struct WatchView {
     pub pages: Vec<bilimusic_bili::PageRef>,
     /// 当前在放的分P 序号（从 1 开始）。
     pub current_page: u32,
+    /// 所属合集；没有合集时为空。
+    pub season: Option<SeasonView>,
     /// 清单的完整地址，已经带上本机代理端口。
     pub manifest_url: String,
     pub duration_ms: u64,

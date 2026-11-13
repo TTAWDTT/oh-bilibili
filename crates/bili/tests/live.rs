@@ -475,3 +475,23 @@ async fn 置顶评论排在第一页最前() {
         }
     }
 }
+
+#[tokio::test]
+#[ignore = "真实网络，核对合集"]
+async fn 合集带全部集数与封面() {
+    let source = Source::open().await.expect("Source");
+    // 影视飓风的「百万粉丝Q&A」是一个 10 集的合集。
+    let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
+    let detail = source.detail(&key).await.expect("详情");
+    let season = detail.season.expect("这条视频属于一个合集");
+    println!("合集「{}」{} 集", season.title, season.episodes.len());
+    assert_eq!(season.episodes.len(), 10);
+    let first = &season.episodes[0];
+    println!(
+        "首集 {} / {:?} / {:?}ms / {:?}",
+        first.title, first.cover.is_some(), first.duration_ms, first.views
+    );
+    assert!(first.bvid.starts_with("BV"), "每集都要有 bvid 才能点进去");
+    assert!(first.duration_ms > 0, "时长要能显示在列表里");
+    assert!(first.views.unwrap_or(0) > 0, "播放量要能显示在列表里");
+}

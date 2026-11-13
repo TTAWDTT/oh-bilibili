@@ -94,10 +94,29 @@ export type WatchView = {
   tname: string | null
   pages: PageRef[]
   current_page: number
+  /** 所属合集；没有合集时为 null。 */
+  season: SeasonView | null
   manifest_url: string
   duration_ms: number
   qualities: QualityOption[]
   audio_quality: number | null
+}
+
+export type SeasonView = {
+  id: number
+  title: string
+  episodes: SeasonEpisodeView[]
+}
+
+export type SeasonEpisodeView = {
+  /** 视频的 key（bvid）。 */
+  key: string
+  title: string
+  cover: string | null
+  duration_ms: number
+  views: number | null
+  /** 当前正在看的就是这一集。 */
+  current: boolean
 }
 
 export type QualityOption = {

@@ -48,6 +48,27 @@ pub struct TrackDetail {
     pub meta: VideoMeta,
     /// 分P 列表。单 P 视频就是一条。
     pub pages: Vec<PageRef>,
+    /// 这条视频所属的合集。B 站观看页右栏那一块「合集」。
+    pub season: Option<SeasonRef>,
+}
+
+/// 一个合集。只有 `ugc_season` 存在的视频才有。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeasonRef {
+    pub id: u64,
+    pub title: String,
+    /// 合集里的每一集，顺序就是 B 站的播放顺序。
+    pub episodes: Vec<SeasonEpisode>,
+}
+
+/// 合集里的一集。字段足够直接渲染成一列可点的条目。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeasonEpisode {
+    pub bvid: String,
+    pub title: String,
+    pub cover: Option<String>,
+    pub duration_ms: u64,
+    pub views: Option<u64>,
 }
 
 /// 一个分P。
@@ -913,6 +934,39 @@ mod wire {
         Ok(out)
     }
 
+/// 从 view 响应里读合集。没有合集就是 None。
+///
+/// 每集的标题/封面/时长/播放量都在 `arc` 里；`arc` 偶尔缺失，那就只给
+/// bvid 和标题，界面仍然能点进去。
+fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
+    let season = data.get("ugc_season")?;
+    let id = season["id"].as_u64()?;
+    let mut episodes = Vec::new();
+    for section in season["sections"].as_array().into_iter().flatten() {
+        for ep in section["episodes"].as_array().into_iter().flatten() {
+            let Some(bvid) = ep["bvid"].as_str().filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            let arc = &ep["arc"];
+            episodes.push(SeasonEpisode {
+                bvid: bvid.to_string(),
+                title: search::strip_tags(ep["title"].as_str().unwrap_or("（无标题）")),
+                cover: norm_cover(arc["pic"].as_str().unwrap_or("")),
+                duration_ms: arc["duration"].as_u64().unwrap_or(0) * 1000,
+                views: arc["stat"]["view"].as_u64(),
+            });
+        }
+    }
+    if episodes.is_empty() {
+        return None;
+    }
+    Some(SeasonRef {
+        id,
+        title: search::strip_tags(season["title"].as_str().unwrap_or("合集")),
+        episodes,
+    })
+}
+
     pub fn track_detail(
         value: &serde_json::Value,
         key: &TrackKey,
@@ -976,6 +1030,7 @@ mod wire {
             aid,
             pages,
             meta,
+            season: season_of(data),
         })
     }
 

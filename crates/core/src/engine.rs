@@ -399,6 +399,22 @@ impl Engine {
             tname: detail.track.tname.clone(),
             pages: detail.pages.clone(),
             current_page: page_no,
+            season: detail.season.as_ref().map(|season| crate::wire::SeasonView {
+                id: season.id,
+                title: season.title.clone(),
+                episodes: season
+                    .episodes
+                    .iter()
+                    .map(|ep| crate::wire::SeasonEpisodeView {
+                        key: ep.bvid.clone(),
+                        title: ep.title.clone(),
+                        cover: ep.cover.clone(),
+                        duration_ms: ep.duration_ms,
+                        views: ep.views,
+                        current: ep.bvid == key.as_opaque(),
+                    })
+                    .collect(),
+            }),
             manifest_url,
             duration_ms: duration.0,
             qualities,

@@ -9,6 +9,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
 import { CommentsPanel } from './CommentsPanel'
 import { RelatedAside } from './RelatedAside'
+import { SeasonList } from './SeasonList'
 import { WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
 
@@ -224,6 +225,11 @@ export function WatchView({ track }: { track: Track }) {
             />
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
+          {!cinema && data?.season ? (
+            <div className="border-t border-hairline md:hidden">
+              <SeasonList season={data.season} />
+            </div>
+          ) : null}
           {!cinema ? (
             <div className="border-t border-hairline md:hidden">
               <RelatedAside items={related} />
@@ -238,6 +244,7 @@ export function WatchView({ track }: { track: Track }) {
 
         {!cinema ? (
           <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
+            {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>
         ) : null}
