@@ -172,6 +172,8 @@ export function WatchView({ track }: { track: Track }) {
             之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
         <div
           data-scroll-root
+          /* 回到顶部按钮按 id 找容器：观看页是最长的一页，少了这个 id 按钮永远不出现。 */
+          id="scroll-main"
           className={
             cinema ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto px-6 pt-4'
           }
