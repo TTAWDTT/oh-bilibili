@@ -272,6 +272,10 @@ export function downloadReveal(key: string): Promise<null> {
   return call<null>('download_reveal', { key })
 }
 
+export function openExternal(url: string): Promise<null> {
+  return call<null>('open_external', { url })
+}
+
 /** 加入或移出稍后再看。 */
 export function watchLaterSet(key: string, on: boolean): Promise<null> {
   return call<null>('watch_later_set', { key, on })

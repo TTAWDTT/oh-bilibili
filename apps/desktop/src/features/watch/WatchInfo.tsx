@@ -5,11 +5,29 @@ import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount, formatDate } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
-import { toastDone } from '../../app/notice'
+import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
+
+/** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
+function descriptionNodes(text: string): React.ReactNode[] {
+  return text.split(/(https?:\/\/[^\s]+)/g).map((part, index) => {
+    if (!/^https?:\/\//.test(part)) return part
+    const url = part.replace(/[.,;:!?，。；、）…]+$/, '')
+    return (
+      <button
+        key={index}
+        type="button"
+        onClick={() => void ipc.openExternal(url).catch((cause) => toastFailure('打开链接', cause))}
+        className="t break-all text-left text-[var(--accent)] hover:underline"
+      >
+        {url}
+      </button>
+    )
+  })
+}
 
 /**
  * 观看页的信息与互动：UP 主、关注、计数、三连、稍后再看、简介、分P。
@@ -382,14 +400,14 @@ export function WatchInfo({
               descOpen ? '' : 'line-clamp-2'
             }`}
           >
-            {data.desc}
+            {descriptionNodes(data.desc)}
           </p>
           {/* 长简介按 B 站收两行；短简介不需要那个按钮。 */}
           {data.desc.length > 90 ? (
             <button
               type="button"
               onClick={() => setDescOpen((open) => !open)}
-              className="t mt-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              className="t mt-1 text-[12px] text-[var(--accent)] hover:underline"
             >
               {descOpen ? '收起' : '展开更多'}
             </button>
@@ -404,7 +422,7 @@ export function WatchInfo({
               key={tag}
               type="button"
               onClick={() => setHeroQuery(tag)}
-              className="t rounded-[3px] bg-[var(--panel-raised)] px-2 text-[12px] leading-[22px] text-[var(--text-2)] hover:text-[var(--accent)]"
+              className="t rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_10%,white)] px-2 text-[12px] leading-[22px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_18%,white)]"
             >
               {tag}
             </button>

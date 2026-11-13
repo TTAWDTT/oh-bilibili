@@ -803,6 +803,21 @@ fn download_reveal(
     Ok(())
 }
 
+/// 用系统默认浏览器打开外部链接。只收 http/https：
+/// 简介里的文字来自 B 站，不能让它拉起 file:// 之类任意 scheme。
+#[tauri::command(rename_all = "snake_case")]
+fn open_external(url: String) -> Result<(), WireError> {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err(WireError::input("url", "只允许 http/https 链接"));
+    }
+    std::process::Command::new("open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| WireError::internal(format!("打不开浏览器：{e}")))?;
+    Ok(())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
     engine
@@ -952,6 +967,7 @@ pub fn run() {
             danmaku_send,
             download_remove,
             download_reveal,
+            open_external,
             download_enqueue,
             sync_now,
         ])
