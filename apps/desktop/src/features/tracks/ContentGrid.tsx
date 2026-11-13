@@ -316,29 +316,34 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
     <>
       <h2 className="sr-only">曲目</h2>
       <div className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]">
-        {tracks.map((track, index) => (
-          <TrackCard
-            key={track.key}
-            track={track}
-            index={index}
-            active={track.key === activeKey}
-            playing={playing}
-            ranked={ranked === true}
-            ratio={progress?.(track) ?? null}
-            noteText={note?.(track) ?? null}
-            highlight={highlight}
-            confirming={confirming === track.key}
-            extra={extraAction ? extraAction(track) : null}
-            onOpen={onOpen}
-            onAuthor={onAuthor}
-            onPlay={onPlay}
-            onCoin={onCoin}
-            onFav={onFav}
-            onLater={onLater}
-            onConfirmCoin={onConfirmCoin}
-            onCancelCoin={onCancelCoin}
-          />
-        ))}
+        {tracks.map((track, index) => {
+          const active = track.key === activeKey
+          return (
+            <TrackCard
+              key={track.key}
+              track={track}
+              index={index}
+              active={active}
+              /* 只有正在播的那一张会用到 playing，别的卡传固定的 false，
+                 这样播放/暂停时 memo 不会把整列上千张卡全部重渲染。 */
+              playing={active && playing}
+              ranked={ranked === true}
+              ratio={progress?.(track) ?? null}
+              noteText={note?.(track) ?? null}
+              highlight={highlight}
+              confirming={confirming === track.key}
+              extra={extraAction ? extraAction(track) : null}
+              onOpen={onOpen}
+              onAuthor={onAuthor}
+              onPlay={onPlay}
+              onCoin={onCoin}
+              onFav={onFav}
+              onLater={onLater}
+              onConfirmCoin={onConfirmCoin}
+              onCancelCoin={onCancelCoin}
+            />
+          )
+        })}
         {picking ? (
           <FavPicker open busy={favBusy} onClose={() => setPicking(null)} onPick={(folderId) => void favTo(folderId)} />
         ) : null}
