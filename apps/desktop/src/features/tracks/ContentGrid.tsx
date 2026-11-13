@@ -220,9 +220,9 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                     const ratio = progress?.(track) ?? null
                     if (ratio === null || ratio <= 0 || ratio >= 1) return null
                     return (
-                      <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/45">
+                      <span className="absolute inset-x-0 bottom-0 h-[4px] bg-black/45">
                         <span
-                          className="block h-full bg-[var(--accent)]"
+                          className="block h-full bg-[var(--bili-pink)] shadow-[0_0_6px_rgba(251,114,153,0.45)]"
                           style={{ width: `${Math.round(ratio * 100)}%` }}
                         />
                       </span>
