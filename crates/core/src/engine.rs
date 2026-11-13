@@ -1335,6 +1335,14 @@ impl Engine {
         Ok(tracks)
     }
 
+    pub async fn popular(&self, page: u32) -> Result<(Vec<Track>, bool), WireError> {
+        let (tracks, no_more) = self.source.popular(page).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok((tracks, no_more))
+    }
+
     pub async fn online_count(&self, key: &TrackKey, cid: u64) -> Result<u64, WireError> {
         Ok(self.source.online_count(&key.as_opaque(), cid).await?)
     }

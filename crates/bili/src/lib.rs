@@ -362,6 +362,11 @@ impl Source {
         self.client.ranking(rid).await
     }
 
+    /// 综合热门。第二个返回值表示后面还有没有更早的稿件。
+    pub async fn popular(&self, page: u32) -> Result<(Vec<Track>, bool), BiliError> {
+        self.client.popular(page).await
+    }
+
     /// 当前在看人数。
     pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
         self.client.online_count(bvid, cid).await

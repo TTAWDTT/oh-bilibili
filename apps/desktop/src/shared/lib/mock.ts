@@ -92,6 +92,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       ]
     case 'ranking':
       return CATALOG.slice(0, 20)
+    case 'popular':
+      return [CATALOG.slice(0, 20), false]
     case 'video_online':
       return 128
     case 'fav_tracks': {

@@ -631,45 +631,28 @@ impl Client {
 
     /// 排行榜。公开接口，一次返回 100 条；rid=0 是全站。
     pub async fn ranking(&self, rid: u32) -> Result<Vec<bilimusic_model::Track>, BiliError> {
-        use bilimusic_model::{Millis, Track, TrackKey};
-
         let v = self
             .get_json(
                 &format!("{API}/x/web-interface/ranking/v2?rid={rid}&type=all"),
                 std::time::Duration::from_millis(400),
             )
             .await?;
-        let Some(list) = v["data"]["list"].as_array() else {
-            return Ok(Vec::new());
-        };
-        Ok(list
-            .iter()
-            .filter_map(|m| {
-                let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
-                let duration = m["duration"].as_u64().filter(|d| *d > 0);
-                Some(Track {
-                    key: TrackKey::from_provider(bvid),
-                    title: m["title"].as_str().unwrap_or_default().to_string(),
-                    artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
-                    duration: duration.map(|d| Millis(d * 1000)),
-                    cover: m["pic"]
-                        .as_str()
-                        .map(|c| c.replacen("http://", "https://", 1)),
-                    accent: None,
-                    views: m["stat"]["view"].as_u64(),
-                    danmaku: m["stat"]["danmaku"].as_u64(),
-                    up_avatar: m["owner"]["face"]
-                        .as_str()
-                        .map(|f| f.replacen("http://", "https://", 1)),
-                    up_mid: m["owner"]["mid"].as_u64(),
-                    tname: m["tname"]
-                        .as_str()
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string()),
-                    typeid: None,
-                })
-            })
-            .collect())
+        Ok(tracks_from_list(&v["data"]["list"]))
+    }
+
+    /// 综合热门（B 站 popular/all）。一次 50 条，`no_more` 为 true 表示翻到底了。
+    pub async fn popular(
+        &self,
+        page: u32,
+    ) -> Result<(Vec<bilimusic_model::Track>, bool), BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/web-interface/popular?pn={page}&ps=50"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let no_more = v["data"]["no_more"].as_bool().unwrap_or(false);
+        Ok((tracks_from_list(&v["data"]["list"]), no_more))
     }
 
     /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
@@ -821,6 +804,42 @@ impl Client {
         .await?;
         Ok(())
     }
+}
+
+/// `data.list` 里的视频卡片。排行榜与综合热门是同一个形状，共用这一份解析。
+fn tracks_from_list(list: &serde_json::Value) -> Vec<bilimusic_model::Track> {
+    use bilimusic_model::{Millis, Track, TrackKey};
+
+    let Some(list) = list.as_array() else {
+        return Vec::new();
+    };
+    list.iter()
+        .filter_map(|m| {
+            let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+            let duration = m["duration"].as_u64().filter(|d| *d > 0);
+            Some(Track {
+                key: TrackKey::from_provider(bvid),
+                title: m["title"].as_str().unwrap_or_default().to_string(),
+                artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+                duration: duration.map(|d| Millis(d * 1000)),
+                cover: m["pic"]
+                    .as_str()
+                    .map(|c| c.replacen("http://", "https://", 1)),
+                accent: None,
+                views: m["stat"]["view"].as_u64(),
+                danmaku: m["stat"]["danmaku"].as_u64(),
+                up_avatar: m["owner"]["face"]
+                    .as_str()
+                    .map(|f| f.replacen("http://", "https://", 1)),
+                up_mid: m["owner"]["mid"].as_u64(),
+                tname: m["tname"]
+                    .as_str()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string()),
+                typeid: None,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]

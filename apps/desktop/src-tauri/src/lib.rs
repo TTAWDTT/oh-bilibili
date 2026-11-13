@@ -595,6 +595,14 @@ async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<
     engine.ranking(rid).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn popular(
+    engine: tauri::State<'_, Arc<Engine>>,
+    page: u32,
+) -> Result<(Vec<Track>, bool), WireError> {
+    engine.popular(page).await
+}
+
 #[derive(Serialize)]
 struct UserHitView {
     mid: u64,
@@ -921,6 +929,7 @@ pub fn run() {
             comment_emotes,
             search_users,
             ranking,
+            popular,
             video_online,
             author_card,
             fav_tracks,

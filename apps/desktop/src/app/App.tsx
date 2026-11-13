@@ -27,6 +27,7 @@ import { useShortcuts } from './useShortcuts'
 import { WatchView } from '../features/watch/WatchView'
 import { HomeView } from '../features/home/HomeView'
 import { RankingView } from '../features/home/RankingView'
+import { PopularView } from '../features/home/PopularView'
 import { WatchLaterView } from '../features/library/WatchLaterView'
 import { FollowingView } from '../features/library/FollowingView'
 
@@ -42,6 +43,8 @@ function viewTitle(view: View): string {
       return '发现'
     case 'ranking':
       return '排行榜'
+    case 'popular':
+      return '热门'
     case 'search':
       return '搜索'
     case 'library':
@@ -75,6 +78,8 @@ function CurrentView({ view }: { view: View }) {
       return <HomeView />
     case 'ranking':
       return <RankingView initialRid={view.rid ?? 0} />
+    case 'popular':
+      return <PopularView />
     case 'search':
       return <SearchView />
     case 'library':

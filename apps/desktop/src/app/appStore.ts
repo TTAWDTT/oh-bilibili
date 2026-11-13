@@ -4,6 +4,7 @@ import { create } from 'zustand'
 export type View =
   | { kind: 'home' }
   | { kind: 'ranking'; rid?: number }
+  | { kind: 'popular' }
   | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }

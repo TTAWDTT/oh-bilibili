@@ -445,6 +445,39 @@ async fn 全站排行榜一次给一百条() {
     assert!(first.cover.is_some(), "榜首要有封面");
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 热门榜能翻页() {
+    let source = Source::open().await.expect("Source");
+    let (first, no_more_first) = source.popular(1).await.expect("热门第 1 页");
+    let (second, no_more_second) = source.popular(2).await.expect("热门第 2 页");
+    println!(
+        "热门 pn=1 {} 条（no_more={no_more_first}），pn=2 {} 条（no_more={no_more_second}）",
+        first.len(),
+        second.len()
+    );
+    let head = first.first().expect("第 1 页有内容");
+    println!(
+        "首条: {} / {}",
+        head.title.chars().take(18).collect::<String>(),
+        head.artist
+    );
+    assert_eq!(first.len(), 50, "每页应该 50 条");
+    assert_eq!(second.len(), 50, "每页应该 50 条");
+    assert!(!no_more_first, "第 1 页不该是最后一页");
+    assert!(!no_more_second, "第 2 页不该是最后一页");
+
+    let seen: std::collections::HashSet<&str> =
+        first.iter().map(|t| t.key.as_opaque()).collect();
+    for track in &second {
+        assert!(
+            !seen.contains(track.key.as_opaque()),
+            "两页之间不该重复：{}",
+            track.title
+        );
+    }
+}
+
 #[tokio::test]
 #[ignore = "真实网络，核对 UP 主置顶评论"]
 async fn 置顶评论排在第一页最前() {

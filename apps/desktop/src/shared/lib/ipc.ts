@@ -236,6 +236,11 @@ export function ranking(rid = 0): Promise<Track[]> {
   return call<Track[]>('ranking', { rid })
 }
 
+/** 综合热门。一次 50 条，第二个返回值表示是否到底。 */
+export function popular(page = 1): Promise<[Track[], boolean]> {
+  return call<[Track[], boolean]>('popular', { page })
+}
+
 /** 当前在看人数。 */
 export function videoOnline(key: string, cid: number): Promise<number> {
   return call<number>('video_online', { key, cid })
