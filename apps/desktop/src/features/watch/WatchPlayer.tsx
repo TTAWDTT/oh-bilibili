@@ -7,6 +7,7 @@ import { formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
+import { DanmakuBeats } from '../player/DanmakuBeats'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { useAutoplay } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
@@ -622,6 +623,7 @@ export function WatchPlayer({
           }}
           className="group relative mb-1.5 h-3 cursor-pointer"
         >
+          <DanmakuBeats items={danmaku} durationMs={duration} />
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
           <span
             className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
