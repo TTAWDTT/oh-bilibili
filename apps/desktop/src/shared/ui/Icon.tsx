@@ -43,6 +43,12 @@ const ICONS = {
       <circle cx="13" cy="15" r="1.3" fill="currentColor" stroke="none" />
     </>
   ),
+  /** 特别关注：B 站头像角上那颗小星星。 */
+  star: (
+    <>
+      <path d="m12 3.6 2.5 5.1 5.6.8-4.1 4 1 5.5-5-2.6-5 2.6 1-5.5-4.1-4 5.6-.8L12 3.6Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   /** 收藏：B 站是带星的书签。 */
   bookmarkStar: (
     <>

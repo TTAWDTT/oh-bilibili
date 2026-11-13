@@ -37,6 +37,11 @@ export type Followed = {
   name: string
   face: string | null
   sign: string
+  /** 0 个人认证、1 机构认证；null/undefined 表示未认证。 */
+  official?: number | null
+  vip?: boolean
+  mutual?: boolean
+  special?: boolean
 }
 
 /** 粉丝牌。颜色是接口原样的 0xAARRGGBB。 */

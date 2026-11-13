@@ -71,6 +71,18 @@ pub struct Followed {
     pub name: String,
     pub face: Option<String>,
     pub sign: String,
+    /// B 站认证：None 未认证，Some(0) 个人认证，Some(1) 机构认证。
+    #[serde(default)]
+    pub official: Option<i8>,
+    /// 大会员（`vip.vipStatus == 1`）。
+    #[serde(default)]
+    pub vip: bool,
+    /// 互相关注（`attribute` 的第 3 位）。
+    #[serde(default)]
+    pub mutual: bool,
+    /// 特别关注。
+    #[serde(default)]
+    pub special: bool,
 }
 
 impl Client {
@@ -450,6 +462,13 @@ impl Client {
                                 .filter(|f| !f.is_empty())
                                 .map(|f| f.replacen("http://", "https://", 1)),
                             sign: u["sign"].as_str().unwrap_or("").trim().to_string(),
+                            official: u["official_verify"]["type"]
+                                .as_i64()
+                                .filter(|t| (0..=1).contains(t))
+                                .map(|t| t as i8),
+                            vip: u["vip"]["vipStatus"].as_u64() == Some(1),
+                            mutual: u["attribute"].as_u64().map_or(false, |a| a & 4 != 0),
+                            special: u["special"].as_u64() == Some(1),
                         })
                     })
                     .collect()

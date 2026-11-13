@@ -9,6 +9,7 @@ import { formatCount } from '../../shared/lib/format'
 import { thumbUrl } from '../../shared/lib/thumb'
 import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
@@ -187,19 +188,45 @@ export function FollowingView() {
                 onBlur={hide}
                 className="t press flex w-full items-center gap-2.5 rounded-[8px] border border-[var(--line)] px-2.5 py-2 text-left hover:bg-[var(--panel-alt)]"
               >
-                {u.face ? (
-                  <img
-                    src={thumbUrl(u.face, 72, 72) ?? u.face}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="h-9 w-9 shrink-0 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="h-9 w-9 shrink-0 rounded-full bg-[var(--panel-alt)]" />
-                )}
+                <span className="relative shrink-0">
+                  {u.face ? (
+                    <img
+                      src={thumbUrl(u.face, 72, 72) ?? u.face}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="h-9 w-9 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="block h-9 w-9 rounded-full bg-[var(--panel-alt)]" />
+                  )}
+                  {u.special ? (
+                    <span
+                      title="特别关注"
+                      className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ffb027] text-white shadow-[0_0_0_1.5px_var(--panel)]"
+                    >
+                      <Icon name="star" size={9} />
+                    </span>
+                  ) : null}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-[var(--text-1)]">{u.name}</span>
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="truncate text-[13px] text-[var(--text-1)]">{u.name}</span>
+                    {u.official != null ? (
+                      <span
+                        title={u.official === 1 ? '机构认证' : '个人认证'}
+                        className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-white"
+                        style={{ background: u.official === 1 ? 'var(--accent)' : '#ffb027' }}
+                      >
+                        <Icon name="check" size={9} />
+                      </span>
+                    ) : null}
+                    {u.mutual ? (
+                      <span className="shrink-0 rounded-[2px] bg-[var(--panel-raised)] px-1 text-[10px] leading-[15px] text-[var(--text-3)]">
+                        互关
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
                     {u.sign || '这个人很神秘，什么都没写'}
                   </span>
@@ -223,11 +250,30 @@ export function FollowingView() {
               <div className="flex items-start gap-2.5">
                 <Avatar src={hover.user.face} alt={hover.user.name} size={48} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-[15px] font-medium text-[var(--text-1)]">
                       {hover.user.name}
                     </span>
                     {card ? <LevelBadge level={card.level} /> : null}
+                    {hover.user.official != null ? (
+                      <span
+                        title={hover.user.official === 1 ? '机构认证' : '个人认证'}
+                        className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-white"
+                        style={{ background: hover.user.official === 1 ? 'var(--accent)' : '#ffb027' }}
+                      >
+                        <Icon name="check" size={9} />
+                      </span>
+                    ) : null}
+                    {hover.user.vip ? (
+                      <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+                        大会员
+                      </span>
+                    ) : null}
+                    {hover.user.mutual ? (
+                      <span className="shrink-0 rounded-[2px] bg-[var(--panel-raised)] px-1 text-[10px] leading-[15px] text-[var(--text-3)]">
+                        互关
+                      </span>
+                    ) : null}
                   </div>
                   {card ? (
                     <div className="num mt-1 flex items-center gap-3 whitespace-nowrap text-[12px] text-[var(--text-3)]">
