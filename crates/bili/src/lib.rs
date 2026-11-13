@@ -171,7 +171,9 @@ impl Source {
             ("search_type", "video".to_string()),
             ("keyword", query.keyword().to_string()),
             ("page", query.page().to_string()),
-            ("page_size", "30".to_string()),
+            // 接口上限就是 50（实测 50 条全带封面）。一次取满，
+            // 列表深预取时少跑几轮往返。
+            ("page_size", "50".to_string()),
         ];
         if let Some(tid) = tid {
             params.push(("tids", tid.to_string()));

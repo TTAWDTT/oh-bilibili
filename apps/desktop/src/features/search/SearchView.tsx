@@ -14,14 +14,12 @@ import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 import { ContinueListening } from './ContinueListening'
 import { DurationFilter, type DurationKey } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
 // 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
-
-/** 提前预取的缓冲深度（像素）。搜索一页 30 条，一次 500ms 上下。 */
-const PREFETCH_PX = 4000
 
 type SearchMemory = {
   key: string
@@ -173,8 +171,9 @@ export function SearchView() {
     }
     const ticket = ++seq.current
     const handle = window.setTimeout(() => {
-      setStatus('loading')
+      // 只有第 1 页算「正在搜索」；翻页是补内容，顶部不该一直转。
       if (page === 1) {
+        setStatus('loading')
         setTracks([])
         setUsers([])
         setDataKey('')
@@ -213,8 +212,14 @@ export function SearchView() {
         })
         .catch((cause: unknown) => {
           if (seq.current !== ticket) return
-          setError(toWireError(cause))
-          setStatus('error')
+          setLoadingMore(false)
+          if (page === 1) {
+            setError(toWireError(cause))
+            setStatus('error')
+          } else {
+            // 翻页失败就停在已取到的地方，别把整页结果换成错误页
+            reachedEnd.current = true
+          }
         })
       // 防抖只在第 1 页有意义：用户还在敲字，等他把词打完。
       // 翻页是明确的动作，再等 320ms 就是白等。

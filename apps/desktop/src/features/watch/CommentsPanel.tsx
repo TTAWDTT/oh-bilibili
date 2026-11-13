@@ -8,6 +8,9 @@ import { thumbUrl } from '../../shared/lib/thumb'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
+/** 评论区比整页窄，提前四屏左右取下一页就够铺满滚动空间。 */
+const COMMENT_PREFETCH_PX = 3600
+
 /** 把评论里的 [表情] 代号换成 B 站表情图，其余文字原样保留。 */
 function CommentText({ text, emotes }: { text: string; emotes: [string, string][] }) {
   if (emotes.length === 0) return <>{text}</>
@@ -202,8 +205,8 @@ export function CommentsPanel({
       (entries) => {
         if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load(page + 1)
       },
-      // 评论一页 20 条，提前一屏多就开始取，滚起来才不会一顿一顿
-      { root: root instanceof Element ? root : null, rootMargin: '900px' },
+      // 评论一页 20 条，提前几屏取下一页，滚起来才不会一顿一顿
+      { root: root instanceof Element ? root : null, rootMargin: `${COMMENT_PREFETCH_PX}px` },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
@@ -246,10 +249,28 @@ export function CommentsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackKey, hot])
 
+  // 取回一页后缓冲还不够深就继续取；评论每页 20 条，一屏就能划完。
+  // 跟着整页滚时量哨兵到窗口的距离，否则量面板自己的滚动位置。
+  useEffect(() => {
+    if (loading || !hasMore) return
+    if (flow) {
+      const mark = sentinelRef.current
+      if (mark && mark.getBoundingClientRect().top < window.innerHeight + COMMENT_PREFETCH_PX) {
+        void load(page + 1)
+      }
+      return
+    }
+    const box = boxRef.current
+    if (box && box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) {
+      void load(page + 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, page, hasMore, loading, flow])
+
   const onScroll = (): void => {
     const box = boxRef.current
     if (!box || loading || !hasMore) return
-    if (box.scrollHeight - box.scrollTop - box.clientHeight < 240) void load(page + 1)
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) void load(page + 1)
   }
 
   const submit = async (): Promise<void> => {

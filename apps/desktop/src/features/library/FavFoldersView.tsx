@@ -14,6 +14,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /** 封面拼图按夹子缓存，来回切页不用重取。 */
 const coverCache = new Map<number, string[]>()
@@ -104,11 +105,11 @@ export function FavFoldersView() {
     }
   }, [picked])
 
-  // 首屏或切夹后如果还不满两屏，先把后面的补上：否则用户一进来就要撞到底部。
+  // 首屏或切夹后如果还没铺满预取深度，先把后面的补上：否则用户一进来就要撞到底部。
   useEffect(() => {
     const el = scrollRef.current
     if (!picked || !el || tracks === null || exhausted || loadingMore) return
-    if (el.scrollHeight - el.clientHeight < 1600) void loadMore()
+    if (el.scrollHeight - el.clientHeight < PREFETCH_PX) void loadMore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks, picked])
 
@@ -155,9 +156,9 @@ export function FavFoldersView() {
   }
   if (folders === null) return <BiliTvLoading label="正在读 B 站收藏夹" />
 
-  /** 离底部不到约两屏就补一页；补完如果还不到两屏，下一次滚动会继续补。 */
+  /** 离底部不到预取深度就补一页；补完还不够深，下一次滚动会继续补。 */
   const pullMore = (el: HTMLDivElement): void => {
-    if (!exhausted && el.scrollHeight - el.scrollTop - el.clientHeight < 1600) void loadMore()
+    if (!exhausted && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) void loadMore()
   }
 
   if (picked) {

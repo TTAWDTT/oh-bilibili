@@ -9,6 +9,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /**
  * 发现页。
@@ -25,15 +26,6 @@ const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop:
   nextFresh: 2,
   scrollTop: 0,
 }
-/**
- * 提前预取的缓冲深度（像素）。
- *
- * 一批 30 条要 500ms 接口 + 600ms 限流间隔，补齐一次近 1.1 秒。
- * 缓冲挖到两屏时，用户一次惯性滑动就能把它划完，于是「划到底就开始等」。
- * 留五屏：用户连续快滑也不会撞上未取过的区间。
- */
-const PREFETCH_PX = 4000
-
 export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)

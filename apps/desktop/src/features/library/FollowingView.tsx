@@ -12,6 +12,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /** 名片按 mid 缓存，同一个 UP 反复悬停不再打接口。 */
 const cards = new Map<number, Promise<AuthorCard>>()
@@ -56,7 +57,6 @@ export function FollowingView() {
   const [hover, setHover] = useState<Hover | null>(null)
   const [loaded, setLoaded] = useState<Record<number, AuthorCard>>({})
   const boxRef = useRef<HTMLDivElement | null>(null)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
   const pageRef = useRef(0)
   const timerRef = useRef<number | null>(null)
@@ -87,22 +87,13 @@ export function FollowingView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 关注列表可能一页装不满窗口（328 个关注、一屏能放 20 个时的常态），
-  // 这时 scrollHeight 不超过 clientHeight，滚动事件永远不会触发。
-  // 用 sentinel 观察，内容不够高也会继续取下一页。
+  // 取回一页后缓冲还不够深就继续取。关注列表常一页装不满窗口
+  // （328 个关注、一屏能放 20 个），光靠滚动事件永远触发不了。
   useEffect(() => {
     const box = boxRef.current
-    const sentinel = sentinelRef.current
-    if (!box || !sentinel || page === 0 || done) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void load(page + 1)
-      },
-      // 提前约两屏就取下一页；贴到底再取会明显等
-      { root: box, rootMargin: '1200px' },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    if (!box || page === 0 || done) return
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) void load(page + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, done, loading])
 
   useEffect(() => {
@@ -173,7 +164,13 @@ export function FollowingView() {
     <div
       ref={boxRef}
       id="scroll-main"
-      onScroll={hide}
+      onScroll={() => {
+        hide()
+        const box = boxRef.current
+        if (box && !done && box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) {
+          void load(page + 1)
+        }
+      }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <PageTitle extra={formatCount(total)}>我关注的人</PageTitle>
@@ -212,7 +209,6 @@ export function FollowingView() {
           ))}
         </ul>
         {loading ? <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取…</p> : null}
-        <div ref={sentinelRef} aria-hidden className="h-px" />
         {done && items.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
