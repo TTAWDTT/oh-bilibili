@@ -412,9 +412,18 @@ impl Engine {
     /// 位置因此不需要在两处各存一份：画面读它时用同一份时钟。
     /// 离开观看页。看模式下的声音就是这条视频的，页都退了还出声等于没关掉；
     /// 听模式必须留着，那是用户主动选的后台播放。
-    pub fn close_watch(&self) -> PlayerSnapshot {
+    ///
+    /// `key` 是离开时那一页的视频。换片时旧页面先卸载、新页面随后开播，
+    /// 两个调用都在异步路上；按 key 比对，旧页面的清理不会把新视频掐掉。
+    pub fn close_watch(&self, key: Option<&TrackKey>) -> PlayerSnapshot {
         if *lock(&self.mode) != crate::wire::PlayMode::Watch {
             return self.snapshot();
+        }
+        if let Some(key) = key {
+            let current = self.snapshot().track.map(|t| t.key);
+            if current.as_ref() != Some(key) {
+                return self.snapshot();
+            }
         }
         lock(&self.player).stop();
         {
@@ -908,6 +917,18 @@ impl Engine {
                         }
                     }
                     if engine.reached_track_end() {
+                        // 看模式下放完由观看页决定（重播 / 下一个 / 自动连播）。
+                        // 引擎自己跳下一首会让画面停在旧视频、声音换成另一条，
+                        // 结束面板也永远等不到 ended。
+                        if *lock(&engine.mode) == crate::wire::PlayMode::Watch {
+                            let mut st = lock(&engine.state);
+                            let current = std::mem::replace(&mut *st, PlayerState::Idle);
+                            *st = current.ended();
+                            drop(st);
+                            engine.emit_state();
+                            stalled = 0;
+                            continue;
+                        }
                         // 真的唱完了：切下一首；失败就停在 ended，别空转
                         if rt.block_on(engine.next()).is_err() {
                             let mut st = lock(&engine.state);

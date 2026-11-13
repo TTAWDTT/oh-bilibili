@@ -94,8 +94,10 @@ export function WatchView({ track }: { track: Track }) {
   // 那边的 close_watch 不会误停用户主动选的后台播放。
   useEffect(() => {
     return () => {
-      void ipc.closeWatch().catch(() => {})
+      void ipc.closeWatch(track.key).catch(() => {})
     }
+    // 只在真正离开观看页时清理；换片由 key 比对保证不会误停新视频。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。

@@ -27,6 +27,14 @@ const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
  */
 const DRIFT_SEEK_MS = 1200
 const DRIFT_NUDGE_MS = 250
+/**
+ * 画面落后声音多少才值得 seek。
+ *
+ * 画面跑快时**不能** seek：那会把已经缓冲好的分片全丢掉，再重新拉一遍，
+ * 观感就是一顿。让它原地等一下声音就行。只有画面落后太多（跳转、解码卡顿）
+ * 才值得往前追。
+ */
+const DRIFT_LAG_SEEK_MS = 2500
 /** 追偏差时最多把画面速度改这么多，再多就看得出来变速了。 */
 const NUDGE_RATIO = 0.06
 
@@ -262,10 +270,16 @@ export function WatchPlayer({
         if (!v.paused) v.pause()
         return
       }
-      if (v.paused) void v.play().catch(() => {})
       const head = readPlayhead()
       const drift = v.currentTime * 1000 - head
-      if (Math.abs(drift) > DRIFT_SEEK_MS) {
+      // 画面比声音快：停下来等声音。seek 回去会把缓冲区丢掉，等于用一次卡顿换对齐。
+      if (drift > DRIFT_SEEK_MS) {
+        if (!v.paused) v.pause()
+        return
+      }
+      if (v.paused) void v.play().catch(() => {})
+      // 画面落后太多才 seek 追上；小落后靠加速慢慢追。
+      if (drift < -DRIFT_LAG_SEEK_MS) {
         v.currentTime = head / 1000
         v.playbackRate = speed
         return
@@ -319,6 +333,11 @@ export function WatchPlayer({
             return
           }
           setError(describePlaybackError(detail))
+        })
+        // 缓冲目标放宽：分片要经本机代理去 CDN 取，默认 10 秒的余量
+        // 遇到一段网络抖动就会断供，画面上就是「转圈 / 停顿」。
+        player.configure?.({
+          streaming: { bufferingGoal: 30, rebufferingGoal: 3, bufferBehind: 30 },
         })
         video.muted = true
         video.volume = 0

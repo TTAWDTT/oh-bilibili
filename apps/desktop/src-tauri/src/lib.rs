@@ -126,8 +126,12 @@ async fn set_mode(
 
 /// 离开观看页。看模式下必须停掉声音，否则退出后视频还在后台放。
 #[tauri::command(rename_all = "snake_case")]
-fn close_watch(engine: tauri::State<'_, Arc<Engine>>) -> PlayerSnapshot {
-    engine.close_watch()
+fn close_watch(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: Option<String>,
+) -> PlayerSnapshot {
+    let key = key.map(|k| TrackKey::from_provider(k));
+    engine.close_watch(key.as_ref())
 }
 
 /// UP 主投稿。

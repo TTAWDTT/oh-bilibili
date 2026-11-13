@@ -351,9 +351,9 @@ export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<Pl
   return invoke<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
 }
 
-/** 离开观看页，停掉这条视频的声音。 */
-export function closeWatch(): Promise<PlayerSnapshot> {
-  return invoke<PlayerSnapshot>('close_watch')
+/** 离开观看页，停掉这条视频的声音。带上 key，换片时旧页面的清理不会掐掉新视频。 */
+export function closeWatch(key: string): Promise<PlayerSnapshot> {
+  return invoke<PlayerSnapshot>('close_watch', { key })
 }
 
 /** UP 主投稿。返回 (列表, 总数)。 */

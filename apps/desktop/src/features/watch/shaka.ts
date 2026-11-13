@@ -7,6 +7,7 @@ export type ShakaPlayer = {
   getVariantTracks: () => ShakaVariant[]
   selectVariantTrack: (track: ShakaVariant, clearBuffer: boolean) => void
   addEventListener: (type: string, handler: (event: { detail?: unknown }) => void) => void
+  configure?: (config: Record<string, unknown>) => void
 }
 
 export type ShakaGlobal = {
