@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { thumbUrl } from '../lib/thumb'
+import { thumbWide } from '../lib/thumb'
 
 type CoverProps = {
   cover: string | null
@@ -23,9 +23,9 @@ export function Cover({ cover, title, className, width }: CoverProps) {
   }, [cover])
 
   if (cover && !broken) {
-    // 2 倍像素密度：高 DPI 屏上不糊，同时仍然远小于原图。
-    const scale = width ? thumbUrl(cover, Math.round(width * 2), Math.round((width * 2 * 10) / 16)) : cover
-    const src = scale ?? cover
+    // 按 16:9 请求（原图比例），显示比例交给外层 CSS 裁。
+    // 请求比原图更宽会让图床补黑边，16:10 的卡片格子就曾因此出现黑边。
+    const src = width ? thumbWide(cover, width * 2) ?? cover : cover
     return (
       <img
         src={src}

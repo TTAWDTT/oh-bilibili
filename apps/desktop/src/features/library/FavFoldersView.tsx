@@ -7,7 +7,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import type { FavFolder } from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { thumbUrl } from '../../shared/lib/thumb'
+import { thumbWide } from '../../shared/lib/thumb'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Icon } from '../../shared/ui/Icon'
@@ -281,7 +281,7 @@ export function FavFoldersView() {
                   shots.slice(0, 4).map((src, i) => (
                     <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
                       <img
-                        src={thumbUrl(src, 400, 250) ?? src}
+                        src={thumbWide(src, 400) ?? src}
                         alt=""
                         aria-hidden
                         referrerPolicy="no-referrer"
@@ -292,7 +292,7 @@ export function FavFoldersView() {
                   ))
                 ) : single ? (
                   <img
-                    src={thumbUrl(single, 800, 500) ?? single}
+                    src={thumbWide(single, 800) ?? single}
                     alt=""
                     aria-hidden
                     referrerPolicy="no-referrer"

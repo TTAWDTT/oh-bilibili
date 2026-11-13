@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
-import { thumbUrl } from '../../shared/lib/thumb'
+import { thumbWide } from '../../shared/lib/thumb'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
@@ -43,7 +43,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       {slides.map((t, i) => (
         <img
           key={t.key}
-          src={thumbUrl(t.cover, 2560, 960) ?? ''}
+          src={thumbWide(t.cover, 1600) ?? ''}
           alt=""
           aria-hidden
           referrerPolicy="no-referrer"

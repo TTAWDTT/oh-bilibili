@@ -14,7 +14,7 @@ import { LevelBars } from './LevelBars'
 import { VideoInfo } from './VideoInfo'
 import { PlaybackProgress } from './PlaybackProgress'
 import { usePlayerStore } from './playerStore'
-import { thumbUrl } from '../../shared/lib/thumb'
+import { thumbWide } from '../../shared/lib/thumb'
 
 /**
  * 整屏舞台。播放时点封面进入，退出后回到列表。
@@ -104,7 +104,7 @@ export function StageView() {
       {/* 背景：同一张封面铺满并重度模糊，画面颜色全部来自这张图 */}
       {track.cover ? (
         <img
-          src={thumbUrl(track.cover, 640, 640) ?? track.cover}
+          src={thumbWide(track.cover, 640) ?? track.cover}
           alt=""
           aria-hidden
           referrerPolicy="no-referrer"
