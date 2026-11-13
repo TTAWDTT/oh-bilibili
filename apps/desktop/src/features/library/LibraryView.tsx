@@ -8,6 +8,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
 import { useLibraryStore } from './libraryStore'
+import { usePlayerStore } from '../player/playerStore'
 
 export function LibraryView() {
   const playlists = useLibraryStore((state) => state.playlists)
@@ -15,6 +16,17 @@ export function LibraryView() {
   const navigate = useAppStore((state) => state.navigate)
   const [tracksByList, setTracksByList] = useState<Record<number, readonly Track[]>>({})
   const [creating, setCreating] = useState(false)
+  const playContext = usePlayerStore((state) => state.playContext)
+
+  /** 从卡片直接整单播放：已经读过曲目就直接排，没读到再拉一次。 */
+  const playPlaylist = async (id: number): Promise<void> => {
+    const list = tracksByList[id] ?? (await ipc.libraryTracks(id).catch(() => []))
+    if (list.length === 0) return
+    await playContext(
+      list.map((t) => t.key),
+      0,
+    )
+  }
 
   // 曲目数是列表行的第二列，逐张读一次；读失败只影响这一列，不挡住整页。
   useEffect(() => {
@@ -70,11 +82,14 @@ export function LibraryView() {
               const tracks = tracksByList[playlist.id]
               const count = tracks ? tracks.length : 0
               return (
-                <button
+                <div
                   key={playlist.id}
+                  className="bili-card bili-card-enter group relative overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)]"
+                >
+                <button
                   type="button"
                   onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                  className="bili-card bili-card-enter bili-press overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
+                  className="block w-full text-left"
                 >
                   {/* 封面拼图区：四宫格铺满卡片上半部 */}
                   <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
@@ -104,6 +119,19 @@ export function LibraryView() {
                     </span>
                   </span>
                 </button>
+                {/* B 站歌单卡右上角也是就近播放：整单排进队列，不用先进详情页。 */}
+                <span className="pointer-events-none absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                  <button
+                    type="button"
+                    aria-label={`播放歌单 ${playlist.name}`}
+                    title="播放全部"
+                    onClick={() => void playPlaylist(playlist.id)}
+                    className="bili-press flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] hover:opacity-90"
+                  >
+                    <Icon name="play" size={16} />
+                  </button>
+                </span>
+                </div>
               )
             })}
           </section>
