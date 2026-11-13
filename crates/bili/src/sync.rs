@@ -403,7 +403,7 @@ impl Client {
     /// UP 主的粉丝与关注数。老接口，不需要签名。
     pub async fn space_stat(&self, mid: u64) -> Result<(u64, u64), BiliError> {
         let v = self
-            .get_json(
+            .get_json_relation(
                 &format!("{API}/x/relation/stat?vmid={mid}"),
                 std::time::Duration::from_millis(300),
             )

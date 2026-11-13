@@ -42,6 +42,8 @@ pub struct Client {
     /// UP 名片后面，实测能等到一两秒。播放是用户按下去就要有反应的动作，
     /// 所以给它一条独立队列。
     play_gate: tokio::sync::Mutex<Option<Instant>>,
+    /// 关系接口单独一条闸门：设置页打开时不能排在推荐预取后面。
+    relation_gate: tokio::sync::Mutex<Option<Instant>>,
     cooldown: tokio::sync::Mutex<Option<Instant>>,
     nav: RwLock<NavState>,
     /// 罐里的 cookie 自上次落盘后是否变过。
@@ -64,6 +66,7 @@ impl Client {
             keys: tokio::sync::Mutex::new(None),
             gate: tokio::sync::Mutex::new(None),
             play_gate: tokio::sync::Mutex::new(None),
+            relation_gate: tokio::sync::Mutex::new(None),
             cooldown: tokio::sync::Mutex::new(None),
             nav: RwLock::new(NavState::default()),
             cookies_dirty: std::sync::atomic::AtomicBool::new(false),
@@ -233,7 +236,16 @@ impl Client {
     }
 
     pub async fn get_json(&self, url: &str, min_interval: Duration) -> Result<Value, BiliError> {
-        self.get_json_inner(url, min_interval, false).await
+        self.get_json_inner(url, min_interval, false, false).await
+    }
+
+    /// 关系接口：独立闸门，避免被列表预取挡住。
+    pub async fn get_json_relation(
+        &self,
+        url: &str,
+        min_interval: Duration,
+    ) -> Result<Value, BiliError> {
+        self.get_json_inner(url, min_interval, false, true).await
     }
 
     /// 允许未登录响应的版本。只有 nav 这种「游客也能拿到有用数据」的接口该用它。
@@ -242,7 +254,7 @@ impl Client {
         url: &str,
         min_interval: Duration,
     ) -> Result<Value, BiliError> {
-        self.get_json_inner(url, min_interval, true).await
+        self.get_json_inner(url, min_interval, true, false).await
     }
 
     async fn get_json_inner(
@@ -250,9 +262,14 @@ impl Client {
         url: &str,
         min_interval: Duration,
         allow_guest: bool,
+        relation: bool,
     ) -> Result<Value, BiliError> {
         self.wait_cooldown().await?;
-        self.gate(min_interval).await;
+        if relation {
+            Client::wait_slot(&self.relation_gate, min_interval).await;
+        } else {
+            self.gate(min_interval).await;
+        }
 
         let cookie = self.cookie_header();
         let mut req = self
@@ -458,7 +475,7 @@ impl Client {
         let query = keys.sign(&params, wts);
         self.gate_play(min_interval).await;
         // 闸门已经过完了，这里用零间隔再走一遍完整流程（含风控冷却与 cookie 吸收）
-        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false)
+        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false, false)
             .await
     }
 
