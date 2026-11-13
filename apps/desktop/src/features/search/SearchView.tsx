@@ -20,6 +20,9 @@ const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
+/** 提前预取的缓冲深度（像素）。搜索一页 30 条，一次 500ms 上下。 */
+const PREFETCH_PX = 4000
+
 type SearchMemory = {
   key: string
   tracks: Track[]
@@ -213,7 +216,9 @@ export function SearchView() {
           setError(toWireError(cause))
           setStatus('error')
         })
-    }, 320)
+      // 防抖只在第 1 页有意义：用户还在敲字，等他把词打完。
+      // 翻页是明确的动作，再等 320ms 就是白等。
+    }, page === 1 ? 320 : 0)
     return () => window.clearTimeout(handle)
   }, [trimmed, page, nonce, order, partition, duration])
 
@@ -222,7 +227,7 @@ export function SearchView() {
     if (status !== 'ready' || loadingMore || tracks.length === 0 || reachedEnd.current) return
     const el = scrollerRef.current
     if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1200) {
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
       setLoadingMore(true)
       setPage((p) => p + 1)
     }
@@ -246,9 +251,8 @@ export function SearchView() {
           if (searchMemory) searchMemory.scrollTop = el.scrollTop
           // 到底之后不再翻页：滚动会一直触发，不挡住就是无限空请求。
           if (loadingMore || status !== 'ready' || tracks.length === 0 || reachedEnd.current) return
-          // 提前约两屏就预取下一页：等到贴近底部再发请求，
-          // 用户会看到「滑到底 → 转圈 → 才有内容」，那就是卡。
-          if (el.scrollHeight - el.scrollTop - el.clientHeight < 1200) {
+          // 缓冲不够深就预取：请求要在用户到达之前发出去。
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
             setLoadingMore(true)
             setPage((p) => p + 1)
           }

@@ -25,6 +25,15 @@ const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop:
   nextFresh: 2,
   scrollTop: 0,
 }
+/**
+ * 提前预取的缓冲深度（像素）。
+ *
+ * 一批 30 条要 500ms 接口 + 600ms 限流间隔，补齐一次近 1.1 秒。
+ * 缓冲挖到两屏时，用户一次惯性滑动就能把它划完，于是「划到底就开始等」。
+ * 留五屏：用户连续快滑也不会撞上未取过的区间。
+ */
+const PREFETCH_PX = 4000
+
 export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
@@ -98,12 +107,12 @@ export function HomeView() {
     void load(next, true)
   }
 
-  // 加载完一批后如果还没填满两屏，就继续取，别让用户撞到底才开始等。
+  // 一批取回来后缓冲还不够深就继续取：请求发生在用户到达之前，而不是之后。
   useEffect(() => {
     if (loading || loadingMore || items.length === 0 || exhausted.current) return
     const el = scrollerRef.current
     if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1400) more()
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, loading, loadingMore])
 
@@ -114,8 +123,7 @@ export function HomeView() {
       onScroll={(event) => {
         const el = event.currentTarget
         feedMemory.scrollTop = el.scrollTop
-        // 提前约两屏预取；贴到底再取就会出现「划到底等半天」。
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < 1400) more()
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
