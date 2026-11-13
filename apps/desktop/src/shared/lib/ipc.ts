@@ -225,6 +225,10 @@ export type UserHit = {
   videos: number
   sign: string
   level: number
+  /** 0 个人认证、1 机构认证；null 表示未认证。 */
+  official?: number | null
+  verify?: string
+  live?: boolean
 }
 
 /** 搜 UP 主。 */

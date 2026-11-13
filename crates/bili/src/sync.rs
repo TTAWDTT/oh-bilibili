@@ -23,6 +23,12 @@ pub struct UserHit {
     pub videos: u64,
     pub sign: String,
     pub level: u8,
+    /// 认证：None 未认证（接口会给 127），Some(0) 个人，Some(1) 机构。
+    pub official: Option<i8>,
+    /// 认证说明，挂在勾的 tooltip 上。
+    pub verify: String,
+    /// 正在直播：搜索结果的 is_live。
+    pub live: bool,
 }
 
 /// 收藏夹列表里的一项。B 站 web 端的收藏夹页就用 `created/list`，它自带每个夹子的封面。
@@ -617,8 +623,8 @@ impl Client {
                     ("page", page.max(1).to_string()),
                     ("page_size", "20".to_string()),
                 ],
-                // 搜索接口连续请求会被限流成空结果，和 search_q 一样按 1 秒隔开
-                std::time::Duration::from_millis(1000),
+                // 搜索接口按窗口限请求数，和 search_q 走同一个间隔
+                std::time::Duration::from_millis(400),
             )
             .await?;
         let Some(list) = v["data"]["result"].as_array() else {
@@ -643,6 +649,16 @@ impl Client {
                     videos: m["videos"].as_u64().unwrap_or(0),
                     sign: m["usign"].as_str().unwrap_or_default().trim().to_string(),
                     level: m["level"].as_u64().unwrap_or(0) as u8,
+                    official: m["official_verify"]["type"]
+                        .as_i64()
+                        .filter(|t| (0..=1).contains(t))
+                        .map(|t| t as i8),
+                    verify: m["official_verify"]["desc"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string(),
+                    live: m["is_live"].as_u64() == Some(1),
                 })
             })
             .collect())

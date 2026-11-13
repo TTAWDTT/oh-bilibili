@@ -20,8 +20,12 @@ use crate::client::Client;
 use crate::error::BiliError;
 use crate::search::Candidate;
 
-/// 搜索间隔。B 站对搜索最敏感，1 秒一次是保守值。
-const SEARCH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1000);
+/// 搜索间隔。
+///
+/// B 站的搜索限流是按窗口算请求数，不是按间隔：实测 350ms 连翻 30 页照样条条有货，
+/// 一分钟内超过三十几页才开始回空。压间隔不增加总预算，只是让同样的页数更早到手——
+/// 缓冲要在十秒内铺满，不然用户已经划到底了还在等下一页。
+const SEARCH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(400);
 /// 取流间隔。
 const PLAY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(300);
 

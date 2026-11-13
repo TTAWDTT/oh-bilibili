@@ -6,6 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { formatCount } from '../../shared/lib/format'
 import { thumbUrl } from '../../shared/lib/thumb'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { usePlayerStore } from '../player/playerStore'
@@ -59,6 +60,7 @@ export function SearchView() {
   const skipFirstFetch = useRef(restored !== null)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   // 统计行要说实话：用户选了「最多播放」，这里就不能还写着「按标题匹配排序」。
@@ -207,6 +209,7 @@ export function SearchView() {
         setStatus('loading')
         setTracks([])
         setDataKey('')
+        setMoreError(false)
         scrollerRef.current?.scrollTo({ top: 0 })
       }
       ipc
@@ -228,6 +231,7 @@ export function SearchView() {
           setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
           setLoadingMore(false)
+          setMoreError(false)
         })
         .catch((cause: unknown) => {
           if (seq.current !== ticket) return
@@ -236,8 +240,10 @@ export function SearchView() {
             setError(toWireError(cause))
             setStatus('error')
           } else {
-            // 翻页失败就停在已取到的地方，别把整页结果换成错误页
-            reachedEnd.current = true
+            // 翻页失败就停在已取到的地方，别把整页结果换成错误页。
+            // 但也不能当成「到底」：搜索碰上限流时只是这一分钟没取到，
+            // 留个重试入口，用户点了再要同一页，别把整条结果链掐断。
+            setMoreError(true)
           }
         })
       // 防抖只在第 1 页有意义：用户还在敲字，等他把词打完。
@@ -248,14 +254,14 @@ export function SearchView() {
 
   // 首屏之后自动补齐：滚到底时下一页往往已经在路上，继续滚也不会停。
   useEffect(() => {
-    if (status !== 'ready' || loadingMore || tracks.length === 0 || reachedEnd.current) return
+    if (status !== 'ready' || loadingMore || moreError || tracks.length === 0 || reachedEnd.current) return
     const el = scrollerRef.current
     if (!el) return
     if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
       setLoadingMore(true)
       setPage((p) => p + 1)
     }
-  }, [tracks, status, loadingMore])
+  }, [tracks, status, loadingMore, moreError])
 
   const pick = (value: string): void => {
     setQuery(value)
@@ -274,7 +280,7 @@ export function SearchView() {
           const el = event.currentTarget
           if (searchMemory) searchMemory.scrollTop = el.scrollTop
           // 到底之后不再翻页：滚动会一直触发，不挡住就是无限空请求。
-          if (loadingMore || status !== 'ready' || tracks.length === 0 || reachedEnd.current) return
+          if (loadingMore || moreError || status !== 'ready' || tracks.length === 0 || reachedEnd.current) return
           // 缓冲不够深就预取：请求要在用户到达之前发出去。
           if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
             setLoadingMore(true)
@@ -373,12 +379,28 @@ export function SearchView() {
                         <span className="h-10 w-10 shrink-0 rounded-full bg-[var(--panel-alt)]" />
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1">
+                        <span className="flex min-w-0 items-center gap-1">
                           <span className="truncate text-[13px] text-[var(--text-1)]">{user.name}</span>
                           {user.level > 0 ? <LevelBadge level={user.level} /> : null}
+                          {user.official != null ? (
+                            <span
+                              title={user.verify || (user.official === 1 ? '机构认证' : '个人认证')}
+                              className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-white"
+                              style={{ background: user.official === 1 ? 'var(--accent)' : '#ffb027' }}
+                            >
+                              <Icon name="check" size={9} />
+                            </span>
+                          ) : null}
                         </span>
-                        <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
-                          {formatCount(user.fans)} 粉丝 · {formatCount(user.videos)} 投稿
+                        <span className="num mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-[var(--text-3)]">
+                          {user.live ? (
+                            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+                              直播中
+                            </span>
+                          ) : null}
+                          <span className="truncate">
+                            {formatCount(user.fans)} 粉丝 · {formatCount(user.videos)} 投稿
+                          </span>
                         </span>
                         {user.sign ? (
                           <span
@@ -529,6 +551,18 @@ export function SearchView() {
               <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[13px] text-[var(--text-3)]">
                 {loadingMore ? (
                   <BiliLoader compact label="正在加载更多…" />
+                ) : moreError ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreError(false)
+                      setLoadingMore(true)
+                      setNonce((current) => current + 1)
+                    }}
+                    className="t press text-[var(--accent)] hover:underline"
+                  >
+                    没加载出来，重试这一页
+                  </button>
                 ) : (
                   <span className="text-[var(--text-3)]">已加载 {tracks.length} 个 · 继续下滑查看更多</span>
                 )}

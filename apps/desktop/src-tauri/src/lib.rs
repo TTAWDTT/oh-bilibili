@@ -619,6 +619,9 @@ struct UserHitView {
     videos: u64,
     sign: String,
     level: u8,
+    official: Option<i8>,
+    verify: String,
+    live: bool,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -639,6 +642,9 @@ async fn search_users(
             videos: u.videos,
             sign: u.sign,
             level: u.level,
+            official: u.official,
+            verify: u.verify,
+            live: u.live,
         })
         .collect())
 }
