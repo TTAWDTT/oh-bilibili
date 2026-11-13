@@ -72,6 +72,15 @@ export function PopularView() {
       })
   }
 
+  // 取回一页后缓冲还不够深就继续取。热门一页 50 条约三四屏，
+  // 只在滚动时触发的话，用户滑到页尾仍会撞上「正在加载更多」。
+  useEffect(() => {
+    if (tracks === null || loadingMore || error) return
+    const el = scrollRef.current
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks, loadingMore, error])
+
   return (
     <div
       ref={scrollRef}

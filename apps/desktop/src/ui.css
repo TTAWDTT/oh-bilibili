@@ -304,6 +304,78 @@
   animation: bili-hold-fill 550ms linear forwards;
 }
 
+/* ── 一键三连的整屏庆祝 ─────────────────────────────
+ * 三拍：图标带旋转弹出 → 文字跟上 → 三枚一起收拢淡出。
+ * 收拢在 1180ms 走完，TripleBurst.tsx 的 1200ms 计时器随即卸载。
+ */
+@keyframes triple-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-120deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes triple-label {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 收拢：左右两枚朝中间并、一起缩小淡出，中间那枚只缩不移。 */
+@keyframes triple-gather {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--dx, 0px)) scale(0.86);
+  }
+}
+
+/* 前两拍用 --spring；收拢这一拍用 linear：--spring 的透明度会越界，
+   图标在总时长过半时就淡没了，剩下半程是空等。 */
+.triple-cell {
+  animation: triple-gather 500ms linear 680ms both;
+}
+
+.triple-cell:first-child {
+  --dx: 26px;
+}
+
+.triple-cell:last-child {
+  --dx: -26px;
+}
+
+.triple-pop {
+  animation: triple-pop 420ms var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+.triple-label {
+  animation: triple-label 240ms var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 100ms);
+}
+
+/* 减少动态：三枚静止地露一下再收走，不做旋转、位移与淡出。
+   白色蒙版保留：它是这三行字在视频画面上的底，不算运动。 */
+@media (prefers-reduced-motion: reduce) {
+  .triple-cell,
+  .triple-pop,
+  .triple-label {
+    animation: none;
+  }
+}
+
 /* 页面切换：淡入。这里不能碰 transform——动画的 fill 模式会让页面成为
    fixed 后代的包含块，观看页全屏就会被裁在内容区里，视频层也会变黑。 */
 @keyframes bili-page-in {

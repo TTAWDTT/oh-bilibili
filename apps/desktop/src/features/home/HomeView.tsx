@@ -38,6 +38,8 @@ export function HomeView() {
   /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
   const nextFresh = useRef(feedMemory.nextFresh)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  /** 滚动事件比 React 状态回写快，用它挡住同一批的重复请求。 */
+  const pending = useRef(false)
   /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
   const exhausted = useRef(false)
 
@@ -92,11 +94,14 @@ export function HomeView() {
 
   const more = (): void => {
     // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
-    if (loading || loadingMore || exhausted.current) return
+    if (pending.current || loading || loadingMore || exhausted.current) return
+    pending.current = true
     const next = nextFresh.current
     nextFresh.current = next + 1
     feedMemory.nextFresh = next + 1
-    void load(next, true)
+    void load(next, true).finally(() => {
+      pending.current = false
+    })
   }
 
   // 一批取回来后缓冲还不够深就继续取：请求发生在用户到达之前，而不是之后。

@@ -4,13 +4,11 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 import { thumbUrl } from '../../shared/lib/thumb'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
-
-/** 评论区比整页窄，提前四屏左右取下一页就够铺满滚动空间。 */
-const COMMENT_PREFETCH_PX = 3600
 
 /** 把评论里的 [表情] 代号换成 B 站表情图，其余文字原样保留。 */
 function CommentText({ text, emotes }: { text: string; emotes: [string, string][] }) {
@@ -339,7 +337,7 @@ export function CommentsPanel({
         if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load(page + 1)
       },
       // 评论一页 20 条，提前几屏取下一页，滚起来才不会一顿一顿
-      { root: root instanceof Element ? root : null, rootMargin: `${COMMENT_PREFETCH_PX}px` },
+      { root: root instanceof Element ? root : null, rootMargin: `${PREFETCH_PX}px` },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
@@ -388,13 +386,13 @@ export function CommentsPanel({
     if (loading || !hasMore) return
     if (flow) {
       const mark = sentinelRef.current
-      if (mark && mark.getBoundingClientRect().top < window.innerHeight + COMMENT_PREFETCH_PX) {
+      if (mark && mark.getBoundingClientRect().top < window.innerHeight + PREFETCH_PX) {
         void load(page + 1)
       }
       return
     }
     const box = boxRef.current
-    if (box && box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) {
+    if (box && box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) {
       void load(page + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -403,7 +401,7 @@ export function CommentsPanel({
   const onScroll = (): void => {
     const box = boxRef.current
     if (!box || loading || !hasMore) return
-    if (box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) void load(page + 1)
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) void load(page + 1)
   }
 
   const submit = async (): Promise<void> => {

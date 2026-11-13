@@ -10,6 +10,7 @@ import { toastDone } from '../../app/notice'
 import { CommentsPanel } from './CommentsPanel'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
+import { TripleBurst } from './TripleBurst'
 import { WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
 
@@ -33,6 +34,8 @@ export function WatchView({ track }: { track: Track }) {
   const [likeDelta, setLikeDelta] = useState(0)
   const [favDelta, setFavDelta] = useState(0)
   const [coinDelta, setCoinDelta] = useState(0)
+  // 三连庆祝的场次：自增一次播一遍，0 表示还没播过。
+  const [burst, setBurst] = useState(0)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
@@ -77,6 +80,7 @@ export function WatchView({ track }: { track: Track }) {
     if (needLike) like()
     if (needCoin) coin()
     if (needFav) fav()
+    setBurst((n) => n + 1)
     toastDone('一键三连', '点赞、投币、收藏都点上了')
   }
 
@@ -161,6 +165,7 @@ export function WatchView({ track }: { track: Track }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <TripleBurst run={burst} />
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
