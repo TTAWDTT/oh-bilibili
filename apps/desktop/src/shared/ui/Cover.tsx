@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
+import { thumbUrl } from '../lib/thumb'
 
 type CoverProps = {
   cover: string | null
   title: string
   className: string
+  /**
+   * 目标渲染宽度（CSS 像素）。
+   *
+   * B 站图床支持 `@宽w_高h_1c.webp` 后缀，同一张原创封面实测 477KB → 22KB。
+   * 网格卡片只有 206–380 宽，不缩图就是拿原图铺小格子，一屏能拉几 MB，
+   * 表现为「划下去要等」。
+   */
+  width?: number
 }
 
-export function Cover({ cover, title, className }: CoverProps) {
+export function Cover({ cover, title, className, width }: CoverProps) {
   const [broken, setBroken] = useState(false)
 
   useEffect(() => {
@@ -14,9 +23,12 @@ export function Cover({ cover, title, className }: CoverProps) {
   }, [cover])
 
   if (cover && !broken) {
+    // 2 倍像素密度：高 DPI 屏上不糊，同时仍然远小于原图。
+    const scale = width ? thumbUrl(cover, Math.round(width * 2), Math.round((width * 2 * 10) / 16)) : cover
+    const src = scale ?? cover
     return (
       <img
-        src={cover}
+        src={src}
         alt=""
         draggable={false}
         /* B 站图床对非 bilibili 的 Referer 一律 403，webview 默认会带页面来源，

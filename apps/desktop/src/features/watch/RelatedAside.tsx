@@ -27,7 +27,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
               className="relative w-[136px] shrink-0 overflow-hidden rounded-[4px]"
               style={{ aspectRatio: '16 / 10' }}
             >
-              <Cover cover={item.cover} title={item.title} className="h-full w-full" />
+              <Cover cover={item.cover} title={item.title} width={136} className="h-full w-full" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-[13px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">

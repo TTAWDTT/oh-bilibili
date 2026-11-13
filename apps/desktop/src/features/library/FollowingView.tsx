@@ -6,6 +6,7 @@ import type { Followed } from '../../shared/lib/contract'
 import type { AuthorCard } from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
+import { thumbUrl } from '../../shared/lib/thumb'
 import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
@@ -191,7 +192,7 @@ export function FollowingView() {
               >
                 {u.face ? (
                   <img
-                    src={u.face}
+                    src={thumbUrl(u.face, 72, 72) ?? u.face}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"

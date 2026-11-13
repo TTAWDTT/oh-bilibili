@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icon } from './Icon'
+import { thumbUrl } from '../lib/thumb'
 
 /**
  * 头像。加载失败或没有地址时退回人形图标。
@@ -32,7 +33,7 @@ export function Avatar({
     >
       {showImage ? (
         <img
-          src={src ?? ''}
+          src={thumbUrl(src, size * 2, size * 2) ?? src ?? ''}
           alt={alt}
           width={size}
           height={size}

@@ -154,7 +154,12 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                   className="relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
                   style={{ aspectRatio: '16 / 10' }}
                 >
-                  <Cover cover={track.cover} title={track.title} className="bili-card-cover h-full w-full" />
+                  <Cover
+                    cover={track.cover}
+                    title={track.title}
+                    width={260}
+                    className="bili-card-cover h-full w-full"
+                  />
                   {ranked ? (
                     <span
                       className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-[4px] px-1 text-[13px] font-semibold text-white"
