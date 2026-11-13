@@ -25,6 +25,9 @@ const FOLLOW_SEEDS: {
   { name: '不睡觉的鹿', sign: '翻唱 / 混音', official: null, vip: false, mutual: false, special: false },
 ]
 
+/** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
+const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
+
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
   // 队列相关命令都在 player 侧实现
@@ -224,15 +227,41 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         audio_quality: 192,
       }
     }
+    case 'comment_add': {
+      const key = str(args, 'key')
+      const text = str(args, 'text').trim()
+      if (!text) throw fail('input', '评论不能为空')
+      const list = sentComments.get(key) ?? []
+      const id = `local-${Date.now()}`
+      list.unshift({ text, at: Date.now(), id })
+      sentComments.set(key, list)
+      await sleep(120)
+      return id
+    }
     case 'watch_comments': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       // 预览只造一页评论：第二页再回同一批，界面上就会原样重复一遍。
       if (page > 1) return { total: COMMENT_SEEDS.length, page, items: [], has_more: false }
+      const mine = (sentComments.get(str(args, 'key')) ?? []).map((c) => ({
+        id: c.id,
+        mid: 1,
+        author: '我',
+        avatar: null,
+        text: c.text,
+        emotes: [],
+        level: 6,
+        likes: 0,
+        at: Math.floor(c.at / 1000),
+        replies: [],
+        reply_count: 0,
+        pinned: false,
+        medal: null,
+      }))
       return {
-        total: COMMENT_SEEDS.length,
+        total: COMMENT_SEEDS.length + mine.length,
         page,
         has_more: false,
-        items: COMMENT_SEEDS.map((seed, i) => ({
+        items: [...mine, ...COMMENT_SEEDS.map((seed, i) => ({
           id: `${page}-${i}`,
           mid: seed.mid,
           author: seed.author,
@@ -257,7 +286,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
                 level_bg: 0xff3d3d3d,
               }
             : null,
-        })),
+        }))],
       }
     }
     case 'watch_replies': {
