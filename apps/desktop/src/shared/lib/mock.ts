@@ -333,9 +333,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'coin_set':
       return null
     case 'relation_states': {
-      // 预览：把前两条标成已赞/已藏，用来验证进页面时状态会被点亮。
+      // 预览：目录第一条固定是已赞/已藏，用来验证进页面时状态会被点亮。
+      // 按「这一批的第一条」算会把鼠标底下那张卡随机点亮，验出来的状态是假的。
       const keys = Array.isArray(args.keys) ? (args.keys as string[]) : []
-      return keys.map((key, i) => [key, i === 0, i === 0, i === 0 ? 1 : 0])
+      const first = CATALOG[0]?.key
+      return keys.map((key) => [key, key === first, key === first, key === first ? 1 : 0])
     }
     case 'like_set': {
       const key = str(args, 'key')
