@@ -40,42 +40,83 @@ export function DanmakuField({
   fade?: boolean
 }) {
   const [flights, setFlights] = useState<Flight[]>([])
+  /** 与 flights 同步的镜像：定时器里读它算下一帧，不把副作用写进 setState 的 updater。 */
+  const flightsRef = useRef<Flight[]>([])
+  flightsRef.current = flights
   const seq = useRef(0)
   const positionRef = useRef(position)
   positionRef.current = position
+  /** 已经放到哪一条了。整场扫一遍太浪费：一部热视频几千条弹幕，220ms 一轮就是几十万次比较。 */
+  const cursor = useRef(0)
+  const lastPos = useRef(-1)
 
   const all = useMemo(() => [...items].sort((a, b) => a.at - b.at), [items])
 
   useEffect(() => {
+    cursor.current = 0
+    lastPos.current = -1
+  }, [all])
+
+  useEffect(() => {
     if (!enabled) return
-    const timer = window.setInterval(() => {
+    const tick = (): void => {
       const pos = positionRef.current()
-      setFlights((prev) => {
-        const alive = prev.filter((f) => pos - f.born < LIFE_MS)
-        if (!playing) return alive.length === prev.length ? prev : alive
-        // 车道在生成时定死并存进条目。用数组下标算 top 的话，一条飘完被移除后
-        // 其余条目下标前移，整排会瞬间跳一行。
-        const used = new Set(alive.map((f) => f.lane))
-        const fresh: Flight[] = []
-        for (const item of all) {
-          if (item.at > pos || item.at <= pos - 2000) continue
-          if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
-          let lane = -1
-          for (let c = 0; c < LANES; c += 1) {
-            if (!used.has(c) && !fresh.some((f) => f.lane === c)) {
-              lane = c
-              break
-            }
-          }
-          // 车道满了就丢掉这条：B 站也是这么做的，硬塞会互相压住
-          if (lane < 0) continue
-          seq.current += 1
-          fresh.push({ ...item, id: seq.current, born: item.at, lane })
+      // 往回拖或换片：二分找到第一个还没过期的位置，从头对齐。
+      if (pos < lastPos.current) {
+        let lo = 0
+        let hi = all.length
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1
+          if (all[mid]!.at < pos - 2000) lo = mid + 1
+          else hi = mid
         }
-        if (fresh.length === 0) return alive.length === prev.length ? prev : alive
-        return [...alive, ...fresh]
-      })
-    }, SPAWN_TICK_MS)
+        cursor.current = lo
+      }
+      lastPos.current = pos
+
+      const prev = flightsRef.current
+      const alive = prev.filter((f) => pos - f.born < LIFE_MS)
+      if (!playing) {
+        if (alive.length !== prev.length) {
+          flightsRef.current = alive
+          setFlights(alive)
+        }
+        return
+      }
+      // 车道在生成时定死并存进条目。用数组下标算 top 的话，一条飘完被移除后
+      // 其余条目下标前移，整排会瞬间跳一行。
+      const used = new Set(alive.map((f) => f.lane))
+      const fresh: Flight[] = []
+      while (cursor.current < all.length && all[cursor.current]!.at <= pos - 2000) cursor.current += 1
+      let i = cursor.current
+      for (; i < all.length && all[i]!.at <= pos; i += 1) {
+        const item = all[i]!
+        if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
+        let lane = -1
+        for (let c = 0; c < LANES; c += 1) {
+          if (!used.has(c) && !fresh.some((f) => f.lane === c)) {
+            lane = c
+            break
+          }
+        }
+        // 车道满了就丢掉这条：B 站也是这么做的，硬塞会互相压住
+        if (lane < 0) continue
+        seq.current += 1
+        fresh.push({ ...item, id: seq.current, born: item.at, lane })
+      }
+      cursor.current = i
+      if (fresh.length === 0) {
+        if (alive.length !== prev.length) {
+          flightsRef.current = alive
+          setFlights(alive)
+        }
+        return
+      }
+      const next = [...alive, ...fresh]
+      flightsRef.current = next
+      setFlights(next)
+    }
+    const timer = window.setInterval(tick, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
   }, [all, enabled, playing])
 
