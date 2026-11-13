@@ -3,6 +3,34 @@
 //! 运行：cargo test -p bilimusic-bili --test live -- --ignored --nocapture
 
 use bilimusic_model::SearchQuery;
+/// 每周必看：期数列表是公开接口，某一期要走 wbi + web_location，缺了就 -352。
+/// 标题在 `data.config` 里（不是 `data` 顶层），片单一次 50 条。
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 每周必看能取到期数与片单() {
+    let source = Source::open().await.expect("Source 应该能打开");
+    let issues = source.weekly_issues().await.expect("期数列表应该能取到");
+    assert!(issues.len() > 10, "期数应该有一长串，实际 {}", issues.len());
+    let latest = issues.first().expect("至少一期");
+    assert!(latest.number >= 300, "最新期号不该这么小：{}", latest.number);
+    assert!(!latest.name.is_empty(), "期数条目要带名字");
+
+    let page = source.weekly_issue(latest.number).await.expect("某一期应该能取到");
+    println!(
+        "第 {} 期：{} / {} / {} 条",
+        latest.number,
+        page.subject,
+        page.label,
+        page.tracks.len()
+    );
+    assert!(!page.subject.is_empty(), "主题在 data.config 里，取空了说明字段名又变了");
+    assert_eq!(page.tracks.len(), 50, "一期应当是 50 条");
+    assert!(
+        page.tracks.iter().all(|t| t.cover.is_some()),
+        "片单条目应该都带封面"
+    );
+}
+
 use bilimusic_bili::Source;
 
 #[tokio::test(flavor = "multi_thread")]
