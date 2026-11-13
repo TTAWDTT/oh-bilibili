@@ -288,6 +288,22 @@
   transform: scale(0.96);
 }
 
+/* 长按点赞：一条从左往右填满的细条，填满就是「一键三连」触发。
+   只动 transform，不触发布局。 */
+@keyframes bili-hold-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.bili-hold-bar {
+  transform-origin: left center;
+  animation: bili-hold-fill 550ms linear forwards;
+}
+
 /* 页面切换：淡入。这里不能碰 transform——动画的 fill 模式会让页面成为
    fixed 后代的包含块，观看页全屏就会被裁在内容区里，视频层也会变黑。 */
 @keyframes bili-page-in {

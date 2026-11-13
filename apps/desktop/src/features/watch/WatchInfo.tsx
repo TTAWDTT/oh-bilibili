@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -28,6 +28,7 @@ export function WatchInfo({
   onLike,
   onFav,
   onCoin,
+  onTriple,
 }: {
   track: Track
   data: WatchData
@@ -41,6 +42,8 @@ export function WatchInfo({
   onLike: () => void
   onFav: () => void
   onCoin: () => void
+  /** 长按点赞：B 站的一键三连。 */
+  onTriple: () => void
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
@@ -56,6 +59,10 @@ export function WatchInfo({
   /** 简介默认收两行，长简介给一个展开。 */
   const [descOpen, setDescOpen] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
+  /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
+  const [holding, setHolding] = useState(false)
+  const holdTimer = useRef<number | null>(null)
+  const longFired = useRef(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
@@ -129,6 +136,29 @@ export function WatchInfo({
       cancelled = true
     }
   }, [data.owner_mid])
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+    }
+  }, [])
+
+  const startHold = (): void => {
+    longFired.current = false
+    setHolding(true)
+    holdTimer.current = window.setTimeout(() => {
+      holdTimer.current = null
+      longFired.current = true
+      setHolding(false)
+      onTriple()
+    }, 550)
+  }
+
+  const endHold = (): void => {
+    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+    holdTimer.current = null
+    setHolding(false)
+  }
 
   /** 胶囊按钮：B 站视频页的每个操作都是这个形状，图标 + 文字 + 数字。 */
   const pill = (on: boolean): string =>
@@ -226,12 +256,25 @@ export function WatchInfo({
         <button
           type="button"
           aria-pressed={liked}
-          onClick={onLike}
-          className={triple(liked, 'left')}
-          title={liked ? '取消点赞' : '点赞'}
+          onPointerDown={startHold}
+          onPointerUp={endHold}
+          onPointerLeave={endHold}
+          onClick={() => {
+            // 长按已经触发过三连，这一次松开不再当成普通点赞
+            if (longFired.current) {
+              longFired.current = false
+              return
+            }
+            onLike()
+          }}
+          className={`${triple(liked, 'left')} relative overflow-hidden`}
+          title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
           <BiliThumb size={15} />
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
+          {holding ? (
+            <span className="bili-hold-bar absolute inset-x-0 bottom-0 h-[2px] bg-[var(--accent)]" />
+          ) : null}
         </button>
         <button
           type="button"

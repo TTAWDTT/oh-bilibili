@@ -6,6 +6,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
+import { toastDone } from '../../app/notice'
 import { CommentsPanel } from './CommentsPanel'
 import { RelatedAside } from './RelatedAside'
 import { WatchInfo } from './WatchInfo'
@@ -60,6 +61,22 @@ export function WatchView({ track }: { track: Track }) {
       .then((ok) => {
         if (ok) setCoinDelta((n) => n + 1)
       })
+  }
+
+  /** 长按点赞：把三连补成「都有了」。已经点过的不重复点，避免把点赞点成取消。 */
+  const triple = (): void => {
+    const st = useReactionStore.getState()
+    const needLike = !(st.liked[track.key] ?? false)
+    const needFav = !(st.faved[track.key] ?? false)
+    const needCoin = (st.coins[track.key] ?? 0) < 2
+    if (!needLike && !needFav && !needCoin) {
+      toastDone('已经三连过了')
+      return
+    }
+    if (needLike) like()
+    if (needCoin) coin()
+    if (needFav) fav()
+    toastDone('一键三连', '点赞、投币、收藏都点上了')
   }
 
   const fav = (): void => {
@@ -200,6 +217,7 @@ export function WatchView({ track }: { track: Track }) {
               onCoin={coin}
               onLike={like}
               onFav={fav}
+              onTriple={triple}
               onListen={(at) => {
                 void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
               }}
