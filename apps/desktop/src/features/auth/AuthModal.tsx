@@ -11,6 +11,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
 import { Skeleton } from '../../shared/ui/Skeleton'
+import { thumbUrl } from '../../shared/lib/thumb'
 import { useAuthStore } from './authStore'
 import { QrPanel } from './QrPanel'
 
@@ -111,7 +112,13 @@ export function AuthModal() {
       {loggedIn && auth?.user ? (
         <div className="flex items-center gap-4 border-b border-hairline pb-5">
           {auth.user.avatar ? (
-            <img src={auth.user.avatar} alt="" className="h-10 w-10 rounded-[4px] border border-[var(--line)] object-cover" />
+            <img
+              src={thumbUrl(auth.user.avatar, 80, 80) ?? auth.user.avatar}
+              alt=""
+              decoding="async"
+              referrerPolicy="no-referrer"
+              className="h-10 w-10 rounded-[4px] border border-[var(--line)] object-cover"
+            />
           ) : (
             <span className="flex h-10 w-10 items-center justify-center rounded-[4px] bg-[var(--panel-raised)] text-[18px] font-medium text-[var(--text-1)]">
               {auth.user.uname.slice(0, 1)}
