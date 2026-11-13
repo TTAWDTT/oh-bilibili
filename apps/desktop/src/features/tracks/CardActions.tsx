@@ -38,7 +38,7 @@ export function CardActions({
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100"
+      className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end gap-0.5 rounded-t-[8px] bg-gradient-to-b from-black/75 via-black/40 to-transparent px-1.5 pb-4 pt-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
       // 互动状态只在这排动作真正被用到时查。整页/预取时逐条查 relation，
       // 会把串行闸门占满，翻页反而被拖慢。
       onPointerEnter={() => void hydrate([track.key]).catch(() => {})}

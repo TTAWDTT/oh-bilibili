@@ -102,7 +102,7 @@ function QueueRow({
           event.stopPropagation()
           onRemove(track.key)
         }}
-        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] group-hover:opacity-100"
+        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] group-hover:opacity-100 focus-visible:opacity-100"
       >
         <Icon name="close" size={11} />
       </span>

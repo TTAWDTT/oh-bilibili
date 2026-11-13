@@ -128,7 +128,7 @@ export function DownloadsView() {
                       <div className="mt-1.5 text-[12px] text-[var(--text-2)]">等待开始</div>
                     )}
                   </div>
-                  <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                     {item.state === 'done' ? (
                       <button
                         type="button"
