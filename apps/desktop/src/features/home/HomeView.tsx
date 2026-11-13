@@ -163,7 +163,10 @@ export function HomeView() {
         ))}
       </nav>
 
-      {error ? <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p> : null}
+      {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}
+      {error && items.length === 0 ? (
+        <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p>
+      ) : null}
 
       <HeroBanner tracks={items} onOpen={(track) => navigate({ kind: 'watch', track })} />
 
@@ -176,6 +179,9 @@ export function HomeView() {
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
+      {error && items.length > 0 ? (
+        <p className="py-6 text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
+      ) : null}
     </div>
   )
 }
