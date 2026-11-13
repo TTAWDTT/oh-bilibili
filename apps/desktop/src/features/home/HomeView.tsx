@@ -7,7 +7,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
-import { PARTS } from '../../shared/lib/biliParts'
+import { PARTS, partColor } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { HOME_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -152,8 +152,9 @@ export function HomeView() {
             key={part.rid}
             type="button"
             onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-            className="t shrink-0 rounded-[4px] px-2.5 py-1 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
+            className="t flex shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
           >
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: partColor(part.name) }} />
             {part.name}
           </button>
         ))}

@@ -1,4 +1,5 @@
 import { formatCount } from '../../shared/lib/format'
+import { partColor } from '../../shared/lib/biliParts'
 import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
 import { CardActions } from './CardActions'
@@ -28,29 +29,6 @@ function coverFlags(title: string): string[] {
   if (/无损/.test(title)) flags.push('无损')
   if (/杜比|\(dolby\)/i.test(title)) flags.push('杜比')
   return flags.slice(0, 2)
-}
-
-/** B 站各分区的代表色，用于分区标签底色。 */
-function partitionColor(name: string): string {
-  const table: Record<string, string> = {
-    音乐: '#fca39a',
-    舞蹈: '#ff6699',
-    游戏: '#53b6ff',
-    鬼畜: '#ff8f6b',
-    动画: '#ffa3b6',
-    生活: '#ffb027',
-    影视: '#ffa0a0',
-    电影: '#ff8f9c',
-    电视剧: '#ff8fa3',
-    搞笑: '#ffd05b',
-    科技: '#00aeec',
-    数码: '#00aeec',
-    美食: '#f6c34a',
-    动物: '#8bd28b',
-    时尚: '#ff9ec4',
-    娱乐: '#ff9ec4',
-  }
-  return table[name] ?? '#9499a0'
 }
 
 /** 排行榜名次底色：1 红、2 橙、3 黄，其余半透明黑。 */
@@ -181,7 +159,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                   ) : track.tname ? (
                     <span
                       className="absolute left-1 top-1 rounded-[2px] px-1 text-[10px] leading-[15px] text-white"
-                      style={{ background: partitionColor(track.tname) }}
+                      style={{ background: partColor(track.tname) }}
                     >
                       {track.tname}
                     </span>

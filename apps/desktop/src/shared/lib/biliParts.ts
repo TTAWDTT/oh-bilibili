@@ -13,3 +13,26 @@ export const PARTS: { rid: number; name: string }[] = [
   { rid: 5, name: '娱乐' },
   { rid: 181, name: '影视' },
 ]
+
+/** B 站各分区的代表色，用于分区标签与频道圆点。 */
+export function partColor(name: string): string {
+  const table: Record<string, string> = {
+    音乐: '#fca39a',
+    舞蹈: '#ff6699',
+    游戏: '#53b6ff',
+    鬼畜: '#ff8f6b',
+    动画: '#ffa3b6',
+    生活: '#ffb027',
+    影视: '#ffa0a0',
+    电影: '#ff8f9c',
+    电视剧: '#ff8fa3',
+    搞笑: '#ffd05b',
+    科技: '#00aeec',
+    数码: '#00aeec',
+    美食: '#f6c34a',
+    动物: '#8bd28b',
+    时尚: '#ff9ec4',
+    娱乐: '#ff9ec4',
+  }
+  return table[name] ?? '#9499a0'
+}
