@@ -552,7 +552,7 @@ export function WatchPlayer({
       {/* 控制条浮在画面上：鼠标移上来才出现，静止就淡出。
           常驻一条控制条会把画面挤小，视频网站都不这么做。 */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-10 text-white transition-opacity duration-200 ${
+        className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-1.5 pt-10 text-white transition-opacity duration-200 ${
           controls || !playing ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -629,11 +629,11 @@ export function WatchPlayer({
             type="button"
             onClick={togglePlay}
             aria-label={playing ? '暂停' : '播放'}
-            className="bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="bili-icon-btn t press flex h-[22px] w-9 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
-          <span className="num shrink-0 text-[12px] text-white/85">
+          <span className="num shrink-0 text-[12px] text-white/80">
             {formatTime(now)} / {formatTime(duration)}
           </span>
 
@@ -656,7 +656,7 @@ export function WatchPlayer({
               aria-expanded={draftPicker}
               aria-label="弹幕颜色与位置"
               title="弹幕颜色与位置"
-              className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+              className={`bili-icon-btn t press flex h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] ${
                 draftPicker ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -738,7 +738,7 @@ export function WatchPlayer({
               aria-expanded={danmakuPanel}
               aria-label="弹幕设置"
               title="弹幕设置"
-              className={`bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
+              className={`bili-icon-btn t press flex h-[22px] w-9 items-center justify-center rounded-[4px] ${
                 danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -836,7 +836,7 @@ export function WatchPlayer({
             onClick={() => setStageMode(!cinema, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+            className={`bili-icon-btn t press flex h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >
