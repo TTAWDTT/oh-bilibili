@@ -117,6 +117,21 @@ export function HomeView() {
     })
   }
 
+  /** 换一批推荐：换一个 fresh_idx 重新取第一屏。 */
+  const refresh = (): void => {
+    const next = fresh + 1
+    // 列表末尾也有「换一批」，换完要回到顶部看新的一屏。
+    scrollerRef.current?.scrollTo({ top: 0 })
+    itemsRef.current = []
+    setFresh(next)
+    nextFresh.current = 2
+    feedMemory.nextFresh = 2
+    feedMemory.scrollTop = 0
+    feedMemory.index = 0
+    exhausted.current = false
+    void load(next)
+  }
+
   return (
     <div
       ref={scrollerRef}
@@ -137,17 +152,7 @@ export function HomeView() {
         <PageTitle>发现</PageTitle>
         <button
           type="button"
-          onClick={() => {
-            const next = fresh + 1
-            itemsRef.current = []
-            setFresh(next)
-            nextFresh.current = 2
-            feedMemory.nextFresh = 2
-            feedMemory.scrollTop = 0
-            feedMemory.index = 0
-            exhausted.current = false
-            void load(next)
-          }}
+          onClick={refresh}
           className="t press ml-auto rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
         >
           {/* 首次加载时列表还没出现，那是「正在取」而不是「正在换」。 */}
@@ -190,7 +195,16 @@ export function HomeView() {
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
       {error && items.length > 0 ? (
-        <p className="py-6 text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
+        <div className="flex flex-col items-center gap-2 py-6">
+          <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            换一批
+          </button>
+        </div>
       ) : null}
     </div>
   )
