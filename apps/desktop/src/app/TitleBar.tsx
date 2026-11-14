@@ -16,6 +16,8 @@ export function TitleBar() {
   const setQuery = useAppStore((state) => state.setHeroQuery)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const navigate = useAppStore((state) => state.navigate)
+  const goBack = useAppStore((state) => state.goBack)
+  const viewing = useAppStore((state) => state.view.kind === 'watch')
   const auth = useAuthStore((state) => state.auth)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
@@ -42,16 +44,28 @@ export function TitleBar() {
       {...drag}
       className="safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pl-[74px] pr-3 md:gap-4 md:pl-[80px]"
     >
-      {/* 装饰性的 logo 块不参与命中：让它穿透，按下时目标才是带
-          data-tauri-drag-region 的顶栏本身，窗口才能被拖动。
-          Tauri 的判定只看事件目标自己有没有这个属性，所以子元素必须穿透。 */}
-      <div className="pointer-events-none flex shrink-0 items-center gap-2">
-        {/* 官方 wordmark 是粉色 #FF6699；蓝色是 B 站的链接与按钮色，不是标志色。 */}
-        <span className="bili-tv-mark text-[var(--bili-pink)]">
-          <Icon name="biliTv" size={19} />
-        </span>
-        <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--bili-pink)] sm:inline">bilibili</span>
-      </div>
+      {/* 观看页把 logo 换成返回：B 站网页版的返回在页面顶栏，不压在画面上。
+          其余页面保持 logo —— 它不参与命中，按下时目标才是带 data-tauri-drag-region
+          的顶栏本身，窗口才能被拖动。 */}
+      {viewing ? (
+        <button
+          type="button"
+          onClick={goBack}
+          aria-label="返回"
+          className="t press flex h-8 shrink-0 items-center gap-1 rounded-[6px] pl-1 pr-2.5 text-[14px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+        >
+          <Icon name="chevronLeft" size={18} />
+          返回
+        </button>
+      ) : (
+        <div className="pointer-events-none flex shrink-0 items-center gap-2">
+          {/* 官方 wordmark 是粉色 #FF6699；蓝色是 B 站的链接与按钮色，不是标志色。 */}
+          <span className="bili-tv-mark text-[var(--bili-pink)]">
+            <Icon name="biliTv" size={19} />
+          </span>
+          <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--bili-pink)] sm:inline">bilibili</span>
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {
