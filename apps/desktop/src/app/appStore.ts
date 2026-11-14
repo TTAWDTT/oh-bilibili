@@ -7,6 +7,8 @@ export type View =
   | { kind: 'popular' }
   | { kind: 'precious' }
   | { kind: 'weekly' }
+  | { kind: 'live' }
+  | { kind: 'bangumi' }
   | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }

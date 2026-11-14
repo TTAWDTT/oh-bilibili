@@ -1349,6 +1349,50 @@ impl Engine {
         Ok(tracks)
     }
 
+    /// 直播推荐位。
+    pub async fn live_rooms(
+        &self,
+        count: u32,
+        page: u32,
+    ) -> Result<Vec<crate::wire::LiveRoomView>, WireError> {
+        let rooms = self.source.live_rooms(count, page).await?;
+        Ok(rooms
+            .into_iter()
+            .map(|room| crate::wire::LiveRoomView {
+                url: format!("https://live.bilibili.com/{}", room.room_id),
+                room_id: room.room_id,
+                title: room.title,
+                uname: room.uname,
+                face: room.face,
+                cover: room.cover,
+                area: room.area,
+                online: room.online,
+                watched: room.watched,
+            })
+            .collect())
+    }
+
+    /// 番剧排行。
+    pub async fn bangumi_rank(
+        &self,
+        count: usize,
+    ) -> Result<Vec<crate::wire::BangumiView>, WireError> {
+        let list = self.source.bangumi_rank(count).await?;
+        Ok(list
+            .into_iter()
+            .map(|item| crate::wire::BangumiView {
+                url: format!("https://www.bilibili.com/bangumi/play/ss{}", item.season_id),
+                season_id: item.season_id,
+                title: item.title,
+                cover: item.cover,
+                rank: item.rank,
+                rating: item.rating,
+                index_show: item.index_show,
+                play_text: item.play_text,
+            })
+            .collect())
+    }
+
     pub async fn popular(&self, page: u32) -> Result<crate::wire::PopularPage, WireError> {
         let (tracks, no_more, notes) = self.source.popular(page).await?;
         for t in &tracks {

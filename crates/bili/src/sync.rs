@@ -3,7 +3,7 @@
 //! 喜欢映射成 B 站点赞；收藏映射到固定名字的收藏夹，没有就自动建。
 //! 两个接口都要 csrf（bili_jct），也必须登录。
 
-use crate::client::{Client, API};
+use crate::client::{Client, API, LIVE_API};
 use crate::error::BiliError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,6 +30,39 @@ pub struct UserHit {
     pub verify: String,
     /// 正在直播：搜索结果的 is_live。
     pub live: bool,
+}
+
+/// 正在直播的一个房间，来自推荐位（不是按分区拉的全量列表）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LiveRoom {
+    pub room_id: u64,
+    pub title: String,
+    /// 主播昵称。直播卡上比房间标题更显眼。
+    pub uname: String,
+    pub face: Option<String>,
+    /// 封面。`user_cover` 是主播自己传的，`system_cover` 是系统截帧，前者优先。
+    pub cover: Option<String>,
+    pub area: String,
+    /// 人气值。接口给的是 66792955 这种原始数，展示时才缩。
+    pub online: u64,
+    /// B 站自己格式化好的人气串（「153.9万」）。接口的 `watched_show.text_small`
+    /// 已经按站内口径缩过，直接用它比本地再算一遍更贴近原站。
+    pub watched: String,
+}
+
+/// 番剧排行榜的一项。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BangumiItem {
+    pub season_id: u64,
+    pub title: String,
+    pub cover: Option<String>,
+    pub rank: u32,
+    /// 已经格式化好的分数，接口直接给「8.8分」这种串。
+    pub rating: String,
+    /// 「更新至第1280话」。
+    pub index_show: String,
+    /// 播放量。接口没给原始数，只给了「22.2亿」这种串。
+    pub play_text: String,
 }
 
 /// 收藏夹列表里的一项。B 站 web 端的收藏夹页就用 `created/list`，它自带每个夹子的封面。
@@ -822,6 +855,83 @@ impl Client {
             )
             .await?;
         Ok(v["data"]["online_count"].as_u64().unwrap_or(0))
+    }
+
+    /// 正在直播的房间推荐：B 站首页右栏最上面那一块就是它。
+    ///
+    /// 走 `room/v1/room/get_user_recommend`：`xlive` 那套 second/getList
+    /// 未带登录态时直接返回 -352，这一条不需要登录。
+    pub async fn live_rooms(&self, count: u32, page: u32) -> Result<Vec<LiveRoom>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{LIVE_API}/room/v1/room/get_user_recommend?page={page}&page_size={count}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(v["data"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|m| {
+                        Some(LiveRoom {
+                            room_id: m["roomid"].as_u64()?,
+                            title: m["title"].as_str().unwrap_or_default().to_string(),
+                            uname: m["uname"].as_str().unwrap_or_default().to_string(),
+                            face: m["face"]
+                                .as_str()
+                                .map(|f| f.replacen("http://", "https://", 1)),
+                            cover: m["user_cover"]
+                                .as_str()
+                                .filter(|c| !c.is_empty())
+                                .or_else(|| m["system_cover"].as_str())
+                                .map(|c| c.replacen("http://", "https://", 1)),
+                            area: m["areaName"].as_str().unwrap_or_default().to_string(),
+                            online: m["online"].as_u64().unwrap_or(0),
+                            watched: m["watched_show"]["text_small"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// 番剧排行（`pgc/web/rank/list`）。这是 B 站首页「番剧」区的数据源。
+    ///
+    /// 只取前 `count` 名：接口一次给 99 条，首页只需要一排。
+    pub async fn bangumi_rank(&self, count: usize) -> Result<Vec<BangumiItem>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/pgc/web/rank/list?day=3&season_type=1"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(v["result"]["list"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .take(count)
+                    .filter_map(|m| {
+                        Some(BangumiItem {
+                            season_id: m["season_id"].as_u64()?,
+                            title: m["title"].as_str().unwrap_or_default().to_string(),
+                            cover: m["cover"]
+                                .as_str()
+                                .map(|c| c.replacen("http://", "https://", 1)),
+                            rank: m["rank"].as_u64().unwrap_or(0) as u32,
+                            rating: m["rating"].as_str().unwrap_or_default().to_string(),
+                            index_show: m["new_ep"]["index_show"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .to_string(),
+                            play_text: m["icon_font"]["text"].as_str().unwrap_or_default().to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     /// 加入稍后再看。

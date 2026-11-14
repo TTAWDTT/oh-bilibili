@@ -15,6 +15,8 @@ pub const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKi
 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 pub const API: &str = "https://api.bilibili.com";
+/// 直播走独立域名，房间数据不在主 API 下。
+pub const LIVE_API: &str = "https://api.live.bilibili.com";
 pub const PASSPORT: &str = "https://passport.bilibili.com";
 pub const REFERER: &str = "https://www.bilibili.com/";
 

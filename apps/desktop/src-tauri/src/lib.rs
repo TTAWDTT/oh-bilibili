@@ -608,6 +608,23 @@ async fn popular(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn live_rooms(
+    engine: tauri::State<'_, Arc<Engine>>,
+    count: u32,
+    page: u32,
+) -> Result<Vec<bilimusic_core::wire::LiveRoomView>, WireError> {
+    engine.live_rooms(count, page).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn bangumi_rank(
+    engine: tauri::State<'_, Arc<Engine>>,
+    count: usize,
+) -> Result<Vec<bilimusic_core::wire::BangumiView>, WireError> {
+    engine.bangumi_rank(count).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn weekly_issues(
     engine: tauri::State<'_, Arc<Engine>>,
 ) -> Result<Vec<bilimusic_core::wire::WeeklyIssueView>, WireError> {
@@ -989,6 +1006,8 @@ pub fn run() {
             comment_emotes,
             search_users,
             ranking,
+            live_rooms,
+            bangumi_rank,
             popular,
             precious,
             weekly_issues,

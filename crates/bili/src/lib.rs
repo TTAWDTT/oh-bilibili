@@ -366,6 +366,16 @@ impl Source {
         self.client.ranking(rid).await
     }
 
+    /// 正在直播的房间。
+    pub async fn live_rooms(&self, count: u32, page: u32) -> Result<Vec<sync::LiveRoom>, BiliError> {
+        self.client.live_rooms(count, page).await
+    }
+
+    /// 番剧排行。
+    pub async fn bangumi_rank(&self, count: usize) -> Result<Vec<sync::BangumiItem>, BiliError> {
+        self.client.bangumi_rank(count).await
+    }
+
     /// 综合热门。第二个返回值表示后面还有没有更早的稿件，第三个是按 bvid 对齐的小标签。
     pub async fn popular(
         &self,

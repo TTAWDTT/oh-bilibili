@@ -246,6 +246,42 @@ export function ranking(rid = 0): Promise<Track[]> {
   return call<Track[]>('ranking', { rid })
 }
 
+/** 直播推荐位的一张卡。 */
+export type LiveRoom = {
+  room_id: number
+  title: string
+  uname: string
+  face: string | null
+  cover: string | null
+  area: string
+  online: number
+  /** B 站格式化好的人气串（「153.9万」）。 */
+  watched: string
+  url: string
+}
+
+/** 番剧排行的一条。 */
+export type Bangumi = {
+  season_id: number
+  title: string
+  cover: string | null
+  rank: number
+  rating: string
+  index_show: string
+  play_text: string
+  url: string
+}
+
+/** 正在直播的房间。直播流本机解不了，点开交给系统浏览器。 */
+export function liveRooms(count = 6, page = 1): Promise<LiveRoom[]> {
+  return call<LiveRoom[]>('live_rooms', { count, page })
+}
+
+/** 番剧排行。 */
+export function bangumiRank(count = 6): Promise<Bangumi[]> {
+  return call<Bangumi[]>('bangumi_rank', { count })
+}
+
 /** 综合热门。一次 50 条，`no_more` 表示是否到底；每条带 B 站的小标签。 */
 export function popular(page = 1): Promise<PopularPage> {
   return call<PopularPage>('popular', { page })

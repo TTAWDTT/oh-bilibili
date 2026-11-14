@@ -690,3 +690,49 @@ async fn 楼中楼能翻页() {
         head.text.chars().take(20).collect::<String>()
     );
 }
+
+/// 发现页底部两块：直播推荐与番剧排行。
+/// 都是公开接口，未登录也要能取到，否则这两块在真机上就是空的。
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 直播与番剧都能取到() {
+    let source = Source::open().await.expect("Source 应该能打开");
+
+    let rooms = source.live_rooms(6, 1).await.expect("直播推荐应该能取到");
+    println!(
+        "直播 {} 个，第一个：{} / {} / 人气 {}",
+        rooms.len(),
+        rooms[0].uname,
+        rooms[0].title,
+        rooms[0].online
+    );
+    assert_eq!(rooms.len(), 6, "要多少给多少");
+    assert!(rooms.iter().all(|r| r.room_id > 0), "每个房间都要有 id");
+    assert!(rooms.iter().all(|r| r.cover.is_some()), "直播卡要带封面");
+    assert!(rooms.iter().all(|r| !r.watched.is_empty()), "人气要用 B 站自己格式化好的串");
+
+    // 直播频道翻页：第二页不能和第一页重样，否则「加载更多」是假的
+    let more = source.live_rooms(12, 2).await.expect("第二页应该能取到");
+    println!("第二页 {} 个，第一个：{}", more.len(), more[0].uname);
+    assert!(
+        more.iter().all(|r| !rooms.iter().any(|first| first.room_id == r.room_id)),
+        "第二页不该重复第一页的房间"
+    );
+
+    let bangumi = source.bangumi_rank(6).await.expect("番剧排行应该能取到");
+    println!(
+        "番剧 {} 部，第一：{} {} {}",
+        bangumi.len(),
+        bangumi[0].title,
+        bangumi[0].rating,
+        bangumi[0].index_show
+    );
+    assert_eq!(bangumi.len(), 6, "只取一排");
+    assert_eq!(bangumi[0].rank, 1, "第一条就是第一名");
+    assert!(bangumi.iter().all(|b| b.cover.is_some()), "番剧卡要带封面");
+    // 未开分的条目 rating 是空串（实测「间谍过家家 第三季」就是），有分的都带「分」后缀
+    assert!(
+        bangumi.iter().filter(|b| !b.rating.is_empty()).all(|b| b.rating.ends_with('分')),
+        "分数是接口给的展示串"
+    );
+}

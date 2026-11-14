@@ -160,6 +160,35 @@ pub struct PopularItemView {
     pub note: String,
 }
 
+/// 首页直播卡。字段直接照接口的展示值，这里不再二次格式化。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LiveRoomView {
+    pub room_id: u64,
+    pub title: String,
+    pub uname: String,
+    pub face: Option<String>,
+    pub cover: Option<String>,
+    pub area: String,
+    pub online: u64,
+    /// B 站格式化好的人气串，没给时前端回落到 online。
+    pub watched: String,
+    /// B 站直播间地址。直播流不能在本机解码，点开交给系统浏览器。
+    pub url: String,
+}
+
+/// 首页番剧卡。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BangumiView {
+    pub season_id: u64,
+    pub title: String,
+    pub cover: Option<String>,
+    pub rank: u32,
+    pub rating: String,
+    pub index_show: String,
+    pub play_text: String,
+    pub url: String,
+}
+
 /// 每周必看的一期（列表用）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct WeeklyIssueView {

@@ -314,6 +314,22 @@ const ICONS = {
   battery: (
     <path d="M13.4 2.8 5.2 13.4h5.2l-1 7.8 8.4-10.8h-5.3l1.1-7.6Z" />
   ),
+  /** 直播：一块屏幕加两圈往外扩的声波，表达「现在正在播」。 */
+  live: (
+    <>
+      <rect x="2.8" y="6.2" width="13.4" height="11.6" rx="2.2" />
+      <path d="M16.2 12.4 21.4 9.4v5.2l-5.2-2.2Z" />
+      <path d="M6.6 10.6h3.2M6.6 13.6h3.2" />
+    </>
+  ),
+  /** 番剧：一张竖版海报，右上角压一颗星，表示追番。 */
+  bangumi: (
+    <>
+      <rect x="4.4" y="3.4" width="15.2" height="17.2" rx="2" />
+      <path d="M8.2 20.6V17h7.6v3.6" />
+      <path d="m14.8 7.4 1.1 2.2 2.4.4-1.7 1.7.4 2.4-2.2-1.1-2.2 1.1.4-2.4L11.3 10l2.4-.4 1.1-2.2Z" fill="currentColor" stroke="none" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof ICONS

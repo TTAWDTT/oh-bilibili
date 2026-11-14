@@ -8,6 +8,8 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
+import { LiveRow } from './LiveRow'
+import { BangumiRow } from './BangumiRow'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
@@ -325,6 +327,10 @@ export function HomeView() {
           </div>
         </div>
       ) : null}
+
+      {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
+      <LiveRow />
+      <BangumiRow />
 
       {items.length > 0 ? (
         <div className="px-4 md:px-8">

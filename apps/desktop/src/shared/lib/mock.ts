@@ -128,6 +128,29 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return [['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png']]
     case 'ranking':
       return CATALOG.slice(0, 20)
+    case 'live_rooms':
+      return CATALOG.slice(0, 6).map((track, i) => ({
+        room_id: 1000 + i,
+        title: track.title,
+        uname: track.artist,
+        face: track.up_avatar ?? null,
+        cover: track.cover,
+        area: '音乐',
+        online: 700_000 - i * 90_000,
+        watched: `${((700_000 - i * 90_000) / 10_000).toFixed(1)}万`,
+        url: `https://live.bilibili.com/${1000 + i}`,
+      }))
+    case 'bangumi_rank':
+      return CATALOG.slice(0, 6).map((track, i) => ({
+        season_id: 33_000 + i,
+        title: track.title,
+        cover: track.cover,
+        rank: i + 1,
+        rating: '9.6分',
+        index_show: '更新至第12话',
+        play_text: '1.2亿',
+        url: `https://www.bilibili.com/bangumi/play/ss${33_000 + i}`,
+      }))
     case 'popular':
       return {
         items: CATALOG.slice(0, 20).map((track, i) => ({
