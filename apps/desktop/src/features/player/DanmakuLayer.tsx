@@ -9,7 +9,7 @@ import type { DanmakuItem } from './DanmakuField'
 
 const EMPTY: never[] = []
 
-export function DanmakuLayer({ trackKey }: { trackKey: string }) {
+export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fade?: boolean }) {
   const [items, setItems] = useState<DanmakuItem[]>([])
   const enabled = useDanmakuSettings((s) => s.enabled)
   const opacity = useDanmakuSettings((s) => s.opacity)
@@ -53,6 +53,7 @@ export function DanmakuLayer({ trackKey }: { trackKey: string }) {
       opacity={opacity}
       size={size}
       speed={speed}
+      fade={fade}
     />
   )
 }

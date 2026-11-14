@@ -116,7 +116,8 @@ export function StageView() {
       <div className="pointer-events-none absolute inset-0 bg-white/55" />
       {/* 弹幕压到内容下面：标题与歌词是这一屏要读的字，不能被弹幕盖住 */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <DanmakuLayer trackKey={track.key} />
+        {/* 舞台上弹幕是气氛，不是要读的字：降一档透明度，别和唱片、标题抢注意力。 */}
+        <DanmakuLayer trackKey={track.key} fade />
       </div>
 
       <button
