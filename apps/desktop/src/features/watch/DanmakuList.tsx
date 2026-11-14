@@ -42,10 +42,17 @@ export function DanmakuList({ items }: { items: DanmakuItem[] }) {
                     void ipc.playerSeek(item.at).catch(() => {})
                   }}
                   title={item.text}
-                  className="t flex w-full gap-2 rounded-[3px] px-2 py-0.5 text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-hover)] hover:text-[var(--accent)]"
+                  className="t flex w-full gap-2 rounded-[3px] px-2 py-0.5 text-left text-[12px] hover:bg-[var(--panel-hover)]"
                 >
                   <span className="num shrink-0 text-[var(--text-3)]">{formatTime(item.at)}</span>
-                  <span className="min-w-0 flex-1 truncate">{item.text}</span>
+                  {/* B 站列表照抄弹幕自己的颜色：一眼能看出哪些是彩蛋、哪些是白字。
+                      白字（含浅色）留在主题色上，否则会在白底列表里消失。 */}
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    style={isPale(item.color) ? undefined : { color: item.color }}
+                  >
+                    {item.text}
+                  </span>
                 </button>
               </li>
             ))}
@@ -54,4 +61,14 @@ export function DanmakuList({ items }: { items: DanmakuItem[] }) {
       </div>
     </div>
   )
+}
+
+/** 判断一条弹幕的颜色在白底上会不会读不出来。阈值取 0.86，纯白和淡黄都会落到这一侧。 */
+function isPale(hex: string): boolean {
+  const nudge = hex.replace('#', '')
+  if (nudge.length !== 6) return true
+  const r = parseInt(nudge.slice(0, 2), 16) / 255
+  const g = parseInt(nudge.slice(2, 4), 16) / 255
+  const b = parseInt(nudge.slice(4, 6), 16) / 255
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.86
 }
