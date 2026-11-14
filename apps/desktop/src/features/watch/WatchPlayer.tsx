@@ -90,7 +90,6 @@ export function WatchPlayer({
   data,
   danmaku,
   onDanmakuSent,
-  onBack,
   onLike,
   onFav,
   onCoin,
@@ -105,7 +104,6 @@ export function WatchPlayer({
   data: WatchData
   danmaku: DanmakuItem[]
   onDanmakuSent: (item: DanmakuItem) => void
-  onBack: () => void
   /** 播完之后的收尾。B 站也是在这时候把三连与重播摆到画面上。 */
   onLike: () => void
   onFav: () => void
@@ -460,17 +458,6 @@ export function WatchPlayer({
         speed={danmakuSpeed}
         fade
       />
-      {/* 返回在左上角：这是所有视频客户端的第一直觉位置，
-          放在标题行里用户要先把视线移出画面才找得到。 */}
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="返回"
-        className="t press absolute left-3 top-3 z-30 flex h-9 items-center gap-1.5 rounded-full bg-white/90 pl-2 pr-3.5 text-[13.5px] font-medium text-[var(--text-1)] shadow-[0_2px_12px_rgba(0,0,0,0.22)] ring-1 ring-black/5 backdrop-blur hover:bg-white"
-      >
-        <Icon name="chevronLeft" size={17} className="text-[var(--accent)]" />
-        返回
-      </button>
       {!ready && !error ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
           <BiliLoader label="正在取流…" />

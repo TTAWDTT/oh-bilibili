@@ -11,9 +11,18 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import type { IconName } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { ShortcutTable } from './ShortcutTable'
+
+/** 窄屏没有侧栏，这些入口收进「我的」，和 B 站 App 的个人页一样排成一排。 */
+const SERVICES: readonly { kind: 'history' | 'favs' | 'watchLater' | 'following'; label: string; icon: IconName }[] = [
+  { kind: 'history', label: '历史', icon: 'clock' },
+  { kind: 'favs', label: '收藏夹', icon: 'bookmarkStar' },
+  { kind: 'watchLater', label: '稍后再看', icon: 'watchLater' },
+  { kind: 'following', label: '关注', icon: 'user' },
+]
 
 /**
  * 设置分组卡片。
@@ -179,6 +188,26 @@ export function SettingsView() {
               </div>
             )}
           </Section>
+
+          <div className="md:hidden">
+            <Section title="我的">
+              <div className="grid grid-cols-4 gap-1">
+                {SERVICES.map((service) => (
+                  <button
+                    key={service.kind}
+                    type="button"
+                    onClick={() => navigate({ kind: service.kind })}
+                    className="t press flex flex-col items-center gap-1.5 rounded-[6px] py-2 text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
+                      <Icon name={service.icon} size={17} />
+                    </span>
+                    {service.label}
+                  </button>
+                ))}
+              </div>
+            </Section>
+          </div>
 
           <Section title="关于">
             <p className="num text-[13px] text-[var(--text-2)]">

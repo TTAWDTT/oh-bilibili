@@ -13,6 +13,7 @@ import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
 import { WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
+import { Icon } from '../../shared/ui/Icon'
 
 /**
  * 观看页。只负责取数与拼装：播放器、信息区、评论区、右栏各是一块。
@@ -164,8 +165,18 @@ export function WatchView({ track }: { track: Track }) {
   }, [track.key])
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       <TripleBurst run={burst} />
+      {/* 返回常驻在页面左上角，不跟着内容滚走：滚到评论区时也要能一眼退出。 */}
+      <button
+        type="button"
+        onClick={() => goBack()}
+        aria-label="返回"
+        className="t press absolute left-6 top-4 z-40 flex h-9 items-center gap-1.5 rounded-full bg-white/90 pl-2 pr-3.5 text-[13.5px] font-medium text-[var(--text-1)] shadow-[0_2px_12px_rgba(0,0,0,0.22)] ring-1 ring-black/5 backdrop-blur hover:bg-white"
+      >
+        <Icon name="chevronLeft" size={17} className="text-[var(--accent)]" />
+        返回
+      </button>
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
@@ -185,7 +196,6 @@ export function WatchView({ track }: { track: Track }) {
                 data={data}
                 danmaku={danmaku}
                 onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
-                onBack={() => goBack()}
                 liked={liked}
                 faved={faved}
                 onLike={like}

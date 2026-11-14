@@ -146,7 +146,9 @@ export default function App() {
 
   useEffect(() => {
     if (!trackKey) return
-    // 新歌开播才把右栏拉回来；用户手动收起后不再固执地弹回。
+    // 窄屏的右栏是一整张全屏面板，跟着每首歌自动弹出来会盖住正在看的页面；
+    // 宽屏才把歌词栏拉回来，窄屏留给迷你播放条上的歌词/队列按钮。
+    if (!window.matchMedia('(min-width: 768px)').matches) return
     if (useAppStore.getState().rail === null) setRail('lyrics')
   }, [trackKey, setRail])
 
