@@ -6,6 +6,95 @@ import * as ipc from '../shared/lib/ipc'
 import { toastFailure } from './notice'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon } from '../shared/ui/Icon'
+import { useSearchHistory } from '../shared/lib/searchHistory'
+
+/**
+ * 顶栏搜索框下面的建议面板。
+ *
+ * B 站这块是两栏：左边搜索历史，右边热搜榜。热搜走 search/square，
+ * 取不到就只显示历史，面板不会因为一个可选接口挂掉。
+ */
+function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
+  const history = useSearchHistory((state) => state.items)
+  const clear = useSearchHistory((state) => state.clear)
+  const [trending, setTrending] = useState<string[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    void ipc
+      .hotSearch()
+      .then((list) => {
+        if (!cancelled) setTrending(list.slice(0, 10))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (history.length === 0 && trending.length === 0) return null
+
+  return (
+    /* 用 onMouseDown 而不是 onClick：先于 input 的 blur 触发，点得中 */
+    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
+      {history.length > 0 ? (
+        <div className="px-3 pb-1.5">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[12px] text-[var(--text-3)]">搜索历史</span>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                clear()
+              }}
+              className="text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              清空
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {history.slice(0, 8).map((word) => (
+              <button
+                key={word}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onPick(word)
+                }}
+                className="max-w-full truncate rounded-[12px] bg-[var(--ga0)] px-2.5 py-0.5 text-[12.5px] text-[var(--text-2)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+              >
+                {word}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {trending.length > 0 ? (
+        <div className={history.length > 0 ? 'mt-1 border-t border-hairline px-3 pt-2' : 'px-3'}>
+          <div className="mb-1 text-[12px] text-[var(--text-3)]">大家都在搜</div>
+          <div className="grid grid-cols-2 gap-x-3">
+            {trending.map((word, i) => (
+              <button
+                key={word}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onPick(word)
+                }}
+                className="flex min-w-0 items-center gap-2 py-[3px] text-left text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
+              >
+                <span className={`num w-3 shrink-0 text-[12px] ${i < 3 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'}`}>
+                  {i + 1}
+                </span>
+                <span className="truncate">{word}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 /**
  * 顶栏。B 站网页端的搜索框就长在这条 header 里——这是它最好认的一处结构。
@@ -93,47 +182,61 @@ export function TitleBar() {
         </nav>
       ) : null}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          submit()
-        }}
-        className="bili-focus-scale flex h-9 min-w-0 max-w-[520px] flex-1 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3"
-      >
-        <Icon name="search" size={15} className="shrink-0 text-[var(--text-3)]" />
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder="搜索视频、UP 主"
-          aria-label="顶栏搜索"
-          className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
-        />
-        {text ? (
-          <button
-            type="button"
-            aria-label="清空搜索"
-            title="清空"
-            onClick={() => {
-              setText('')
-              inputRef.current?.focus()
-            }}
-            className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
-          >
-            <Icon name="close" size={12} />
-          </button>
-        ) : focused ? null : (
-          <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>
-        )}
-        <button
-          type="submit"
-          className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
+      <div className="relative min-w-0 max-w-[520px] flex-1">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+          className="bili-focus-scale flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3"
         >
-          搜索
-        </button>
-      </form>
+          <Icon name="search" size={15} className="shrink-0 text-[var(--text-3)]" />
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="搜索视频、UP 主"
+            aria-label="顶栏搜索"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
+          />
+          {text ? (
+            <button
+              type="button"
+              aria-label="清空搜索"
+              title="清空"
+              onClick={() => {
+                setText('')
+                inputRef.current?.focus()
+              }}
+              className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+            >
+              <Icon name="close" size={12} />
+            </button>
+          ) : focused ? null : (
+            <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>
+          )}
+          <button
+            type="submit"
+            className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
+          >
+            搜索
+          </button>
+        </form>
+        {/*
+         * B 站搜索框点进去会落下一块建议面板：历史 + 热搜。
+         * 只在输入为空时出现——已经在打字的人要的是自己的词，不是别人的榜。
+         */}
+        {focused && text.trim().length === 0 ? (
+          <SearchSuggest
+            onPick={(word) => {
+              setText(word)
+              setQuery(word)
+            }}
+          />
+        ) : null}
+      </div>
 
       <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-2 [&>*]:pointer-events-auto">
         {/*
