@@ -5,9 +5,9 @@ import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { formatCount } from '../../shared/lib/format'
-import { thumbUrl } from '../../shared/lib/thumb'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
+import { Avatar } from '../../shared/ui/Avatar'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { usePlayerStore } from '../player/playerStore'
@@ -397,17 +397,7 @@ export function SearchView() {
                       onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
                       className="bili-press flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
-                      {user.face ? (
-                        <img
-                          src={thumbUrl(user.face, 80, 80) ?? user.face}
-                          alt=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          className="h-10 w-10 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="h-10 w-10 shrink-0 rounded-full bg-[var(--panel-alt)]" />
-                      )}
+                      <Avatar src={user.face} alt={user.name} size={40} />
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-1">
                           <span className="truncate text-[13px] text-[var(--text-1)]">{user.name}</span>
@@ -488,24 +478,16 @@ export function SearchView() {
             </div>
 
             {tracks.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <DurationFilter
-                  active={duration}
-                  onChange={(key) => {
-                    setDuration(key)
-                    setPage(1)
-                  }}
-                />
-
-                <PartitionFilter
-                  active={partition}
-                  onChange={(label) => {
-                    setPartition(label)
-                    // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
-                    setPage(1)
-                  }}
-                />
-                <div className="mb-3 flex items-center gap-1">
+              <div className="mb-2 flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <DurationFilter
+                    active={duration}
+                    onChange={(key) => {
+                      setDuration(key)
+                      setPage(1)
+                    }}
+                  />
+                  <div className="flex items-center gap-1">
                   {([
                     ['totalrank', '综合'],
                     ['click', '最多播放'],
@@ -527,7 +509,17 @@ export function SearchView() {
                       {label}
                     </button>
                   ))}
+                  </div>
                 </div>
+
+                <PartitionFilter
+                  active={partition}
+                  onChange={(label) => {
+                    setPartition(label)
+                    // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
+                    setPage(1)
+                  }}
+                />
               </div>
             ) : null}
 

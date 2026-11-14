@@ -5,7 +5,7 @@ import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contra
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { COMMENT_PREFETCH_PX } from '../../shared/lib/prefetch'
-import { thumbUrl } from '../../shared/lib/thumb'
+import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
@@ -137,17 +137,9 @@ function CommentRow({
   return (
     <li className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}>
       <div className="flex items-start gap-2">
-        {c.avatar ? (
-          <img
-            src={thumbUrl(c.avatar, 48, 48) ?? c.avatar}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <span className="mt-0.5 h-6 w-6 shrink-0 rounded-full bg-[var(--panel-alt)]" />
-        )}
+        <span className="mt-0.5 shrink-0">
+          <Avatar src={c.avatar} alt={c.author} size={24} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             {c.medal ? <CommentMedalBadge medal={c.medal} /> : null}

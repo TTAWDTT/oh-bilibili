@@ -27,7 +27,7 @@ export function PartitionFilter({
   onChange: (label: string) => void
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {PARTITIONS.map((p) => {
         const on = p.label === active
         return (

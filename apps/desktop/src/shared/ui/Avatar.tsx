@@ -26,7 +26,7 @@ export function Avatar({
   return (
     <span
       className={[
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[var(--text-3)]',
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--ga2)] text-[var(--text-3)]',
         bordered ? 'border border-hairline' : '',
       ].join(' ')}
       style={{ width: size, height: size }}

@@ -6,7 +6,6 @@ import type { Followed } from '../../shared/lib/contract'
 import type { AuthorCard } from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
-import { thumbUrl } from '../../shared/lib/thumb'
 import { Avatar } from '../../shared/ui/Avatar'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
@@ -196,17 +195,7 @@ export function FollowingView() {
                 className="t press flex w-full items-center gap-2.5 rounded-[8px] border border-[var(--line)] px-2.5 py-2 text-left hover:bg-[var(--panel-alt)]"
               >
                 <span className="relative shrink-0">
-                  {u.face ? (
-                    <img
-                      src={thumbUrl(u.face, 72, 72) ?? u.face}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="block h-9 w-9 rounded-full bg-[var(--panel-alt)]" />
-                  )}
+                  <Avatar src={u.face} alt={u.name} size={36} />
                   {u.special ? (
                     <span
                       title="特别关注"
