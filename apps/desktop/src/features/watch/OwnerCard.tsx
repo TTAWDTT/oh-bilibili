@@ -15,15 +15,79 @@ export function OwnerCard({
   card,
   followed,
   onFollow,
+  inline = false,
 }: {
   data: WatchData
   card: ipc.AuthorCard | null
   followed: boolean | null
   onFollow: () => void
+  /** 主栏那一行：头像、名字、粉丝数、关注按钮横排一行，不带竖排布局与大段签名。 */
+  inline?: boolean
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const goAuthor = (): void => {
     navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })
+  }
+
+  if (inline) {
+    return (
+      <div className="flex w-fit max-w-full flex-wrap items-center gap-3 py-1">
+        <button type="button" onClick={goAuthor} aria-label={`看 ${data.owner} 的更多视频`} className="t shrink-0">
+          <Avatar src={data.owner_avatar} alt={data.owner} size={38} />
+        </button>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={goAuthor}
+              title={`看 ${data.owner} 的更多视频`}
+              className="t max-w-[220px] truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
+            >
+              {data.owner}
+            </button>
+            {card ? <LevelBadge level={card.level} /> : null}
+            {card?.official_type != null ? (
+              <span
+                title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}
+                className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-white"
+                style={{ background: card.official_type === 1 ? 'var(--accent)' : '#ffb027' }}
+              >
+                <Icon name="check" size={10} />
+              </span>
+            ) : null}
+          </div>
+          {/* 粉丝数是这一行里最有用的一格信息：B 站在名字右侧挂「N 粉丝」。 */}
+          {card ? (
+            <p className="num mt-0.5 text-[12px] text-[var(--text-3)]">{formatCount(card.fans)} 粉丝</p>
+          ) : null}
+        </div>
+        {data.owner_mid ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              title="去 B 站给 UP 主充电"
+              onClick={() => void ipc.openExternal(`https://space.bilibili.com/${data.owner_mid}`)}
+              className="t press flex h-7 items-center gap-1 rounded-[4px] border border-[color-mix(in_oklab,var(--accent)_45%,white)] px-2.5 text-[12.5px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_8%,white)]"
+            >
+              <Icon name="battery" size={13} />
+              充电
+            </button>
+            <button
+              type="button"
+              aria-pressed={followed === true}
+              onClick={onFollow}
+              className={`t press flex h-7 items-center rounded-[4px] px-3 text-[12.5px] ${
+                followed === true
+                  ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                  : 'bg-[var(--accent)] text-white hover:opacity-90'
+              }`}
+            >
+              {followed === true ? '已关注' : '关注'}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
   }
 
   return (

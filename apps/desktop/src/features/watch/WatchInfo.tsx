@@ -115,6 +115,7 @@ export function WatchInfo({
   onFav,
   onCoin,
   onTriple,
+  ownerRow,
 }: {
   track: Track
   data: WatchData
@@ -128,6 +129,8 @@ export function WatchInfo({
   onCoin: () => void
   /** 长按点赞：B 站的一键三连。 */
   onTriple: () => void
+  /** 宽屏主栏的 UP 主行，插在标签之后、分P 之前。 */
+  ownerRow?: React.ReactNode
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
@@ -330,6 +333,9 @@ export function WatchInfo({
           </button>
         </div>
       ) : null}
+
+      {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}
+      {ownerRow ? <div className="mt-1">{ownerRow}</div> : null}
 
       {data.desc ? (
         <div className="mt-3 max-w-[820px]">

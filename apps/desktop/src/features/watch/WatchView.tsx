@@ -297,6 +297,7 @@ export function WatchView({ track }: { track: Track }) {
               onLike={like}
               onFav={fav}
               onTriple={triple}
+              ownerRow={<OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} inline />}
             />
           ) : null}
           {/* 右栏在窄屏收起，UP 名片跟着回到正文里，否则没有地方关注。 */}
