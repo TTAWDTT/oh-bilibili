@@ -19,8 +19,9 @@ export function WeeklyView() {
   const [page, setPage] = useState<ipc.WeeklyPage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [picking, setPicking] = useState(false)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
-  const chipsRef = useRef<HTMLDivElement | null>(null)
+  const pickerRef = useRef<HTMLDivElement | null>(null)
   const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
@@ -42,12 +43,23 @@ export function WeeklyView() {
     }
   }, [nonce])
 
-  // 用「上一期 / 下一期」翻的时候把当前期号滚进可视区，否则条子停在上一次的位置。
+  // 展开期数下拉时，把当前期滚到列表中间；400 多期，落在顶部等于又找一遍。
   useLayoutEffect(() => {
-    chipsRef.current
+    if (!picking) return
+    pickerRef.current
       ?.querySelector('[data-active="true"]')
-      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
-  }, [number])
+      ?.scrollIntoView({ block: 'center' })
+  }, [picking, number])
+
+  // 点外面收起。用 pointerdown 而不是 click：点在列表里也算「里面」，晚一拍的 click 会重新展开。
+  useEffect(() => {
+    if (!picking) return
+    const onDown = (event: PointerEvent): void => {
+      if (!pickerRef.current?.contains(event.target as Node)) setPicking(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [picking])
 
   useEffect(() => {
     if (number === null) return
@@ -82,12 +94,10 @@ export function WeeklyView() {
        */}
       <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-[17px] font-medium text-[var(--text-1)]">
-            {page?.label || (number !== null ? `第 ${number} 期` : '每周必看')}
+          {/* 标题只放主题，期号与更新日期在下拉上：同一句话在这条带里出现两次就是噪音。 */}
+          <h2 className="min-w-0 truncate text-[17px] font-medium text-[var(--text-1)]">
+            {page?.subject || '每周必看'}
           </h2>
-          {page?.subject ? (
-            <span className="truncate text-[13px] text-[var(--text-2)]">{page.subject}</span>
-          ) : null}
           {/* 398 期，横条翻起来费劲；前后各给一个。 */}
           <span className="ml-auto flex shrink-0 items-center gap-1">
             {/* 左箭头回到更早的一期，右箭头往前一期：和时间方向一致，不是和横条的排法一致。 */}
@@ -114,27 +124,57 @@ export function WeeklyView() {
           </span>
         </div>
         <p className="mt-1 text-[12px] text-[var(--text-3)]">每周五晚 18:00 更新</p>
+        {/*
+         * B 站这里是「第399期(1113更新) ▾」下拉，不是一排胶囊：400 多期铺成横条，
+         * 右端永远被切断，想翻到很久以前的一期得一直拖。展开后按年分组，一屏能扫到几十期。
+         */}
         {issues && issues.length > 0 ? (
-          <div ref={chipsRef} className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-1">
-            {/* 一期一个按钮，几百个也只是按钮，不截断：B 站能一路翻回最早那期。 */}
-            {issues.map((issue) => (
-              <button
-                key={issue.number}
-                type="button"
-                onClick={() => setNumber(issue.number)}
-                aria-pressed={issue.number === number}
-                data-active={issue.number === number}
-                title={issue.name}
-                className={[
-                  't press shrink-0 rounded-[6px] px-3 py-1 text-[13px]',
-                  issue.number === number
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'bg-[var(--ga0)] text-[var(--text-2)] hover:text-[var(--accent)]',
-                ].join(' ')}
+          <div className="relative mt-2">
+            <button
+              type="button"
+              onClick={() => setPicking((open) => !open)}
+              aria-expanded={picking}
+              aria-haspopup="listbox"
+              className="t press flex h-8 items-center gap-1.5 rounded-[6px] text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
+            >
+              <span className="font-medium">{page?.label || `第 ${number} 期`}</span>
+              <Icon
+                name="chevronRight"
+                size={13}
+                className={`text-[var(--text-3)] transition-transform ${picking ? '-rotate-90' : 'rotate-90'}`}
+              />
+            </button>
+            {picking ? (
+              <div
+                ref={pickerRef}
+                role="listbox"
+                aria-label="选择期数"
+                className="absolute left-0 top-9 z-30 max-h-[60vh] w-[260px] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
               >
-                第 {issue.number} 期
-              </button>
-            ))}
+                {issues.map((issue) => (
+                  <button
+                    key={issue.number}
+                    type="button"
+                    role="option"
+                    aria-selected={issue.number === number}
+                    data-active={issue.number === number}
+                    title={issue.name}
+                    onClick={() => {
+                      setNumber(issue.number)
+                      setPicking(false)
+                    }}
+                    className={`t flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--ga0)] ${
+                      issue.number === number ? 'text-[var(--accent)]' : 'text-[var(--text-2)]'
+                    }`}
+                  >
+                    <span className="w-[68px] shrink-0">第 {issue.number} 期</span>
+                    <span className="num min-w-0 flex-1 truncate text-[12px] text-[var(--text-3)]">
+                      {issue.name.replace(/^\d+第\d+期\s*/, '')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </nav>
