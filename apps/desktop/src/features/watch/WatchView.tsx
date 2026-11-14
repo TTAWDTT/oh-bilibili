@@ -11,7 +11,7 @@ import { CommentsPanel } from './CommentsPanel'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
-import { WatchInfo } from './WatchInfo'
+import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
 
 /**
@@ -41,6 +41,25 @@ export function WatchView({ track }: { track: Track }) {
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
+  /** 当前在看人数。取不到就不显示，不猜。 */
+  const [online, setOnline] = useState<number | null>(null)
+
+  // 标题行要用到「N 人在看」，所以这一条请求放在页面级：它和标题一起在播放器上方。
+  useEffect(() => {
+    const cid = data?.pages.find((p) => p.no === data.current_page)?.cid
+    if (!cid) return
+    let cancelled = false
+    setOnline(null)
+    void ipc
+      .videoOnline(track.key, cid)
+      .then((count) => {
+        if (!cancelled) setOnline(count)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [track.key, data])
 
   useEffect(() => {
     setLikeDelta(0)
@@ -179,6 +198,17 @@ export function WatchView({ track }: { track: Track }) {
             cinema ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto px-6 pt-4'
           }
         >
+          {/* B 站网页端把标题压在画面之上：先知道在放什么，再决定看不看。 */}
+          {!cinema && data ? (
+            <WatchHead
+              track={track}
+              data={data}
+              online={online}
+              onListen={(at) => {
+                void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
+              }}
+            />
+          ) : null}
           {data ? (
             <div className={cinema ? 'h-full' : 'overflow-hidden rounded-[8px]'}>
               <WatchPlayer
@@ -226,9 +256,6 @@ export function WatchView({ track }: { track: Track }) {
               onLike={like}
               onFav={fav}
               onTriple={triple}
-              onListen={(at) => {
-                void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
-              }}
             />
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}

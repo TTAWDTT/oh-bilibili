@@ -31,6 +31,76 @@ function descriptionNodes(text: string): React.ReactNode[] {
 }
 
 /**
+ * 播放器上方的标题与统计行。
+ *
+ * B 站网页端的顺序是「标题 → 播放量/弹幕/日期 → 播放器 → 三连」，
+ * 标题在画面之上，先知道在放什么，再决定看不看。之前标题压在播放器下面，
+ * 一屏里画面占满，标题要往下才看得到。
+ */
+export function WatchHead({
+  track,
+  data,
+  online,
+  onListen,
+}: {
+  track: Track
+  data: WatchData
+  online: number | null
+  onListen: (atMs: number) => void
+}) {
+  return (
+    <div className="pb-2">
+      {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
+      <div className="flex items-start gap-2">
+        <h1
+          className="min-w-0 flex-1 text-[20px] font-medium leading-[1.35] text-[var(--text-1)]"
+          title={track.title}
+        >
+          {track.title}
+        </h1>
+        <button
+          type="button"
+          onClick={() => onListen(Math.round(readPlayhead()))}
+          className="t press mt-0.5 h-7 shrink-0 rounded-[6px] border border-[var(--line)] px-2.5 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          听视频
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
+        <span className="num">{formatCount(data.stats.views)} 播放</span>
+        <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+        <span className="num">{formatCount(data.stats.replies)} 评论</span>
+        {online !== null && online > 0 ? (
+          <span className="num">{formatCount(online)} 人在看</span>
+        ) : null}
+        {/* B 站这一行的尾巴是投稿日期，分区名跟在后面。 */}
+        {data.pubdate > 0 ? <span className="num">{formatDate(data.pubdate)}</span> : null}
+        {data.tname ? (
+          <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px] text-[var(--text-2)]">
+            {data.tname}
+          </span>
+        ) : null}
+        {/* B 站视频页在统计行尾巴挂着 BV 号，点一下就是分享链接。 */}
+        <button
+          type="button"
+          title="复制 BV 号与链接"
+          onClick={() => {
+            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+              toastDone(ok ? `已复制 ${track.key}` : '复制失败'),
+            )
+          }}
+          className="num rounded-[3px] px-1.5 leading-[18px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+        >
+          {track.key}
+        </button>
+      </div>
+
+    </div>
+  )
+}
+
+/**
  * 观看页的信息与互动：UP 主、关注、计数、三连、稍后再看、简介、分P。
  *
  * 每个按钮都复述服务端的真实状态：点赞/收藏/投币来自 reaction store 的
@@ -40,7 +110,6 @@ export function WatchInfo({
   track,
   data,
   onPage,
-  onListen,
   likeDelta,
   favDelta,
   coinDelta,
@@ -52,8 +121,6 @@ export function WatchInfo({
   track: Track
   data: WatchData
   onPage: (no: number) => void
-  /** 把当前画面位置交给音频引擎，切到听模式。 */
-  onListen: (atMs: number) => void
   /** 点赞与收藏的计数偏移由观看页统一持有，这里只负责显示。 */
   likeDelta: number
   favDelta: number
@@ -71,8 +138,6 @@ export function WatchInfo({
   const [saved, setSaved] = useState(false)
   /** 视频标签。公开接口，取不到就不显示这一行。 */
   const [tags, setTags] = useState<string[]>([])
-  /** 当前在看人数。取不到就不显示，不猜。 */
-  const [online, setOnline] = useState<number | null>(null)
   /** UP 主名片：粉丝、等级、认证。B 站把「粉丝 123.4万」挂在名字后面。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   /** 简介默认收两行，长简介给一个展开。 */
@@ -118,23 +183,6 @@ export function WatchInfo({
       cancelled = true
     }
   }, [track.key])
-
-  const cid = data.pages.find((p) => p.no === data.current_page)?.cid
-
-  useEffect(() => {
-    if (!cid) return
-    let cancelled = false
-    setOnline(null)
-    void ipc
-      .videoOnline(track.key, cid)
-      .then((count) => {
-        if (!cancelled) setOnline(count)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [track.key, cid])
 
   useEffect(() => {
     let cancelled = false
@@ -204,110 +252,7 @@ export function WatchInfo({
     ].join(' ')
 
   return (
-    <div className="pb-4 pt-4">
-      {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
-      <div className="flex items-start gap-2">
-        <h1
-          className="min-w-0 flex-1 text-[20px] font-medium leading-[1.35] text-[var(--text-1)]"
-          title={track.title}
-        >
-          {track.title}
-        </h1>
-        <button
-          type="button"
-          onClick={() => onListen(Math.round(readPlayhead()))}
-          className="t press mt-0.5 h-7 shrink-0 rounded-[6px] border border-[var(--line)] px-2.5 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        >
-          听视频
-        </button>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
-        <span className="num">{formatCount(data.stats.views)} 播放</span>
-        <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
-        <span className="num">{formatCount(data.stats.replies)} 评论</span>
-        {online !== null && online > 0 ? (
-          <span className="num">{formatCount(online)} 人在看</span>
-        ) : null}
-        {/* B 站这一行的尾巴是投稿日期，分区名跟在后面。 */}
-        {data.pubdate > 0 ? <span className="num">{formatDate(data.pubdate)}</span> : null}
-        {data.tname ? (
-          <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px] text-[var(--text-2)]">
-            {data.tname}
-          </span>
-        ) : null}
-        {/* B 站视频页在统计行尾巴挂着 BV 号，点一下就是分享链接。 */}
-        <button
-          type="button"
-          title="复制 BV 号与链接"
-          onClick={() => {
-            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
-              toastDone(ok ? `已复制 ${track.key}` : '复制失败'),
-            )
-          }}
-          className="num rounded-[3px] px-1.5 leading-[18px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
-        >
-          {track.key}
-        </button>
-      </div>
-
-      <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })}
-          title={`看 ${data.owner} 的更多视频`}
-          className="t flex min-w-0 items-center gap-2 rounded-[4px] text-left hover:text-[var(--accent)]"
-        >
-          <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
-          <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
-          {card ? <LevelBadge level={card.level} /> : null}
-          {card?.vip ? (
-            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
-              大会员
-            </span>
-          ) : null}
-          {card?.official_type != null ? (
-            <span
-              title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}
-              className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-white"
-              style={{ background: card.official_type === 1 ? 'var(--accent)' : '#ffb027' }}
-            >
-              <Icon name="check" size={10} />
-            </span>
-          ) : null}
-          {card !== null ? (
-            <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
-              粉丝 {formatCount(card.fans)}
-            </span>
-          ) : null}
-        </button>
-        {/* 关注按钮常驻：状态没取到（未登录、接口失败）时按未关注显示，
-           点击后由服务端裁决。整颗按钮消失会让 UP 行缺一块，B 站不会这样。 */}
-        {data.owner_mid ? (
-          <button
-            type="button"
-            aria-pressed={followed === true}
-            onClick={() => {
-              const next = followed !== true
-              void ipc
-                .followSet(data.owner_mid!, next)
-                .then(() => {
-                  setFollowed(next)
-                  toastDone(next ? '已关注' : '已取消关注')
-                })
-                .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
-            }}
-            className={`t press h-8 shrink-0 rounded-[6px] px-4 text-[13px] ${
-              followed === true
-                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                : 'bg-[var(--accent)] text-white hover:opacity-90'
-            }`}
-          >
-            {followed === true ? '已关注' : '关注'}
-          </button>
-        ) : null}
-      </div>
-
+    <div className="pb-4 pt-3">
       <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto">
         <div className="flex shrink-0 items-stretch">
         <button
@@ -457,6 +402,63 @@ export function WatchInfo({
           ))}
         </div>
       ) : null}
+
+      <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
+        <button
+          type="button"
+          onClick={() => navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })}
+          title={`看 ${data.owner} 的更多视频`}
+          className="t flex min-w-0 items-center gap-2 rounded-[4px] text-left hover:text-[var(--accent)]"
+        >
+          <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
+          <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
+          {card ? <LevelBadge level={card.level} /> : null}
+          {card?.vip ? (
+            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+              大会员
+            </span>
+          ) : null}
+          {card?.official_type != null ? (
+            <span
+              title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}
+              className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-white"
+              style={{ background: card.official_type === 1 ? 'var(--accent)' : '#ffb027' }}
+            >
+              <Icon name="check" size={10} />
+            </span>
+          ) : null}
+          {card !== null ? (
+            <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
+              粉丝 {formatCount(card.fans)}
+            </span>
+          ) : null}
+        </button>
+        {/* 关注按钮常驻：状态没取到（未登录、接口失败）时按未关注显示，
+           点击后由服务端裁决。整颗按钮消失会让 UP 行缺一块，B 站不会这样。 */}
+        {data.owner_mid ? (
+          <button
+            type="button"
+            aria-pressed={followed === true}
+            onClick={() => {
+              const next = followed !== true
+              void ipc
+                .followSet(data.owner_mid!, next)
+                .then(() => {
+                  setFollowed(next)
+                  toastDone(next ? '已关注' : '已取消关注')
+                })
+                .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
+            }}
+            className={`t press h-8 shrink-0 rounded-[6px] px-4 text-[13px] ${
+              followed === true
+                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                : 'bg-[var(--accent)] text-white hover:opacity-90'
+            }`}
+          >
+            {followed === true ? '已关注' : '关注'}
+          </button>
+        ) : null}
+      </div>
 
       {data.pages.length > 1 ? (
         <div className="no-scrollbar mt-3 flex gap-1 overflow-x-auto">
