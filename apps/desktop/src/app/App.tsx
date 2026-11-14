@@ -187,7 +187,16 @@ export default function App() {
 
       <div className="relative z-10 flex min-h-0 flex-1">
         {showSidebar ? <Sidebar /> : null}
-        <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
+        {/*
+         * 页面区域自己铺底：观看页不挂侧栏，主区会从 0 起画。
+         * WebKit 会把卸掉侧栏的那块合成层留到下一次重绘，透明背景下
+         * 就成了一条点不动的「幽灵侧栏」，直到窗口 resize 才消失。
+         */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="block min-w-0 flex-1 overflow-hidden bg-[var(--color-ink)] outline-none"
+        >
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
           <div key={view.kind} className="bili-page flex h-full flex-col">
