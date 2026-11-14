@@ -870,7 +870,9 @@ impl Source {
                 key: TrackKey::from_provider(bvid),
                 title: search::strip_tags(item["title"].as_str().unwrap_or("（无标题）")),
                 artist: item["owner"]["name"].as_str().unwrap_or("").to_string(),
-                duration: item["duration"].as_u64().map(Millis),
+                // 这条接口的 duration 是秒，别的地方（feed、详情）也都是秒，唯独这里之前漏了换算，
+                // 结果相关推荐每一行的时长都渲染成 0:00。
+                duration: item["duration"].as_u64().map(|s| Millis(s * 1000)),
                 cover: wire::norm_cover(item["pic"].as_str().unwrap_or("")),
                 accent: None,
                 views: item["stat"]["view"].as_u64(),

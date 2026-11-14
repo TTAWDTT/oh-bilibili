@@ -1,7 +1,8 @@
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
-import { formatCount } from '../../shared/lib/format'
+import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
+import { Icon } from '../../shared/ui/Icon'
 
 /** 观看页右栏：相关推荐。条目全来自接口，点击进入它自己的观看页。 */
 export function RelatedAside({ items }: { items: Track[] }) {
@@ -28,14 +29,32 @@ export function RelatedAside({ items }: { items: Track[] }) {
               style={{ aspectRatio: '16 / 10' }}
             >
               <Cover cover={item.cover} title={item.title} width={136} className="h-full w-full" />
+              {/* B 站相关推荐的封面右下角挂着时长，扫一眼就知道要花多久。 */}
+              {item.duration_ms ? (
+                <span className="num absolute bottom-0.5 right-1 rounded-[2px] bg-black/65 px-1 text-[10px] leading-[14px] text-white">
+                  {formatDuration(item.duration_ms)}
+                </span>
+              ) : null}
             </span>
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-[13px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                 {item.title}
               </span>
-              <span className="num mt-1 block truncate text-[12px] text-[var(--text-3)]">
-                {item.artist}
-                {item.views ? ` · ${formatCount(item.views)}` : ''}
+              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)]">
+                <span className="truncate">{item.artist}</span>
+                {/* B 站这一行的两枚计数用「播放 / 弹幕」两条小图标，不用文字写「播放」。 */}
+                {item.views ? (
+                  <span className="num flex shrink-0 items-center gap-0.5">
+                    <Icon name="play" size={10} />
+                    {formatCount(item.views)}
+                  </span>
+                ) : null}
+                {(item.danmaku ?? 0) > 0 ? (
+                  <span className="num flex shrink-0 items-center gap-0.5">
+                    <Icon name="danmaku" size={11} />
+                    {formatCount(item.danmaku!)}
+                  </span>
+                ) : null}
               </span>
             </span>
           </button>

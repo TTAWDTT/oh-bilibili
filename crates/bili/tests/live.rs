@@ -2,7 +2,7 @@
 //!
 //! 运行：cargo test -p bilimusic-bili --test live -- --ignored --nocapture
 
-use bilimusic_model::SearchQuery;
+use bilimusic_model::{SearchQuery, TrackKey};
 /// 每周必看：期数列表是公开接口，某一期要走 wbi + web_location，缺了就 -352。
 /// 标题在 `data.config` 里（不是 `data` 顶层），片单一次 50 条。
 #[tokio::test(flavor = "multi_thread")]
@@ -299,6 +299,27 @@ async fn up_名片能拿到粉丝数与签名() {
     assert!(c.videos > 0, "投稿总数应该是真实值");
     assert!(c.level >= 1 && c.level <= 6, "等级应该在 1..6");
     assert!(c.face.starts_with("https://"));
+}
+
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 相关推荐的时长是毫秒不是秒() {
+    let source = Source::open().await.expect("Source");
+    // 咒术回战续作，相关推荐里有大量几分钟到几十分钟的稿子
+    let key = TrackKey::from_provider("BV1XeP9zYE8L");
+    let items = source.related(&key).await.expect("相关推荐");
+    let with_duration = items
+        .iter()
+        .filter(|t| t.duration.is_some())
+        .take(5)
+        .map(|t| t.duration.unwrap().0)
+        .collect::<Vec<_>>();
+    println!("前 5 条时长（毫秒）：{with_duration:?}");
+    // 这条接口按秒下发；漏了换算的话每条都会是几十毫秒，渲染成 0:00
+    assert!(
+        with_duration.iter().all(|ms| *ms >= 1000),
+        "相关推荐的时长应该是毫秒，实际 {with_duration:?}"
+    );
 }
 
 #[tokio::test]
