@@ -6,7 +6,7 @@ import { ContentGrid } from '../tracks/ContentGrid'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
-import { PARTS } from '../../shared/lib/biliParts'
+import { PART_CHILDREN, PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { LiveRow } from './LiveRow'
 import { BangumiRow } from './BangumiRow'
@@ -44,6 +44,7 @@ export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
+  const [hoverPart, setHoverPart] = useState<{ name: string; left: number; top: number } | null>(null)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [heroLoading, setHeroLoading] = useState(false)
@@ -229,17 +230,68 @@ export function HomeView() {
               </button>
             ))}
           </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 border-l border-[var(--line)] pl-5">
-            {PARTS.filter((part) => part.rid !== 0).map((part) => (
-              <button
-                key={part.rid}
-                type="button"
-                onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-                className="t h-7 w-[62px] shrink-0 rounded-[4px] bg-[var(--ga0)] text-[12.5px] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]"
+          <div
+            className="relative min-w-0 flex-1"
+            onMouseLeave={() => setHoverPart(null)}
+          >
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 border-l border-[var(--line)] pl-5">
+              {PARTS.filter((part) => part.rid !== 0).map((part) => (
+                <button
+                  key={part.rid}
+                  type="button"
+                  onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+                  onMouseEnter={(event) =>
+                    setHoverPart({
+                      name: part.name,
+                      left: event.currentTarget.offsetLeft,
+                      top: event.currentTarget.offsetTop,
+                    })
+                  }
+                  onFocus={(event) =>
+                    setHoverPart({
+                      name: part.name,
+                      left: event.currentTarget.offsetLeft,
+                      top: event.currentTarget.offsetTop,
+                    })
+                  }
+                  className="t h-7 w-[62px] shrink-0 rounded-[4px] bg-[var(--ga0)] text-[12.5px] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]"
+                >
+                  {part.name}
+                </button>
+              ))}
+            </div>
+            {hoverPart && PART_CHILDREN[hoverPart.name] ? (
+              /* pt-2 是这块面板的悬停桥：留成 margin 的话，鼠标往下走的 8px 会
+                 先离开外层，面板在指针到达前就关了。top 跟着被悬停的胶囊走，
+                 窄窗口胶囊折成两三行时，面板不会落到整块区域的底部。 */
+              <div
+                className="absolute z-30 pt-2"
+                style={{
+                  top: `${hoverPart.top + 28}px`,
+                  left: `clamp(0px, ${hoverPart.left - 20}px, calc(100% - min(600px, 100%)))`,
+                  width: 'min(600px, 100%)',
+                }}
               >
-                {part.name}
-              </button>
-            ))}
+                <div className="w-full rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-5 py-4 shadow-[0_16px_40px_-18px_rgba(0,0,0,0.28)]">
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-2.5 sm:grid-cols-4 sm:gap-x-8">
+                    {(PART_CHILDREN[hoverPart.name] ?? []).map((child) => (
+                      <button
+                        key={child}
+                        type="button"
+                        onClick={() => {
+                          useAppStore.getState().setSearchFilters(hoverPart.name, 'totalrank', 0)
+                          useAppStore.getState().setHeroQuery(child)
+                          setHoverPart(null)
+                        }}
+                        className="w-full whitespace-nowrap py-0.5 text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                      >
+                        {child}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </nav>
