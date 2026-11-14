@@ -15,6 +15,7 @@ import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
+import { FavPicker } from '../library/FavPicker'
 
 /**
  * 观看页。只负责取数与拼装：播放器、信息区、评论区、右栏各是一块。
@@ -48,6 +49,10 @@ export function WatchView({ track }: { track: Track }) {
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   const [followed, setFollowed] = useState<boolean | null>(null)
+  /** 收藏要先选收藏夹，和 B 站网页版、列表卡片的行为一致。 */
+  const [pickingFav, setPickingFav] = useState(false)
+  const [favBusy, setFavBusy] = useState(false)
+  const favToStore = useReactionStore((st) => st.favTo)
 
   // 标题行要用到「N 人在看」，所以这一条请求放在页面级：它和标题一起在播放器上方。
   useEffect(() => {
@@ -154,6 +159,29 @@ export function WatchView({ track }: { track: Track }) {
       })
   }
 
+  /** 已收藏是取消，未收藏才弹收藏夹。 */
+  const openFav = (): void => {
+    if (faved) {
+      fav()
+      return
+    }
+    setPickingFav(true)
+  }
+
+  const favTo = async (folderId: number | null): Promise<void> => {
+    setFavBusy(true)
+    try {
+      await favToStore(track, folderId)
+      setFavDelta((n) => n + 1)
+      toastDone('已收藏', folderId === null ? '收进了默认收藏夹' : '已收进所选收藏夹')
+      setPickingFav(false)
+    } catch {
+      // store 里已经提示过，这里只负责收尾
+    } finally {
+      setFavBusy(false)
+    }
+  }
+
   // 取清单与档位
   useEffect(() => {
     let cancelled = false
@@ -226,6 +254,7 @@ export function WatchView({ track }: { track: Track }) {
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       <TripleBurst run={burst} />
+      <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       {/* 返回在顶栏（TitleBar），不在画面上：浮在视频角上会挡住画面内容。 */}
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -260,7 +289,7 @@ export function WatchView({ track }: { track: Track }) {
                 liked={liked}
                 faved={faved}
                 onLike={like}
-                onFav={fav}
+                onFav={openFav}
                 onCoin={coin}
                 coins={coins}
                 onReplay={() => {
@@ -295,7 +324,7 @@ export function WatchView({ track }: { track: Track }) {
               coinDelta={coinDelta}
               onCoin={coin}
               onLike={like}
-              onFav={fav}
+              onFav={openFav}
               onTriple={triple}
               ownerRow={<OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} inline />}
             />

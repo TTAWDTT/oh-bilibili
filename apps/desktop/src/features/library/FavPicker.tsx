@@ -46,7 +46,7 @@ export function FavPicker({
     <Modal
       open={open}
       title="收藏到"
-      description="选一个收藏夹。也可以直接用默认的「哔哩哔哩 music」。"
+      description={null}
       onClose={onClose}
       width="max-w-[420px]"
     >
@@ -79,14 +79,18 @@ export function FavPicker({
         ))}
       </div>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => onPick(null)}
-        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-2 text-[14px] text-white disabled:opacity-50"
-      >
-        {busy ? '收藏中…' : '收进默认收藏夹'}
-      </button>
+      {/* 列表读得到时默认夹就在第一行，这颗按钮只在读不到时当兜底，免得两个入口重复。 */}
+      {busy ? (
+        <p className="mt-3 text-center text-[13px] text-[var(--text-3)]">收藏中…</p>
+      ) : error || (folders !== null && folders.length === 0) ? (
+        <button
+          type="button"
+          onClick={() => onPick(null)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-2 text-[14px] text-white"
+        >
+          收进默认收藏夹
+        </button>
+      ) : null}
     </Modal>
   )
 }
