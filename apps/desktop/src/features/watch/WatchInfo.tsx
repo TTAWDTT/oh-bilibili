@@ -229,32 +229,21 @@ export function WatchInfo({
     setHolding(false)
   }
 
-  /** 胶囊按钮：B 站视频页的每个操作都是这个形状，图标 + 文字 + 数字。 */
-  const pill = (on: boolean): string =>
-    [
-      't press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] border px-3 text-[13px]',
-      on
-        ? 'border-[var(--accent)] text-[var(--accent)]'
-        : 'border-[var(--line)] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
-    ].join(' ')
-
   /**
-   * 三连的三段。B 站把点赞/投币/收藏连成一排，中间没有缝；
-   * 分成三个独立胶囊就看不出它们是同一组动作。
+   * 操作项。B 站网页版的工具栏没有边框：图标 + 数字平铺一排，悬停才给一层浅底。
+   * 做成胶囊会让这一行看起来像一排按钮，而 B 站把它当成视频信息的附注。
    */
-  const triple = (on: boolean, edge: 'left' | 'middle' | 'right'): string =>
+  const action = (on: boolean): string =>
     [
-      't press flex h-9 shrink-0 items-center gap-1.5 border border-[var(--line)] px-4 text-[13px] first:border-l',
-      edge === 'left' ? 'rounded-l-[6px] border-r-0' : '',
-      edge === 'middle' ? 'border-r-0' : '',
-      edge === 'right' ? 'rounded-r-[6px]' : '',
-      on ? 'text-[var(--accent)]' : 'text-[var(--text-1)] hover:text-[var(--accent)]',
+      't press flex h-9 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px]',
+      on
+        ? 'text-[var(--accent)]'
+        : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]',
     ].join(' ')
 
   return (
     <div className="pb-4 pt-3">
-      <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto">
-        <div className="flex shrink-0 items-stretch">
+      <div className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto border-y border-hairline py-1.5">
         <button
           type="button"
           aria-pressed={liked}
@@ -270,10 +259,10 @@ export function WatchInfo({
             }
             onLike()
           }}
-          className={`${triple(liked, 'left')} relative overflow-hidden`}
+          className={`${action(liked)} relative overflow-hidden`}
           title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
-          <BiliThumb size={15} />
+          <BiliThumb size={19} />
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
           {holding ? (
             <span className="bili-hold-bar absolute inset-x-0 bottom-0 h-[2px] bg-[var(--accent)]" />
@@ -290,10 +279,10 @@ export function WatchInfo({
             }
             setConfirmingCoin(true)
           }}
-          className={triple(coins > 0, 'middle')}
+          className={action(coins > 0)}
           title="投币"
         >
-          <BiliCoin size={15} />
+          <BiliCoin size={19} />
           {formatCount(data.stats.coins + coinDelta)}
         </button>
         <button
@@ -301,13 +290,27 @@ export function WatchInfo({
           aria-pressed={faved}
           aria-label={faved ? '取消收藏' : '收藏'}
           onClick={onFav}
-          className={triple(faved, 'right')}
+          className={action(faved)}
           title={faved ? '取消收藏' : '收藏'}
         >
-          <BiliStar size={15} />
+          <BiliStar size={19} />
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>
-        </div>
+        <button
+          type="button"
+          title="分享，复制视频链接"
+          aria-label="分享，复制视频链接"
+          onClick={() => {
+            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+              toastDone(ok ? '链接已复制' : '复制失败'),
+            )
+          }}
+          className={action(false)}
+        >
+          <Icon name="share" size={19} />
+          {formatCount(data.stats.shares)}
+        </button>
+        <span className="mx-1.5 h-4 w-px shrink-0 bg-[var(--line)]" />
         <button
           type="button"
           aria-pressed={saved}
@@ -323,24 +326,10 @@ export function WatchInfo({
                 toastDone(next ? '加入稍后再看失败' : '移出稍后再看失败', '登录后再试'),
               )
           }}
-          className={pill(saved)}
+          className={action(false)}
         >
-          <Icon name="watchLater" size={14} />
+          <Icon name="watchLater" size={18} />
           {saved ? '已加入' : '稍后再看'}
-        </button>
-        <button
-          type="button"
-          title="复制视频链接"
-          aria-label="复制视频链接"
-          onClick={() => {
-            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
-              toastDone(ok ? '链接已复制' : '复制失败'),
-            )
-          }}
-          className={pill(false)}
-        >
-          <Icon name="copy" size={14} />
-          {formatCount(data.stats.shares)}
         </button>
       </div>
       {confirmingCoin ? (

@@ -4,7 +4,13 @@
  * 不是灰色骨架条，而是那只上下弹跳的小电视——B 站自己加载内容时就是这么做的。
  * 骨架屏传达「正在取数据」，这只电视传达「这里是 B 站」。
  */
-export function BiliLoader({ label = '正在加载…', compact = false }: { label?: string; compact?: boolean }) {
+export function BiliLoader({
+  label = '正在玩命加载…',
+  compact = false,
+}: {
+  label?: string
+  compact?: boolean
+}) {
   if (compact) {
     return (
       <div

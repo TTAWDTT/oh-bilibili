@@ -271,6 +271,10 @@ export function HomeView() {
           </button>
         </div>
       ) : null}
+      {/* 站脚：B 站首页最底下那句老口号，是这个站最好认的一行字。 */}
+      <p className="py-8 text-center text-[12px] tracking-wide text-[var(--text-3)]">
+        哔哩哔哩 (゜-゜)つロ 干杯~
+      </p>
     </div>
   )
 }

@@ -614,7 +614,8 @@ export function WatchPlayer({
           <DanmakuBeats items={danmaku} durationMs={duration} />
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
           <span
-            className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
+            /* B 站播放器的进度条是品牌粉，不是链接蓝。 */
+            className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--bili-pink)]"
             style={{ width: `${percent}%` }}
           />
           <span
