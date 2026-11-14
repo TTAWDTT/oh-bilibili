@@ -160,7 +160,7 @@ const TrackCard = memo(function TrackCard({
           type="button"
           onClick={() => onOpen(track)}
           aria-label={`观看 ${track.title}`}
-          className="relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
+          className="bili-card-frame relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
           style={{ aspectRatio: '16 / 10' }}
         >
           <Cover cover={track.cover} title={track.title} width={260} className="bili-card-cover h-full w-full" />
@@ -231,8 +231,8 @@ const TrackCard = memo(function TrackCard({
 
       <h3
         className={[
-          'mt-2 line-clamp-2 min-h-[2.7em] text-[15px] leading-[1.35] transition-colors',
-          active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent)]',
+          'bili-card-title mt-2 line-clamp-2 min-h-[2.7em] text-[15px] leading-[1.35]',
+          active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]',
         ].join(' ')}
         title={track.title}
       >

@@ -265,6 +265,31 @@
     box-shadow var(--dur) var(--ease);
 }
 
+/*
+ * 封面卡片的标题在 hover 时变 B 站粉。
+ *
+ * 这是 B 站网页端最标志性的一处：整屏灰黑文字里，鼠标扫过的那一条标题先亮成粉色，
+ * 比整张卡换个底色更轻、也更好认。卡片本身只做 2px 抬升，不换背景。
+ */
+.bili-card .bili-card-title {
+  transition: color 140ms var(--ease);
+}
+
+.bili-card:hover .bili-card-title,
+.bili-card:focus-within .bili-card-title {
+  color: var(--bili-pink);
+}
+
+/* 封面圆角在 hover 时描一圈粉边：B 站的预览框就是这个观感。 */
+.bili-card .bili-card-frame {
+  transition: box-shadow 140ms var(--ease);
+}
+
+.bili-card:hover .bili-card-frame,
+.bili-card:focus-within .bili-card-frame {
+  box-shadow: 0 0 0 2px var(--bili-pink);
+}
+
 .bili-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
@@ -397,6 +422,51 @@
 
 .bili-page {
   animation: bili-page-in 240ms var(--ease) both;
+}
+
+/*
+ * 页面前进/返回的方向感。
+ *
+ * 只动 8px、只淡入，不整屏横移：B 站网页端切页是「内容淡入」，没有整页平移动画。
+ * 之前只有 opacity，前进与返回看起来一模一样，返回就少了「回去」的实感。
+ */
+@keyframes bili-page-forward {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bili-page-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.bili-page[data-nav='fwd'] {
+  animation: bili-page-forward 200ms var(--ease) both;
+}
+
+.bili-page[data-nav='back'] {
+  animation: bili-page-back 200ms var(--ease) both;
+}
+
+/* 系统开了「减少动态效果」就只保留淡入，位移全部去掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .bili-page,
+  .bili-page[data-nav='fwd'],
+  .bili-page[data-nav='back'] {
+    animation: bili-page-in 120ms linear both;
+  }
 }
 
 /* 加载骨架：B 站粉的微光从左扫到右 */
