@@ -7,7 +7,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
-import { PARTS, partColor } from '../../shared/lib/biliParts'
+import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
@@ -164,51 +164,59 @@ export function HomeView() {
       </div>
 
       {/*
-       * 频道条：四个站级入口铺成四等分的导航位，每个占满 1/4 宽度、中间竖向分隔；
-       * 分区是筛选，不是目的地，所以收成下面一行安静的文本，不再和入口抢视线。
-       * 上一版把四个图标挤在左边、分区挤在右边，右边留一大片空白，读起来像残局。
+       * 频道条照 B 站首页原版排：左边两个圆形入口，中间两行白底描边的小胶囊分区，
+       * 右边一列小号快捷链接。整条不套外框，直接落在页面上——B 站这一块本来就没有卡片。
+       * 之前几版要么把入口挤在左边留一大片空带，要么做成四等分导航，都不像首页。
        */}
-      <nav className="mb-4 overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--panel)]">
-        <div className="grid grid-cols-2 sm:grid-cols-4">
+      <nav className="mb-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+        <div className="flex shrink-0 items-start gap-3">
           {[
             { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
-            { label: '每周必看', icon: 'calendar' as const, tone: '#ffb027', run: () => navigate({ kind: 'weekly' }) },
-            { label: '入站必刷', icon: 'gift' as const, tone: '#f56c2d', run: () => navigate({ kind: 'precious' }) },
             { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
-          ].map((entry, index) => (
+          ].map((entry) => (
             <button
               key={entry.label}
               type="button"
               onClick={entry.run}
-              style={{ '--i': index } as React.CSSProperties}
-              className={`bili-card-enter t press flex h-14 items-center justify-center gap-2.5 hover:bg-[var(--panel-raised)] ${
-                index > 0 ? 'sm:border-l sm:border-hairline' : ''
-              }`}
+              className="t press flex w-12 flex-col items-center gap-1.5 rounded-[8px] py-1 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
             >
               <span
-                className="bili-channel-icon flex h-9 w-9 items-center justify-center rounded-full text-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.2)]"
+                className="bili-channel-icon flex h-9 w-9 items-center justify-center rounded-full text-white"
                 style={{ background: entry.tone }}
               >
                 <Icon name={entry.icon} size={18} />
               </span>
-              <span className="whitespace-nowrap text-[13px] text-[var(--text-2)]">{entry.label}</span>
+              <span className="whitespace-nowrap">{entry.label}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline px-4 py-2">
+        <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {PARTS.filter((part) => part.rid !== 0).map((part) => (
             <button
               key={part.rid}
               type="button"
               onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              className="t flex shrink-0 items-center gap-1.5 py-0.5 text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
+              className="t flex h-8 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
-              <span
-                aria-hidden
-                className="bili-channel-icon h-1.5 w-1.5 rounded-full"
-                style={{ background: partColor(part.name) }}
-              />
               {part.name}
+            </button>
+          ))}
+        </div>
+        <div className="hidden shrink-0 grid-cols-2 gap-x-5 gap-y-2 pt-1 xl:grid">
+          {[
+            { label: '每周必看', icon: 'calendar' as const, run: () => navigate({ kind: 'weekly' }) },
+            { label: '入站必刷', icon: 'gift' as const, run: () => navigate({ kind: 'precious' }) },
+            { label: '历史', icon: 'clock' as const, run: () => navigate({ kind: 'history' }) },
+            { label: '收藏', icon: 'bookmarkStar' as const, run: () => navigate({ kind: 'favs' }) },
+          ].map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              onClick={entry.run}
+              className="bili-icon-btn t flex items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              <Icon name={entry.icon} size={13} />
+              {entry.label}
             </button>
           ))}
         </div>
