@@ -2,63 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { formatCount, formatDuration } from '../../shared/lib/format'
 import { useAppStore } from '../../app/appStore'
-import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
-
-/**
- * 热门页的一条：B 站综合热门是两列横排大卡，封面在左、标题与计数在右，
- * 不是发现页那种封面主导的竖卡。这里不复用 ContentGrid，两边的信息密度差一倍。
- */
-function PopularRow({ track, onOpen }: { track: Track; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="bili-card group flex items-start gap-4 text-left"
-      title={track.title}
-    >
-      <span className="relative aspect-video w-[190px] shrink-0 overflow-hidden rounded-[8px]">
-        <Cover cover={track.cover} title={track.title} width={190} className="bili-card-cover h-full w-full" />
-        <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[16px] text-white">
-          {formatDuration(track.duration_ms)}
-        </span>
-      </span>
-      <span className="min-w-0 flex-1 py-0.5">
-        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
-          {track.title}
-        </span>
-        {track.tname ? (
-          <span className="mt-1.5 inline-block rounded-[3px] border border-[color-mix(in_oklab,var(--bili-pink)_45%,white)] px-1 text-[11px] leading-[16px] text-[var(--bili-pink)]">
-            {track.tname}
-          </span>
-        ) : null}
-        <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </span>
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
-          {track.views ? (
-            <span className="flex items-center gap-0.5">
-              <Icon name="play" size={11} />
-              {formatCount(track.views)}
-            </span>
-          ) : null}
-          {(track.danmaku ?? 0) > 0 ? (
-            <span className="flex items-center gap-0.5">
-              <Icon name="danmaku" size={11} />
-              {formatCount(track.danmaku!)}
-            </span>
-          ) : null}
-        </span>
-      </span>
-    </button>
-  )
-}
+import { WideCard } from '../tracks/WideCard'
 
 /**
  * 热门。B 站的综合热门（popular/all）：按时间往下翻，一次 50 条，没有名次。
@@ -180,7 +129,7 @@ export function PopularView() {
           <>
             <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
               {tracks.map((track) => (
-                <PopularRow
+                <WideCard
                   key={track.key}
                   track={track}
                   onOpen={() => navigate({ kind: 'watch', track })}
