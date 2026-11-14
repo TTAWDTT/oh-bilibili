@@ -48,7 +48,7 @@ function highlightTitle(title: string, keyword: string | undefined): React.React
   for (let hit = haystack.indexOf(needle); hit !== -1; hit = haystack.indexOf(needle, cursor)) {
     if (hit > cursor) parts.push(title.slice(cursor, hit))
     parts.push(
-      <mark key={hit} className="bg-transparent text-[#fb7299]">
+      <mark key={hit} className="bg-transparent text-[var(--accent)]">
         {title.slice(hit, hit + needle.length)}
       </mark>,
     )
@@ -197,7 +197,7 @@ const TrackCard = memo(function TrackCard({
           {ratio !== null && ratio > 0 && ratio < 1 ? (
             <span className="absolute inset-x-0 bottom-0 h-[4px] bg-black/45">
               <span
-                className="block h-full bg-[var(--bili-pink)] shadow-[0_0_6px_rgba(251,114,153,0.45)]"
+                className="block h-full bg-[var(--accent)] shadow-[0_0_6px_color-mix(in_oklab,var(--accent)_55%,transparent)]"
                 style={{ width: `${Math.round(ratio * 100)}%` }}
               />
             </span>

@@ -169,13 +169,13 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         <div
           className="relative h-[88px] overflow-hidden rounded-t-[7px]"
           style={{
-            background: 'linear-gradient(115deg, color-mix(in srgb, var(--bili-pink) 23%, white), color-mix(in srgb, var(--bili-pink) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
+            background: 'linear-gradient(115deg, color-mix(in srgb, var(--accent) 23%, white), color-mix(in srgb, var(--accent) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
           }}
         >
           <Mascot2233 height={176} className="pointer-events-none absolute -bottom-[62px] -right-3 opacity-15 sm:right-5" />
         </div>
         <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
-          <div className="relative -mt-9 shrink-0 rounded-full bg-white p-[4px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--bili-pink)_25%,white),0_3px_12px_rgba(255,102,153,0.12)]">
+          <div className="relative -mt-9 shrink-0 rounded-full bg-white p-[4px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_25%,white),0_3px_12px_color-mix(in oklab, var(--accent) 18%, transparent)]">
             <Avatar src={avatar} alt={name} size={88} bordered={false} />
           </div>
           <div className="min-w-0 max-w-full flex-[1_1_240px] pt-3">

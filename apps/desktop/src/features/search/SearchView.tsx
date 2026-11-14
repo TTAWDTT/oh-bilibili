@@ -368,7 +368,7 @@ export function SearchView() {
                     >
                       <span
                         className={`num w-4 shrink-0 text-right text-[13px] ${
-                          index < 3 ? 'text-[var(--bili-pink)]' : 'text-[var(--text-3)]'
+                          index < 3 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'
                         }`}
                       >
                         {index + 1}
@@ -415,7 +415,7 @@ export function SearchView() {
                         </span>
                         <span className="num mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-[var(--text-3)]">
                           {user.live ? (
-                            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+                            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                               直播中
                             </span>
                           ) : null}

@@ -389,10 +389,9 @@
   to { transform: translateX(calc(-1 * var(--dm-travel, 100vw) - 100%)); }
 }
 
-/* B 站主题：22 娘蓝与 33 娘粉双色。蓝色只用于次级强调，比如链接与标签描边。 */
+/* 主题色只有一种：B 站蓝。旧的双主色（22 娘蓝 + 33 娘粉）已退役，全站强调一律蓝色。 */
 :root {
   --bili-blue: #00aeec;
-  --bili-pink: #ff6699;
 }
 
 /* ── 灵动感 ─────────────────────────────────────────
@@ -411,7 +410,7 @@
  * 封面卡片的标题在 hover 时变 B 站的链接蓝（#00AEEC）。
  *
  * 网页端就是这么做的：整屏深灰文字里，鼠标扫到的那一条标题先亮成蓝色。
- * 不用粉色——粉色在 B 站是品牌与大会员色，标题用它会让整页读起来像活动页。
+ * 主色只有这一种蓝，不再混第二种主色。
  */
 .bili-card .bili-card-title {
   transition: color 120ms var(--ease);
@@ -609,7 +608,7 @@
   }
 }
 
-/* 加载骨架：B 站粉的微光从左扫到右 */
+/* 加载骨架：一道微光从左扫到右 */
 @keyframes bili-shimmer {
   from {
     background-position: -200% 0;
@@ -620,7 +619,7 @@
 }
 
 .bili-skeleton {
-  /* 中性灰的流光：粉色占位一屏十几块，整页泛红，比空着更吵。 */
+  /* 中性灰的流光：一整屏彩色占位比空白更吵。 */
   background: linear-gradient(
     90deg,
     var(--panel-raised) 0%,
@@ -661,10 +660,10 @@
 }
 
 .bili-marquee:hover {
-  color: var(--bili-pink);
+  color: var(--accent);
 }
 
-/* 侧栏行：hover / 激活时左侧滑入一条粉色竖条，是 B 站侧边栏的选中样式 */
+/* 侧栏行：hover / 激活时左侧滑入一条主题色竖条，是 B 站侧边栏的选中样式 */
 .bili-nav-item {
   position: relative;
   transition:
@@ -680,7 +679,7 @@
   height: 0;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--bili-pink);
+  background: var(--accent);
   transform: translateY(-50%);
   transition:
     height var(--dur) var(--ease),

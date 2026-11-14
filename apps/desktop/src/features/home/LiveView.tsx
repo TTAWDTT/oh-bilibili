@@ -81,7 +81,7 @@ export function LiveView() {
       <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
         <div className="flex items-center gap-2">
           <h2 className="text-[17px] font-medium text-[var(--text-1)]">直播</h2>
-          <span className="flex items-center gap-1 rounded-[3px] bg-[var(--bili-pink)] px-1.5 text-[11px] leading-[17px] text-white">
+          <span className="flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 text-[11px] leading-[17px] text-white">
             <span className="bili-live-dot" aria-hidden />
             LIVE
           </span>

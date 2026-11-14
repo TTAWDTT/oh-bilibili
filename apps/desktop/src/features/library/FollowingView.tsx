@@ -282,7 +282,7 @@ export function FollowingView() {
                       </span>
                     ) : null}
                     {hover.user.vip ? (
-                      <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+                      <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                         大会员
                       </span>
                     ) : null}

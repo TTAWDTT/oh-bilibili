@@ -159,7 +159,7 @@ function CommentRow({
             )}
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
             {c.pinned ? (
-              <span className="shrink-0 rounded-[2px] bg-[#fb7299] px-1 text-[10px] leading-[15px] text-white">
+              <span className="shrink-0 rounded-[2px] bg-[var(--accent)] px-1 text-[10px] leading-[15px] text-white">
                 置顶
               </span>
             ) : null}

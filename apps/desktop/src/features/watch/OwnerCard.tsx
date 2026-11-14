@@ -38,13 +38,13 @@ export function OwnerCard({
               type="button"
               onClick={goAuthor}
               title={`看 ${data.owner} 的更多视频`}
-              className="t max-w-full truncate text-[14px] font-medium text-[var(--bili-pink)] hover:underline"
+              className="t max-w-full truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
             >
               {data.owner}
             </button>
             {card ? <LevelBadge level={card.level} /> : null}
             {card?.vip ? (
-              <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
+              <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 大会员
               </span>
             ) : null}
@@ -74,7 +74,7 @@ export function OwnerCard({
             type="button"
             title="去 B 站给 UP 主充电"
             onClick={() => void ipc.openExternal(`https://space.bilibili.com/${data.owner_mid}`)}
-            className="t press flex h-8 items-center gap-1 rounded-[4px] border border-[color-mix(in_oklab,var(--bili-pink)_45%,white)] px-3 text-[13px] text-[var(--bili-pink)] hover:bg-[color-mix(in_oklab,var(--bili-pink)_8%,white)]"
+            className="t press flex h-8 items-center gap-1 rounded-[4px] border border-[color-mix(in_oklab,var(--accent)_45%,white)] px-3 text-[13px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_8%,white)]"
           >
             <Icon name="battery" size={14} />
             充电

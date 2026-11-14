@@ -62,10 +62,10 @@ export function TitleBar() {
       ) : (
         <div className="pointer-events-none flex shrink-0 items-center gap-2">
           {/* 官方 wordmark 是粉色 #FF6699；蓝色是 B 站的链接与按钮色，不是标志色。 */}
-          <span className="bili-tv-mark text-[var(--bili-pink)]">
+          <span className="bili-tv-mark text-[var(--accent)]">
             <Icon name="biliTv" size={19} />
           </span>
-          <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--bili-pink)] sm:inline">bilibili</span>
+          <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
         </div>
       )}
 
@@ -144,7 +144,7 @@ export function TitleBar() {
               .openExternal('https://member.bilibili.com/platform/upload/video/frame')
               .catch((cause) => toastFailure('打开投稿页', cause))
           }
-          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--bili-pink)] px-3.5 text-[13px] text-white hover:opacity-90 sm:flex"
+          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--accent)] px-3.5 text-[13px] text-white hover:opacity-90 sm:flex"
         >
           投稿
         </button>

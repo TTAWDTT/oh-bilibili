@@ -122,13 +122,13 @@ export function SettingsView() {
                 <div
                   className="relative h-[88px] overflow-hidden"
                   style={{
-                    background: 'linear-gradient(115deg, color-mix(in srgb, var(--bili-pink) 23%, white), color-mix(in srgb, var(--bili-pink) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
+                    background: 'linear-gradient(115deg, color-mix(in srgb, var(--accent) 23%, white), color-mix(in srgb, var(--accent) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
                   }}
                 >
                   <Mascot2233 height={192} className="pointer-events-none absolute -bottom-[68px] right-5 opacity-20" />
                 </div>
                 <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
-                  <div className="relative -mt-10 shrink-0 rounded-full bg-white p-[5px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--bili-pink)_25%,white),0_3px_12px_rgba(255,102,153,0.12)]">
+                  <div className="relative -mt-10 shrink-0 rounded-full bg-white p-[5px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_25%,white),0_3px_12px_color-mix(in oklab, var(--accent) 18%, transparent)]">
                     <Avatar src={user.avatar} alt={user.uname} size={120} bordered={false} />
                   </div>
                   <div className="min-w-0 flex-[1_1_240px] pt-3">

@@ -43,7 +43,7 @@ export function LiveRow() {
         <div className="flex items-center gap-2">
           <h2 className="text-[17px] font-medium text-[var(--text-1)]">正在直播</h2>
           {/* 一颗会呼吸的红点：B 站用它在标题旁表达「现在是活的」 */}
-          <span className="flex items-center gap-1 rounded-[3px] bg-[var(--bili-pink)] px-1.5 text-[11px] leading-[17px] text-white">
+          <span className="flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 text-[11px] leading-[17px] text-white">
             <span className="bili-live-dot" aria-hidden />
             LIVE
           </span>

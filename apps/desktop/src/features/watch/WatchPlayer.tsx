@@ -634,7 +634,7 @@ export function WatchPlayer({
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
           <span
             /* B 站播放器的进度条是品牌粉，不是链接蓝。 */
-            className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--bili-pink)]"
+            className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
             style={{ width: `${percent}%` }}
           />
           <span

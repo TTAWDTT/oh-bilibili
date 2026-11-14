@@ -21,7 +21,7 @@ export const PARTS: { rid: number; name: string }[] = [
 export function partColor(name: string): string {
   const table: Record<string, string> = {
     音乐: '#fca39a',
-    舞蹈: '#ff6699',
+    舞蹈: '#00aeec',
     游戏: '#53b6ff',
     鬼畜: '#ff8f6b',
     动画: '#ffa3b6',

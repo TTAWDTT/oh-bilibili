@@ -210,7 +210,7 @@ export function HomeView() {
           <div className="flex shrink-0 items-start gap-3">
             {[
               { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
-              { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
+              { label: '排行', icon: 'rank' as const, tone: 'var(--accent)', run: () => navigate({ kind: 'ranking' }) },
             ].map((entry) => (
               <button
                 key={entry.label}

@@ -87,7 +87,7 @@ export function BangumiView() {
                   className="num absolute left-0 top-0 px-1.5 text-[12px] font-medium leading-[18px] text-white"
                   style={{
                     background:
-                      item.rank === 1 ? '#fb7299' : item.rank === 2 ? '#ff8f3f' : item.rank === 3 ? '#f6c34a' : 'rgba(0,0,0,0.55)',
+                      item.rank === 1 ? 'var(--accent)' : item.rank === 2 ? '#ff8f3f' : item.rank === 3 ? '#f6c34a' : 'rgba(0,0,0,0.55)',
                   }}
                 >
                   {item.rank}

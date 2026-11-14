@@ -14,7 +14,7 @@ import { useAppStore } from '../../app/appStore'
 
 /** 名次底色：B 站前三是粉红 / 橙 / 黄，其余是一块半透明黑。 */
 function rankTone(rank: number): string {
-  if (rank === 1) return '#fb7299'
+  if (rank === 1) return 'var(--accent)'
   if (rank === 2) return '#ff8f3f'
   if (rank === 3) return '#f6c34a'
   return 'rgba(0,0,0,0.55)'

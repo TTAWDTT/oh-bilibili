@@ -6,7 +6,7 @@ import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 const TOTAL_MS = 1200
 
 const ICONS = [
-  { label: '点赞', Icon: BiliThumb, tone: 'text-[var(--bili-pink)]' },
+  { label: '点赞', Icon: BiliThumb, tone: 'text-[var(--accent)]' },
   { label: '投币', Icon: BiliCoin, tone: 'text-[var(--warn)]' },
   { label: '收藏', Icon: BiliStar, tone: 'text-[var(--accent)]' },
 ] as const

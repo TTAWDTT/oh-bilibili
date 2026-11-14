@@ -122,7 +122,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       {/* B 站轮播左上角那颗红色「荐」印章：方形红底、白字、轻微倾斜。 */}
       <span
         aria-hidden
-        className="absolute left-3 top-3 flex h-8 w-8 -rotate-6 items-center justify-center rounded-[4px] bg-[#ff5c8a] text-[15px] font-medium text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+        className="absolute left-3 top-3 flex h-8 w-8 -rotate-6 items-center justify-center rounded-[4px] bg-[var(--accent)] text-[15px] font-medium text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
       >
         荐
       </span>
