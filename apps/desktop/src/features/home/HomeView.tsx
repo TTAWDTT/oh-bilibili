@@ -217,20 +217,17 @@ export function HomeView() {
        * 右侧那栏给人「还有一批可以点」的入口。轮播用前 5 条、右栏接 6 条，
        * 下面网格从第 11 条开始，同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
+      <div className="mb-5 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
         <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
         {items.length > 5 ? (
           <ol className="hidden flex-col gap-1 lg:flex">
-            {items.slice(5, 11).map((track, index) => (
+            {items.slice(5, 11).map((track) => (
               <li key={track.key}>
                 <button
                   type="button"
                   onClick={() => navigate({ kind: 'watch', track })}
                   className="t flex w-full items-start gap-2.5 rounded-[6px] p-1.5 text-left hover:bg-[var(--panel-raised)]"
                 >
-                  <span className="num w-3 shrink-0 pt-0.5 text-center text-[13px] text-[var(--text-3)]">
-                    {index + 6}
-                  </span>
                   <span className="relative block h-[50px] w-[89px] shrink-0 overflow-hidden rounded-[4px]">
                     <Cover cover={track.cover} title={track.title} width={180} className="h-full w-full" />
                   </span>
@@ -239,7 +236,8 @@ export function HomeView() {
                       {track.title}
                     </span>
                     <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
-                      {track.views ? `${formatCount(track.views)} 播放` : track.artist}
+                      {track.artist}
+                      {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
                     </span>
                   </span>
                 </button>

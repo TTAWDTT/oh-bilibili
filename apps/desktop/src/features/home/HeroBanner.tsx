@@ -38,7 +38,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       aria-label="推荐轮播"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="relative mb-5 aspect-[16/6] overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)]"
+      className="relative mb-0 aspect-[16/6] overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)] lg:aspect-auto lg:h-full lg:min-h-[340px]"
     >
       {slides.map((t, i) => (
         <img
