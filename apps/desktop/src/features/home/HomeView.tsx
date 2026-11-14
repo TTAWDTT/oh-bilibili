@@ -267,7 +267,8 @@ export function HomeView() {
         <div className="grid min-w-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
           <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {hero.length > 5 ? (
-            <div className="hidden grid-cols-2 gap-3 lg:grid">
+            /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
+            <div key={hero[0]?.key} className="bili-hero-swap hidden grid-cols-2 gap-3 lg:grid">
               {hero.slice(5, 9).map((track) => (
                 <button
                   key={track.key}

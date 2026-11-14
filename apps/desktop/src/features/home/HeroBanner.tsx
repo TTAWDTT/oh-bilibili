@@ -35,12 +35,14 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
 
   return (
     <section
+      /* key 绑首条：换一换之后整块重挂载，淡入从第一帧开始，而不是新封面直接顶替。 */
+      key={slides[0]?.key}
       aria-label="推荐轮播"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
          之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
-      className="relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)]"
+      className="bili-hero-swap relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)]"
     >
       {slides.map((t, i) => (
         <img

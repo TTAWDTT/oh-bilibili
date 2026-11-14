@@ -648,6 +648,32 @@
   animation: bili-icon-pop 280ms var(--spring) both;
 }
 
+/*
+ * 「换一换」换掉首屏那九条时的淡出淡入。
+ * 之前整块是硬切：新封面在第一帧直接顶替旧封面，视觉上像闪一下。
+ * 只动 opacity 与很小的一段位移，不触发布局；key 变化时由 React 重挂载触发。
+ */
+@keyframes bili-hero-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bili-hero-swap {
+  animation: bili-hero-swap 240ms var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bili-hero-swap {
+    animation: none;
+  }
+}
+
 /* 频道项：hover 时图标先弹一下 */
 .bili-channel-icon {
   transition: transform 180ms var(--spring);
