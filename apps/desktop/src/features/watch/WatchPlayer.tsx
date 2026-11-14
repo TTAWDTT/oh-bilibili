@@ -9,6 +9,7 @@ import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { DanmakuBeats } from '../player/DanmakuBeats'
 import { useDanmakuSettings } from '../player/danmakuSettings'
+import { useAuthStore } from '../auth/authStore'
 import { useAutoplay } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
@@ -150,6 +151,9 @@ export function WatchPlayer({
   const [countdown, setCountdown] = useState<number | null>(null)
   const autoplay = useAutoplay((state) => state.enabled)
   const setAutoplay = useAutoplay((state) => state.setEnabled)
+  /** 没登录就没有发弹幕资格：把「请先登录或注册」摆在输入框的位置上。 */
+  const signedIn = useAuthStore((state) => state.auth !== null)
+  const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
 
@@ -558,6 +562,19 @@ export function WatchPlayer({
       >
         {/* 窄屏把发弹幕单独放一行：控制条一行塞不下输入框，挤压后会与画面字幕糊在一起。 */}
         <div className="mb-1.5 flex items-center gap-2 md:hidden">
+          {!signedIn ? (
+            <button
+              type="button"
+              onClick={() => setAuthOpen(true)}
+              className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-[4px] px-1 text-[12px] text-white/60 hover:text-white"
+            >
+              请先
+              <span className="text-[var(--accent)]">登录</span>
+              或
+              <span className="text-[var(--accent)]">注册</span>
+            </button>
+          ) : (
+            <>
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -576,6 +593,8 @@ export function WatchPlayer({
           >
             发送
           </button>
+            </>
+          )}
         </div>
 
         <div
@@ -640,6 +659,23 @@ export function WatchPlayer({
           <div className="min-w-0 flex-1" />
 
           <div className="hidden items-center gap-2 md:flex">
+            {/*
+             * 未登录时 B 站不给输入框，而是把「请先登录或注册」摊在同一行：
+             * 让人能打字再说「发送失败」是最差的一种。登录态取不到也按未登录处理。
+             */}
+            {!signedIn ? (
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] px-1 text-[12px] text-white/60 hover:text-white"
+              >
+                请先
+                <span className="text-[var(--accent)] hover:underline">登录</span>
+                或
+                <span className="text-[var(--accent)] hover:underline">注册</span>
+              </button>
+            ) : (
+              <>
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -673,6 +709,8 @@ export function WatchPlayer({
             >
               发送
             </button>
+              </>
+            )}
             {draftPicker ? (
               <div className="absolute bottom-9 right-2 z-30 w-[212px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
                 <div className="mb-2 flex items-center justify-between text-[11px] text-white/70">
