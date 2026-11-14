@@ -86,6 +86,7 @@ export function WatchInfo({
   /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
+  const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
     let cancelled = false
@@ -251,7 +252,12 @@ export function WatchInfo({
       </div>
 
       <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
-        <span className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })}
+          title={`看 ${data.owner} 的更多视频`}
+          className="t flex min-w-0 items-center gap-2 rounded-[4px] text-left hover:text-[var(--accent)]"
+        >
           <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
           <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
           {card ? <LevelBadge level={card.level} /> : null}
@@ -274,7 +280,7 @@ export function WatchInfo({
               粉丝 {formatCount(card.fans)}
             </span>
           ) : null}
-        </span>
+        </button>
         {data.owner_mid && followed !== null ? (
           <button
             type="button"
