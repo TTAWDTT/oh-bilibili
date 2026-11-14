@@ -265,7 +265,7 @@ export function FavFoldersView() {
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-      <PageTitle>收藏夹</PageTitle>
+      <PageTitle extra={`${folders.length} 个`}>收藏夹</PageTitle>
       <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
         {folders.map((folder) => {
           const shots = covers[folder.id]

@@ -32,7 +32,7 @@ export function EmptyState({ icon, mascot, title, detail, action, compact = fals
       {/* 整页空态用站娘站底。B 站的空态就是 22 娘/33 娘撑着，
           一行小字摆在半空的页面里像是内容丢了。 */}
       {mascot && !compact ? (
-        <Mascot2233 height={132} className="opacity-95" />
+        <Mascot2233 height={200} className="opacity-95" />
       ) : mascot ? null : icon === 'biliTv' ? (
         <span className="text-[var(--accent)]">
           <BiliTvMark size={48} />
