@@ -37,6 +37,12 @@ export function WideCard({
         <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
           {track.title}
         </span>
+        {/* 热门页的标签在标题正下方、UP 之上；入站必刷的推荐语在整张卡最底部。 */}
+        {note && noteAsTag ? (
+          <span className="mt-1 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
+            {note}
+          </span>
+        ) : null}
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
           <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
           <span className="truncate">{track.artist}</span>
@@ -55,11 +61,7 @@ export function WideCard({
             </span>
           ) : null}
         </span>
-        {note && noteAsTag ? (
-          <span className="mt-1.5 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
-            {note}
-          </span>
-        ) : note ? (
+        {note && !noteAsTag ? (
           <span className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ff7a45]">
             <Icon name="flame" size={12} className="shrink-0" />
             <span className="truncate">{note}</span>
