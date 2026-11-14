@@ -61,13 +61,37 @@ export function TitleBar() {
         </button>
       ) : (
         <div className="pointer-events-none flex shrink-0 items-center gap-2">
-          {/* 官方 wordmark 是粉色 #FF6699；蓝色是 B 站的链接与按钮色，不是标志色。 */}
           <span className="bili-tv-mark text-[var(--accent)]">
             <Icon name="biliTv" size={19} />
           </span>
           <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
         </div>
       )}
+
+      {/*
+       * B 站网页端 header 里 logo 右边那排频道：首页 / 番剧 / 直播 / 游戏中心 / 会员购。
+       * 前三个进站内页；游戏中心与会员购没有站内实现，如实交给系统浏览器，
+       * 不做成点了没反应的假入口。窄窗口收起来，避免和搜索框抢位置。
+       */}
+      {!viewing ? (
+        <nav aria-label="频道" className="pointer-events-auto hidden shrink-0 items-center gap-0.5 xl:flex">
+          {[
+            { label: '首页', run: () => navigate({ kind: 'home' }) },
+            { label: '番剧', run: () => navigate({ kind: 'bangumi' }) },
+            { label: '直播', run: () => navigate({ kind: 'live' }) },
+          ].map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              onClick={entry.run}
+              /* 网页端这排是纯文字，不带图标；带上图标就成了 App 的频道栏 */
+              className="t press flex h-8 shrink-0 items-center rounded-[6px] px-2.5 text-[13.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+            >
+              {entry.label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
       <form
         onSubmit={(e) => {
