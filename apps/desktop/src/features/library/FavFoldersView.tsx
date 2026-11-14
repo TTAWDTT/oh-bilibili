@@ -33,6 +33,9 @@ export function FavFoldersView() {
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
   const [exhausted, setExhausted] = useState(false)
+  /** 翻页失败只是这一页没取到，不是到底；给一个原地重试。 */
+  const [failed, setFailed] = useState(false)
+  const busy = useRef(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const navigate = useAppStore((state) => state.navigate)
@@ -92,6 +95,7 @@ export function FavFoldersView() {
     setTracks(null)
     setPage(1)
     setExhausted(false)
+    setFailed(false)
     void ipc
       .favTracks(picked.id, 1)
       .then((list) => {
@@ -108,10 +112,10 @@ export function FavFoldersView() {
   // 首屏或切夹后如果还没铺满预取深度，先把后面的补上：否则用户一进来就要撞到底部。
   useEffect(() => {
     const el = scrollRef.current
-    if (!picked || !el || tracks === null || exhausted || loadingMore) return
+    if (!picked || !el || tracks === null || exhausted || failed || loadingMore) return
     if (el.scrollHeight - el.clientHeight < PREFETCH_PX) void loadMore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, picked])
+  }, [tracks, picked, failed])
 
   /** 从当前收藏夹移出一条。成功后从列表里去掉，不用整页刷新。 */
   const removeOne = async (track: Track): Promise<void> => {
@@ -127,8 +131,10 @@ export function FavFoldersView() {
 
   /** 加载收藏夹的下一页。B 站每页 40 条。 */
   const loadMore = async (): Promise<void> => {
-    if (!picked || loadingMore || exhausted) return
+    if (!picked || busy.current || exhausted) return
+    busy.current = true
     setLoadingMore(true)
+    setFailed(false)
     try {
       const next = await ipc.favTracks(picked.id, page + 1)
       if (next.length === 0) {
@@ -138,8 +144,9 @@ export function FavFoldersView() {
         setPage((p) => p + 1)
       }
     } catch {
-      setExhausted(true)
+      setFailed(true)
     } finally {
+      busy.current = false
       setLoadingMore(false)
     }
   }
@@ -158,7 +165,9 @@ export function FavFoldersView() {
 
   /** 离底部不到预取深度就补一页；补完还不够深，下一次滚动会继续补。 */
   const pullMore = (el: HTMLDivElement): void => {
-    if (!exhausted && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) void loadMore()
+    if (!exhausted && !failed && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
+      void loadMore()
+    }
   }
 
   if (picked) {
@@ -233,6 +242,14 @@ export function FavFoldersView() {
             <div className="mt-6 flex justify-center">
               {exhausted ? (
                 <span className="text-[13px] text-[var(--text-3)]">已经到底了</span>
+              ) : failed ? (
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  className="t press text-[13px] text-[var(--accent)] hover:underline"
+                >
+                  没加载出来，重试这一页
+                </button>
               ) : (
                 <button
                   type="button"
