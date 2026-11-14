@@ -161,7 +161,7 @@ export function WeeklyView() {
           ))}
         </div>
       ) : (
-        <EmptyState icon="biliTv" title="这一期暂时是空的" action={null} />
+        <EmptyState mascot="missYou" icon="biliTv" title="这一期暂时是空的" action={null} />
       )}
 
       {number !== null && page === null && !error ? <BiliLoader compact label="正在取这一期…" /> : null}

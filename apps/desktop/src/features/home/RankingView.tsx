@@ -86,7 +86,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       ) : tracks === null ? (
         <CardGridSkeleton cards={10} />
       ) : tracks.length === 0 ? (
-        <EmptyState icon="biliTv" title="这个分区今天没有榜单" action={null} />
+        <EmptyState mascot="missYou" icon="biliTv" title="这个分区今天没有榜单" action={null} />
       ) : (
         <ContentGrid
           tracks={tracks}
