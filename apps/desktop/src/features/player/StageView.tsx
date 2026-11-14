@@ -108,12 +108,11 @@ export function StageView() {
           alt=""
           aria-hidden
           referrerPolicy="no-referrer"
-          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-[100px] saturate-125"
+          className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-45 blur-[80px] saturate-150"
         />
       ) : null}
-      {/* 浅色底：白色半透明压住封面，让文字在任何封面上都读得清 */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--ga0)' }} />
-      <div className="pointer-events-none absolute inset-0 bg-white/55" />
+      {/* 白纱必须渐变：整层纯色会把模糊封面完全盖掉，舞台就退化成一张白纸 */}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),rgba(255,255,255,0.78)_58%,rgba(255,255,255,0.94))]" />
       {/* 弹幕压到内容下面：标题与歌词是这一屏要读的字，不能被弹幕盖住 */}
       <div className="pointer-events-none absolute inset-0 z-0">
         {/* 舞台上弹幕是气氛，不是要读的字：降一档透明度，别和唱片、标题抢注意力。 */}
@@ -124,23 +123,30 @@ export function StageView() {
         type="button"
         onClick={() => setStage(false)}
         aria-label="退出舞台"
-        className="t press absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-[4px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+        /* 舞台铺满整窗，左上角是系统红绿灯：按钮要落在它们右侧，不能压上去 */
+        className="t press absolute left-24 top-3 z-20 flex h-8 items-center gap-1 rounded-full bg-[var(--panel)]/85 pl-2 pr-3.5 text-[13px] text-[var(--text-2)] shadow-[0_2px_10px_rgba(0,0,0,0.08)] backdrop-blur hover:text-[var(--text-1)]"
       >
-        <Icon name="close" size={16} />
+        <Icon name="chevronLeft" size={16} />
+        退出
       </button>
 
       <DanmakuPanel />
 
       <div className="relative flex w-full max-w-[560px] flex-col items-center px-8">
         <div className="stage-disc" data-playing={snapshot?.phase === 'playing'}>
-          <Cover
-            cover={track.cover}
-            title={track.title}
-            className="h-[148px] w-[148px] rounded-full border-4 border-white shadow-[0_18px_50px_-16px_rgba(0,0,0,0.45)] md:h-[188px] md:w-[188px]"
-          />
+          <div className="stage-vinyl flex h-[200px] w-[200px] items-center justify-center rounded-full md:h-[248px] md:w-[248px]">
+            <Cover
+              cover={track.cover}
+              title={track.title}
+              /* 圆标压在黑胶片上，白描边是唱片中心那一圈压纹，不是浅色界面装饰 */
+              className="h-[38%] w-[38%] rounded-full border border-white/20 shadow-[0_2px_12px_rgba(0,0,0,0.5)] ui-audit-ok"
+            />
+            <span aria-hidden className="stage-spindle" />
+          </div>
+          <span aria-hidden className="stage-tonearm" data-playing={snapshot?.phase === 'playing'} />
         </div>
 
-        <h2 className="mt-5 max-w-full truncate text-[24px] font-semibold text-[var(--text-1)]" title={track.title}>
+        <h2 className="mt-5 line-clamp-2 max-w-full text-center text-[22px] font-semibold leading-[1.35] text-[var(--text-1)]" title={track.title}>
           {track.title}
         </h2>
         <p className="mt-1 truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
@@ -148,8 +154,8 @@ export function StageView() {
         </p>
 
         <div className="mt-4 flex min-h-[62px] flex-col items-center text-center">
-          <p className="stage-line text-[24px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
-          <p className="mt-3 text-[16px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
+          <p className="stage-line text-[27px] leading-[1.45] text-[var(--text-1)]">{current || '♪'}</p>
+          <p className="mt-3 text-[15px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
         </div>
 
         {/* 弹幕输入框放在播放键上方：真机窗口比网页矮，放下面会被底部的

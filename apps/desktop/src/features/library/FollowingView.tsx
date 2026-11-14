@@ -37,7 +37,8 @@ function popoverStyle(anchor: Hover['anchor']): { left: number; top: number; wid
   let left = anchor.right + gap
   if (left + width > window.innerWidth - 8) left = anchor.left - width - gap
   if (left < 8) left = 8
-  const top = Math.min(Math.max(anchor.top, 8), Math.max(8, window.innerHeight - 196))
+  // 名片高约 236（头像行 + 签名两行 + 查看主页），留余量再夹进窗口，别让底部按钮掉出屏幕。
+  const top = Math.min(Math.max(anchor.top, 8), Math.max(8, window.innerHeight - 244))
   return { left, top, width }
 }
 
@@ -254,7 +255,13 @@ export function FollowingView() {
         ? createPortal(
             <div
               role="tooltip"
-              className="pointer-events-none fixed z-[60] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
+              /* 名片本身可点：指针从卡片移进名片时不能收起来，否则里面的入口永远按不到 */
+              onPointerEnter={() => {
+                if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+                timerRef.current = null
+              }}
+              onPointerLeave={hide}
+              className="fixed z-[60] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
               style={popoverStyle(hover.anchor)}
             >
               <div className="flex items-start gap-2.5">
@@ -303,6 +310,14 @@ export function FollowingView() {
                   {card?.sign || hover.user.sign}
                 </p>
               ) : null}
+              <button
+                type="button"
+                onClick={() => navigate({ kind: 'author', name: hover.user.name, mid: hover.user.mid })}
+                className="t press mt-2.5 flex w-full items-center justify-center gap-1 rounded-[4px] border border-[var(--accent)] py-1 text-[12px] text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                查看主页
+                <Icon name="chevronRight" size={12} />
+              </button>
             </div>,
             document.body,
           )
