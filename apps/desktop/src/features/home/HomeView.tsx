@@ -148,14 +148,15 @@ export function HomeView() {
           feedMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
         }
       }}
-      className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
+      className="bili-canvas min-h-0 flex-1 overflow-y-auto py-0 px-0 pb-10 md:px-0"
     >
       {/*
-       * 频道条照 B 站首页原版：左边两个圆形入口，右边两行等宽白底描边胶囊。
-       * 整条不套外框，直接落在页面上——B 站这一块本来就没有卡片。
-       * 右侧那列快捷链接不再放：左侧栏已有同样入口，多一列就把这一带撑成三行。
+       * 频道条照 B 站首页原版：左边两个圆形入口，右边两行等宽胶囊。
+       * B 站这一带是白色 header 带、胶囊 #f6f7f8 铺在白上；我们页面底也是 #f6f7f8，
+       * 所以这里自带一条白带，否则胶囊会和背景融成一片、整条读起来像空缺。
+       * 右侧那列快捷链接不放：左侧栏已有同样入口，多一列会把这一带撑成三行。
        */}
-      <nav className="mb-5 flex items-start gap-5">
+      <nav className="mb-4 flex items-start gap-5 bg-[var(--panel)] px-4 py-3 md:px-8">
         <div className="flex shrink-0 items-start gap-3">
           {[
             { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
@@ -183,7 +184,9 @@ export function HomeView() {
               key={part.rid}
               type="button"
               onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              className="t flex h-7 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              /* B 站频道胶囊实测：底色 #f6f7f8、描边 #f1f2f3、圆角 6、高 28、字 13。
+                 白底 + 深灰边比它抢眼得多，一屏 11 个就把轮播压住了。 */
+              className="t flex h-7 items-center justify-center rounded-[6px] border border-[var(--ga1)] bg-[var(--ga0)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
             >
               {part.name}
             </button>
@@ -201,7 +204,7 @@ export function HomeView() {
        * 而不是一列文字条目。轮播用前 5 条、右栏接 4 条，下面网格从第 9 条开始，
        * 同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 flex items-stretch gap-3">
+      <div className="mb-5 flex items-stretch gap-3 px-4 pt-4 md:px-8">
         <div className="grid min-w-0 flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
           <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {items.length > 5 ? (
@@ -248,15 +251,17 @@ export function HomeView() {
       {items.length > 0 ? (
         <>
           {/* 分区标题：长页面在这里有第一个断点，而不是从轮播一路铺到屏幕外。 */}
-          <h2 className="mb-3 text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
-          <ContentGrid
-            tracks={items.slice(9)}
-            activeKey={activeKey}
-            playing={playing}
-            onNeedMore={more}
-            lookahead={600}
-            initialIndex={feedMemory.index}
-          />
+          <div className="px-4 md:px-8">
+            <h2 className="mb-3 text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
+            <ContentGrid
+              tracks={items.slice(9)}
+              activeKey={activeKey}
+              playing={playing}
+              onNeedMore={more}
+              lookahead={600}
+              initialIndex={feedMemory.index}
+            />
+          </div>
         </>
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
