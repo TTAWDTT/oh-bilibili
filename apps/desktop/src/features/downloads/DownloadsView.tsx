@@ -59,7 +59,24 @@ export function DownloadsView() {
         id="scroll-main"
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
       >
-        <PageTitle>已下载</PageTitle>
+        <PageTitle
+          action={
+            <button
+              type="button"
+              onClick={() =>
+                void ipc
+                  .downloadOpenDir()
+                  .catch((cause) => toastFailure('打开下载目录', cause))
+              }
+              className="t press flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              <Icon name="folder" size={14} />
+              打开目录
+            </button>
+          }
+        >
+          已下载
+        </PageTitle>
         {items === null ? (
           <div aria-hidden>
             {Array.from({ length: 3 }, (_, index) => (

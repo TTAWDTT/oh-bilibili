@@ -1808,6 +1808,11 @@ fn find_ytdlp() -> Option<std::path::PathBuf> {
     None
 }
 
+/// 下载目录。界面上的「打开目录」用它，免得前端自己拼 HOME。
+pub fn downloads_dir() -> std::path::PathBuf {
+    download_dir()
+}
+
 fn download_dir() -> std::path::PathBuf {
     std::env::var_os("HOME")
         .map(std::path::PathBuf::from)

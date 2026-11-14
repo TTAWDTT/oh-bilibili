@@ -316,6 +316,11 @@ export function followSet(mid: number, on: boolean): Promise<null> {
   return call<null>('follow_set', { mid, on })
 }
 
+/** 在访达里打开下载目录。 */
+export function downloadOpenDir(): Promise<null> {
+  return call<null>('download_open_dir', {})
+}
+
 /** 当前账号有没有关注这个 UP 主。 */
 export function relationFollowed(mid: number): Promise<boolean> {
   return call<boolean>('relation_followed', { mid })

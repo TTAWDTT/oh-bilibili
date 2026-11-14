@@ -335,6 +335,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             : [],
       }
     }
+    case 'download_open_dir':
+      return null
     case 'follow_set':
       // 预览里不真的改关注关系，返回成功即可；界面上按钮会切成「已关注」。
       return null

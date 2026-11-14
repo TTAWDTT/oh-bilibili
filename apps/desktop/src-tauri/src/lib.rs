@@ -828,6 +828,19 @@ fn download_reveal(
     Ok(())
 }
 
+/// 在访达里打开下载目录（没有就建一个再打开）。
+#[tauri::command(rename_all = "snake_case")]
+fn download_open_dir() -> Result<(), WireError> {
+    let dir = bilimusic_core::engine::downloads_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
+    std::process::Command::new("open")
+        .arg(&dir)
+        .spawn()
+        .map_err(|e| WireError::internal(format!("打不开访达：{e}")))?;
+    Ok(())
+}
+
 /// 用系统默认浏览器打开外部链接。只收 http/https：
 /// 简介里的文字来自 B 站，不能让它拉起 file:// 之类任意 scheme。
 #[tauri::command(rename_all = "snake_case")]
@@ -994,6 +1007,7 @@ pub fn run() {
             danmaku_send,
             download_remove,
             download_reveal,
+            download_open_dir,
             open_external,
             download_enqueue,
             sync_now,
