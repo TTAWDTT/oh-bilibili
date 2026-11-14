@@ -17,11 +17,16 @@ import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { ShortcutTable } from './ShortcutTable'
 
 /** 窄屏没有侧栏，这些入口收进「我的」，和 B 站 App 的个人页一样排成一排。 */
-const SERVICES: readonly { kind: 'history' | 'favs' | 'watchLater' | 'following'; label: string; icon: IconName }[] = [
+const SERVICES: readonly {
+  kind: 'history' | 'favs' | 'watchLater' | 'following' | 'downloads'
+  label: string
+  icon: IconName
+}[] = [
   { kind: 'history', label: '历史', icon: 'clock' },
   { kind: 'favs', label: '收藏夹', icon: 'bookmarkStar' },
   { kind: 'watchLater', label: '稍后再看', icon: 'watchLater' },
   { kind: 'following', label: '关注', icon: 'user' },
+  { kind: 'downloads', label: '已下载', icon: 'download' },
 ]
 
 /**
@@ -191,7 +196,7 @@ export function SettingsView() {
 
           <div className="md:hidden">
             <Section title="我的">
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-5 gap-1">
                 {SERVICES.map((service) => (
                   <button
                     key={service.kind}
