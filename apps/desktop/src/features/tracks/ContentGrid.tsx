@@ -239,7 +239,7 @@ const TrackCard = memo(function TrackCard({
 
       <h3
         className={[
-          'bili-card-title mt-2 line-clamp-2 min-h-[2.7em] text-[15px] leading-[1.35]',
+          'bili-card-title mt-2 line-clamp-2 min-h-[44px] text-[15px] font-medium leading-[22px]',
           active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]',
         ].join(' ')}
         title={track.title}

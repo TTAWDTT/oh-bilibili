@@ -151,11 +151,11 @@ export function HomeView() {
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
       {/*
-       * 频道条照 B 站首页原版排：左边两个圆形入口，中间两行白底描边的小胶囊分区，
-       * 右边一列小号快捷链接。整条不套外框，直接落在页面上——B 站这一块本来就没有卡片。
-       * 之前几版要么把入口挤在左边留一大片空带，要么做成四等分导航，都不像首页。
+       * 频道条照 B 站首页原版：左边两个圆形入口，右边两行等宽白底描边胶囊。
+       * 整条不套外框，直接落在页面上——B 站这一块本来就没有卡片。
+       * 右侧那列快捷链接不再放：左侧栏已有同样入口，多一列就把这一带撑成三行。
        */}
-      <nav className="mb-5 flex flex-wrap items-start gap-x-6 gap-y-3">
+      <nav className="mb-5 flex items-start gap-5">
         <div className="flex shrink-0 items-start gap-3">
           {[
             { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
@@ -177,35 +177,15 @@ export function HomeView() {
             </button>
           ))}
         </div>
-        <div className="flex w-[616px] max-w-full flex-wrap gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {PARTS.filter((part) => part.rid !== 0).map((part) => (
             <button
               key={part.rid}
               type="button"
               onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              className="t flex h-7 w-24 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="t flex h-7 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               {part.name}
-            </button>
-          ))}
-        </div>
-        <div className="hidden shrink-0 grid-cols-2 gap-x-5 gap-y-2 pt-1 xl:grid">
-          {[
-            { label: '每周必看', icon: 'calendar' as const, run: () => navigate({ kind: 'weekly' }) },
-            { label: '入站必刷', icon: 'gift' as const, run: () => navigate({ kind: 'precious' }) },
-            { label: '历史', icon: 'clock' as const, run: () => navigate({ kind: 'history' }) },
-            { label: '收藏', icon: 'bookmarkStar' as const, run: () => navigate({ kind: 'favs' }) },
-            { label: '稍后再看', icon: 'watchLater' as const, run: () => navigate({ kind: 'watchLater' }) },
-            { label: '曲库', icon: 'library' as const, run: () => navigate({ kind: 'library' }) },
-          ].map((entry) => (
-            <button
-              key={entry.label}
-              type="button"
-              onClick={entry.run}
-              className="bili-icon-btn t flex items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              <Icon name={entry.icon} size={13} />
-              {entry.label}
             </button>
           ))}
         </div>
@@ -221,7 +201,7 @@ export function HomeView() {
        * 而不是一列文字条目。轮播用前 5 条、右栏接 4 条，下面网格从第 9 条开始，
        * 同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 flex items-start gap-3">
+      <div className="mb-5 flex items-stretch gap-3">
         <div className="grid min-w-0 flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
           <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {items.length > 5 ? (
@@ -239,10 +219,10 @@ export function HomeView() {
                       {formatDuration(track.duration_ms)}
                     </span>
                   </span>
-                  <span className="mt-1.5 line-clamp-2 text-[12.5px] leading-[17px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                  <span className="mt-1.5 line-clamp-2 text-[13px] leading-[18px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                     {track.title}
                   </span>
-                  <span className="num mt-0.5 block truncate text-[11px] text-[var(--text-3)]">
+                  <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
                     {track.artist}
                     {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
                   </span>
@@ -256,7 +236,7 @@ export function HomeView() {
           type="button"
           onClick={refresh}
           title="换一换"
-          className="bili-icon-btn t press mt-[3px] flex h-[88px] w-9 shrink-0 flex-col items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          className="bili-icon-btn t press flex w-9 shrink-0 flex-col items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
           <Icon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
           <span style={{ writingMode: 'vertical-rl' }} className="leading-none tracking-[0.18em]">
