@@ -304,6 +304,10 @@ const ICONS = {
       <path d="M8 3.8v4.2M16 3.8v4.2" />
     </>
   ),
+  /** 充电：B 站这根斜插的闪电，比正立的闪电更像它在按钮里用的那颗。 */
+  battery: (
+    <path d="M13.4 2.8 5.2 13.4h5.2l-1 7.8 8.4-10.8h-5.3l1.1-7.6Z" />
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof ICONS
