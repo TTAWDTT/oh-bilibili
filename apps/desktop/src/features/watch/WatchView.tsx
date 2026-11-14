@@ -131,7 +131,9 @@ export function WatchView({ track }: { track: Track }) {
       .getState()
       .addCoin(track, count, alsoLike)
       .then((ok) => {
-        if (ok) setCoinDelta((n) => n + count)
+        if (!ok) return
+        setCoinDelta((n) => n + count)
+        toastDone('投币成功', alsoLike ? '同时点了个赞' : null)
       })
   }
 
