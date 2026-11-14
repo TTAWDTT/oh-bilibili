@@ -30,6 +30,7 @@ function persist(list: string[]): void {
 export const useSearchHistory = create<{
   items: string[]
   push: (keyword: string) => void
+  remove: (keyword: string) => void
   clear: () => void
 }>((set, get) => ({
   items: load(),
@@ -37,6 +38,11 @@ export const useSearchHistory = create<{
     const word = keyword.trim()
     if (!word) return
     const next = [word, ...get().items.filter((w) => w !== word)].slice(0, MAX)
+    persist(next)
+    set({ items: next })
+  },
+  remove: (keyword) => {
+    const next = get().items.filter((w) => w !== keyword)
     persist(next)
     set({ items: next })
   },

@@ -80,6 +80,7 @@ export function SearchView() {
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   const clearHistory = useSearchHistory((s) => s.clear)
+  const removeHistory = useSearchHistory((s) => s.remove)
   /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
   const [hotWords, setHotWords] = useState<string[]>([])
   useEffect(() => {
@@ -308,15 +309,27 @@ export function SearchView() {
               历史
             </span>
             {history.slice(0, 8).map((word) => (
-              <button
-                key={word}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(word)}
-                className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
-              >
-                {word}
-              </button>
+              <span key={word} className="group/h inline-flex max-w-full items-center">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(word)}
+                  className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
+                >
+                  {word}
+                </button>
+                {/* B 站的历史词也能单独删，不必为了去掉一个词清空整串。 */}
+                <button
+                  type="button"
+                  aria-label={`删除历史 ${word}`}
+                  title="删除这个词"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => removeHistory(word)}
+                  className="t ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] opacity-0 hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] group-hover/h:opacity-100"
+                >
+                  <Icon name="close" size={10} />
+                </button>
+              </span>
             ))}
             <button
               type="button"
