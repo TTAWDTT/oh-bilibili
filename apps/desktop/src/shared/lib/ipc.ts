@@ -275,6 +275,27 @@ export function liveRooms(count = 6, page = 1): Promise<LiveRoom[]> {
   return call<LiveRoom[]>('live_rooms', { count, page })
 }
 
+/** 番剧时间表的一天。 */
+export type BangumiDay = {
+  date: string
+  /** 1=周一 … 7=周日 */
+  weekday: number
+  today: boolean
+  episodes: {
+    season_id: number
+    title: string
+    cover: string | null
+    pub_index: string
+    pub_time: string
+    url: string
+  }[]
+}
+
+/** 一周的番剧更新表。 */
+export function bangumiTimeline(): Promise<BangumiDay[]> {
+  return call<BangumiDay[]>('bangumi_timeline', {})
+}
+
 /** 番剧排行。 */
 export function bangumiRank(count = 6): Promise<Bangumi[]> {
   return call<Bangumi[]>('bangumi_rank', { count })

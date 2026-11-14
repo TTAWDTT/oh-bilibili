@@ -63,6 +63,29 @@ pub struct BangumiItem {
     pub play_text: String,
 }
 
+/// 番剧时间表里的一天。B 站首页那块「周一 / 周二 …」就照这个排。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BangumiDay {
+    /// 已经格式化好的日期，接口直接给「11-16」。
+    pub date: String,
+    /// 1=周一 … 7=周日。
+    pub weekday: u8,
+    pub today: bool,
+    pub episodes: Vec<BangumiEpisode>,
+}
+
+/// 某一天更新的某一部番。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BangumiEpisode {
+    pub season_id: u64,
+    pub title: String,
+    pub cover: Option<String>,
+    /// 「更新至第12话」「第1话~第10话」这种，接口原文。
+    pub pub_index: String,
+    /// 更新时间「12:00」，没定时是空串。
+    pub pub_time: String,
+}
+
 /// 收藏夹列表里的一项。B 站 web 端的收藏夹页就用 `created/list`，它自带每个夹子的封面。
 #[derive(Debug, Clone)]
 pub struct FavFolder {
@@ -921,6 +944,59 @@ impl Client {
                                 .unwrap_or_default()
                                 .to_string(),
                             play_text: m["icon_font"]["text"].as_str().unwrap_or_default().to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// 番剧更新表。B 站首页右下角那块「周一 周二 …」就是它，一天一组。
+    ///
+    /// `before` / `after` 是天数：取 6 天前到 6 天后，正好铺满一周。
+    pub async fn bangumi_timeline(&self) -> Result<Vec<BangumiDay>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/pgc/web/timeline?types=1&before=6&after=6"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(v["result"]
+            .as_array()
+            .map(|days| {
+                days.iter()
+                    .filter_map(|d| {
+                        let weekday = d["day_of_week"].as_u64()? as u8;
+                        Some(BangumiDay {
+                            date: d["date"].as_str().unwrap_or_default().to_string(),
+                            weekday,
+                            today: d["is_today"].as_u64() == Some(1),
+                            episodes: d["episodes"]
+                                .as_array()
+                                .map(|list| {
+                                    list.iter()
+                                        .filter_map(|m| {
+                                            Some(BangumiEpisode {
+                                                season_id: m["season_id"].as_u64()?,
+                                                title: m["title"].as_str().unwrap_or_default().to_string(),
+                                                cover: m["square_cover"]
+                                                    .as_str()
+                                                    .filter(|c| !c.is_empty())
+                                                    .or_else(|| m["cover"].as_str())
+                                                    .map(|c| c.replacen("http://", "https://", 1)),
+                                                pub_index: m["pub_index"]
+                                                    .as_str()
+                                                    .unwrap_or_default()
+                                                    .to_string(),
+                                                pub_time: m["pub_time"]
+                                                    .as_str()
+                                                    .unwrap_or_default()
+                                                    .to_string(),
+                                            })
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
                         })
                     })
                     .collect()

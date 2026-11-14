@@ -376,6 +376,11 @@ impl Source {
         self.client.bangumi_rank(count).await
     }
 
+    /// 番剧更新表（周一…周日）。
+    pub async fn bangumi_timeline(&self) -> Result<Vec<sync::BangumiDay>, BiliError> {
+        self.client.bangumi_timeline().await
+    }
+
     /// 综合热门。第二个返回值表示后面还有没有更早的稿件，第三个是按 bvid 对齐的小标签。
     pub async fn popular(
         &self,

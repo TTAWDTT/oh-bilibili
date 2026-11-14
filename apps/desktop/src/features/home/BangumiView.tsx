@@ -4,6 +4,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
+import { BangumiTimeline } from './BangumiTimeline'
 
 /**
  * 番剧频道。B 站番剧区的立绘是高封面（3:4），分数压在右下角。
@@ -58,7 +59,11 @@ export function BangumiView() {
       ) : items.length === 0 ? (
         <EmptyState icon="biliTv" title="番剧榜暂时是空的" action={null} />
       ) : (
-        <div className="grid grid-cols-3 gap-x-3 gap-y-6 px-4 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 md:px-8">
+        <>
+          <div className="px-4 md:px-8">
+            <BangumiTimeline />
+          </div>
+          <div className="grid grid-cols-3 gap-x-3 gap-y-6 px-4 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 md:px-8">
           {items.map((item) => (
             <button
               key={item.season_id}
@@ -101,7 +106,8 @@ export function BangumiView() {
               </span>
             </button>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

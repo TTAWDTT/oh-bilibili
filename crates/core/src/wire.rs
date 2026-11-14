@@ -174,6 +174,25 @@ pub struct LiveRoomView {
     pub url: String,
 }
 
+/// 番剧时间表的一天。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BangumiDayView {
+    pub date: String,
+    pub weekday: u8,
+    pub today: bool,
+    pub episodes: Vec<BangumiEpisodeView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BangumiEpisodeView {
+    pub season_id: u64,
+    pub title: String,
+    pub cover: Option<String>,
+    pub pub_index: String,
+    pub pub_time: String,
+    pub url: String,
+}
+
 /// 首页番剧卡。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BangumiView {

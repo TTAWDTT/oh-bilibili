@@ -1371,6 +1371,33 @@ impl Engine {
             .collect())
     }
 
+    /// 番剧更新表。
+    pub async fn bangumi_timeline(
+        &self,
+    ) -> Result<Vec<crate::wire::BangumiDayView>, WireError> {
+        let days = self.source.bangumi_timeline().await?;
+        Ok(days
+            .into_iter()
+            .map(|day| crate::wire::BangumiDayView {
+                date: day.date,
+                weekday: day.weekday,
+                today: day.today,
+                episodes: day
+                    .episodes
+                    .into_iter()
+                    .map(|ep| crate::wire::BangumiEpisodeView {
+                        url: format!("https://www.bilibili.com/bangumi/play/ss{}", ep.season_id),
+                        season_id: ep.season_id,
+                        title: ep.title,
+                        cover: ep.cover,
+                        pub_index: ep.pub_index,
+                        pub_time: ep.pub_time,
+                    })
+                    .collect(),
+            })
+            .collect())
+    }
+
     /// 番剧排行。
     pub async fn bangumi_rank(
         &self,

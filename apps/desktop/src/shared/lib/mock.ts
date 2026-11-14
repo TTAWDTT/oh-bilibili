@@ -150,6 +150,20 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         play_text: '1.2亿',
         url: `https://www.bilibili.com/bangumi/play/ss${33_000 + i}`,
       }))
+    case 'bangumi_timeline':
+      return Array.from({ length: 7 }, (_, i) => ({
+        date: `11-${String(9 + i).padStart(2, '0')}`,
+        weekday: i + 1,
+        today: i === 5,
+        episodes: CATALOG.slice(i, i + 3).map((track, j) => ({
+          season_id: 40_000 + i * 10 + j,
+          title: track.title,
+          cover: track.cover,
+          pub_index: `更新至第${i + 8}话`,
+          pub_time: '12:00',
+          url: `https://www.bilibili.com/bangumi/play/ss${40_000 + i * 10 + j}`,
+        })),
+      }))
     case 'popular':
       return {
         items: CATALOG.slice(0, 20).map((track, i) => ({

@@ -625,6 +625,13 @@ async fn bangumi_rank(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn bangumi_timeline(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<bilimusic_core::wire::BangumiDayView>, WireError> {
+    engine.bangumi_timeline().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn weekly_issues(
     engine: tauri::State<'_, Arc<Engine>>,
 ) -> Result<Vec<bilimusic_core::wire::WeeklyIssueView>, WireError> {
@@ -1008,6 +1015,7 @@ pub fn run() {
             ranking,
             live_rooms,
             bangumi_rank,
+            bangumi_timeline,
             popular,
             precious,
             weekly_issues,

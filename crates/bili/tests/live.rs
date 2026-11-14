@@ -736,3 +736,25 @@ async fn 直播与番剧都能取到() {
         "分数是接口给的展示串"
     );
 }
+
+/// 番剧时间表：一周七天，每天一组，字段是站内口径。
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 番剧时间表能取到一周() {
+    let source = Source::open().await.expect("Source 应该能打开");
+    let days = source.bangumi_timeline().await.expect("时间表应该能取到");
+    println!("天数 {}，第一天 {} 周{}，{} 部", days.len(), days[0].date, days[0].weekday, days[0].episodes.len());
+    assert!(days.len() >= 7, "before=6&after=6 至少给七天，实际 {}", days.len());
+    let weekdays: std::collections::BTreeSet<u8> = days.iter().map(|d| d.weekday).collect();
+    assert_eq!(weekdays.len(), 7, "一周七天都要有，实际 {:?}", weekdays);
+    assert_eq!(days.iter().filter(|d| d.today).count(), 1, "只有一天是今天");
+
+    let ep = days
+        .iter()
+        .flat_map(|d| d.episodes.iter())
+        .next()
+        .expect("至少有一部在更新");
+    println!("第一部：{} / {} / {}", ep.title, ep.pub_time, ep.pub_index);
+    assert!(!ep.title.is_empty(), "番剧要有名字");
+    assert!(ep.cover.is_some(), "时间表条目要带封面");
+}
