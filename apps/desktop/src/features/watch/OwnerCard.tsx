@@ -27,7 +27,7 @@ export function OwnerCard({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 border-b border-hairline px-3 py-3">
+    <div className="flex flex-col gap-2.5 px-3 py-3">
       <div className="flex items-start gap-3">
         <button type="button" onClick={goAuthor} aria-label={`看 ${data.owner} 的更多视频`} className="t shrink-0">
           <Avatar src={data.owner_avatar} alt={data.owner} size={48} />

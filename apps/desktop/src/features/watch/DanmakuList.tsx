@@ -15,40 +15,43 @@ export function DanmakuList({ items }: { items: DanmakuItem[] }) {
   const sorted = [...items].sort((a, b) => a.at - b.at)
 
   return (
-    <div className="border-b border-hairline px-3 py-2">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        className="t flex h-6 w-full items-center gap-2 text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
-      >
-        <span className="min-w-0 flex-1 text-left">弹幕列表</span>
-        <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
-        <Icon
-          name="chevronRight"
-          size={14}
-          className={`shrink-0 text-[var(--text-3)] transition-transform ${open ? 'rotate-90' : ''}`}
-        />
-      </button>
-      {open ? (
-        <ul className="mt-1 max-h-[240px] overflow-y-auto">
-          {sorted.map((item, index) => (
-            <li key={`${item.at}-${index}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  void ipc.playerSeek(item.at).catch(() => {})
-                }}
-                title={item.text}
-                className="t flex w-full gap-2 rounded-[3px] px-1 py-0.5 text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
-              >
-                <span className="num shrink-0 text-[var(--text-3)]">{formatTime(item.at)}</span>
-                <span className="min-w-0 flex-1 truncate">{item.text}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+    <div className="px-2 pb-2">
+      {/* B 站把弹幕列表做成一条灰底圆角卡片，收起时只剩这条标题。 */}
+      <div className="overflow-hidden rounded-[8px] border border-[var(--line)]">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className="t flex h-9 w-full items-center gap-2 bg-[var(--ga0)] px-3 text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
+        >
+          <span className="min-w-0 flex-1 text-left">弹幕列表</span>
+          <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
+          <Icon
+            name="chevronRight"
+            size={14}
+            className={`shrink-0 text-[var(--text-3)] transition-transform ${open ? 'rotate-90' : ''}`}
+          />
+        </button>
+        {open ? (
+          <ul className="max-h-[240px] overflow-y-auto bg-[var(--panel)] px-1 py-1">
+            {sorted.map((item, index) => (
+              <li key={`${item.at}-${index}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void ipc.playerSeek(item.at).catch(() => {})
+                  }}
+                  title={item.text}
+                  className="t flex w-full gap-2 rounded-[3px] px-2 py-0.5 text-left text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-hover)] hover:text-[var(--accent)]"
+                >
+                  <span className="num shrink-0 text-[var(--text-3)]">{formatTime(item.at)}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.text}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </div>
   )
 }
