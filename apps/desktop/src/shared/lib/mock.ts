@@ -237,7 +237,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         tname: track.tname ?? null,
         pages: [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }],
         current_page: 1,
-        season: null,
+        // 预览给一个三集合集：换成别的视频时把当前这条换进第一集，右栏合集能验到。
+        season: {
+          id: 1,
+          title: '预览合集 · 精选现场',
+          episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
+            key: t.key,
+            title: t.title,
+            cover: t.cover ?? null,
+            duration_ms: t.duration_ms ?? 30_000,
+            views: t.views ?? null,
+            current: t.key === track.key,
+          })),
+        },
         // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
         manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
         duration_ms: track.duration_ms ?? 30_000,
