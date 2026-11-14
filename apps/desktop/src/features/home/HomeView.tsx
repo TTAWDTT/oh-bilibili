@@ -246,14 +246,18 @@ export function HomeView() {
       </div>
 
       {items.length > 0 ? (
-        <ContentGrid
-          tracks={items.slice(9)}
-          activeKey={activeKey}
-          playing={playing}
-          onNeedMore={more}
-          lookahead={600}
-          initialIndex={feedMemory.index}
-        />
+        <>
+          {/* 分区标题：长页面在这里有第一个断点，而不是从轮播一路铺到屏幕外。 */}
+          <h2 className="mb-3 text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
+          <ContentGrid
+            tracks={items.slice(9)}
+            activeKey={activeKey}
+            playing={playing}
+            onNeedMore={more}
+            lookahead={600}
+            initialIndex={feedMemory.index}
+          />
+        </>
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}

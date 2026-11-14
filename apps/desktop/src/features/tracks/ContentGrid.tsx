@@ -160,7 +160,9 @@ const TrackCard = memo(function TrackCard({
           type="button"
           onClick={() => onOpen(track)}
           aria-label={`观看 ${track.title}`}
-          className="relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
+          /* 封面本身就是卡片：不描边，靠图片与留白分隔，鼠标悬停时整块抬升。
+             之前每张封面套 1px 灰边，一屏几十张全是框线，页面读起来像表格。 */
+          className="relative block w-full overflow-hidden rounded-[8px]"
           style={{ aspectRatio: '16 / 10' }}
         >
           <Cover cover={track.cover} title={track.title} width={260} className="bili-card-cover h-full w-full" />
