@@ -3,7 +3,6 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
-import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
@@ -151,24 +150,12 @@ export function HomeView() {
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
-      <div className="mb-4 flex items-center gap-3">
-        <PageTitle>发现</PageTitle>
-        <button
-          type="button"
-          onClick={refresh}
-          className="t press ml-auto rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
-        >
-          {/* 首次加载时列表还没出现，那是「正在取」而不是「正在换」。 */}
-          {loading ? (items.length > 0 ? '正在换…' : '正在取…') : '换一批'}
-        </button>
-      </div>
-
       {/*
        * 频道条照 B 站首页原版排：左边两个圆形入口，中间两行白底描边的小胶囊分区，
        * 右边一列小号快捷链接。整条不套外框，直接落在页面上——B 站这一块本来就没有卡片。
        * 之前几版要么把入口挤在左边留一大片空带，要么做成四等分导航，都不像首页。
        */}
-      <nav className="mb-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+      <nav className="mb-5 flex flex-wrap items-start gap-x-6 gap-y-3">
         <div className="flex shrink-0 items-start gap-3">
           {[
             { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
@@ -178,25 +165,25 @@ export function HomeView() {
               key={entry.label}
               type="button"
               onClick={entry.run}
-              className="t press flex w-12 flex-col items-center gap-1.5 rounded-[8px] py-1 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+              className="t press flex w-12 flex-col items-center gap-1 rounded-[8px] py-0.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
             >
               <span
-                className="bili-channel-icon flex h-9 w-9 items-center justify-center rounded-full text-white"
+                className="bili-channel-icon flex h-8 w-8 items-center justify-center rounded-full text-white"
                 style={{ background: entry.tone }}
               >
-                <Icon name={entry.icon} size={18} />
+                <Icon name={entry.icon} size={16} />
               </span>
               <span className="whitespace-nowrap">{entry.label}</span>
             </button>
           ))}
         </div>
-        <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <div className="flex w-[616px] max-w-full flex-wrap gap-2">
           {PARTS.filter((part) => part.rid !== 0).map((part) => (
             <button
               key={part.rid}
               type="button"
               onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              className="t flex h-8 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="t flex h-7 w-24 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               {part.name}
             </button>
@@ -208,6 +195,8 @@ export function HomeView() {
             { label: '入站必刷', icon: 'gift' as const, run: () => navigate({ kind: 'precious' }) },
             { label: '历史', icon: 'clock' as const, run: () => navigate({ kind: 'history' }) },
             { label: '收藏', icon: 'bookmarkStar' as const, run: () => navigate({ kind: 'favs' }) },
+            { label: '稍后再看', icon: 'watchLater' as const, run: () => navigate({ kind: 'watchLater' }) },
+            { label: '曲库', icon: 'library' as const, run: () => navigate({ kind: 'library' }) },
           ].map((entry) => (
             <button
               key={entry.label}
@@ -232,34 +221,48 @@ export function HomeView() {
        * 右侧那栏给人「还有一批可以点」的入口。轮播用前 5 条、右栏接 6 条，
        * 下面网格从第 11 条开始，同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
-        <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
-        {items.length > 5 ? (
-          <ol className="hidden flex-col gap-1 lg:flex">
-            {items.slice(5, 11).map((track) => (
-              <li key={track.key}>
-                <button
-                  type="button"
-                  onClick={() => navigate({ kind: 'watch', track })}
-                  className="t flex w-full items-start gap-2.5 rounded-[6px] p-1.5 text-left hover:bg-[var(--panel-raised)]"
-                >
-                  <span className="relative block h-[50px] w-[89px] shrink-0 overflow-hidden rounded-[4px]">
-                    <Cover cover={track.cover} title={track.title} width={180} className="h-full w-full" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-[13px] leading-[18px] text-[var(--text-1)]">
-                      {track.title}
+      <div className="mb-5 flex items-start gap-3">
+        <div className="grid min-w-0 flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
+          <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
+          {items.length > 5 ? (
+            <ol className="hidden flex-col gap-1 lg:flex">
+              {items.slice(5, 11).map((track) => (
+                <li key={track.key}>
+                  <button
+                    type="button"
+                    onClick={() => navigate({ kind: 'watch', track })}
+                    className="t flex w-full items-start gap-2.5 rounded-[6px] p-1.5 text-left hover:bg-[var(--panel-raised)]"
+                  >
+                    <span className="relative block h-[50px] w-[89px] shrink-0 overflow-hidden rounded-[4px]">
+                      <Cover cover={track.cover} title={track.title} width={180} className="h-full w-full" />
                     </span>
-                    <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
-                      {track.artist}
-                      {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 text-[13px] leading-[18px] text-[var(--text-1)]">
+                        {track.title}
+                      </span>
+                      <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
+                        {track.artist}
+                        {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        ) : null}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+        {/* B 站首页轮播右侧那颗竖排「换一换」：整列高度，刷新图标在上、字竖排。 */}
+        <button
+          type="button"
+          onClick={refresh}
+          title="换一换"
+          className="bili-icon-btn t press mt-[3px] flex h-[88px] w-9 shrink-0 flex-col items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          <Icon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
+          <span style={{ writingMode: 'vertical-rl' }} className="leading-none tracking-[0.18em]">
+            换一换
+          </span>
+        </button>
       </div>
 
       {items.length > 0 ? (
