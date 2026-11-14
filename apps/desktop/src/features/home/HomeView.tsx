@@ -198,51 +198,65 @@ export function HomeView() {
       className="bili-canvas min-h-0 flex-1 overflow-y-auto py-0 px-0 pb-10 md:px-0"
     >
       {/*
-       * 频道条照 B 站首页原版：左边两个圆形入口，右边两行等宽胶囊。
-       * B 站这一带是白色 header 带、胶囊 #f6f7f8 铺在白上；我们页面底也是 #f6f7f8，
-       * 所以这里自带一条白带，否则胶囊会和背景融成一片、整条读起来像空缺。
-       * 右侧那列快捷链接不放：左侧栏已有同样入口，多一列会把这一带撑成三行。
-       * 白带横向铺满，内边距和下面内容区同一套（px-4 / md:px-8），
-       * 这样胶囊、轮播、卡片流的左右边界天然对齐，不用各自手写 padding。
+       * 频道条照 B 站首页这一带的三段结构：左边圆形入口、中间两排定宽胶囊、
+       * 右边一块用竖线隔开的快捷入口。B 站胶囊实测 #f6f7f8、无描边、深色字、32 高；
+       * 之前用描边 + 灰字 + 拉满到 150 宽，一屏读下来像一排输入框。
+       * 白带横向铺满，内边距跟内容区同一套，胶囊和轮播天然共用左右边界。
        */}
       <nav className="mb-4 bg-[var(--panel)] py-3">
-        {/* 右边多留 48px（换一换按钮 36 + gap 12）：首屏那一行右边有个竖排按钮，
-            胶囊必须停在同一条线上，否则真机上胶囊比轮播宽出 50px，看着就是歪的。 */}
-        <div className="flex items-start gap-5 px-4 md:px-8 lg:pl-8 lg:pr-20">
-        <div className="flex shrink-0 items-start gap-3">
-          {[
-            { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
-            { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
-          ].map((entry) => (
-            <button
-              key={entry.label}
-              type="button"
-              onClick={entry.run}
-              /* 不写固定宽度：按钮宽 = 圆形直径，圆的左缘就和下面胶囊、轮播、卡片同一条线。
-                 之前 w-12 里居中的 32px 圆比左边线内缩 8px，整条带读起来就是歪的。 */
-              className="t press flex flex-col items-center gap-1 rounded-[8px] py-0.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
-            >
-              <span
-                className="bili-channel-icon flex h-8 w-8 items-center justify-center rounded-full text-white"
-                style={{ background: entry.tone }}
+        <div className="flex items-start gap-6 px-4 md:px-8">
+          <div className="flex shrink-0 items-start gap-3">
+            {[
+              { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
+              { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
+            ].map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={entry.run}
+                /* 不写固定宽度：按钮宽 = 圆形直径，圆的左缘就和下面胶囊、轮播、卡片同一条线。 */
+                className="t press flex flex-col items-center gap-1 rounded-[8px] py-0.5 text-[13px] text-[var(--text-2)] hover:text-[var(--text-1)]"
               >
-                <Icon name={entry.icon} size={16} />
-              </span>
-              <span className="whitespace-nowrap">{entry.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                <span
+                  className="bili-channel-icon flex h-10 w-10 items-center justify-center rounded-full text-white"
+                  style={{ background: entry.tone }}
+                >
+                  <Icon name={entry.icon} size={18} />
+                </span>
+                <span className="whitespace-nowrap">{entry.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {PARTS.filter((part) => part.rid !== 0).map((part) => (
               <button
                 key={part.rid}
                 type="button"
                 onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-                /* B 站频道胶囊实测：底色 #f6f7f8、描边 #f1f2f3、圆角 6、高 28、字 13。
-                   白底 + 深灰边比它抢眼得多，一屏 12 个就把轮播压住了。 */
-                className="t flex h-7 items-center justify-center rounded-[6px] border border-[var(--ga1)] bg-[var(--ga0)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
+                className="t h-8 rounded-[6px] bg-[var(--ga0)] text-[13px] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]"
               >
                 {part.name}
+              </button>
+            ))}
+          </div>
+          {/* 窄窗口先收起来：右侧栏本身就能走到这些页面，这一块只负责把宽带填平。 */}
+          <div className="hidden shrink-0 grid-cols-3 gap-x-4 gap-y-3 border-l border-[var(--line)] pl-6 xl:grid">
+            {[
+              { label: '入站必刷', icon: 'star' as const, run: () => navigate({ kind: 'precious' }) },
+              { label: '每周必看', icon: 'calendar' as const, run: () => navigate({ kind: 'weekly' }) },
+              { label: '关注', icon: 'user' as const, run: () => navigate({ kind: 'following' }) },
+              { label: '收藏夹', icon: 'bookmarkStar' as const, run: () => navigate({ kind: 'favs' }) },
+              { label: '历史', icon: 'clock' as const, run: () => navigate({ kind: 'history' }) },
+              { label: '稍后再看', icon: 'watchLater' as const, run: () => navigate({ kind: 'watchLater' }) },
+            ].map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={entry.run}
+                className="t flex items-center gap-1.5 whitespace-nowrap text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
+              >
+                <Icon name={entry.icon} size={14} className="shrink-0 text-[var(--text-3)]" />
+                {entry.label}
               </button>
             ))}
           </div>
@@ -264,7 +278,9 @@ export function HomeView() {
          * B 站 1280 视口实测：轮播 563×322（约占内容宽 45%），右侧四张卡每张约 340 宽。
          * 此前把轮播撑到 73%、右栏固定 336，卡片被压到 162 宽，首屏比例整个是反的。
          */}
-        <div className="grid min-w-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+        {/* 55/45 + 轮播 7:5：轮播和右侧四卡在真机 1320 宽下都收在 410 上下，
+            45/55 配 16:9 会让轮播只有 268 高，底下空出一大块。 */}
+        <div className="grid min-w-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)]">
           <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {hero.length > 5 ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
@@ -278,8 +294,25 @@ export function HomeView() {
                 >
                   <span className="relative block aspect-video overflow-hidden rounded-[6px]">
                     <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
-                    <span className="num absolute bottom-1 right-1 rounded-[3px] bg-black/65 px-1 text-[10px] leading-[14px] text-white">
-                      {formatDuration(track.duration_ms)}
+                    {/* 左下角播放/弹幕两枚计数、右下角时长：跟下面推荐流同一套压角规则。 */}
+                    <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                      <span className="num flex min-w-0 items-center gap-1">
+                        {track.views ? (
+                          <>
+                            <Icon name="play" size={10} className="shrink-0" />
+                            <span className="truncate">{formatCount(track.views)}</span>
+                          </>
+                        ) : null}
+                        {(track.danmaku ?? 0) > 0 ? (
+                          <>
+                            <Icon name="danmaku" size={11} className="ml-0.5 shrink-0" />
+                            <span className="truncate">{formatCount(track.danmaku!)}</span>
+                          </>
+                        ) : null}
+                      </span>
+                      <span className="num shrink-0 rounded-[2px] bg-black/60 px-1 [text-shadow:none]">
+                        {formatDuration(track.duration_ms)}
+                      </span>
                     </span>
                   </span>
                   {/* 字号跟下面网格一致（15px/22px）：这两块是同一种卡片，
@@ -287,9 +320,12 @@ export function HomeView() {
                   <span className="mt-2 line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                     {track.title}
                   </span>
-                  <span className="num mt-1 block truncate text-[13px] text-[var(--text-3)]">
-                    {track.artist}
-                    {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
+                  <span className="mt-1 flex items-center gap-1.5 text-[13px] text-[var(--text-3)]">
+                    <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
+                      UP
+                    </span>
+                    <span className="truncate">{track.artist}</span>
+                    {track.views ? <span className="num shrink-0">· {formatCount(track.views)} 播放</span> : null}
                   </span>
                 </button>
               ))}

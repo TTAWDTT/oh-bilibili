@@ -42,7 +42,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       onMouseLeave={() => setPaused(false)}
       /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
          之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
-      className="bili-hero-swap relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)]"
+      className="bili-hero-swap relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)] lg:aspect-[7/5]"
     >
       {slides.map((t, i) => (
         <img

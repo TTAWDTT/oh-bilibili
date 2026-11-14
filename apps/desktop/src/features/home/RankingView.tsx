@@ -49,7 +49,11 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <PageTitle extra={tracks ? String(tracks.length) : undefined}>排行榜</PageTitle>
-      <div className="mb-4 flex flex-wrap gap-1">
+      {/*
+       * 分区选择器和发现页那排频道胶囊用同一套画法：灰底 #f6f7f8 + 淡描边 + 圆角 6。
+       * 之前这里是蓝色实心药丸，同一个「选分区」的动作在两页长得完全不同。
+       */}
+      <div className="mb-4 flex flex-wrap gap-2">
         {PARTS.map((part) => (
           <button
             key={part.rid}
@@ -60,10 +64,10 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
               // 记进当前视图：从视频页返回时还落在同一个分区
               replace({ kind: 'ranking', rid: part.rid })
             }}
-            className={`t press rounded-[4px] px-3 py-1 text-[13px] ${
+            className={`t press h-7 rounded-[6px] border px-3 text-[13px] ${
               part.rid === rid
-                ? 'bg-[var(--accent)] text-white'
-                : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]'
+                ? 'border-[var(--accent)] bg-[var(--panel)] text-[var(--accent)]'
+                : 'border-[var(--ga1)] bg-[var(--ga0)] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]'
             }`}
           >
             {part.name}
