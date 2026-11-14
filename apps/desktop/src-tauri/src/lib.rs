@@ -180,6 +180,15 @@ async fn home_feed(
     engine.home_feed(fresh).await
 }
 
+/// 关注动态。
+#[tauri::command(rename_all = "snake_case")]
+async fn dynamic_feed(
+    engine: tauri::State<'_, Arc<Engine>>,
+    offset: Option<String>,
+) -> Result<bilimusic_core::wire::DynamicPage, WireError> {
+    engine.dynamic_feed(offset).await
+}
+
 /// 取一页评论。评论区只读，取不到不该挡住看视频。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_comments(
@@ -969,6 +978,7 @@ pub fn run() {
             comment_add,
             comment_del,
             home_feed,
+            dynamic_feed,
             watch_later_list,
             following,
             space_videos,

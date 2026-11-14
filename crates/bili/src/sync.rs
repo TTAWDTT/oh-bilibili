@@ -170,6 +170,31 @@ pub struct Followed {
     pub special: bool,
 }
 
+/// 关注动态里的一条视频投稿。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicItem {
+    pub id: String,
+    pub mid: u64,
+    pub author: String,
+    pub face: String,
+    pub pub_time: String,
+    pub pub_ts: u64,
+    pub text: String,
+    pub bvid: String,
+    pub title: String,
+    pub cover: String,
+    pub duration_ms: Option<u64>,
+    pub views: u64,
+    pub danmaku: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicPage {
+    pub items: Vec<DynamicItem>,
+    pub offset: String,
+    pub has_more: bool,
+}
+
 impl Client {
     /// 读一条视频当前在账号里的互动状态（点赞、收藏、投币）。
     ///
@@ -568,6 +593,31 @@ impl Client {
             })
             .unwrap_or_default();
         Ok((list, total))
+    }
+
+    /// 关注动态。`offset` 是接口上一页返回的游标，第一页为空。
+    pub async fn dynamic_feed(&self, offset: Option<String>) -> Result<DynamicPage, BiliError> {
+        let suffix = offset
+            .map(|o| format!("&offset={}", crate::wbi::encode_uri_component(&o)))
+            .unwrap_or_default();
+        let v = self
+            .get_json(
+                &format!(
+                    "{API}/x/polymer/web-dynamic/v1/feed/all?type=video&page=1&features=itemOpusStyle{suffix}"
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let data = &v["data"];
+        let items = data["items"]
+            .as_array()
+            .map(|list| list.iter().filter_map(dynamic_item).collect())
+            .unwrap_or_default();
+        Ok(DynamicPage {
+            items,
+            offset: data["offset"].as_str().unwrap_or_default().to_string(),
+            has_more: data["has_more"].as_bool().unwrap_or(false),
+        })
     }
 
     /// 稍后再看列表。一条响应就带全卡片数据，不需要逐条查详情。
@@ -1216,6 +1266,78 @@ fn weekly_notes(list: &serde_json::Value) -> HashMap<String, String> {
             Some((bvid.to_string(), note.to_string()))
         })
         .collect()
+}
+
+/// mid 在动态接口里可能是数字，也可能是数字字符串。
+fn dynamic_mid(value: &serde_json::Value) -> Option<u64> {
+    value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+}
+
+fn duration_text_ms(text: &str) -> Option<u64> {
+    let parts: Vec<&str> = text.split(':').collect();
+    let (hours, minutes, seconds) = match parts.as_slice() {
+        [minutes, seconds] => (0, minutes.parse::<u64>().ok()?, seconds.parse::<u64>().ok()?),
+        [hours, minutes, seconds] => (
+            hours.parse::<u64>().ok()?,
+            minutes.parse::<u64>().ok()?,
+            seconds.parse::<u64>().ok()?,
+        ),
+        _ => return None,
+    };
+    Some((hours * 3600 + minutes * 60 + seconds) * 1000)
+}
+
+fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
+    if item["type"].as_str() != Some("DYNAMIC_TYPE_AV") {
+        return None;
+    }
+    let major = &item["modules"]["module_dynamic"]["major"];
+    if major["type"].as_str() != Some("MAJOR_TYPE_ARCHIVE") {
+        return None;
+    }
+    let archive = &major["archive"];
+    let author = &item["modules"]["module_author"];
+    Some(DynamicItem {
+        id: item["id_str"]
+            .as_str()
+            .map(str::to_string)
+            .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?,
+        mid: dynamic_mid(&author["mid"])?,
+        author: author["name"].as_str().unwrap_or_default().to_string(),
+        face: author["face"]
+            .as_str()
+            .unwrap_or_default()
+            .replacen("http://", "https://", 1),
+        pub_time: author["pub_time"].as_str().unwrap_or_default().to_string(),
+        pub_ts: author["pub_ts"].as_u64().unwrap_or(0),
+        text: item["modules"]["module_dynamic"]["desc"]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        bvid: archive["bvid"].as_str()?.to_string(),
+        title: archive["title"].as_str().unwrap_or_default().to_string(),
+        cover: archive["cover"]
+            .as_str()
+            .unwrap_or_default()
+            .replacen("http://", "https://", 1),
+        duration_ms: archive["duration_text"]
+            .as_str()
+            .and_then(duration_text_ms),
+        views: archive["stat"]["play"].as_u64().unwrap_or(0),
+        danmaku: archive["stat"]["danmaku"].as_u64().unwrap_or(0),
+    })
+}
+
+#[cfg(test)]
+mod dynamic_duration_tests {
+    #[test]
+    fn 解析动态时长() {
+        assert_eq!(super::duration_text_ms("03:12"), Some(192_000));
+        assert_eq!(super::duration_text_ms("1:02:33"), Some(3_753_000));
+        assert_eq!(super::duration_text_ms("garbage"), None);
+    }
 }
 
 #[cfg(test)]

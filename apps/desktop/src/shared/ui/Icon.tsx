@@ -314,6 +314,8 @@ const ICONS = {
   battery: (
     <path d="M13.4 2.8 5.2 13.4h5.2l-1 7.8 8.4-10.8h-5.3l1.1-7.6Z" />
   ),
+  /** 动态：B 站的闪电。 */
+  dynamic: <path d="M13.4 2.8 5.2 13.4h5.2l-1 7.8 8.4-10.8h-5.3l1.1-7.6Z" fill="currentColor" stroke="none" />,
   /** 直播：一块屏幕加两圈往外扩的声波，表达「现在正在播」。 */
   live: (
     <>

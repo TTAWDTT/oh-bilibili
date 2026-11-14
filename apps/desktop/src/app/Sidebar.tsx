@@ -15,6 +15,7 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
     title: null,
     items: [
       { view: { kind: 'home' }, label: '发现', icon: 'biliTv' },
+      { view: { kind: 'dynamic' }, label: '动态', icon: 'dynamic' },
       { view: { kind: 'ranking' }, label: '排行', icon: 'rank' },
       { view: { kind: 'popular' }, label: '热门', icon: 'flame' },
       { view: { kind: 'precious' }, label: '入站必刷', icon: 'gift' },

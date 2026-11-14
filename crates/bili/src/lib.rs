@@ -304,6 +304,14 @@ impl Source {
         self.client.following(page).await
     }
 
+    /// 关注动态。
+    pub async fn dynamic_feed(
+        &self,
+        offset: Option<String>,
+    ) -> Result<sync::DynamicPage, BiliError> {
+        self.client.dynamic_feed(offset).await
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<Track>, BiliError> {
         self.client.watch_later_tracks().await

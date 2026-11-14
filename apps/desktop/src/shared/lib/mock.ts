@@ -257,6 +257,45 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = (fresh * size) % CATALOG.length
       return CATALOG.slice(start, start + size)
     }
+    case 'dynamic_feed': {
+      const now = Math.floor(Date.now() / 1000)
+      return {
+        items: [
+          {
+            id: '{{SECRET_8pepx2sb}}',
+            mid: 5000,
+            author: '造梦阿瑄',
+            face: CATALOG[0]?.up_avatar ?? '',
+            pub_time: '3小时前',
+            pub_ts: now - 10_800,
+            text: '新一期翻唱上啦，这次把副歌改成了双声部。',
+            bvid: 'BV1xx411c7mD',
+            title: '【翻唱】晴天｜一人双声部',
+            cover: CATALOG[0]?.cover ?? '',
+            duration_ms: CATALOG[0]?.duration_ms ?? null,
+            views: 128_000,
+            danmaku: 2_340,
+          },
+          {
+            id: '{{SECRET_6mt0ir88}}',
+            mid: 5002,
+            author: '不睡觉的鹿',
+            face: CATALOG[1]?.up_avatar ?? '',
+            pub_time: '昨天 18:20',
+            pub_ts: now - 79_200,
+            text: '',
+            bvid: 'BV1yy411c7mE',
+            title: '起风了｜深夜卧室版',
+            cover: CATALOG[1]?.cover ?? '',
+            duration_ms: CATALOG[1]?.duration_ms ?? null,
+            views: 64_500,
+            danmaku: 896,
+          },
+        ],
+        offset: '',
+        has_more: false,
+      }
+    }
     case 'hot_search':
       return ['周杰伦', '晴天', '纯音乐', '夜空中最亮的星', '起风了', '海底']
     case 'watch_open': {

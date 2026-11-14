@@ -500,6 +500,33 @@ export function homeFeed(fresh: number): Promise<Track[]> {
   return call<Track[]>('home_feed', { fresh })
 }
 
+export type DynamicItem = {
+  id: string
+  mid: number
+  author: string
+  face: string
+  pub_time: string
+  pub_ts: number
+  text: string
+  bvid: string
+  title: string
+  cover: string
+  duration_ms: number | null
+  views: number
+  danmaku: number
+}
+
+export type DynamicPage = {
+  items: DynamicItem[]
+  offset: string
+  has_more: boolean
+}
+
+/** 关注动态。`offset` 是上一页返回的游标。 */
+export function dynamicFeed(offset?: string | null): Promise<DynamicPage> {
+  return call<DynamicPage>('dynamic_feed', { offset: offset ?? null })
+}
+
 /** 取一页评论。 */
 export function watchComments(key: string, page: number, hot = true): Promise<CommentPage> {
   return call<CommentPage>('watch_comments', { key, page, hot })

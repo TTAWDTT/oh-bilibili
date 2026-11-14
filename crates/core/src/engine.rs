@@ -534,6 +534,14 @@ impl Engine {
         Ok(self.source.following(page).await?)
     }
 
+    /// 关注动态。
+    pub async fn dynamic_feed(
+        &self,
+        offset: Option<String>,
+    ) -> Result<crate::wire::DynamicPage, WireError> {
+        Ok(self.source.dynamic_feed(offset).await?)
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<bilimusic_model::Track>, WireError> {
         let tracks = self.source.watch_later_list().await?;

@@ -34,6 +34,7 @@ import { LiveView } from '../features/home/LiveView'
 import { BangumiView } from '../features/home/BangumiView'
 import { WatchLaterView } from '../features/library/WatchLaterView'
 import { FollowingView } from '../features/library/FollowingView'
+import { DynamicView } from '../features/home/DynamicView'
 
 /**
  * 当前页面的标题。
@@ -45,6 +46,8 @@ function viewTitle(view: View): string {
   switch (view.kind) {
     case 'home':
       return '发现'
+    case 'dynamic':
+      return '动态'
     case 'ranking':
       return '排行榜'
     case 'popular':
@@ -88,6 +91,8 @@ function CurrentView({ view }: { view: View }) {
   switch (view.kind) {
     case 'home':
       return <HomeView />
+    case 'dynamic':
+      return <DynamicView />
     case 'ranking':
       return <RankingView initialRid={view.rid ?? 0} />
     case 'popular':
