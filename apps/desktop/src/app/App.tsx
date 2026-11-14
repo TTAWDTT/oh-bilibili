@@ -120,8 +120,8 @@ function CurrentView({ view }: { view: View }) {
 export default function App() {
   useBootstrap()
   useShortcuts()
+  const vtSupported = typeof document !== 'undefined' && typeof document.startViewTransition === 'function'
   const view = useAppStore((state) => state.view)
-  const navDir = useAppStore((state) => state.navDir)
   const rail = useAppStore((state) => state.rail)
   const setRail = useAppStore((state) => state.setRail)
   // 只有进系统全屏才藏标题栏。网页全屏要留着它：自定义标题栏里带着
@@ -181,8 +181,9 @@ export default function App() {
         <main id="main-content" tabIndex={-1} className="block min-w-0 flex-1 overflow-hidden outline-none">
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
-          {/* data-nav 交给 CSS 决定入场方向；watch 页不参与滑动（视频区自己就是画布）。 */}
-          <div key={view.kind} data-nav={navDir} className="bili-page flex h-full flex-col">
+          {/* 支持 View Transition 时由合成器做交叉淡入；不支持的 WebView 用 CSS 兜底。
+              两条路二选一，不然 CSS 动画会被拍进快照，叠成两层淡入。 */}
+          <div key={view.kind} data-vt={vtSupported ? 'on' : 'off'} className="bili-page flex h-full flex-col">
             <h1 className="sr-only">{viewTitle(view)}</h1>
             <CurrentView view={view} />
           </div>

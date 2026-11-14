@@ -10,6 +10,7 @@ import { useAppStore } from '../../app/appStore'
 import { PARTS, partColor } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
+import { Icon } from '../../shared/ui/Icon'
 
 /**
  * 发现页。
@@ -160,19 +161,48 @@ export function HomeView() {
         </button>
       </div>
 
-      {/* B 站首页的频道条。每一项都落到对应分区的排行榜，不摆点不动的装饰。 */}
-      <nav className="no-scrollbar mb-3 flex items-center gap-0.5 overflow-x-auto border-b border-hairline pb-2">
-        {PARTS.filter((part) => part.rid !== 0).map((part) => (
-          <button
-            key={part.rid}
-            type="button"
-            onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-            className="t flex shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
-          >
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: partColor(part.name) }} />
-            {part.name}
-          </button>
-        ))}
+      {/*
+       * 频道条。B 站首页这一块是一张白色圆角卡：左边两个带橙色圆形图标的入口
+       * （动态 / 热门），右边是一整片描边胶囊的分区。之前这里是一排小色点，
+       * 读起来像图例、不像导航。每一项都真的落到对应分区的排行榜。
+       */}
+      <nav className="mb-4 rounded-[10px] border border-[var(--line)] bg-[var(--panel)] p-2">
+        <div className="flex flex-wrap items-stretch gap-1">
+          <div className="mr-1 flex shrink-0 items-center gap-1 border-r border-hairline pr-2">
+            {[
+              { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
+              { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
+            ].map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={entry.run}
+                className="t press flex w-[52px] shrink-0 flex-col items-center gap-1 rounded-[6px] py-1.5 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+              >
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white"
+                  style={{ background: entry.tone }}
+                >
+                  <Icon name={entry.icon} size={15} />
+                </span>
+                {entry.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-wrap content-start gap-1">
+            {PARTS.filter((part) => part.rid !== 0).map((part) => (
+              <button
+                key={part.rid}
+                type="button"
+                onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+                className="t flex shrink-0 items-center gap-1.5 rounded-[6px] border border-transparent bg-[var(--ga1)] px-2.5 py-[5px] text-[13px] text-[var(--text-2)] hover:border-[var(--line)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
+              >
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: partColor(part.name) }} />
+                {part.name}
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
 
       {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}

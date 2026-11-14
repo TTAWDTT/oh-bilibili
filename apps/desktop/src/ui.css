@@ -399,63 +399,47 @@
   }
 }
 
-/* 页面切换：淡入。这里不能碰 transform——动画的 fill 模式会让页面成为
-   fixed 后代的包含块，观看页全屏就会被裁在内容区里，视频层也会变黑。 */
-@keyframes bili-page-in {
+/*
+ * 没有 View Transition 的 WebView 用这一版：从 0.35 淡入。
+ *
+ * 从 0 开始淡入时，旧页面已经消失、新页面还看不见，中间那一帧就是白屏，
+ * 观感是「闪一下再出来」。留 35% 底子，接上的是画面而不是空白。
+ * 支持 View Transition 时这条不生效——那条路由合成器负责，不会闪。
+ */
+@keyframes bili-page-fade-in {
   from {
-    opacity: 0;
+    opacity: 0.35;
   }
   to {
     opacity: 1;
   }
 }
 
-.bili-page {
-  animation: bili-page-in 240ms var(--ease) both;
+.bili-page[data-vt='off'] {
+  animation: bili-page-fade-in 140ms ease-out both;
+}
+
+.bili-page[data-vt='on'] {
+  animation: none;
 }
 
 /*
- * 页面前进与返回分开处理。
+ * 页面切换交给 View Transition：旧帧与新帧由合成器同时持有，做交叉淡入。
  *
- * 返回只淡入、不带位移：回列表时整页要一次性重新挂载几百张卡，
- * 叠一层 transform 会让这帧多一次合成，观感就是「卡一下才出来」。
- * 淡入在 130ms 内结束，比位移更跟手；前进才保留一点点右侧推入，给方向感。
- *
- * 两个动画都只用 backwards 填充：结束后不留 transform，
- * 长列表滚动时不会有额外的合成层开销。
+ * 自己在新页面上加 fade 时旧帧已经没了，中间必然出现一帧空白，看起来就是「闪」。
+ * 这里只调时长与曲线；不支持该 API 的 WebView 上 startViewTransition 不存在，
+ * 切换是瞬时的，不会退化成半套动画。
  */
-@keyframes bili-page-forward {
-  from {
-    opacity: 0;
-    transform: translate3d(10px, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes bili-page-back {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.bili-page[data-nav='fwd'] {
-  animation: bili-page-forward 170ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-
-.bili-page[data-nav='back'] {
-  animation: bili-page-back 130ms linear backwards;
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bili-page[data-nav='fwd'],
-  .bili-page[data-nav='back'] {
-    animation: bili-page-in 100ms linear backwards;
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms;
   }
 }
 

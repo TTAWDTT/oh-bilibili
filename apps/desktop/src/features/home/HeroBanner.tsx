@@ -78,20 +78,46 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
         </span>
       </button>
       {slides.length > 1 ? (
-        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1.5">
-          {slides.map((t, i) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setIndex(i)}
-              aria-label={`第 ${i + 1} 张推荐`}
-              aria-current={i === index}
-              className={`h-1.5 rounded-full transition-all duration-200 ${
-                i === index ? 'w-7 bg-white' : 'w-3 bg-white/45 hover:bg-white/70'
-              }`}
-            />
-          ))}
-        </div>
+        <>
+          {/* 左右箭头常驻半透明，hover 加深：B 站首页轮播就是这两颗圆钮。 */}
+          <button
+            type="button"
+            aria-label="上一张推荐"
+            onClick={() => setIndex((current) => (current - 1 + slides.length) % slides.length)}
+            className="t press absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[6px] bg-black/35 text-white/90 backdrop-blur-sm hover:bg-black/55 hover:text-white"
+          >
+            <Icon name="chevronLeft" size={17} />
+          </button>
+          <button
+            type="button"
+            aria-label="下一张推荐"
+            onClick={() => setIndex((current) => (current + 1) % slides.length)}
+            className="t press absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[6px] bg-black/35 text-white/90 backdrop-blur-sm hover:bg-black/55 hover:text-white"
+          >
+            <Icon name="chevronRight" size={17} />
+          </button>
+          <div className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1.5">
+            {slides.map((t, i) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`第 ${i + 1} 张推荐`}
+                aria-current={i === index}
+                className={`h-1.5 rounded-full transition-all duration-200 ${
+                  i === index ? 'w-7 bg-white' : 'w-3 bg-white/45 hover:bg-white/70'
+                }`}
+              />
+            ))}
+          </div>
+          {/* B 站轮播左上角那颗红色「荐」印章：方形红底、白字、轻微倾斜。 */}
+          <span
+            aria-hidden
+            className="absolute left-3 top-3 flex h-8 w-8 -rotate-6 items-center justify-center rounded-[4px] bg-[#ff5c8a] text-[15px] font-medium text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+          >
+            荐
+          </span>
+        </>
       ) : null}
     </section>
   )
