@@ -160,7 +160,7 @@ const TrackCard = memo(function TrackCard({
           type="button"
           onClick={() => onOpen(track)}
           aria-label={`观看 ${track.title}`}
-          className="bili-card-frame relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
+          className="relative block w-full overflow-hidden rounded-[8px] border border-[var(--line)]"
           style={{ aspectRatio: '16 / 10' }}
         >
           <Cover cover={track.cover} title={track.title} width={260} className="bili-card-cover h-full w-full" />
@@ -172,8 +172,10 @@ const TrackCard = memo(function TrackCard({
               {index + 1}
             </span>
           ) : track.tname ? (
+            /* B 站分区角标：左上角的粉色小贴纸，右下角带一道折角。
+               用一个伪元素画折角，不额外塞 DOM，长列表上也只剩一层。 */
             <span
-              className="absolute left-1 top-1 rounded-[2px] px-1 text-[10px] leading-[15px] text-white"
+              className="bili-part-tag absolute left-0 top-0 max-w-[calc(100%-1.5rem)] truncate rounded-tl-[8px] rounded-br-[6px] px-1.5 text-[10px] leading-[17px] text-white"
               style={{ background: partColor(track.tname) }}
             >
               {track.tname}

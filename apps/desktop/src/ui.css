@@ -266,28 +266,18 @@
 }
 
 /*
- * 封面卡片的标题在 hover 时变 B 站粉。
+ * 封面卡片的标题在 hover 时变 B 站的链接蓝（#00AEEC）。
  *
- * 这是 B 站网页端最标志性的一处：整屏灰黑文字里，鼠标扫过的那一条标题先亮成粉色，
- * 比整张卡换个底色更轻、也更好认。卡片本身只做 2px 抬升，不换背景。
+ * 网页端就是这么做的：整屏深灰文字里，鼠标扫到的那一条标题先亮成蓝色。
+ * 不用粉色——粉色在 B 站是品牌与大会员色，标题用它会让整页读起来像活动页。
  */
 .bili-card .bili-card-title {
-  transition: color 140ms var(--ease);
+  transition: color 120ms var(--ease);
 }
 
 .bili-card:hover .bili-card-title,
 .bili-card:focus-within .bili-card-title {
-  color: var(--bili-pink);
-}
-
-/* 封面圆角在 hover 时描一圈粉边：B 站的预览框就是这个观感。 */
-.bili-card .bili-card-frame {
-  transition: box-shadow 140ms var(--ease);
-}
-
-.bili-card:hover .bili-card-frame,
-.bili-card:focus-within .bili-card-frame {
-  box-shadow: 0 0 0 2px var(--bili-pink);
+  color: var(--accent);
 }
 
 .bili-card:hover {
@@ -425,15 +415,19 @@
 }
 
 /*
- * 页面前进/返回的方向感。
+ * 页面前进与返回分开处理。
  *
- * 只动 8px、只淡入，不整屏横移：B 站网页端切页是「内容淡入」，没有整页平移动画。
- * 之前只有 opacity，前进与返回看起来一模一样，返回就少了「回去」的实感。
+ * 返回只淡入、不带位移：回列表时整页要一次性重新挂载几百张卡，
+ * 叠一层 transform 会让这帧多一次合成，观感就是「卡一下才出来」。
+ * 淡入在 130ms 内结束，比位移更跟手；前进才保留一点点右侧推入，给方向感。
+ *
+ * 两个动画都只用 backwards 填充：结束后不留 transform，
+ * 长列表滚动时不会有额外的合成层开销。
  */
 @keyframes bili-page-forward {
   from {
     opacity: 0;
-    transform: translate3d(8px, 0, 0);
+    transform: translate3d(10px, 0, 0);
   }
   to {
     opacity: 1;
@@ -444,28 +438,29 @@
 @keyframes bili-page-back {
   from {
     opacity: 0;
-    transform: translate3d(-8px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
+.bili-page {
+  /* 把重绘限制在这一块里：切页时侧栏与播放条不该跟着重画。 */
+  contain: paint;
+}
+
 .bili-page[data-nav='fwd'] {
-  animation: bili-page-forward 200ms var(--ease) both;
+  animation: bili-page-forward 170ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .bili-page[data-nav='back'] {
-  animation: bili-page-back 200ms var(--ease) both;
+  animation: bili-page-back 130ms linear backwards;
 }
 
-/* 系统开了「减少动态效果」就只保留淡入，位移全部去掉。 */
 @media (prefers-reduced-motion: reduce) {
-  .bili-page,
   .bili-page[data-nav='fwd'],
   .bili-page[data-nav='back'] {
-    animation: bili-page-in 120ms linear both;
+    animation: bili-page-in 100ms linear backwards;
   }
 }
 
@@ -647,6 +642,16 @@
 
 .bili-card:hover .bili-card-cover {
   transform: scale(1.04);
+}
+
+/*
+ * 封面左上角的分区小标签。
+ *
+ * B 站用的是「贴纸」形状：左边贴着封面圆角，右下角收一道斜角。
+ * 之前是一个规整的圆角矩形，少了这道角就只是一块色块，读不出是分区。
+ */
+.bili-part-tag {
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 82% 100%, 0 100%);
 }
 
 /* 图标按钮：hover 时轻轻放大 */
