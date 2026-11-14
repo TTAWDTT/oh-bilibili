@@ -37,6 +37,7 @@ export function WatchView({ track }: { track: Track }) {
   const [likeDelta, setLikeDelta] = useState(0)
   const [favDelta, setFavDelta] = useState(0)
   const [coinDelta, setCoinDelta] = useState(0)
+  const [fansDelta, setFansDelta] = useState(0)
   // 三连庆祝的场次：自增一次播一遍，0 表示还没播过。
   const [burst, setBurst] = useState(0)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
@@ -83,6 +84,7 @@ export function WatchView({ track }: { track: Track }) {
     let cancelled = false
     setCard(null)
     setFollowed(null)
+    setFansDelta(0)
     if (!mid) return
     void ipc
       .authorCard(mid)
@@ -108,6 +110,7 @@ export function WatchView({ track }: { track: Track }) {
       .followSet(mid, next)
       .then(() => {
         setFollowed(next)
+        setFansDelta((n) => n + (next ? 1 : -1))
         toastDone(next ? '已关注' : '已取消关注')
       })
       .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
@@ -123,12 +126,12 @@ export function WatchView({ track }: { track: Track }) {
       })
   }
 
-  const coin = (): void => {
+  const coin = (count: number, alsoLike: boolean): void => {
     void useReactionStore
       .getState()
-      .addCoin(track, 1)
+      .addCoin(track, count, alsoLike)
       .then((ok) => {
-        if (ok) setCoinDelta((n) => n + 1)
+        if (ok) setCoinDelta((n) => n + count)
       })
   }
 
@@ -143,7 +146,7 @@ export function WatchView({ track }: { track: Track }) {
       return
     }
     if (needLike) like()
-    if (needCoin) coin()
+    if (needCoin) coin(1, true)
     if (needFav) fav()
     setBurst((n) => n + 1)
     toastDone('一键三连', '点赞、投币、收藏都点上了')
@@ -290,7 +293,7 @@ export function WatchView({ track }: { track: Track }) {
                 faved={faved}
                 onLike={like}
                 onFav={openFav}
-                onCoin={coin}
+                onCoin={() => coin(1, true)}
                 coins={coins}
                 onReplay={() => {
                   void ipc.playerSeek(0).catch(() => {})
@@ -326,13 +329,28 @@ export function WatchView({ track }: { track: Track }) {
               onLike={like}
               onFav={openFav}
               onTriple={triple}
-              ownerRow={<OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} inline />}
+              ownerRow={
+                <OwnerCard
+                  data={data}
+                  card={card}
+                  followed={followed}
+                  fansDelta={fansDelta}
+                  onFollow={toggleFollow}
+                  inline
+                />
+              }
             />
           ) : null}
           {/* 右栏在窄屏收起，UP 名片跟着回到正文里，否则没有地方关注。 */}
           {!cinema && data ? (
             <div className="border-b border-hairline md:hidden">
-              <OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} />
+              <OwnerCard
+                data={data}
+                card={card}
+                followed={followed}
+                fansDelta={fansDelta}
+                onFollow={toggleFollow}
+              />
             </div>
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
@@ -355,7 +373,15 @@ export function WatchView({ track }: { track: Track }) {
 
         {!cinema ? (
           <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
-            {data ? <OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} /> : null}
+            {data ? (
+              <OwnerCard
+                data={data}
+                card={card}
+                followed={followed}
+                fansDelta={fansDelta}
+                onFollow={toggleFollow}
+              />
+            ) : null}
             <DanmakuList items={danmaku} />
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />

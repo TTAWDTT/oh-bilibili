@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -126,7 +126,7 @@ export function WatchInfo({
   coinDelta: number
   onLike: () => void
   onFav: () => void
-  onCoin: () => void
+  onCoin: (count: number, alsoLike: boolean) => void
   /** 长按点赞：B 站的一键三连。 */
   onTriple: () => void
   /** 宽屏主栏的 UP 主行，插在标签之后、分P 之前。 */
@@ -141,7 +141,11 @@ export function WatchInfo({
   const [tags, setTags] = useState<string[]>([])
   /** 简介默认收两行，长简介给一个展开。 */
   const [descOpen, setDescOpen] = useState(false)
-  const [confirmingCoin, setConfirmingCoin] = useState(false)
+  /** 投币浮层的位置，null 表示没开。操作排是 overflow-x-auto，absolute 会被裁掉。 */
+  const [coinAt, setCoinAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
+  const coinPanel = useRef<HTMLDivElement | null>(null)
+  const [coinPick, setCoinPick] = useState(1)
+  const [alsoLike, setAlsoLike] = useState(true)
   /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
   const [holding, setHolding] = useState(false)
   const holdTimer = useRef<number | null>(null)
@@ -154,7 +158,7 @@ export function WatchInfo({
     setSaved(false)
     setTags([])
     setDescOpen(false)
-    setConfirmingCoin(false)
+    setCoinAt(null)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -184,6 +188,47 @@ export function WatchInfo({
       if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!coinAt) return
+    const close = (): void => setCoinAt(null)
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') close()
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [coinAt])
+
+  // 操作排靠近窗口底部时，向下展开会有一半落在窗口外。B 站同样贴着按钮，
+  // 但会往上翻。先按向下渲染一帧，量到真实高度后再翻，避免写死面板高度。
+  useLayoutEffect(() => {
+    const panel = coinPanel.current
+    if (!coinAt || !panel) return
+    const height = panel.offsetHeight
+    const top = coinAt.top + height > window.innerHeight - 8 ? Math.max(8, coinAt.anchorTop - height - 8) : coinAt.top
+    if (top !== coinAt.top) setCoinAt((prev) => (prev ? { ...prev, top } : prev))
+  }, [coinAt])
+
+  const openCoin = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    if (coins >= 2) {
+      toastDone('已经投过两枚', 'B 站上限 2 枚')
+      return
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    setCoinAt({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 276)),
+      top: rect.bottom + 8,
+      anchorTop: rect.top,
+    })
+    setCoinPick(1)
+    setAlsoLike(!liked)
+  }
 
   const startHold = (): void => {
     longFired.current = false
@@ -247,13 +292,7 @@ export function WatchInfo({
           type="button"
           aria-pressed={coins > 0}
           aria-label="投币"
-          onClick={() => {
-            if (coins >= 2) {
-              toastDone('已经投过两枚', 'B 站上限 2 枚')
-              return
-            }
-            setConfirmingCoin(true)
-          }}
+          onClick={openCoin}
           className={action(coins > 0)}
           title="投币"
         >
@@ -311,27 +350,82 @@ export function WatchInfo({
           {saved ? '已加入' : '稍后再看'}
         </button>
       </div>
-      {confirmingCoin ? (
-        <div className="mt-2 flex items-center gap-2 rounded-[4px] bg-[var(--panel-raised)] px-2 py-1.5 text-[12px]">
-          <span className="text-[var(--text-2)]">投 1 枚硬币？不可撤销</span>
+      {coinAt ? (
+        <>
           <button
             type="button"
-            onClick={() => {
-              setConfirmingCoin(false)
-              onCoin()
-            }}
-            className="rounded-[3px] bg-[var(--accent)] px-2 text-white"
+            aria-label="关闭"
+            onClick={() => setCoinAt(null)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <div
+            ref={coinPanel}
+            role="dialog"
+            aria-label="投币"
+            style={{ left: coinAt.left, top: coinAt.top }}
+            className="fixed z-50 w-[268px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.3)]"
           >
-            投
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingCoin(false)}
-            className="text-[var(--text-3)] hover:text-[var(--text-1)]"
-          >
-            取消
-          </button>
-        </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-[var(--text-2)]">给 UP 主投上硬币</span>
+              <button
+                type="button"
+                aria-label="关闭"
+                onClick={() => setCoinAt(null)}
+                className="t text-[var(--text-3)] hover:text-[var(--text-1)]"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            <div className="mt-3 flex gap-2">
+              {Array.from({ length: Math.max(0, 2 - coins) }, (_, index) => index + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={coinPick === n}
+                  onClick={() => setCoinPick(n)}
+                  className={`t flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-[6px] border text-[13px] ${
+                    coinPick === n
+                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                      : 'border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)]'
+                  }`}
+                >
+                  <BiliCoin size={18} filled={coinPick === n} />
+                  {n} 枚
+                </button>
+              ))}
+            </div>
+            {!liked ? (
+              <label className="mt-3 flex items-center gap-2 text-[12px] text-[var(--text-2)]">
+                <input
+                  type="checkbox"
+                  checked={alsoLike}
+                  onChange={(event) => setAlsoLike(event.target.checked)}
+                  className="h-3.5 w-3.5 accent-[var(--accent)]"
+                />
+                同时点赞
+              </label>
+            ) : null}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCoinAt(null)
+                  onCoin(coinPick, alsoLike)
+                }}
+                className="t press h-8 flex-1 rounded-[4px] bg-[var(--accent)] text-[13px] text-white hover:opacity-90"
+              >
+                投 {coinPick} 枚
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoinAt(null)}
+                className="t shrink-0 px-2 text-[13px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                下次一定
+              </button>
+            </div>
+          </div>
+        </>
       ) : null}
 
       {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}

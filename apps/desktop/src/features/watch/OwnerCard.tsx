@@ -14,12 +14,14 @@ export function OwnerCard({
   data,
   card,
   followed,
+  fansDelta,
   onFollow,
   inline = false,
 }: {
   data: WatchData
   card: ipc.AuthorCard | null
   followed: boolean | null
+  fansDelta?: number
   onFollow: () => void
   /** 主栏那一行：头像、名字、粉丝数、关注按钮横排一行，不带竖排布局与大段签名。 */
   inline?: boolean
@@ -58,7 +60,9 @@ export function OwnerCard({
           </div>
           {/* 粉丝数是这一行里最有用的一格信息：B 站在名字右侧挂「N 粉丝」。 */}
           {card ? (
-            <p className="num mt-0.5 text-[12px] text-[var(--text-3)]">{formatCount(card.fans)} 粉丝</p>
+            <p className="num mt-0.5 text-[12px] text-[var(--text-3)]">
+              {formatCount(Math.max(0, card.fans + (fansDelta ?? 0)))} 粉丝
+            </p>
           ) : null}
         </div>
         {data.owner_mid ? (
@@ -153,7 +157,9 @@ export function OwnerCard({
                 : 'bg-[var(--accent)] text-white hover:opacity-90'
             }`}
           >
-            {followed === true ? '已关注' : `+ 关注 ${card ? formatCount(card.fans) : ''}`.trim()}
+            {followed === true
+              ? '已关注'
+              : `+ 关注 ${card ? formatCount(Math.max(0, card.fans + (fansDelta ?? 0))) : ''}`.trim()}
           </button>
         </div>
       ) : null}

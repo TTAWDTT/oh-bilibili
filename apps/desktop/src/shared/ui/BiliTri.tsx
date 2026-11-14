@@ -33,9 +33,19 @@ export function BiliThumb({ size = 18, className, filled = true }: Props & State
   )
 }
 
-export function BiliCoin({ size = 18, className }: Props) {
+export function BiliCoin({ size = 18, className, filled = true }: Props & Stateful) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="currentColor" aria-hidden className={className}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 28 28"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
+      strokeWidth={filled ? undefined : 2}
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"

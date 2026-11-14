@@ -19,7 +19,7 @@ type ReactionStore = {
   toggleLike: (track: Track) => Promise<boolean | null>
   toggleFav: (track: Track) => Promise<boolean | null>
   /** 投币。成功后本地计数 +count，与账号一致；返回是否真的成功。 */
-  addCoin: (track: Track, count: number) => Promise<boolean>
+  addCoin: (track: Track, count: number, alsoLike?: boolean) => Promise<boolean>
   /** 收进指定收藏夹后把本地状态点亮点。 */
   favTo: (track: Track, folderId: number | null) => Promise<void>
 }
@@ -84,14 +84,14 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
     }))
     return next
   },
-  addCoin: async (track, count) => {
+  addCoin: async (track, count, alsoLike = true) => {
     const previous = get().coins[track.key] ?? 0
     try {
-      await ipc.coinAdd(track.key, count, true)
+      await ipc.coinAdd(track.key, count, alsoLike)
       // 投币不可撤销，只有成功才改本地
       set((state) => ({
         coins: { ...state.coins, [track.key]: Math.min(2, previous + count) },
-        liked: { ...state.liked, [track.key]: true },
+        liked: alsoLike ? { ...state.liked, [track.key]: true } : state.liked,
       }))
       return true
     } catch (cause) {
