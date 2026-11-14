@@ -232,7 +232,9 @@ export function WatchInfo({
           className={`${action(liked)} relative overflow-hidden`}
           title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
-          <BiliThumb size={19} />
+          <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
+            <BiliThumb size={19} />
+          </span>
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
           {holding ? (
             <span className="bili-hold-bar absolute inset-x-0 bottom-0 h-[2px] bg-[var(--accent)]" />
@@ -252,7 +254,9 @@ export function WatchInfo({
           className={action(coins > 0)}
           title="投币"
         >
-          <BiliCoin size={19} />
+          <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
+            <BiliCoin size={19} />
+          </span>
           {formatCount(data.stats.coins + coinDelta)}
         </button>
         <button
@@ -263,7 +267,9 @@ export function WatchInfo({
           className={action(faved)}
           title={faved ? '取消收藏' : '收藏'}
         >
-          <BiliStar size={19} />
+          <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
+            <BiliStar size={19} />
+          </span>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>
         <button

@@ -54,7 +54,9 @@ export function CardActions({
         onClick={() => void toggleLike(track)}
         className={`${item} ${liked ? 'text-[var(--accent)]' : off}`}
       >
-        <BiliThumb size={13} />
+        <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
+          <BiliThumb size={13} />
+        </span>
       </button>
       <button
         type="button"
@@ -64,7 +66,9 @@ export function CardActions({
         onClick={onCoin}
         className={`${item} ${coins > 0 ? 'text-[var(--coin)]' : off} ${coins >= 2 ? 'cursor-default opacity-50' : ''}`}
       >
-        <BiliCoin size={13} />
+        <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
+          <BiliCoin size={13} />
+        </span>
       </button>
       <button
         type="button"
@@ -74,7 +78,9 @@ export function CardActions({
         onClick={() => onFav(faved)}
         className={`${item} ${faved ? 'text-[var(--coin)]' : off}`}
       >
-        <BiliStar size={13} />
+        <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
+          <BiliStar size={13} />
+        </span>
       </button>
       <button type="button" aria-label="稍后再看" title="稍后再看" onClick={onLater} className={`${item} ${off}`}>
         <Icon name="watchLater" size={13} />

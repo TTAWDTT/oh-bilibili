@@ -327,6 +327,44 @@
   animation: bili-hold-fill 550ms linear forwards;
 }
 
+/* 三连按钮点中那一下：点赞先放大再回弹，硬币翻面，收藏转一圈。
+   只在状态翻转时通过 key 重挂载播放一次，平时不占渲染。 */
+@keyframes bili-tri-pop {
+  0% { transform: scale(1); }
+  38% { transform: scale(1.34); }
+  70% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bili-tri-flip {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes bili-tri-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  55% { transform: rotate(150deg) scale(1.24); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.bili-tri-pop,
+.bili-tri-flip,
+.bili-tri-spin {
+  display: inline-flex;
+}
+
+.bili-tri-pop { animation: bili-tri-pop 320ms var(--spring); }
+.bili-tri-flip { animation: bili-tri-flip 420ms var(--ease); }
+.bili-tri-spin { animation: bili-tri-spin 420ms var(--spring); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bili-tri-pop,
+  .bili-tri-flip,
+  .bili-tri-spin {
+    animation: none;
+  }
+}
+
 /* ── 一键三连的整屏庆祝 ─────────────────────────────
  * 三拍：图标带旋转弹出 → 文字跟上 → 三枚一起收拢淡出。
  * 收拢在 1180ms 走完，TripleBurst.tsx 的 1200ms 计时器随即卸载。
