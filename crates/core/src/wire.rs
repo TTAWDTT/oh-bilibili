@@ -170,8 +170,6 @@ pub struct LiveRoomView {
     pub cover: Option<String>,
     pub area: String,
     pub online: u64,
-    /// B 站格式化好的人气串，没给时前端回落到 online。
-    pub watched: String,
     /// B 站直播间地址。直播流不能在本机解码，点开交给系统浏览器。
     pub url: String,
 }

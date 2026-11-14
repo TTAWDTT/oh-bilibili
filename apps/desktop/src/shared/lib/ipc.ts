@@ -255,8 +255,6 @@ export type LiveRoom = {
   cover: string | null
   area: string
   online: number
-  /** B 站格式化好的人气串（「153.9万」）。 */
-  watched: string
   url: string
 }
 

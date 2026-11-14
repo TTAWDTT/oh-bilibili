@@ -43,11 +43,9 @@ pub struct LiveRoom {
     /// 封面。`user_cover` 是主播自己传的，`system_cover` 是系统截帧，前者优先。
     pub cover: Option<String>,
     pub area: String,
-    /// 人气值。接口给的是 66792955 这种原始数，展示时才缩。
+    /// 人气值。接口 `online` 给的是 66792955 这种原始数，展示时才缩。
+    /// 不要用 `watched_show.text_small`：那个是「人看过」，和人气不是一回事。
     pub online: u64,
-    /// B 站自己格式化好的人气串（「153.9万」）。接口的 `watched_show.text_small`
-    /// 已经按站内口径缩过，直接用它比本地再算一遍更贴近原站。
-    pub watched: String,
 }
 
 /// 番剧排行榜的一项。
@@ -887,10 +885,6 @@ impl Client {
                                 .map(|c| c.replacen("http://", "https://", 1)),
                             area: m["areaName"].as_str().unwrap_or_default().to_string(),
                             online: m["online"].as_u64().unwrap_or(0),
-                            watched: m["watched_show"]["text_small"]
-                                .as_str()
-                                .unwrap_or_default()
-                                .to_string(),
                         })
                     })
                     .collect()

@@ -137,7 +137,6 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         cover: track.cover,
         area: '音乐',
         online: 700_000 - i * 90_000,
-        watched: `${((700_000 - i * 90_000) / 10_000).toFixed(1)}万`,
         url: `https://live.bilibili.com/${1000 + i}`,
       }))
     case 'bangumi_rank':

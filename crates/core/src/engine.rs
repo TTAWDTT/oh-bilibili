@@ -1367,7 +1367,6 @@ impl Engine {
                 cover: room.cover,
                 area: room.area,
                 online: room.online,
-                watched: room.watched,
             })
             .collect())
     }

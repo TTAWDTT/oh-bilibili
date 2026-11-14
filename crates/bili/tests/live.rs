@@ -709,7 +709,7 @@ async fn 直播与番剧都能取到() {
     assert_eq!(rooms.len(), 6, "要多少给多少");
     assert!(rooms.iter().all(|r| r.room_id > 0), "每个房间都要有 id");
     assert!(rooms.iter().all(|r| r.cover.is_some()), "直播卡要带封面");
-    assert!(rooms.iter().all(|r| !r.watched.is_empty()), "人气要用 B 站自己格式化好的串");
+    assert!(rooms.iter().all(|r| r.online > 0), "每个房间都该有人气数");
 
     // 直播频道翻页：第二页不能和第一页重样，否则「加载更多」是假的
     let more = source.live_rooms(12, 2).await.expect("第二页应该能取到");

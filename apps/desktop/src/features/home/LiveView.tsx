@@ -126,7 +126,7 @@ export function LiveView() {
                     <i />
                     <i />
                   </span>
-                  <span className="truncate">{room.watched || formatCount(room.online)}</span>
+                  <span className="truncate">{formatCount(room.online)}</span>
                 </span>
                 {room.area ? (
                   <span className="shrink-0 rounded-[2px] bg-black/45 px-1 [text-shadow:none]">{room.area}</span>
