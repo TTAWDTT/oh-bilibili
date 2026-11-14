@@ -2,12 +2,63 @@ import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { PageTitle } from '../../shared/ui/PageTitle'
+import { formatCount, formatDuration } from '../../shared/lib/format'
+import { useAppStore } from '../../app/appStore'
+import { Cover } from '../../shared/ui/Cover'
+import { Icon } from '../../shared/ui/Icon'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { ContentGrid } from '../tracks/ContentGrid'
-import { usePlayerStore } from '../player/playerStore'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
+
+/**
+ * 热门页的一条：B 站综合热门是两列横排大卡，封面在左、标题与计数在右，
+ * 不是发现页那种封面主导的竖卡。这里不复用 ContentGrid，两边的信息密度差一倍。
+ */
+function PopularRow({ track, onOpen }: { track: Track; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="bili-card group flex items-start gap-4 text-left"
+      title={track.title}
+    >
+      <span className="relative aspect-video w-[190px] shrink-0 overflow-hidden rounded-[8px]">
+        <Cover cover={track.cover} title={track.title} width={190} className="bili-card-cover h-full w-full" />
+        <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[16px] text-white">
+          {formatDuration(track.duration_ms)}
+        </span>
+      </span>
+      <span className="min-w-0 flex-1 py-0.5">
+        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+          {track.title}
+        </span>
+        {track.tname ? (
+          <span className="mt-1.5 inline-block rounded-[3px] border border-[color-mix(in_oklab,var(--bili-pink)_45%,white)] px-1 text-[11px] leading-[16px] text-[var(--bili-pink)]">
+            {track.tname}
+          </span>
+        ) : null}
+        <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
+          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
+          <span className="truncate">{track.artist}</span>
+        </span>
+        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+          {track.views ? (
+            <span className="flex items-center gap-0.5">
+              <Icon name="play" size={11} />
+              {formatCount(track.views)}
+            </span>
+          ) : null}
+          {(track.danmaku ?? 0) > 0 ? (
+            <span className="flex items-center gap-0.5">
+              <Icon name="danmaku" size={11} />
+              {formatCount(track.danmaku!)}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </button>
+  )
+}
 
 /**
  * 热门。B 站的综合热门（popular/all）：按时间往下翻，一次 50 条，没有名次。
@@ -23,7 +74,8 @@ export function PopularView() {
   /** 滚动事件会连着触发，请求在飞的时候用 ref 挡住重入。 */
   const pending = useRef(false)
   const noMore = useRef(false)
-  const snapshot = usePlayerStore((state) => state.snapshot)
+  const navigate = useAppStore((state) => state.navigate)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -73,52 +125,82 @@ export function PopularView() {
       })
   }
 
+  /** 原来靠 ContentGrid 的 onNeedMore 触发翻页；换成两列大卡后由底部哨兵接管。 */
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !error) more()
+      },
+      { root: document.getElementById('scroll-main'), rootMargin: '900px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [error, tracks])
+
   return (
-    <div
-      id="scroll-main"
-      className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
-    >
-      <PageTitle extra={tracks ? String(tracks.length) : undefined}>热门</PageTitle>
-      {tracks === null ? (
-        error ? (
-          <EmptyState
-            icon="alert"
-            title="热门没取到"
-            detail={error}
-            action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
-          />
+    <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
+      {/*
+       * B 站热门页是白色 header 带：标题 + 一行副标题、右侧「热门规则」入口。
+       * 下面正文是两列横排大卡，跟发现页的封面网格完全不是一套密度。
+       */}
+      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-[17px] font-medium text-[var(--text-1)]">热门</h2>
+          {tracks ? <span className="num text-[12px] text-[var(--text-3)]">{tracks.length}</span> : null}
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="text-[12px] text-[var(--text-3)]">各个领域中新奇好玩的优质内容都在这里~</p>
+          <button
+            type="button"
+            onClick={() => void ipc.openExternal('https://www.bilibili.com/v/popular/all').catch(() => {})}
+            className="t press flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+          >
+            <Icon name="info" size={12} />
+            热门规则
+          </button>
+        </div>
+      </nav>
+      <div className="px-4 md:px-8">
+        {tracks === null ? (
+          error ? (
+            <EmptyState
+              icon="alert"
+              title="热门没取到"
+              detail={error}
+              action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
+            />
+          ) : (
+            <CardGridSkeleton cards={8} />
+          )
+        ) : tracks.length === 0 ? (
+          <EmptyState icon="biliTv" title="热门榜暂时是空的" action={null} />
         ) : (
-          <CardGridSkeleton cards={10} />
-        )
-      ) : tracks.length === 0 ? (
-        <EmptyState icon="biliTv" title="热门榜暂时是空的" action={null} />
-      ) : (
-        <>
-          <ContentGrid
-            tracks={tracks}
-            activeKey={snapshot?.track?.key ?? null}
-            playing={snapshot?.phase === 'playing'}
-            onNeedMore={() => {
-              // 出事就停在原地等用户按「重试」，滚动不再自动重发。
-              if (!error) more()
-            }}
-          />
-          {error ? (
-            <div className="flex items-center justify-center gap-3 py-4 text-[12px] text-[var(--text-3)]">
-              <span>{error}</span>
-              <button
-                type="button"
-                onClick={more}
-                className="t press text-[var(--accent)] hover:underline"
-              >
-                重试
-              </button>
+          <>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
+              {tracks.map((track) => (
+                <PopularRow
+                  key={track.key}
+                  track={track}
+                  onOpen={() => navigate({ kind: 'watch', track })}
+                />
+              ))}
             </div>
-          ) : loadingMore ? (
-            <BiliLoader compact label="正在加载更多…" />
-          ) : null}
-        </>
-      )}
+            <div ref={sentinelRef} className="h-1" aria-hidden />
+            {error ? (
+              <div className="flex items-center justify-center gap-3 py-4 text-[12px] text-[var(--text-3)]">
+                <span>{error}</span>
+                <button type="button" onClick={more} className="t press text-[var(--accent)] hover:underline">
+                  重试
+                </button>
+              </div>
+            ) : loadingMore ? (
+              <BiliLoader compact label="正在加载更多…" />
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   )
 }
