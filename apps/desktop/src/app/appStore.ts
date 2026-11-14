@@ -1,24 +1,5 @@
 import type { Track } from '../shared/lib/contract'
-import { flushSync } from 'react-dom'
 import { create } from 'zustand'
-
-/**
- * 页面切换时让浏览器拍两张快照做交叉淡入。
- *
- * 自己用 CSS 给新页面加 fade 时，旧页面是瞬间消失的，整块内容会「闪」一下；
- * View Transition 由合成器负责，新旧两帧同时在场，中间没有空档。
- * 不支持的老 WebView 直接切，不再叠一层自己写的动画。
- */
-function withViewTransition(update: () => void): void {
-  const doc = document as Document & {
-    startViewTransition?: (callback: () => void) => unknown
-  }
-  if (typeof doc.startViewTransition !== 'function') {
-    update()
-    return
-  }
-  doc.startViewTransition(() => flushSync(update))
-}
 
 export type View =
   | { kind: 'home' }
@@ -118,39 +99,34 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   authorQuery: null,
   toasts: [],
   navigate: (view) =>
-    withViewTransition(() =>
-      set((state) => {
-        // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
-        if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
-          return {}
-        }
-        return {
-          view,
-          navDir: 'fwd' as const,
-          cinema: false,
-          osFullscreen: false,
-          history: [...state.history, state.view].slice(-32),
-        }
-      }),
-    ),
-  replace: (view) =>
-    withViewTransition(() => set({ view, navDir: 'fwd', cinema: false, osFullscreen: false })),
+    set((state) => {
+      // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
+      if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
+        return {}
+      }
+      return {
+        view,
+        navDir: 'fwd' as const,
+        cinema: false,
+        osFullscreen: false,
+        history: [...state.history, state.view].slice(-32),
+      }
+    }),
+  replace: (view) => set({ view, navDir: 'fwd', cinema: false, osFullscreen: false }),
   goBack: () =>
-    withViewTransition(() =>
-      set((state) => {
-        const prev = state.history.at(-1)
-        if (!prev) {
-          return { view: { kind: 'home' } as View, navDir: 'back' as const, cinema: false, osFullscreen: false }
-        }
-        return {
-          view: prev,
-          navDir: 'back' as const,
-          cinema: false,
-          osFullscreen: false,
-          history: state.history.slice(0, -1),
-        }
-      }),
-    ),
+    set((state) => {
+      const prev = state.history.at(-1)
+      if (!prev) {
+        return { view: { kind: 'home' } as View, navDir: 'back' as const, cinema: false, osFullscreen: false }
+      }
+      return {
+        view: prev,
+        navDir: 'back' as const,
+        cinema: false,
+        osFullscreen: false,
+        history: state.history.slice(0, -1),
+      }
+    }),
   setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),

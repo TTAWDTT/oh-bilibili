@@ -400,46 +400,32 @@
 }
 
 /*
- * 没有 View Transition 的 WebView 用这一版：从 0.35 淡入。
+ * 页面切换：从 0.55 淡到 1，只动 opacity。
  *
- * 从 0 开始淡入时，旧页面已经消失、新页面还看不见，中间那一帧就是白屏，
- * 观感是「闪一下再出来」。留 35% 底子，接上的是画面而不是空白。
- * 支持 View Transition 时这条不生效——那条路由合成器负责，不会闪。
+ * 三个约束：
+ * 1. 只碰 opacity —— 动画里的 transform / filter 会让这一块成为 fixed 后代的包含块，
+ *    观看页的全屏与浮层就被裁在内容区里。opacity 只走合成器，没有这个问题。
+ * 2. 起点不是 0 —— 旧页面已经消失、新页面还是全透明时，那一帧就是白闪；
+ *    从 0.55 起，接上的是画面而不是空白。
+ * 3. 不用 View Transition —— 它要先给整页拍快照，几百张卡的列表上这一步就是一次冻结，
+ *    还不如一层 150ms 的淡入来得直接。
  */
 @keyframes bili-page-fade-in {
   from {
-    opacity: 0.35;
+    opacity: 0.55;
   }
   to {
     opacity: 1;
   }
 }
 
-.bili-page[data-vt='off'] {
-  animation: bili-page-fade-in 140ms ease-out both;
-}
-
-.bili-page[data-vt='on'] {
-  animation: none;
-}
-
-/*
- * 页面切换交给 View Transition：旧帧与新帧由合成器同时持有，做交叉淡入。
- *
- * 自己在新页面上加 fade 时旧帧已经没了，中间必然出现一帧空白，看起来就是「闪」。
- * 这里只调时长与曲线；不支持该 API 的 WebView 上 startViewTransition 不存在，
- * 切换是瞬时的，不会退化成半套动画。
- */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 180ms;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+.bili-page {
+  animation: bili-page-fade-in 150ms cubic-bezier(0.33, 1, 0.68, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 1ms;
+  .bili-page {
+    animation: none;
   }
 }
 
