@@ -12,7 +12,6 @@ import { toastDone } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { formatDuration } from '../../shared/lib/format'
-import { Avatar } from '../../shared/ui/Avatar'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { usePlayerStore } from '../player/playerStore'
@@ -258,7 +257,7 @@ const TrackCard = memo(function TrackCard({
           onClick={() => onAuthor(track)}
           className="flex min-w-0 items-center gap-1 hover:text-[var(--accent)]"
         >
-          <Avatar src={track.up_avatar ?? null} alt={track.artist} size={18} />
+          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
           <span className="truncate">{track.artist}</span>
         </button>
       </div>
@@ -403,7 +402,9 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
       <h2 className="sr-only">曲目</h2>
       <div
         data-shown={shown}
-        className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]"
+        /* 190 是让 1320 窗口（内容 1056）落成 5 列的分界：5*190+4*20=1030。
+           B 站首页推荐流同宽也是 5 列，206 的写法会掉成 4 列、卡片大一圈。 */
+        className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
       >
         {tracks.slice(0, shown).map((track, index) => {
           const active = track.key === activeKey
