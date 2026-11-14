@@ -168,12 +168,16 @@ function CommentRow({
                 UP主
               </span>
             ) : null}
-            {c.likes > 0 ? (
-              <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
-                {formatCount(c.likes)} 赞
+            {/* B 站评论头行右侧是「拇指 数」+「拇指朝下」两颗灰图标，
+                即使 0 赞也留着位置，一排评论扫下来才是同一个形状。 */}
+            <span className="num ml-auto flex shrink-0 items-center gap-3 text-[11px] text-[var(--text-3)]">
+              <span className="flex items-center gap-0.5">
+                <Icon name="thumb" size={12} />
+                {c.likes > 0 ? formatCount(c.likes) : null}
               </span>
-            ) : null}
-            <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
+              <Icon name="thumbDown" size={12} />
+            </span>
+            <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
             {depth === 0 && onReply ? (
               <button
                 type="button"
