@@ -63,7 +63,10 @@ export function WideCard({
         </span>
         {note && !noteAsTag ? (
           <span className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ff7a45]">
-            <Icon name="flame" size={12} className="shrink-0" />
+            {/* B 站入站必刷 / 每周必看的推荐语前面是一对橙色引号，不是火焰图标。 */}
+            <span aria-hidden className="shrink-0 text-[13px] leading-none">
+              ❝
+            </span>
             <span className="truncate">{note}</span>
           </span>
         ) : null}
