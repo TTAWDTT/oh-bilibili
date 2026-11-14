@@ -183,7 +183,7 @@ export function WatchInfo({
   /** 胶囊按钮：B 站视频页的每个操作都是这个形状，图标 + 文字 + 数字。 */
   const pill = (on: boolean): string =>
     [
-      't press flex h-8 items-center gap-1.5 rounded-[6px] border px-3 text-[13px]',
+      't press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] border px-3 text-[13px]',
       on
         ? 'border-[var(--accent)] text-[var(--accent)]'
         : 'border-[var(--line)] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
@@ -195,7 +195,7 @@ export function WatchInfo({
    */
   const triple = (on: boolean, edge: 'left' | 'middle' | 'right'): string =>
     [
-      't press flex h-9 items-center gap-1.5 border border-[var(--line)] px-4 text-[13px] first:border-l',
+      't press flex h-9 shrink-0 items-center gap-1.5 border border-[var(--line)] px-4 text-[13px] first:border-l',
       edge === 'left' ? 'rounded-l-[6px] border-r-0' : '',
       edge === 'middle' ? 'border-r-0' : '',
       edge === 'right' ? 'rounded-r-[6px]' : '',
@@ -300,8 +300,8 @@ export function WatchInfo({
         ) : null}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="flex items-stretch">
+      <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto">
+        <div className="flex shrink-0 items-stretch">
         <button
           type="button"
           aria-pressed={liked}

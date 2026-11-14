@@ -152,6 +152,17 @@ export default function App() {
     if (useAppStore.getState().rail === null) setRail('lyrics')
   }, [trackKey, setRail])
 
+  // 从宽窗口拖到窄窗口时，桌面的右栏会变成盖住整页的面板；跨过断点就收起，
+  // 需要时再点播放条上的歌词/队列按钮打开。
+  useEffect(() => {
+    const narrow = window.matchMedia('(max-width: 767px)')
+    const onChange = (event: MediaQueryListEvent): void => {
+      if (event.matches) setRail(null)
+    }
+    narrow.addEventListener('change', onChange)
+    return () => narrow.removeEventListener('change', onChange)
+  }, [setRail])
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
       style={{ background: 'var(--color-ink)' }}>
