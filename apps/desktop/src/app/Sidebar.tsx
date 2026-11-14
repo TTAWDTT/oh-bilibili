@@ -54,13 +54,13 @@ export function Sidebar() {
         onClick={() => navigate(entry.view)}
         aria-current={active ? 'page' : undefined}
         className={[
-          't flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[14px]',
+          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[14px]',
           active
             ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <Icon name={entry.icon} size={16} />
+        <Icon name={entry.icon} size={16} className={active ? 'bili-icon-pop' : ''} />
         {entry.label}
       </button>
     )

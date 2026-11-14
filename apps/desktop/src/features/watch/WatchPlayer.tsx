@@ -629,7 +629,7 @@ export function WatchPlayer({
             type="button"
             onClick={togglePlay}
             aria-label={playing ? '暂停' : '播放'}
-            className="t press flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
@@ -656,7 +656,7 @@ export function WatchPlayer({
               aria-expanded={draftPicker}
               aria-label="弹幕颜色与位置"
               title="弹幕颜色与位置"
-              className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+              className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
                 draftPicker ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -738,7 +738,7 @@ export function WatchPlayer({
               aria-expanded={danmakuPanel}
               aria-label="弹幕设置"
               title="弹幕设置"
-              className={`t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
+              className={`bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
                 danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -836,7 +836,7 @@ export function WatchPlayer({
             onClick={() => setStageMode(!cinema, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+            className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >
@@ -847,7 +847,7 @@ export function WatchPlayer({
             onClick={() => (osFullscreen ? setStageMode(false, false) : setStageMode(true, true))}
             aria-label={osFullscreen ? '退出全屏' : '全屏'}
             title="全屏（F）"
-            className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
             <Icon name={osFullscreen ? 'close' : 'fullscreen'} size={14} />
           </button>

@@ -628,6 +628,26 @@
   transform: scale(1.18);
 }
 
+/* 带图标的按钮：悬停时让图标自己弹一下，而不是整颗按钮变大 */
+.bili-icon-btn svg {
+  transition: transform 160ms var(--spring);
+}
+
+.bili-icon-btn:hover svg {
+  transform: scale(1.12);
+}
+
+/* 切到某一页时，那一项图标弹一下，像 B 站侧栏选中时的那下回应 */
+@keyframes bili-icon-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.24) rotate(-5deg); }
+  100% { transform: scale(1); }
+}
+
+.bili-icon-pop {
+  animation: bili-icon-pop 280ms var(--spring) both;
+}
+
 /* 频道项：hover 时图标先弹一下 */
 .bili-channel-icon {
   transition: transform 180ms var(--spring);

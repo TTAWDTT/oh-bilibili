@@ -33,7 +33,7 @@ export function CardActions({
   const hydrate = useReactionStore((st) => st.hydrate)
 
   const item =
-    'bili-icon-hover flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20'
+    'bili-icon-btn flex h-6 w-6 items-center justify-center rounded-[4px] hover:bg-white/20'
   const off = 'text-white/90 hover:text-white'
 
   return (

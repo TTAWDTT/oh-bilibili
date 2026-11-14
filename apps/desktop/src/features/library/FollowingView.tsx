@@ -192,22 +192,20 @@ export function FollowingView() {
                 onPointerLeave={hide}
                 onFocus={(event) => show(u, event.currentTarget)}
                 onBlur={hide}
-                className="t press flex w-full items-center gap-2.5 rounded-[8px] border border-[var(--line)] px-2.5 py-2 text-left hover:bg-[var(--panel-alt)]"
+                className="bili-card group flex w-full items-center gap-3 rounded-[10px] border border-[var(--line)] bg-[var(--panel)] px-3 py-3 text-left hover:border-[var(--accent)]"
               >
-                <span className="relative shrink-0">
-                  <Avatar src={u.face} alt={u.name} size={36} />
-                  {u.special ? (
-                    <span
-                      title="特别关注"
-                      className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ffb027] text-white shadow-[0_0_0_1.5px_var(--panel)]"
-                    >
-                      <Icon name="star" size={9} />
-                    </span>
-                  ) : null}
-                </span>
+                <Avatar src={u.face} alt={u.name} size={46} />
                 <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1">
-                    <span className="truncate text-[13px] text-[var(--text-1)]">{u.name}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-[14px] font-medium text-[var(--text-1)]">{u.name}</span>
+                    {u.special ? (
+                      <span
+                        title="特别关注"
+                        className="flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full text-[#ffb027]"
+                      >
+                        <Icon name="star" size={12} />
+                      </span>
+                    ) : null}
                     {u.official != null ? (
                       <span
                         title={u.official === 1 ? '机构认证' : '个人认证'}
@@ -218,15 +216,20 @@ export function FollowingView() {
                       </span>
                     ) : null}
                     {u.mutual ? (
-                      <span className="shrink-0 rounded-[2px] bg-[var(--panel-raised)] px-1 text-[10px] leading-[15px] text-[var(--text-3)]">
+                      <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                         互关
                       </span>
                     ) : null}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
+                  <span className="mt-1 block truncate text-[12px] text-[var(--text-3)]">
                     {u.sign || '这个人很神秘，什么都没写'}
                   </span>
                 </span>
+                <Icon
+                  name="chevronRight"
+                  size={16}
+                  className="shrink-0 text-[var(--ga3)] transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
+                />
               </button>
             </li>
           ))}

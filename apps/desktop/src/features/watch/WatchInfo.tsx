@@ -205,7 +205,7 @@ export function WatchInfo({
    */
   const action = (on: boolean): string =>
     [
-      't press flex h-9 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px]',
+      'bili-icon-btn t press flex h-9 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px]',
       on
         ? 'text-[var(--accent)]'
         : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]',

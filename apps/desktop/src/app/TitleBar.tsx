@@ -129,7 +129,7 @@ export function TitleBar() {
               onClick={() => navigate({ kind: entry.kind })}
               title={entry.label}
               aria-label={entry.label}
-              className="t press flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+              className="bili-icon-btn t press flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
             >
               <Icon name={entry.icon} size={17} />
             </button>
