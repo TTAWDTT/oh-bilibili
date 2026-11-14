@@ -115,7 +115,8 @@ export function SearchView() {
 
   // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
   useEffect(() => {
-    if (!heroQuery) return
+    // 空串是「搜一个空词」：清掉结果回到热搜页，不能当成没提交。
+    if (heroQuery === null) return
     setQuery(heroQuery)
     setPage(1)
     setNonce((n) => n + 1)
