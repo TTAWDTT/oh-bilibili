@@ -8,6 +8,8 @@ import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
 import { CommentsPanel } from './CommentsPanel'
+import { DanmakuList } from './DanmakuList'
+import { OwnerCard } from './OwnerCard'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
@@ -43,6 +45,9 @@ export function WatchView({ track }: { track: Track }) {
   const [nonce, setNonce] = useState(0)
   /** 当前在看人数。取不到就不显示，不猜。 */
   const [online, setOnline] = useState<number | null>(null)
+  /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
+  const [card, setCard] = useState<ipc.AuthorCard | null>(null)
+  const [followed, setFollowed] = useState<boolean | null>(null)
 
   // 标题行要用到「N 人在看」，所以这一条请求放在页面级：它和标题一起在播放器上方。
   useEffect(() => {
@@ -66,6 +71,42 @@ export function WatchView({ track }: { track: Track }) {
     setFavDelta(0)
     setCoinDelta(0)
   }, [track.key])
+
+  const mid = data?.owner_mid ?? null
+
+  useEffect(() => {
+    let cancelled = false
+    setCard(null)
+    setFollowed(null)
+    if (!mid) return
+    void ipc
+      .authorCard(mid)
+      .then((next) => {
+        if (!cancelled) setCard(next)
+      })
+      .catch(() => {})
+    void ipc
+      .relationFollowed(mid)
+      .then((on) => {
+        if (!cancelled) setFollowed(on)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [mid])
+
+  const toggleFollow = (): void => {
+    if (!mid) return
+    const next = followed !== true
+    void ipc
+      .followSet(mid, next)
+      .then(() => {
+        setFollowed(next)
+        toastDone(next ? '已关注' : '已取消关注')
+      })
+      .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
+  }
 
   const like = (): void => {
     const before = useReactionStore.getState().liked[track.key] ?? false
@@ -258,6 +299,12 @@ export function WatchView({ track }: { track: Track }) {
               onTriple={triple}
             />
           ) : null}
+          {/* 右栏在窄屏收起，UP 名片跟着回到正文里，否则没有地方关注。 */}
+          {!cinema && data ? (
+            <div className="md:hidden">
+              <OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} />
+            </div>
+          ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           {!cinema && data?.season ? (
             <div className="border-t border-hairline md:hidden">
@@ -278,6 +325,8 @@ export function WatchView({ track }: { track: Track }) {
 
         {!cinema ? (
           <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
+            {data ? <OwnerCard data={data} card={card} followed={followed} onFollow={toggleFollow} /> : null}
+            <DanmakuList items={danmaku} />
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>

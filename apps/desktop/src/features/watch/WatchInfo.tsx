@@ -7,9 +7,7 @@ import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
-import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
-import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
 /** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
@@ -138,8 +136,6 @@ export function WatchInfo({
   const [saved, setSaved] = useState(false)
   /** 视频标签。公开接口，取不到就不显示这一行。 */
   const [tags, setTags] = useState<string[]>([])
-  /** UP 主名片：粉丝、等级、认证。B 站把「粉丝 123.4万」挂在名字后面。 */
-  const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   /** 简介默认收两行，长简介给一个展开。 */
   const [descOpen, setDescOpen] = useState(false)
   const [confirmingCoin, setConfirmingCoin] = useState(false)
@@ -148,16 +144,12 @@ export function WatchInfo({
   const holdTimer = useRef<number | null>(null)
   const longFired = useRef(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
-  /** null 表示还没读到（未登录或请求失败），此时不显示关注按钮。 */
-  const [followed, setFollowed] = useState<boolean | null>(null)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
-  const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
     let cancelled = false
     setSaved(false)
     setTags([])
-    setCard(null)
     setDescOpen(false)
     setConfirmingCoin(false)
     void ipc
@@ -183,28 +175,6 @@ export function WatchInfo({
       cancelled = true
     }
   }, [track.key])
-
-  useEffect(() => {
-    let cancelled = false
-    setFollowed(null)
-    if (!data.owner_mid) return
-    // 一张 card 同时给出粉丝、等级和认证，比先查 relation/stat 再补一次请求划算。
-    void ipc
-      .authorCard(data.owner_mid)
-      .then((next) => {
-        if (!cancelled) setCard(next)
-      })
-      .catch(() => {})
-    void ipc
-      .relationFollowed(data.owner_mid)
-      .then((on) => {
-        if (!cancelled) setFollowed(on)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [data.owner_mid])
 
   useEffect(() => {
     return () => {
@@ -391,63 +361,6 @@ export function WatchInfo({
           ))}
         </div>
       ) : null}
-
-      <div className="mt-3 flex items-center gap-3 border-b border-hairline pb-3">
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })}
-          title={`看 ${data.owner} 的更多视频`}
-          className="t flex min-w-0 items-center gap-2 rounded-[4px] text-left hover:text-[var(--accent)]"
-        >
-          <Avatar src={data.owner_avatar ?? track.up_avatar ?? null} alt={data.owner} size={28} />
-          <span className="truncate text-[14px] text-[var(--text-2)]">{data.owner}</span>
-          {card ? <LevelBadge level={card.level} /> : null}
-          {card?.vip ? (
-            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--bili-pink)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--bili-pink)]">
-              大会员
-            </span>
-          ) : null}
-          {card?.official_type != null ? (
-            <span
-              title={card.official ?? (card.official_type === 1 ? '机构认证' : '个人认证')}
-              className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-white"
-              style={{ background: card.official_type === 1 ? 'var(--accent)' : '#ffb027' }}
-            >
-              <Icon name="check" size={10} />
-            </span>
-          ) : null}
-          {card !== null ? (
-            <span className="num shrink-0 text-[12px] text-[var(--text-3)]">
-              粉丝 {formatCount(card.fans)}
-            </span>
-          ) : null}
-        </button>
-        {/* 关注按钮常驻：状态没取到（未登录、接口失败）时按未关注显示，
-           点击后由服务端裁决。整颗按钮消失会让 UP 行缺一块，B 站不会这样。 */}
-        {data.owner_mid ? (
-          <button
-            type="button"
-            aria-pressed={followed === true}
-            onClick={() => {
-              const next = followed !== true
-              void ipc
-                .followSet(data.owner_mid!, next)
-                .then(() => {
-                  setFollowed(next)
-                  toastDone(next ? '已关注' : '已取消关注')
-                })
-                .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
-            }}
-            className={`t press h-8 shrink-0 rounded-[6px] px-4 text-[13px] ${
-              followed === true
-                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                : 'bg-[var(--accent)] text-white hover:opacity-90'
-            }`}
-          >
-            {followed === true ? '已关注' : '关注'}
-          </button>
-        ) : null}
-      </div>
 
       {data.pages.length > 1 ? (
         <div className="no-scrollbar mt-3 flex gap-1 overflow-x-auto">

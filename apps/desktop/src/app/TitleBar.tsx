@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { Avatar } from '../shared/ui/Avatar'
+import * as ipc from '../shared/lib/ipc'
+import { toastFailure } from './notice'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon } from '../shared/ui/Icon'
 
@@ -133,6 +135,19 @@ export function TitleBar() {
             </button>
           ))}
         </div>
+        {/* B 站顶栏最右边那颗粉色投稿：站里唯一一个实心品牌色按钮。
+            投稿本身在网页端完成，这里如实把官方上传页交给系统浏览器。 */}
+        <button
+          type="button"
+          onClick={() =>
+            void ipc
+              .openExternal('https://member.bilibili.com/platform/upload/video/frame')
+              .catch((cause) => toastFailure('打开投稿页', cause))
+          }
+          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--bili-pink)] px-3.5 text-[13px] text-white hover:opacity-90 sm:flex"
+        >
+          投稿
+        </button>
         {auth?.user ? (
           <button
             type="button"
