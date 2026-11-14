@@ -451,7 +451,7 @@ export function WatchInfo({
       ) : null}
 
       {data.pages.length > 1 ? (
-        <div className="mt-3 flex gap-1 overflow-x-auto">
+        <div className="no-scrollbar mt-3 flex gap-1 overflow-x-auto">
           {data.pages.map((p) => (
             <button
               key={p.cid}

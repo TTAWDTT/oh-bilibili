@@ -80,7 +80,7 @@ export function WeeklyView() {
       <PageTitle extra={issues ? `${issues.length} 期` : undefined}>每周必看</PageTitle>
 
       {issues && issues.length > 0 ? (
-        <div ref={chipsRef} className="-mt-2 mb-4 flex gap-1.5 overflow-x-auto pb-1">
+        <div ref={chipsRef} className="no-scrollbar -mt-2 mb-4 flex gap-1.5 overflow-x-auto pb-1">
           {/* 一期一个按钮，几百个也只是按钮，不截断：B 站能一路翻回最早那期。 */}
           {issues.map((issue) => (
             <button

@@ -19,6 +19,14 @@
   outline-offset: 2px;
 }
 
+/* 横向卡片条：滚动手势还在，但不留一条常驻的滚动条。 */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 * {
   scrollbar-width: thin;
   /* 滚动条也吃主题色：白色滑块在浅色底上等于没有滚动条。 */

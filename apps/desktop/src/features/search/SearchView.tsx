@@ -387,7 +387,7 @@ export function SearchView() {
             {usersQuery === trimmed && users.length > 0 ? (
               <div className="mb-4">
                 <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
                   {users.map((user) => (
                     <div
                       key={user.mid}

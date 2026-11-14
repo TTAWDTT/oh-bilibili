@@ -189,7 +189,7 @@ export function StageView() {
       {related.length > 0 ? (
         <div className="absolute inset-x-0 bottom-0 hidden border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur md:block">
           <div className="mb-2 text-[12px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
             {related.map((item) => (
               <button
                 key={item.key}

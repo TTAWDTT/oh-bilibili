@@ -35,7 +35,7 @@ export function ContinueListening() {
   return (
     <div className="mt-8">
       <div className="text-[12px] uppercase tracking-[0.22em] text-[var(--text-2)]">继续听</div>
-      <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+      <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto pb-1">
         {tracks.map((track, i) => (
           <button
             key={track.key}

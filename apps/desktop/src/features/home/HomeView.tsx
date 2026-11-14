@@ -156,7 +156,7 @@ export function HomeView() {
       </div>
 
       {/* B 站首页的频道条。每一项都落到对应分区的排行榜，不摆点不动的装饰。 */}
-      <nav className="mb-3 flex items-center gap-0.5 overflow-x-auto border-b border-hairline pb-2">
+      <nav className="no-scrollbar mb-3 flex items-center gap-0.5 overflow-x-auto border-b border-hairline pb-2">
         {PARTS.filter((part) => part.rid !== 0).map((part) => (
           <button
             key={part.rid}
