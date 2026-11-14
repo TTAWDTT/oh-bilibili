@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { LyricDoc, LyricLine, Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { clamp } from '../../shared/lib/format'
+import { toWireError } from '../../shared/lib/errors'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Skeleton } from '../../shared/ui/Skeleton'
@@ -56,6 +57,8 @@ export function LyricsView({ track }: { track: Track | null }) {
   const toggleRail = useAppStore((state) => state.toggleRail)
   const [doc, setDoc] = useState<LyricDoc | null>(null)
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+  const [nonce, setNonce] = useState(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<Array<HTMLDivElement | null>>([])
   const [offset, setOffset] = useState(0)
@@ -70,23 +73,37 @@ export function LyricsView({ track }: { track: Track | null }) {
     let cancelled = false
     setLoading(true)
     setDoc(null)
-    ipc
-      .lyricsGet(key)
-      .then((next) => {
+    setFailed(null)
+    /*
+     * 歌词要并发打 lrclib 与 B 站字幕两路外网，任意一路卡住时这里会一直转骨架屏——
+     * 真机上见过右栏空 8 秒以上。兜底 12 秒：超时就当没歌词，给出重试，
+     * 不让一个可选的右栏拖住整个播放界面。
+     */
+    const timeout = new Promise<'timeout' | 'ok'>((resolve) => {
+      window.setTimeout(() => resolve('timeout'), 12000)
+    })
+    Promise.race([ipc.lyricsGet(key).then((next) => ['ok', next] as const), timeout.then((t) => [t, null] as const)])
+      .then(([state, next]) => {
         if (cancelled) return
-        setDoc(next)
         setLoading(false)
+        if (state === 'ok' && next) {
+          setDoc(next)
+          return
+        }
+        setDoc(null)
+        if (state === 'timeout') setFailed('歌词加载超时')
       })
       .catch((cause: unknown) => {
         if (cancelled) return
         setLoading(false)
         setDoc(null)
+        setFailed(toWireError(cause).message)
         toastFailure('读取歌词', cause)
       })
     return () => {
       cancelled = true
     }
-  }, [key])
+  }, [key, nonce])
 
   const lineTimes = doc && doc.synced ? doc.lines.map((l) => l.at_ms) : EMPTY_TIMES
   const active = useSmoothIndex(lineTimes, Boolean(doc && doc.synced))
@@ -130,9 +147,19 @@ export function LyricsView({ track }: { track: Track | null }) {
     return (
       <EmptyState
         icon="biliTv"
-        title={track ? '这条视频没挂歌词，先听个响' : '还没有在播放'}
-        detail={track ? '三级回退都没查到时不去编造，播放本身不受影响。' : '挑一首歌，歌词会跟着进度滚动。'}
-        action={track ? { label: '看看队列', onClick: () => toggleRail('queue') } : { label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+        title={failed ?? (track ? '这条视频没挂歌词，先听个响' : '还没有在播放')}
+        detail={
+          failed
+            ? '歌词是可选的一条支路，播放本身不受影响。'
+            : track
+              ? '三级回退都没查到时不去编造，播放本身不受影响。'
+              : '挑一首歌，歌词会跟着进度滚动。'
+        }
+        action={
+          track
+            ? { label: failed ? '重新取一次' : '看看队列', onClick: failed ? () => setNonce((n) => n + 1) : () => toggleRail('queue') }
+            : { label: '去搜索', onClick: () => navigate({ kind: 'search' }) }
+        }
         compact
       />
     )
