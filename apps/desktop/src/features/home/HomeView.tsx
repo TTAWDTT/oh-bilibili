@@ -11,7 +11,7 @@ import { HeroBanner } from './HeroBanner'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
-import { formatCount } from '../../shared/lib/format'
+import { formatCount, formatDuration } from '../../shared/lib/format'
 
 /**
  * 发现页。
@@ -217,38 +217,38 @@ export function HomeView() {
       ) : null}
 
       {/*
-       * B 站首页首屏是「大轮播 + 右侧六条」而不是整幅轮播：
-       * 右侧那栏给人「还有一批可以点」的入口。轮播用前 5 条、右栏接 6 条，
-       * 下面网格从第 11 条开始，同一批推荐不会在屏上出现两次。
+       * B 站首页首屏是「大轮播 + 右侧卡片网格」：右侧给四张带封面的卡，
+       * 而不是一列文字条目。轮播用前 5 条、右栏接 4 条，下面网格从第 9 条开始，
+       * 同一批推荐不会在屏上出现两次。
        */}
       <div className="mb-5 flex items-start gap-3">
         <div className="grid min-w-0 flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
           <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {items.length > 5 ? (
-            <ol className="hidden flex-col gap-1 lg:flex">
-              {items.slice(5, 11).map((track) => (
-                <li key={track.key}>
-                  <button
-                    type="button"
-                    onClick={() => navigate({ kind: 'watch', track })}
-                    className="t flex w-full items-start gap-2.5 rounded-[6px] p-1.5 text-left hover:bg-[var(--panel-raised)]"
-                  >
-                    <span className="relative block h-[50px] w-[89px] shrink-0 overflow-hidden rounded-[4px]">
-                      <Cover cover={track.cover} title={track.title} width={180} className="h-full w-full" />
+            <div className="hidden grid-cols-2 grid-rows-2 gap-3 lg:grid">
+              {items.slice(5, 9).map((track) => (
+                <button
+                  key={track.key}
+                  type="button"
+                  onClick={() => navigate({ kind: 'watch', track })}
+                  className="bili-card group min-w-0 text-left"
+                >
+                  <span className="relative block aspect-video overflow-hidden rounded-[6px]">
+                    <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
+                    <span className="num absolute bottom-1 right-1 rounded-[3px] bg-black/65 px-1 text-[10px] leading-[14px] text-white">
+                      {formatDuration(track.duration_ms)}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-[13px] leading-[18px] text-[var(--text-1)]">
-                        {track.title}
-                      </span>
-                      <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
-                        {track.artist}
-                        {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
-                      </span>
-                    </span>
-                  </button>
-                </li>
+                  </span>
+                  <span className="mt-1.5 line-clamp-2 text-[12.5px] leading-[17px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                    {track.title}
+                  </span>
+                  <span className="num mt-0.5 block truncate text-[11px] text-[var(--text-3)]">
+                    {track.artist}
+                    {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
+                  </span>
+                </button>
               ))}
-            </ol>
+            </div>
           ) : null}
         </div>
         {/* B 站首页轮播右侧那颗竖排「换一换」：整列高度，刷新图标在上、字竖排。 */}
@@ -267,7 +267,7 @@ export function HomeView() {
 
       {items.length > 0 ? (
         <ContentGrid
-          tracks={items.slice(11)}
+          tracks={items.slice(9)}
           activeKey={activeKey}
           playing={playing}
           onNeedMore={more}
