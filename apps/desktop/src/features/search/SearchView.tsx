@@ -17,7 +17,6 @@ import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 import { ContinueListening } from './ContinueListening'
 import { DurationFilter, type DurationKey } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
 // 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
@@ -30,6 +29,8 @@ type SearchMemory = {
   users: ipc.UserHit[]
   page: number
   scrollTop: number
+  /** 顶部第一张卡的序号；窗口化以后只靠像素恢复不回原处。 */
+  index: number
 }
 
 /** 搜索结果按查询条件缓存：从视频页返回时不该重新搜一遍，也不该跳回顶部。 */
@@ -141,7 +142,16 @@ export function SearchView() {
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
-    if (el && restored) el.scrollTop = restored.scrollTop
+    if (!el || !restored) return
+    const card =
+      restored.index > 0
+        ? el.querySelector<HTMLElement>(`[data-track-card][data-index="${restored.index}"]`)
+        : null
+    if (card) {
+      el.scrollTop += card.getBoundingClientRect().top - el.getBoundingClientRect().top - 8
+    } else {
+      el.scrollTop = restored.scrollTop
+    }
   }, [restored])
 
   // 只把属于当前查询的结果写进缓存，避免新关键词挂上旧结果。
@@ -154,7 +164,7 @@ export function SearchView() {
     if (dataKey !== key) return
     const currentUsers = usersQuery === trimmed ? users : []
     if (!searchMemory || searchMemory.key !== key) {
-      searchMemory = { key, tracks, users: currentUsers, page, scrollTop: 0 }
+      searchMemory = { key, tracks, users: currentUsers, page, scrollTop: 0, index: 0 }
     } else {
       searchMemory.tracks = tracks
       searchMemory.users = currentUsers
@@ -262,16 +272,12 @@ export function SearchView() {
     return () => window.clearTimeout(handle)
   }, [trimmed, page, nonce, order, partition, duration])
 
-  // 首屏之后自动补齐：滚到底时下一页往往已经在路上，继续滚也不会停。
-  useEffect(() => {
-    if (status !== 'ready' || loadingMore || moreError || tracks.length === 0 || reachedEnd.current) return
-    const el = scrollerRef.current
-    if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
-      setLoadingMore(true)
-      setPage((p) => p + 1)
-    }
-  }, [tracks, status, loadingMore, moreError])
+  /** 卡片网格的缓冲浅到阈值就来要下一页。 */
+  const needMore = (): void => {
+    if (status !== 'ready' || loadingMore || moreError || reachedEnd.current) return
+    setLoadingMore(true)
+    setPage((p) => p + 1)
+  }
 
   const pick = (value: string): void => {
     setQuery(value)
@@ -288,13 +294,12 @@ export function SearchView() {
         id="scroll-main"
         onScroll={(event) => {
           const el = event.currentTarget
-          if (searchMemory) searchMemory.scrollTop = el.scrollTop
-          // 到底之后不再翻页：滚动会一直触发，不挡住就是无限空请求。
-          if (loadingMore || moreError || status !== 'ready' || tracks.length === 0 || reachedEnd.current) return
-          // 缓冲不够深就预取：请求要在用户到达之前发出去。
-          if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
-            setLoadingMore(true)
-            setPage((p) => p + 1)
+          if (!searchMemory) return
+          searchMemory.scrollTop = el.scrollTop
+          const max = el.scrollHeight - el.clientHeight
+          const rendered = Number(el.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 0)
+          if (max > 0 && rendered > 1) {
+            searchMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
           }
         }}
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
@@ -593,6 +598,8 @@ export function SearchView() {
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}
                 highlight={trimmed}
+                onNeedMore={needMore}
+                initialIndex={restored?.index ?? 0}
               />
             ) : null}
 

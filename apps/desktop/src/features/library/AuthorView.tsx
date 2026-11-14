@@ -14,7 +14,6 @@ import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { useAuthStore } from '../auth/authStore'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /**
  * UP 主页面。
@@ -144,14 +143,6 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }
 
-  // 取回一页后如果还没铺满预取深度就继续取：请求要在用户到达之前发出去。
-  useEffect(() => {
-    const box = scroller.current
-    if (!box || isFallback || tracks === null) return
-    if (box.scrollHeight - box.scrollTop - box.clientHeight < PREFETCH_PX) void loadMore()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, page, order, isFallback])
-
   if (tracks === null) return <TrackListSkeleton rows={6} />
   if (tracks.length === 0) {
     return (
@@ -172,10 +163,6 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     <div
       ref={scroller}
       id="scroll-main"
-      onScroll={(event) => {
-        const el = event.currentTarget
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) void loadMore()
-      }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <header className="mb-6 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
@@ -285,6 +272,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         tracks={tracks}
         activeKey={snapshot?.track?.key ?? null}
         playing={snapshot?.phase === 'playing'}
+        onNeedMore={() => void loadMore()}
       />
 
       {loadingMore ? (

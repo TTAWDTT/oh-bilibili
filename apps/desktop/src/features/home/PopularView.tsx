@@ -7,7 +7,6 @@ import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 
 /**
@@ -19,7 +18,6 @@ export function PopularView() {
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [nonce, setNonce] = useState(0)
-  const scrollRef = useRef<HTMLDivElement | null>(null)
   /** 下一页的页码。取成功才往前走，失败重试拿的还是同一页。 */
   const nextPage = useRef(2)
   /** 滚动事件会连着触发，请求在飞的时候用 ref 挡住重入。 */
@@ -75,25 +73,9 @@ export function PopularView() {
       })
   }
 
-  // 取回一页后缓冲还不够深就继续取。热门一页 50 条约三四屏，
-  // 只在滚动时触发的话，用户滑到页尾仍会撞上「正在加载更多」。
-  useEffect(() => {
-    if (tracks === null || loadingMore || error) return
-    const el = scrollRef.current
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, loadingMore, error])
-
   return (
     <div
-      ref={scrollRef}
       id="scroll-main"
-      onScroll={(event) => {
-        const el = event.currentTarget
-        // 出错后停在底部等用户按重试，滚动不再自动重发。
-        if (error) return
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) more()
-      }}
       className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <PageTitle extra={tracks ? String(tracks.length) : undefined}>热门</PageTitle>
@@ -116,6 +98,10 @@ export function PopularView() {
             tracks={tracks}
             activeKey={snapshot?.track?.key ?? null}
             playing={snapshot?.phase === 'playing'}
+            onNeedMore={() => {
+              // 出事就停在原地等用户按「重试」，滚动不再自动重发。
+              if (!error) more()
+            }}
           />
           {error ? (
             <div className="flex items-center justify-center gap-3 py-4 text-[12px] text-[var(--text-3)]">

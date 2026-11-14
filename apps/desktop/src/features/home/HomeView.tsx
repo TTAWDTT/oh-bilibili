@@ -9,7 +9,6 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PARTS, partColor } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
-import { HOME_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 
 /**
@@ -21,11 +20,12 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
  */
 
 /** 按会话记住这一屏：从视频页返回时，推荐流和滚动位置都要原样回来。 */
-const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop: number } = {
+const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop: number; index: number } = {
   items: [],
   fresh: 1,
   nextFresh: 2,
   scrollTop: 0,
+  index: 0,
 }
 export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
@@ -84,7 +84,17 @@ export function HomeView() {
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
-    if (el && feedMemory.items.length > 0) el.scrollTop = feedMemory.scrollTop
+    if (!el) return
+    // 窗口化后滚动高度只代表已挂出来的这一段，按「第几条」恢复才落得回原处。
+    const card =
+      feedMemory.index > 0
+        ? el.querySelector<HTMLElement>(`[data-track-card][data-index="${feedMemory.index}"]`)
+        : null
+    if (card) {
+      el.scrollTop += card.getBoundingClientRect().top - el.getBoundingClientRect().top - 8
+    } else if (feedMemory.items.length > 0) {
+      el.scrollTop = feedMemory.scrollTop
+    }
   }, [])
 
   useEffect(() => {
@@ -107,15 +117,6 @@ export function HomeView() {
     })
   }
 
-  // 一批取回来后缓冲还不够深就继续取：请求发生在用户到达之前，而不是之后。
-  useEffect(() => {
-    if (loading || loadingMore || items.length === 0 || exhausted.current) return
-    const el = scrollerRef.current
-    if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < HOME_PREFETCH_PX) more()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, loading, loadingMore])
-
   return (
     <div
       ref={scrollerRef}
@@ -123,7 +124,12 @@ export function HomeView() {
       onScroll={(event) => {
         const el = event.currentTarget
         feedMemory.scrollTop = el.scrollTop
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < HOME_PREFETCH_PX) more()
+        const max = el.scrollHeight - el.clientHeight
+        // 滚动高度只覆盖已挂出来的卡片，比例要按渲染窗口算，不能按取回的条数算。
+        const rendered = Number(el.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 0)
+        if (max > 0 && rendered > 1) {
+          feedMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
+        }
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-8"
     >
@@ -138,6 +144,7 @@ export function HomeView() {
             nextFresh.current = 2
             feedMemory.nextFresh = 2
             feedMemory.scrollTop = 0
+            feedMemory.index = 0
             exhausted.current = false
             void load(next)
           }}
@@ -175,6 +182,9 @@ export function HomeView() {
           tracks={items}
           activeKey={activeKey}
           playing={playing}
+          onNeedMore={more}
+          lookahead={600}
+          initialIndex={feedMemory.index}
         />
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}

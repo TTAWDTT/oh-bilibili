@@ -6,7 +6,7 @@ import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
@@ -64,6 +64,17 @@ type ContentGridProps = {
   tracks: Track[]
   activeKey: string | null
   playing: boolean
+  /**
+   * 列表还有下一页时通知外面补数据。
+   *
+   * 预取要深，DOM 不能跟着长：取回来的页先留在缓冲里，只把已经滚到的
+   * 那一段挂出来。没有这个回调的列表（排行、每周必看等一次取完的）不传。
+   */
+  onNeedMore?: () => void
+  /** 数据缓冲的条数。默认 1200；发现页推荐风控更严，单独降到 600。 */
+  lookahead?: number
+  /** 从视频页回来时先挂到第几条附近；窗口化以后像素位置不再等于条目位置。 */
+  initialIndex?: number
   /** 排行榜：封面左上角改画名次，前三名用 B 站的红/橙/黄。 */
   ranked?: boolean
   /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
@@ -74,6 +85,27 @@ type ContentGridProps = {
   note?: (track: Track) => string | null
   /** 搜索页传当前关键词，标题里命中的片段标粉；其它页面不传。 */
   highlight?: string
+}
+
+/** 首屏先挂多少张卡。 */
+const RENDER_INITIAL = 240
+/** 滚到已渲染末尾附近时，一次再接多少张。 */
+const RENDER_CHUNK = 120
+/**
+ * 已取回、但还没挂到 DOM 的缓冲。
+ *
+ * 1200 条是二十四页：按一页 400–500ms 算，够连续下滑十秒不碰网络。
+ * 之前把 180000 像素的页全部挂进 DOM，搜索一次就有一千九百多张卡、
+ * 真机渲染进程 1.2GB / 100% CPU，滚一下就卡死；预取深度不变，只把渲染收窄。
+ */
+const RENDER_LOOKAHEAD = 1200
+
+/** 最近的纵向滚动容器。哨兵要拿它当 root，rootMargin 才会往外扩。 */
+function scrollParentOf(element: HTMLElement): Element | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node
+  }
+  return null
 }
 
 type CardProps = {
@@ -122,7 +154,7 @@ const TrackCard = memo(function TrackCard({
   onCancelCoin,
 }: CardProps) {
   return (
-    <article data-track-card className="bili-card group">
+    <article data-track-card data-index={index} className="bili-card group">
       <div className="relative">
         <button
           type="button"
@@ -248,7 +280,7 @@ const TrackCard = memo(function TrackCard({
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, note, highlight }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, note, highlight, onNeedMore, lookahead, initialIndex }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const toggleFav = useReactionStore((state) => state.toggleFav)
@@ -260,6 +292,50 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
   // 收藏前先选收藏夹；未收藏 → 弹选择；已收藏 → 直接取消
   const [picking, setPicking] = useState<Track | null>(null)
   const [favBusy, setFavBusy] = useState(false)
+
+  /** 已经挂到 DOM 的卡片数。 */
+  const [shown, setShown] = useState(() =>
+    Math.min(tracks.length, Math.max(RENDER_INITIAL, (initialIndex ?? 0) + RENDER_CHUNK)),
+  )
+  const sentinel = useRef<HTMLDivElement | null>(null)
+  /** 换了一份结果（新搜索、新分区、新 UP）就从窗口头重新开始。 */
+  const initialLead = useRef(tracks[0]?.key ?? '')
+  const leadKey = tracks[0]?.key ?? ''
+  useEffect(() => {
+    // 首次挂载可能带着 initialIndex，别把它收回窗口头。
+    if (leadKey === initialLead.current) return
+    setShown(Math.min(tracks.length, RENDER_INITIAL))
+    // 只在换了一份结果时重置；翻页追加不该把用户已经滚开的窗口收回去。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadKey])
+  /** 列表被删短时窗口跟着收，别留下越界的下标。 */
+  useEffect(() => {
+    setShown((current) => Math.min(current, Math.max(tracks.length, RENDER_INITIAL)))
+  }, [tracks.length])
+
+  // 缓冲不够深就继续向接口要；这里只管数据，不把新页直接挂进 DOM。
+  const needMore = useRef(onNeedMore)
+  needMore.current = onNeedMore
+  useEffect(() => {
+    if (tracks.length - shown < (lookahead ?? RENDER_LOOKAHEAD)) needMore.current?.()
+  }, [tracks.length, shown, lookahead])
+
+  // 滚到已渲染末尾前几屏时，从内存里的缓冲再接一段出来，不走网络。
+  useEffect(() => {
+    const mark = sentinel.current
+    if (!mark || shown >= tracks.length) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        setShown((current) => Math.min(current + RENDER_CHUNK, tracks.length))
+      },
+      // root 必须是这层滚动容器：用视口的话，哨兵还没进容器可视区就被
+      // 容器的 overflow 裁掉了，rootMargin 扩不到它。
+      { root: scrollParentOf(mark), rootMargin: '2400px 0px' },
+    )
+    observer.observe(mark)
+    return () => observer.disconnect()
+  }, [shown, tracks.length])
 
   // 「听」是整列排队播放：回调里要拿到最新的曲目表，但又不能让回调本身每页都换新，
   // 否则 memo 的卡片会被整片作废。所以曲目表放 ref 里，回调只建一次。
@@ -315,8 +391,11 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
   return (
     <>
       <h2 className="sr-only">曲目</h2>
-      <div className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]">
-        {tracks.map((track, index) => {
+      <div
+        data-shown={shown}
+        className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(206px,1fr))]"
+      >
+        {tracks.slice(0, shown).map((track, index) => {
           const active = track.key === activeKey
           return (
             <TrackCard
@@ -344,6 +423,8 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
             />
           )
         })}
+        {/* 窗口的哨兵：进到可视区前两屏就把下一段缓冲接出来。 */}
+        <div ref={sentinel} aria-hidden className="col-span-full h-px" />
         {picking ? (
           <FavPicker open busy={favBusy} onClose={() => setPicking(null)} onPick={(folderId) => void favTo(folderId)} />
         ) : null}

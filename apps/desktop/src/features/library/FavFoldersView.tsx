@@ -14,7 +14,6 @@ import { Icon } from '../../shared/ui/Icon'
 import { TrackListSkeleton } from '../../shared/ui/Skeleton'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /** 封面拼图按夹子缓存，来回切页不用重取。 */
 const coverCache = new Map<number, string[]>()
@@ -109,14 +108,6 @@ export function FavFoldersView() {
     }
   }, [picked])
 
-  // 首屏或切夹后如果还没铺满预取深度，先把后面的补上：否则用户一进来就要撞到底部。
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!picked || !el || tracks === null || exhausted || failed || loadingMore) return
-    if (el.scrollHeight - el.clientHeight < PREFETCH_PX) void loadMore()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, picked, failed])
-
   /** 从当前收藏夹移出一条。成功后从列表里去掉，不用整页刷新。 */
   const removeOne = async (track: Track): Promise<void> => {
     if (!picked) return
@@ -130,8 +121,8 @@ export function FavFoldersView() {
   }
 
   /** 加载收藏夹的下一页。B 站每页 40 条。 */
-  const loadMore = async (): Promise<void> => {
-    if (!picked || busy.current || exhausted) return
+  const loadMore = async (force = false): Promise<void> => {
+    if (!picked || busy.current || exhausted || (failed && !force)) return
     busy.current = true
     setLoadingMore(true)
     setFailed(false)
@@ -163,19 +154,11 @@ export function FavFoldersView() {
   }
   if (folders === null) return <BiliTvLoading label="正在读 B 站收藏夹" />
 
-  /** 离底部不到预取深度就补一页；补完还不够深，下一次滚动会继续补。 */
-  const pullMore = (el: HTMLDivElement): void => {
-    if (!exhausted && !failed && el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_PX) {
-      void loadMore()
-    }
-  }
-
   if (picked) {
     return (
       <div
         ref={scrollRef}
         id="scroll-main"
-        onScroll={(event) => pullMore(event.currentTarget)}
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
       >
         <button
@@ -227,6 +210,7 @@ export function FavFoldersView() {
               tracks={tracks}
               activeKey={snapshot?.track?.key ?? null}
               playing={snapshot?.phase === 'playing'}
+              onNeedMore={() => void loadMore()}
               extraAction={(track) => (
                 <button
                   type="button"
@@ -245,7 +229,7 @@ export function FavFoldersView() {
               ) : failed ? (
                 <button
                   type="button"
-                  onClick={() => void loadMore()}
+                  onClick={() => void loadMore(true)}
                   className="t press text-[13px] text-[var(--accent)] hover:underline"
                 >
                   没加载出来，重试这一页
