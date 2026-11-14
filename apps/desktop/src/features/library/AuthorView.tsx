@@ -58,15 +58,17 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   /** 关注是真接口：写进你的 B 站关注列表，取关同理。 */
   const follow = async (): Promise<void> => {
-    const mid = tracks?.find((t) => t.up_mid)?.up_mid
-    if (!mid) {
+    // 页面本身就带着 mid（从搜索结果、关注列表点进来时都有），
+    // 不该再从投稿列表里反推：列表是「按作者名搜索」的兜底时，条目可能不带 mid。
+    const ownerMid = mid ?? tracks?.find((t) => t.up_mid)?.up_mid
+    if (!ownerMid) {
       toastFailure('关注', { class: 'input', message: '这条结果没带 UP 主的 uid' })
       return
     }
     const next = !followed
     setFollowed(next)
     try {
-      await ipc.followSet(mid, next)
+      await ipc.followSet(ownerMid, next)
       toastDone(next ? '已关注' : '已取消关注')
     } catch (e) {
       setFollowed(!next)
