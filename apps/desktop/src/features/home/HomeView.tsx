@@ -164,15 +164,17 @@ export function HomeView() {
       </div>
 
       {/*
-       * 频道条。B 站首页这一块是一张白色圆角卡：左边两个带橙色圆形图标的入口
-       * （动态 / 热门），右边是一整片描边胶囊的分区。之前这里是一排小色点，
-       * 读起来像图例、不像导航。每一项都真的落到对应分区的排行榜。
+       * 频道条。B 站首页这一块是一张白色圆角卡：左边四个带圆形图标的入口
+       * （综合热门 / 每周必看 / 入站必刷 / 排行榜），右边是一整片描边胶囊的分区。
+       * 之前这里是一排小色点，读起来像图例、不像导航。每一项都真的落到对应页面。
        */}
       <nav className="mb-4 rounded-[10px] border border-[var(--line)] bg-[var(--panel)] p-2">
         <div className="flex flex-wrap items-stretch gap-1">
           <div className="mr-1 flex shrink-0 items-center gap-1 border-r border-hairline pr-2">
             {[
               { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
+              { label: '每周必看', icon: 'calendar' as const, tone: '#ffb027', run: () => navigate({ kind: 'weekly' }) },
+              { label: '入站必刷', icon: 'gift' as const, tone: '#f56c2d', run: () => navigate({ kind: 'precious' }) },
               { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
             ].map((entry) => (
               <button
