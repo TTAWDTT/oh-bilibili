@@ -22,8 +22,17 @@ import { formatCount, formatDuration } from '../../shared/lib/format'
  */
 
 /** 按会话记住这一屏：从视频页返回时，推荐流和滚动位置都要原样回来。 */
-const feedMemory: { items: Track[]; fresh: number; nextFresh: number; scrollTop: number; index: number } = {
+const feedMemory: {
+  items: Track[]
+  /** 首屏那九条（轮播 5 + 右侧 4）。它可以被「换一换」单独换掉，下面推荐流不动。 */
+  hero: Track[]
+  fresh: number
+  nextFresh: number
+  scrollTop: number
+  index: number
+} = {
   items: [],
+  hero: [],
   fresh: 1,
   nextFresh: 2,
   scrollTop: 0,
@@ -34,8 +43,11 @@ export function HomeView() {
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const [items, setItems] = useState<Track[]>(feedMemory.items)
+  const [hero, setHero] = useState<Track[]>(feedMemory.hero)
+  const [heroLoading, setHeroLoading] = useState(false)
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
   const itemsRef = useRef<Track[]>(feedMemory.items)
+  const heroRef = useRef<Track[]>(feedMemory.hero)
   const [fresh, setFresh] = useState(feedMemory.fresh)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,6 +79,12 @@ export function HomeView() {
       const merged = [...base, ...fresh]
       itemsRef.current = merged
       setItems(merged)
+      // 首屏那九条跟着第一页走；之后翻页只往推荐流里加，不动顶部。
+      if (!append) {
+        const top = merged.slice(0, 9)
+        heroRef.current = top
+        setHero(top)
+      }
       if (list.length === 0) {
         if (append) exhausted.current = true
         setError(append ? '这一轮的推荐已经到底了，换一批看看。' : '这次没拿到推荐，换一批试试。')
@@ -104,6 +122,10 @@ export function HomeView() {
   }, [items])
 
   useEffect(() => {
+    feedMemory.hero = hero
+  }, [hero])
+
+  useEffect(() => {
     feedMemory.fresh = fresh
   }, [fresh])
 
@@ -119,12 +141,37 @@ export function HomeView() {
     })
   }
 
-  /** 换一批推荐：换一个 fresh_idx 重新取第一屏。 */
-  const refresh = (): void => {
+  /**
+   * 轮播右侧那颗「换一换」只换首屏那九条：换一个 fresh_idx 取一页，
+   * 把新的一页里推荐流还没出现过、也不在旧首屏里的条目挑出来补进顶部。
+   * 下面的推荐流、滚动位置都不动——B 站这颗按钮也只作用于上面那一块。
+   */
+  const refreshHero = async (): Promise<void> => {
+    if (heroLoading) return
+    setHeroLoading(true)
     const next = fresh + 1
-    // 列表末尾也有「换一批」，换完要回到顶部看新的一屏。
+    setFresh(next)
+    try {
+      const list = await ipc.homeFeed(next)
+      const seen = new Set(itemsRef.current.map((t) => t.key))
+      const swapped = list.filter((t) => !seen.has(t.key)).slice(0, 9)
+      if (swapped.length > 0) {
+        heroRef.current = swapped
+        setHero(swapped)
+      }
+    } catch {
+      // 换失败就保留当前首屏，不把已经能看的内容清空。
+    } finally {
+      setHeroLoading(false)
+    }
+  }
+
+  /** 列表末尾的「换一批」才是换整页：连推荐流一起重来，并回到顶部。 */
+  const refreshAll = (): void => {
+    const next = fresh + 1
     scrollerRef.current?.scrollTo({ top: 0 })
     itemsRef.current = []
+    heroRef.current = []
     setFresh(next)
     nextFresh.current = 2
     feedMemory.nextFresh = 2
@@ -155,8 +202,13 @@ export function HomeView() {
        * B 站这一带是白色 header 带、胶囊 #f6f7f8 铺在白上；我们页面底也是 #f6f7f8，
        * 所以这里自带一条白带，否则胶囊会和背景融成一片、整条读起来像空缺。
        * 右侧那列快捷链接不放：左侧栏已有同样入口，多一列会把这一带撑成三行。
+       * 白带横向铺满，内边距和下面内容区同一套（px-4 / md:px-8），
+       * 这样胶囊、轮播、卡片流的左右边界天然对齐，不用各自手写 padding。
        */}
-      <nav className="mb-4 flex items-start gap-5 bg-[var(--panel)] px-4 py-3 md:px-8">
+      <nav className="mb-4 bg-[var(--panel)] py-3">
+        {/* 右边多留 48px（换一换按钮 36 + gap 12）：首屏那一行右边有个竖排按钮，
+            胶囊必须停在同一条线上，否则真机上胶囊比轮播宽出 50px，看着就是歪的。 */}
+        <div className="flex items-start gap-5 px-4 md:px-8 lg:pl-8 lg:pr-20">
         <div className="flex shrink-0 items-start gap-3">
           {[
             { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
@@ -166,7 +218,9 @@ export function HomeView() {
               key={entry.label}
               type="button"
               onClick={entry.run}
-              className="t press flex w-12 flex-col items-center gap-1 rounded-[8px] py-0.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+              /* 不写固定宽度：按钮宽 = 圆形直径，圆的左缘就和下面胶囊、轮播、卡片同一条线。
+                 之前 w-12 里居中的 32px 圆比左边线内缩 8px，整条带读起来就是歪的。 */
+              className="t press flex flex-col items-center gap-1 rounded-[8px] py-0.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
             >
               <span
                 className="bili-channel-icon flex h-8 w-8 items-center justify-center rounded-full text-white"
@@ -179,18 +233,19 @@ export function HomeView() {
           ))}
         </div>
         <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          {PARTS.filter((part) => part.rid !== 0).map((part) => (
-            <button
-              key={part.rid}
-              type="button"
-              onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              /* B 站频道胶囊实测：底色 #f6f7f8、描边 #f1f2f3、圆角 6、高 28、字 13。
-                 白底 + 深灰边比它抢眼得多，一屏 11 个就把轮播压住了。 */
-              className="t flex h-7 items-center justify-center rounded-[6px] border border-[var(--ga1)] bg-[var(--ga0)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
-            >
-              {part.name}
-            </button>
-          ))}
+            {PARTS.filter((part) => part.rid !== 0).map((part) => (
+              <button
+                key={part.rid}
+                type="button"
+                onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+                /* B 站频道胶囊实测：底色 #f6f7f8、描边 #f1f2f3、圆角 6、高 28、字 13。
+                   白底 + 深灰边比它抢眼得多，一屏 12 个就把轮播压住了。 */
+                className="t flex h-7 items-center justify-center rounded-[6px] border border-[var(--ga1)] bg-[var(--ga0)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
+              >
+                {part.name}
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
 
@@ -204,12 +259,16 @@ export function HomeView() {
        * 而不是一列文字条目。轮播用前 5 条、右栏接 4 条，下面网格从第 9 条开始，
        * 同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 flex items-stretch gap-3 px-4 pt-4 md:px-8">
-        <div className="grid min-w-0 flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_336px]">
-          <HeroBanner tracks={items.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
-          {items.length > 5 ? (
-            <div className="hidden grid-cols-2 grid-rows-2 gap-3 lg:grid">
-              {items.slice(5, 9).map((track) => (
+      <div className="mb-5 flex items-start gap-3 px-4 pt-4 md:px-8">
+        {/*
+         * B 站 1280 视口实测：轮播 563×322（约占内容宽 45%），右侧四张卡每张约 340 宽。
+         * 此前把轮播撑到 73%、右栏固定 336，卡片被压到 162 宽，首屏比例整个是反的。
+         */}
+        <div className="grid min-w-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+          <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
+          {hero.length > 5 ? (
+            <div className="hidden grid-cols-2 gap-3 lg:grid">
+              {hero.slice(5, 9).map((track) => (
                 <button
                   key={track.key}
                   type="button"
@@ -237,11 +296,11 @@ export function HomeView() {
         {/* B 站首页轮播右侧那颗竖排「换一换」：整列高度，刷新图标在上、字竖排。 */}
         <button
           type="button"
-          onClick={refresh}
+          onClick={() => void refreshHero()}
           title="换一换"
           className="bili-icon-btn t press flex w-9 shrink-0 flex-col items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
-          <Icon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
+          <Icon name="refresh" size={14} className={heroLoading ? 'animate-spin' : ''} />
           <span style={{ writingMode: 'vertical-rl' }} className="leading-none tracking-[0.18em]">
             换一换
           </span>
@@ -271,7 +330,7 @@ export function HomeView() {
           <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
           <button
             type="button"
-            onClick={refresh}
+            onClick={refreshAll}
             className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             换一批

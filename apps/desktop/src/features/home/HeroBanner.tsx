@@ -38,7 +38,9 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       aria-label="推荐轮播"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="relative mb-0 aspect-[16/6] overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)] lg:aspect-auto lg:h-full lg:min-h-[340px]"
+      /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
+         之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
+      className="relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)]"
     >
       {slides.map((t, i) => (
         <img
