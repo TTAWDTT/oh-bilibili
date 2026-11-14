@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
-import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
-import { ContentGrid } from '../tracks/ContentGrid'
-import { usePlayerStore } from '../player/playerStore'
+import { useAppStore } from '../../app/appStore'
+import { WideCard } from '../tracks/WideCard'
 
 /**
  * 每周必看。B 站自己按周出的片单：一期一个主题，一次 50 条。
@@ -22,7 +21,7 @@ export function WeeklyView() {
   const [nonce, setNonce] = useState(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const chipsRef = useRef<HTMLDivElement | null>(null)
-  const snapshot = usePlayerStore((state) => state.snapshot)
+  const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
     let cancelled = false
@@ -76,41 +75,21 @@ export function WeeklyView() {
   const newer = index > 0 ? (issues?.[index - 1]?.number ?? null) : null
 
   return (
-    <div ref={scrollerRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-      <PageTitle extra={issues ? `${issues.length} 期` : undefined}>每周必看</PageTitle>
-
-      {issues && issues.length > 0 ? (
-        <div ref={chipsRef} className="no-scrollbar -mt-2 mb-4 flex gap-1.5 overflow-x-auto pb-1">
-          {/* 一期一个按钮，几百个也只是按钮，不截断：B 站能一路翻回最早那期。 */}
-          {issues.map((issue) => (
-            <button
-              key={issue.number}
-              type="button"
-              onClick={() => setNumber(issue.number)}
-              aria-pressed={issue.number === number}
-              data-active={issue.number === number}
-              title={issue.name}
-              className={[
-                't press shrink-0 rounded-[6px] px-3 py-1.5 text-[13px]',
-                issue.number === number
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'bg-[var(--panel-raised)] text-[var(--text-2)] hover:text-[var(--accent)]',
-              ].join(' ')}
-            >
-              第 {issue.number} 期
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {page ? (
-        <div className="mb-4 flex items-center gap-x-3 border-b border-hairline pb-3">
-          <h2 className="min-w-0 flex-1 text-[18px] font-medium text-[var(--text-1)]">
-            {page.subject}
-            <span className="ml-2 align-middle text-[12px] font-normal text-[var(--text-3)]">{page.label}</span>
+    <div ref={scrollerRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
+      {/*
+       * B 站每周必看：白色 header 带里是「第 N 期(日期更新)」+ 一行更新时间，
+       * 正文和热门、入站必刷一样是两列横排大卡，每张卡多一句 B 站写的推荐语。
+       */}
+      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-[17px] font-medium text-[var(--text-1)]">
+            {page?.label || (number !== null ? `第 ${number} 期` : '每周必看')}
           </h2>
+          {page?.subject ? (
+            <span className="truncate text-[13px] text-[var(--text-2)]">{page.subject}</span>
+          ) : null}
           {/* 398 期，横条翻起来费劲；前后各给一个。 */}
-          <span className="flex shrink-0 items-center gap-1">
+          <span className="ml-auto flex shrink-0 items-center gap-1">
             {/* 左箭头回到更早的一期，右箭头往前一期：和时间方向一致，不是和横条的排法一致。 */}
             <button
               type="button"
@@ -134,8 +113,33 @@ export function WeeklyView() {
             </button>
           </span>
         </div>
-      ) : null}
+        <p className="mt-1 text-[12px] text-[var(--text-3)]">每周五晚 18:00 更新</p>
+        {issues && issues.length > 0 ? (
+          <div ref={chipsRef} className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-1">
+            {/* 一期一个按钮，几百个也只是按钮，不截断：B 站能一路翻回最早那期。 */}
+            {issues.map((issue) => (
+              <button
+                key={issue.number}
+                type="button"
+                onClick={() => setNumber(issue.number)}
+                aria-pressed={issue.number === number}
+                data-active={issue.number === number}
+                title={issue.name}
+                className={[
+                  't press shrink-0 rounded-[6px] px-3 py-1 text-[13px]',
+                  issue.number === number
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'bg-[var(--ga0)] text-[var(--text-2)] hover:text-[var(--accent)]',
+                ].join(' ')}
+              >
+                第 {issue.number} 期
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </nav>
 
+      <div className="px-4 md:px-8">
       {error ? (
         <EmptyState
           icon="alert"
@@ -144,18 +148,24 @@ export function WeeklyView() {
           action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
         />
       ) : issues === null || (number !== null && page === null) ? (
-        <CardGridSkeleton cards={10} />
+        <CardGridSkeleton cards={8} />
       ) : page && page.tracks.length > 0 ? (
-        <ContentGrid
-          tracks={page.tracks}
-          activeKey={snapshot?.track?.key ?? null}
-          playing={snapshot?.phase === 'playing'}
-        />
+        <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
+          {page.tracks.map((track) => (
+            <WideCard
+              key={track.key}
+              track={track}
+              note={page.notes[track.key] ?? null}
+              onOpen={() => navigate({ kind: 'watch', track })}
+            />
+          ))}
+        </div>
       ) : (
         <EmptyState icon="biliTv" title="这一期暂时是空的" action={null} />
       )}
 
       {number !== null && page === null && !error ? <BiliLoader compact label="正在取这一期…" /> : null}
+      </div>
     </div>
   )
 }

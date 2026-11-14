@@ -1380,6 +1380,7 @@ impl Engine {
             subject: page.subject,
             label: page.label,
             tracks: page.tracks,
+            notes: page.notes,
         })
     }
 

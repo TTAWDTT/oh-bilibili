@@ -160,6 +160,8 @@ pub struct WeeklyPage {
     pub subject: String,
     pub label: String,
     pub tracks: Vec<Track>,
+    /// 每条的推荐语，按曲目 key 对齐；B 站没给的条目不在表里。
+    pub notes: std::collections::HashMap<String, String>,
 }
 
 /// `PreciousItemView` 故意不带 `Default`：`Track` 没有默认值，编不出来。

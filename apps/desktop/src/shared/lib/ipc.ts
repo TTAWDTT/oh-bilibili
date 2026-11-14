@@ -261,6 +261,8 @@ export type WeeklyPage = {
   subject: string
   label: string
   tracks: Track[]
+  /** 每条的推荐语，按曲目 key 对齐。 */
+  notes: Record<string, string>
 }
 
 /** 每周必看的期数列表。 */

@@ -6,6 +6,7 @@
 use crate::client::{Client, API};
 use crate::error::BiliError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 关注列表每页条数。接口上限 50，超过也只回 50。
 pub const FOLLOW_PAGE_SIZE: u32 = 50;
@@ -77,6 +78,8 @@ pub struct WeeklyIssuePage {
     pub label: String,
     pub cover: Option<String>,
     pub tracks: Vec<bilimusic_model::Track>,
+    /// 每条 B 站自己写的一句话推荐语（`rcmd_reason`），按 bvid 对齐到 `tracks`。
+    pub notes: HashMap<String, String>,
 }
 
 /// 把 `03:45` / `1:02:03` 解析成毫秒。UP 主投稿列表里时长是字符串。
@@ -747,16 +750,7 @@ impl Client {
 
     /// 某一期的片单。
     pub async fn weekly_issue(&self, number: u32) -> Result<WeeklyIssuePage, BiliError> {
-        let v = self
-            .signed_get(
-                &format!("{API}/x/web-interface/popular/series/one"),
-                vec![
-                    ("number", number.to_string()),
-                    ("web_location", "333.976".to_string()),
-                ],
-                std::time::Duration::from_millis(400),
-            )
-            .await?;
+        let v = self.weekly_issue_raw(number).await?;
         // 这一期自己的标题、期号封面都在 `config` 里，`data` 顶层只有 config / list / reminder。
         let config = &v["data"]["config"];
         Ok(WeeklyIssuePage {
@@ -767,7 +761,21 @@ impl Client {
                 .filter(|c| !c.is_empty())
                 .map(|c| c.replacen("http://", "https://", 1)),
             tracks: tracks_from_list(&v["data"]["list"]),
+            notes: weekly_notes(&v["data"]["list"]),
         })
+    }
+
+    /// 单期原始响应。解析放在 [`Self::weekly_issue`]，这里只负责签名取数。
+    pub async fn weekly_issue_raw(&self, number: u32) -> Result<serde_json::Value, BiliError> {
+        self.signed_get(
+            &format!("{API}/x/web-interface/popular/series/one"),
+            vec![
+                ("number", number.to_string()),
+                ("web_location", "333.976".to_string()),
+            ],
+            std::time::Duration::from_millis(400),
+        )
+        .await
     }
 
     /// 入站必刷：B 站给新用户的首屏片单。
@@ -997,9 +1005,39 @@ fn tracks_from_list(list: &serde_json::Value) -> Vec<bilimusic_model::Track> {
     list.iter().filter_map(track_from_item).collect()
 }
 
+/// 单期片单每条的推荐语。字段名是 `rcmd_reason`，不是入站必刷那个 `achievement`；
+/// 早期按 `achievement` 解析过，结果永远是空表（真实响应里它是 null）。
+fn weekly_notes(list: &serde_json::Value) -> HashMap<String, String> {
+    let Some(list) = list.as_array() else {
+        return HashMap::new();
+    };
+    list.iter()
+        .filter_map(|m| {
+            let bvid = m["bvid"].as_str()?;
+            let note = m["rcmd_reason"].as_str().filter(|s| !s.is_empty())?;
+            Some((bvid.to_string(), note.to_string()))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod relation_shape_tests {
     use serde_json::json;
+
+    /// 真实单期响应里推荐语在 `rcmd_reason`（2026-11 实测，第一条是「就在今天」）。
+    /// `achievement` 是入站必刷的字段，在这里是 null，照它解析会永远是空表。
+    #[test]
+    fn 每周必看推荐语取_rcmd_reason() {
+        let list = json!([
+            { "bvid": "BV1TgWp6MEHJ", "rcmd_reason": "就在今天", "achievement": null },
+            { "bvid": "BV1UB4v67Exr", "rcmd_reason": "", "achievement": "不该用这个" },
+            { "bvid": "BV1vmWJ6LEmW" }
+        ]);
+        let notes = super::weekly_notes(&list);
+        assert_eq!(notes.get("BV1TgWp6MEHJ").map(String::as_str), Some("就在今天"));
+        assert!(!notes.contains_key("BV1UB4v67Exr"), "空推荐语不该入表");
+        assert!(!notes.contains_key("BV1vmWJ6LEmW"), "没给推荐语就不该有这一项");
+    }
 
     /// 这个结构取自真实登录态响应（2025-11 实测）：
     /// 字段是 `like` / `favorite` / `coin`，前两个是 bool。

@@ -143,6 +143,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         subject: `第 ${number} 期的主题`,
         label: `第${number}期`,
         tracks: CATALOG.slice(0, 12),
+        notes: Object.fromEntries(CATALOG.slice(0, 12).map((track) => [track.key, '预览模式的推荐语'])),
       }
     }
     case 'precious':

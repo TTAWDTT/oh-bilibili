@@ -381,6 +381,11 @@ impl Source {
         self.client.weekly_issue(number).await
     }
 
+    /// 单期原始响应，只给调试与探针用。
+    pub async fn weekly_issue_raw(&self, number: u32) -> Result<serde_json::Value, BiliError> {
+        self.client.weekly_issue_raw(number).await
+    }
+
     /// 入站必刷：标题、官方文案与每条视频的推荐语。
     pub async fn precious(&self) -> Result<(String, String, Vec<sync::PreciousItem>), BiliError> {
         self.client.precious().await
