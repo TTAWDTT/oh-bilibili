@@ -233,7 +233,7 @@ export function WatchInfo({
           title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
           <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
-            <BiliThumb size={19} />
+            <BiliThumb size={19} filled={liked} />
           </span>
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
           {holding ? (
@@ -268,7 +268,7 @@ export function WatchInfo({
           title={faved ? '取消收藏' : '收藏'}
         >
           <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
-            <BiliStar size={19} />
+            <BiliStar size={19} filled={faved} />
           </span>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>

@@ -55,7 +55,7 @@ export function CardActions({
         className={`${item} ${liked ? 'text-[var(--accent)]' : off}`}
       >
         <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
-          <BiliThumb size={13} />
+          <BiliThumb size={13} filled={liked} />
         </span>
       </button>
       <button
@@ -79,7 +79,7 @@ export function CardActions({
         className={`${item} ${faved ? 'text-[var(--coin)]' : off}`}
       >
         <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
-          <BiliStar size={13} />
+          <BiliStar size={13} filled={faved} />
         </span>
       </button>
       <button type="button" aria-label="稍后再看" title="稍后再看" onClick={onLater} className={`${item} ${off}`}>

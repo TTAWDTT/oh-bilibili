@@ -8,9 +8,22 @@
 
 type Props = { size?: number; className?: string }
 
-export function BiliThumb({ size = 18, className }: Props) {
+/** 未点亮时 B 站画的是空心线稿，点亮后才填实；只换颜色读不出状态。 */
+type Stateful = { filled?: boolean }
+
+export function BiliThumb({ size = 18, className, filled = true }: Props & Stateful) {
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36" fill="currentColor" aria-hidden className={className}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 36 36"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
+      strokeWidth={filled ? undefined : 2.4}
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -32,9 +45,19 @@ export function BiliCoin({ size = 18, className }: Props) {
   )
 }
 
-export function BiliStar({ size = 18, className }: Props) {
+export function BiliStar({ size = 18, className, filled = true }: Props & Stateful) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="currentColor" aria-hidden className={className}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 28 28"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
+      strokeWidth={filled ? undefined : 2}
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
