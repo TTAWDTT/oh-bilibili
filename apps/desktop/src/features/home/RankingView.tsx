@@ -43,37 +43,39 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   }, [rid, nonce])
 
   return (
-    <div
-      ref={scrollRef}
-      id="scroll-main"
-      className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
-    >
-      <PageTitle extra={tracks ? String(tracks.length) : undefined}>排行榜</PageTitle>
+    <div ref={scrollRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
       {/*
-       * 分区选择器和发现页那排频道胶囊用同一套画法：灰底 #f6f7f8 + 淡描边 + 圆角 6。
-       * 之前这里是蓝色实心药丸，同一个「选分区」的动作在两页长得完全不同。
+       * B 站排行榜页是白色 header 带：标题、一行口径说明、一排文字 tab（选中项挂蓝色下划线）。
+       * 之前用灰色胶囊平铺在灰底上，跟榜单页原版完全不是一个东西，也没有说清楚这个榜怎么排的。
        */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {PARTS.map((part) => (
-          <button
-            key={part.rid}
-            type="button"
-            aria-pressed={part.rid === rid}
-            onClick={() => {
-              setRid(part.rid)
-              // 记进当前视图：从视频页返回时还落在同一个分区
-              replace({ kind: 'ranking', rid: part.rid })
-            }}
-            className={`t press h-7 rounded-[6px] border px-3 text-[13px] ${
-              part.rid === rid
-                ? 'border-[var(--accent)] bg-[var(--panel)] text-[var(--accent)]'
-                : 'border-[var(--ga1)] bg-[var(--ga0)] text-[var(--text-2)] hover:border-[var(--accent)] hover:bg-[var(--panel)] hover:text-[var(--accent)]'
-            }`}
-          >
-            {part.name}
-          </button>
-        ))}
-      </div>
+      <nav className="mb-3 border-b border-[var(--line)] bg-[var(--panel)] px-4 pb-0 pt-4 md:px-8">
+        <PageTitle extra={tracks ? String(tracks.length) : undefined}>排行榜</PageTitle>
+        <p className="-mt-2 mb-3 text-[12px] text-[var(--text-3)]">
+          榜单根据稿件内容质量与近期数据综合排序，动态更新
+        </p>
+        <div className="no-scrollbar -mb-px flex items-center gap-5 overflow-x-auto">
+          {PARTS.map((part) => (
+            <button
+              key={part.rid}
+              type="button"
+              aria-pressed={part.rid === rid}
+              onClick={() => {
+                setRid(part.rid)
+                // 记进当前视图：从视频页返回时还落在同一个分区
+                replace({ kind: 'ranking', rid: part.rid })
+              }}
+              className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
+                part.rid === rid
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {part.name}
+            </button>
+          ))}
+        </div>
+      </nav>
+      <div className="px-4 md:px-8">
       {error ? (
         <EmptyState
           icon="alert"
@@ -93,6 +95,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           playing={snapshot?.phase === 'playing'}
         />
       )}
+      </div>
     </div>
   )
 }
