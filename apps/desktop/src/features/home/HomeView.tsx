@@ -282,10 +282,12 @@ export function HomeView() {
                       {formatDuration(track.duration_ms)}
                     </span>
                   </span>
-                  <span className="mt-1.5 line-clamp-2 text-[13px] leading-[18px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                  {/* 字号跟下面网格一致（15px/22px）：这两块是同一种卡片，
+                      只有尺寸不同；小两档会让首屏像另一个列表。 */}
+                  <span className="mt-2 line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                     {track.title}
                   </span>
-                  <span className="num mt-0.5 block truncate text-[11.5px] text-[var(--text-3)]">
+                  <span className="num mt-1 block truncate text-[13px] text-[var(--text-3)]">
                     {track.artist}
                     {track.views ? ` · ${formatCount(track.views)} 播放` : ''}
                   </span>
