@@ -444,11 +444,6 @@
   }
 }
 
-.bili-page {
-  /* 把重绘限制在这一块里：切页时侧栏与播放条不该跟着重画。 */
-  contain: paint;
-}
-
 .bili-page[data-nav='fwd'] {
   animation: bili-page-forward 170ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }

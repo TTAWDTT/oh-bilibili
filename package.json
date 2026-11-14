@@ -14,8 +14,5 @@
     "typecheck": "npm run typecheck -w @bilimusic/desktop",
     "ui:audit": "node scripts/ui-audit.mjs",
     "verify": "bash scripts/verify.sh"
-  },
-  "devDependencies": {
-    "lxgw-wenkai-lite-webfont": "^1.7.0"
   }
 }
