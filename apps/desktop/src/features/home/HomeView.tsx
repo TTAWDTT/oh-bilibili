@@ -183,7 +183,7 @@ export function HomeView() {
               key={part.rid}
               type="button"
               onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-              className="t flex h-7 w-24 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="t flex h-7 w-24 items-center justify-center rounded-[4px] border border-[var(--line)] bg-[var(--panel)] text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               {part.name}
             </button>

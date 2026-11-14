@@ -19,7 +19,7 @@
    * 字体栈照 B 站网页端：系统黑体优先，没有就用雅黑/思源，最后无衬线。
    * 之前挂的是 LXGW 文楷（楷体），中文全变成手写感，这是「不像 B 站」最大的一处。
    */
-  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei",
+  --font-sans: "PingFang SC", -apple-system, BlinkMacSystemFont, "HarmonyOS Sans SC", "Microsoft YaHei",
     "Source Han Sans SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
   /* 展示字号（歌词、播放器标题）用同一套黑体，只是字重更重。 */
   --font-display: var(--font-sans);
@@ -87,10 +87,10 @@ body {
   color: var(--text-1);
   font-family: var(--font-sans);
   font-size: 14px;
-  /* B 站正文行高是 20px（14px 的 1.43 倍），字重 500 比 400 用得多得多。
-     这两点决定了「读起来厚不厚」，比配色更影响观感。 */
+  /* B 站正文行高 20px（14px 的 1.43 倍），字重是 400——实测线上 body 与卡片标题
+     都是 400，500 只留给分区标题这类少数位置。整站压在 500 会让字看起来又厚又假。 */
   line-height: 20px;
-  font-weight: 500;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
