@@ -55,6 +55,21 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }, [mid])
 
+  // 空间页也要知道自己有没有关注这个人。之前默认 false，已关注的 UP 也显示「+ 关注」。
+  useEffect(() => {
+    if (!mid) return
+    let cancelled = false
+    void ipc
+      .relationFollowed(mid)
+      .then((on) => {
+        if (!cancelled) setFollowed(on)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [mid])
+
   /** 关注是真接口：写进你的 B 站关注列表，取关同理。 */
   const follow = async (): Promise<void> => {
     // 页面本身就带着 mid（从搜索结果、关注列表点进来时都有），
