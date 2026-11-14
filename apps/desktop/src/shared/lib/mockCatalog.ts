@@ -115,7 +115,7 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     // 播放量按名次递减，排行榜才有真实感；不是随机数。
     // 目录有三四十条，线性递减会减成负数；到底之后按最低值兜住。
     views: Math.max(12_000, 9_800_000 - index * 260_000),
-    danmaku: 42_000 - index * 1_800,
+    danmaku: 6_000 + (index % 7) * 1_800,
     tname: '音乐',
     typeid: 3,
     up_mid: MID_BY_ARTIST.get(seed.artist) ?? 900000 + index,

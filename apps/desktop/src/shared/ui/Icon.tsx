@@ -115,6 +115,13 @@ const ICONS = {
     </>
   ),
   play: <path d="M9 6.4v11.2L18.5 12 9 6.4Z" fill="currentColor" stroke="none" />,
+  /** 弹幕：B 站卡片左下角那枚「小屏幕 + 两条字」。 */
+  danmaku: (
+    <>
+      <rect x="3" y="6.2" width="18" height="11.6" rx="2.6" />
+      <path d="M6.6 10.6h7.4M6.6 13.8h4.6" strokeLinecap="round" />
+    </>
+  ),
   pause: (
     <>
       <rect x="8" y="6" width="2.8" height="12" rx="1" fill="currentColor" stroke="none" />

@@ -109,7 +109,30 @@ export function TitleBar() {
         </button>
       </form>
 
-      <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-3 [&>*]:pointer-events-auto">
+      <div className="pointer-events-none ml-auto flex shrink-0 items-center gap-2 [&>*]:pointer-events-auto">
+        {/*
+         * B 站顶栏右侧那一排图标：历史 / 收藏 / 稍后再看。
+         * 每一项都进对应的真实页面，不摆点不动的装饰；窄屏收进侧栏与「我的」，
+         * 所以这里只在 md 以上出现。
+         */}
+        <div className="hidden items-center gap-1 md:flex">
+          {[
+            { kind: 'history' as const, label: '历史', icon: 'clock' as const },
+            { kind: 'favs' as const, label: '收藏夹', icon: 'bookmarkStar' as const },
+            { kind: 'watchLater' as const, label: '稍后再看', icon: 'watchLater' as const },
+          ].map((entry) => (
+            <button
+              key={entry.kind}
+              type="button"
+              onClick={() => navigate({ kind: entry.kind })}
+              title={entry.label}
+              aria-label={entry.label}
+              className="t press flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+            >
+              <Icon name={entry.icon} size={17} />
+            </button>
+          ))}
+        </div>
         {auth?.user ? (
           <button
             type="button"

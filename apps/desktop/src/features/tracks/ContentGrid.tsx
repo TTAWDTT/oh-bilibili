@@ -191,7 +191,7 @@ const TrackCard = memo(function TrackCard({
             </span>
           ) : null}
           <CardDanmaku trackKey={track.key} />
-          {/* B 站卡片的两枚角标：左下一行带三角的播放量，右下一格时长。
+          {/* B 站卡片左下角的信息：播放量与弹幕数并排（各带一枚图标），右下是时长。
               播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
           {ratio !== null && ratio > 0 && ratio < 1 ? (
             <span className="absolute inset-x-0 bottom-0 h-[4px] bg-black/45">
@@ -207,6 +207,12 @@ const TrackCard = memo(function TrackCard({
                 <>
                   <Icon name="play" size={10} className="shrink-0" />
                   <span className="truncate">{formatCount(track.views)}</span>
+                </>
+              ) : null}
+              {(track.danmaku ?? 0) > 0 ? (
+                <>
+                  <Icon name="danmaku" size={11} className="ml-0.5 shrink-0" />
+                  <span className="truncate">{formatCount(track.danmaku!)}</span>
                 </>
               ) : null}
             </span>

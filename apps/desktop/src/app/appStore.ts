@@ -53,11 +53,6 @@ type AppStore = {
   toasts: Toast[]
   /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
   history: View[]
-  /**
-   * 这次切换是「往前」还是「往回」。页面入场按它决定从哪边滑进来：
-   * 往前从右侧轻推、往回从左侧轻推，和浏览器的方向感一致。
-   */
-  navDir: 'fwd' | 'back'
   navigate: (view: View) => void
   /** 换一条视频但不进历史：观看页里点相关推荐或自动连播，返回该回到来的那一页。 */
   replace: (view: View) => void
@@ -82,7 +77,6 @@ type AppStore = {
 export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'home' },
   history: [],
-  navDir: 'fwd',
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,
@@ -106,22 +100,20 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
       return {
         view,
-        navDir: 'fwd' as const,
         cinema: false,
         osFullscreen: false,
         history: [...state.history, state.view].slice(-32),
       }
     }),
-  replace: (view) => set({ view, navDir: 'fwd', cinema: false, osFullscreen: false }),
+  replace: (view) => set({ view, cinema: false, osFullscreen: false }),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)
       if (!prev) {
-        return { view: { kind: 'home' } as View, navDir: 'back' as const, cinema: false, osFullscreen: false }
+        return { view: { kind: 'home' } as View, cinema: false, osFullscreen: false }
       }
       return {
         view: prev,
-        navDir: 'back' as const,
         cinema: false,
         osFullscreen: false,
         history: state.history.slice(0, -1),
