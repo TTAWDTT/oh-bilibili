@@ -42,6 +42,9 @@
     翻页改由底部哨兵 + IntersectionObserver 触发，rootMargin 900px；真机连续下滑列表从 50 条继续接上。
 28. **入站必刷**：与热门共用 `features/tracks/WideCard.tsx`，白带里标题是接口给的「我不允许还有人没看过这98个宝藏视频！」；
     每张卡底部多一条橙色推荐语（`Icon flame` + note），内容原样来自接口。
+29. **每周必看**：白带里是「第N期(日期更新) + 主题」、一行「每周五晚 18:00 更新」、‹ › 翻期与期数胶囊；
+    正文同样是两列横卡。每条推荐语来自单期接口的 `rcmd_reason`（不是入站必刷那个 `achievement`，
+    真实响应里 `achievement` 是 null）。回归见 `crates/bili/src/sync.rs` 的 `每周必看推荐语取_rcmd_reason`。
 
 ## 一句话现状
 
