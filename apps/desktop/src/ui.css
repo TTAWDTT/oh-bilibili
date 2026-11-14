@@ -244,7 +244,9 @@
 
 @keyframes danmaku-drift {
   from { transform: translateX(0); }
-  to { transform: translateX(calc(-100vw - 100%)); }
+  /* 走完播放器宽度 + 自身宽度就完全出画面。用 100vw 的话，播放器比窗口窄时
+     后半段在画面外空跑，同一速度下露脸时间被砍掉一截。 */
+  to { transform: translateX(calc(-1 * var(--dm-travel, 100vw) - 100%)); }
 }
 
 /* B 站主题：22 娘蓝与 33 娘粉双色。蓝色只用于次级强调，比如链接与标签描边。 */

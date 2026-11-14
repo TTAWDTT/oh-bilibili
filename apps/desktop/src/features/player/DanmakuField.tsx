@@ -9,6 +9,14 @@ const LIFE_MS = 9000
 const LANES = 10
 /** 多久检查一次「有哪些新弹幕该出现」。运动本身由 CSS 跑，不受这个频率影响。 */
 const SPAWN_TICK_MS = 220
+/**
+ * 一条车道多久后可以放下一条。
+ *
+ * 之前是「车道上还有活着的弹幕就不复用」，等于每条车道被独占 9 秒，
+ * 十条车道上限约 1 条/秒，热视频看起来像没几条弹幕。同速弹幕不会追尾，
+ * 只要前一条已经完全进入画面，这条车道就能再用。
+ */
+const LANE_REUSE_RATIO = 0.16
 
 /**
  * 弹幕层本体。
@@ -49,6 +57,24 @@ export function DanmakuField({
   /** 已经放到哪一条了。整场扫一遍太浪费：一部热视频几千条弹幕，220ms 一轮就是几十万次比较。 */
   const cursor = useRef(0)
   const lastPos = useRef(-1)
+  /** 每条车道最近一条的出生时刻，用来判断能不能复用。 */
+  const laneBorn = useRef<number[]>(new Array<number>(LANES).fill(-Infinity))
+  /**
+   * 弹幕要跑的距离 = 播放器宽度 + 自身宽度。
+   * 之前写死 100vw（整窗宽），播放器比窗口窄时后半程在画面外空跑，
+   * 既看不见又让每条露脸的时间变短。宽度用 ResizeObserver 跟着容器走。
+   */
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const [boxWidth, setBoxWidth] = useState(0)
+
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    setBoxWidth(el.clientWidth)
+    const ro = new ResizeObserver(([entry]) => setBoxWidth(entry!.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const all = useMemo(() => [...items].sort((a, b) => a.at - b.at), [items])
 
@@ -59,6 +85,10 @@ export function DanmakuField({
 
   useEffect(() => {
     if (!enabled) return
+    /** 当前速度下一条弹幕在屏幕上的总时长。CSS 的 animationDuration 用的是同一个值。 */
+    const lifeMs = LIFE_MS / Math.max(speed, 0.1)
+    /** 前一条走开足够远、这条再进来不会追尾。 */
+    const reuseMs = lifeMs * LANE_REUSE_RATIO
     const tick = (): void => {
       const pos = positionRef.current()
       // 往回拖或换片：二分找到第一个还没过期的位置，从头对齐。
@@ -71,11 +101,17 @@ export function DanmakuField({
           else hi = mid
         }
         cursor.current = lo
+        // 往回拖之后，车道记录里全是「未来」的出生时刻，不复位就再也放不出新的。
+        laneBorn.current.fill(-Infinity)
       }
       lastPos.current = pos
 
       const prev = flightsRef.current
-      const alive = prev.filter((f) => pos - f.born < LIFE_MS)
+      const alive = prev.filter((f) => pos - f.born < lifeMs)
+      // 活着但已经过了独占期的车道要放回去，否则吞吐被寿命卡死。
+      for (let c = 0; c < LANES; c += 1) {
+        if (pos - laneBorn.current[c]! >= reuseMs) laneBorn.current[c] = -Infinity
+      }
       if (!playing) {
         if (alive.length !== prev.length) {
           flightsRef.current = alive
@@ -85,7 +121,6 @@ export function DanmakuField({
       }
       // 车道在生成时定死并存进条目。用数组下标算 top 的话，一条飘完被移除后
       // 其余条目下标前移，整排会瞬间跳一行。
-      const used = new Set(alive.map((f) => f.lane))
       const fresh: Flight[] = []
       while (cursor.current < all.length && all[cursor.current]!.at <= pos - 2000) cursor.current += 1
       let i = cursor.current
@@ -94,7 +129,7 @@ export function DanmakuField({
         if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
         let lane = -1
         for (let c = 0; c < LANES; c += 1) {
-          if (!used.has(c) && !fresh.some((f) => f.lane === c)) {
+          if (laneBorn.current[c] === -Infinity && !fresh.some((f) => f.lane === c)) {
             lane = c
             break
           }
@@ -102,6 +137,7 @@ export function DanmakuField({
         // 车道满了就丢掉这条：B 站也是这么做的，硬塞会互相压住
         if (lane < 0) continue
         seq.current += 1
+        laneBorn.current[lane] = item.at
         fresh.push({ ...item, id: seq.current, born: item.at, lane })
       }
       cursor.current = i
@@ -118,29 +154,37 @@ export function DanmakuField({
     }
     const timer = window.setInterval(tick, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
-  }, [all, enabled, playing])
-
-  if (!enabled || flights.length === 0) return null
+  }, [all, enabled, playing, speed])
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
-      {flights.map((f) => (
-        <span
-          key={f.id}
-          className="danmaku absolute whitespace-nowrap"
-          style={{
-            top: `${6 + (f.lane * 82) / LANES}%`,
-            animationDuration: `${LIFE_MS / speed / 1000}s`,
-            animationPlayState: playing ? 'running' : 'paused',
-            color: f.color,
-            textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
-            opacity: fade ? opacity * 0.85 : opacity,
-            fontSize: `${size}px`,
-          }}
-        >
-          {f.text}
-        </span>
-      ))}
+    <div
+      ref={boxRef}
+      className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+      aria-hidden
+      /* 把容器宽度交给 CSS：关键帧里用 -100% - 这个值，正好跑到左边缘外。 */
+      style={{ ['--dm-travel' as string]: `${boxWidth}px` }}
+    >
+      {enabled && flights.length > 0
+        ? flights.map((f) => (
+            <span
+              key={f.id}
+              className="danmaku absolute whitespace-nowrap"
+              style={{
+                /* 车道只铺到画面 78%：底下 22% 留给进度条与控制条，
+                   否则最下面一两条会正好压在进度条上，读不清也看不清。 */
+                top: `${6 + (f.lane * 72) / LANES}%`,
+                animationDuration: `${LIFE_MS / speed / 1000}s`,
+                animationPlayState: playing ? 'running' : 'paused',
+                color: f.color,
+                textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
+                opacity: fade ? opacity * 0.85 : opacity,
+                fontSize: `${size}px`,
+              }}
+            >
+              {f.text}
+            </span>
+          ))
+        : null}
     </div>
   )
 }
