@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
+import { toastDone } from '../../app/notice'
 import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
@@ -10,6 +11,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { usePlayerStore } from '../player/playerStore'
+import { useAuthStore } from '../auth/authStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
 import { ContinueListening } from './ContinueListening'
@@ -61,6 +63,9 @@ export function SearchView() {
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState(false)
+  /** 这一批 UP 主里已经点过关注的人。只单向关注，不提供取关，避免误触。 */
+  const [followedMids, setFollowedMids] = useState<ReadonlySet<number>>(new Set())
+  const loggedIn = useAuthStore((state) => state.auth?.logged_in ?? false)
   /** 结果已经翻到头。ref 不能触发渲染，底部要据此换掉「继续下滑查看更多」。 */
   const [ended, setEnded] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
@@ -365,11 +370,14 @@ export function SearchView() {
                 <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {users.map((user) => (
-                    <button
+                    <div
                       key={user.mid}
+                      className="bili-card flex w-[248px] shrink-0 items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)]"
+                    >
+                    <button
                       type="button"
                       onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
-                      className="bili-card bili-press flex w-[248px] shrink-0 items-center gap-2.5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 text-left hover:border-[var(--accent)]"
+                      className="bili-press flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
                       {user.face ? (
                         <img
@@ -416,6 +424,30 @@ export function SearchView() {
                         ) : null}
                       </span>
                     </button>
+                    {loggedIn ? (
+                      <button
+                        type="button"
+                        disabled={followedMids.has(user.mid)}
+                        onClick={() => {
+                          void ipc
+                            .followSet(user.mid, true)
+                            .then(() => {
+                              setFollowedMids((prev) => new Set(prev).add(user.mid))
+                              toastDone('已关注', user.name)
+                            })
+                            .catch(() => toastDone('关注失败', '登录后再试'))
+                        }}
+                        className={[
+                          't press ml-1 h-6 shrink-0 rounded-[4px] px-2 text-[12px]',
+                          followedMids.has(user.mid)
+                            ? 'border border-[var(--line)] text-[var(--text-3)]'
+                            : 'bg-[var(--accent)] text-white hover:opacity-90',
+                        ].join(' ')}
+                      >
+                        {followedMids.has(user.mid) ? '已关注' : '关注'}
+                      </button>
+                    ) : null}
+                    </div>
                   ))}
                 </div>
               </div>

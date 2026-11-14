@@ -335,6 +335,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             : [],
       }
     }
+    case 'follow_set':
+      // 预览里不真的改关注关系，返回成功即可；界面上按钮会切成「已关注」。
+      return null
+    case 'relation_followed':
+      return false
     case 'following': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       const users = FOLLOW_SEEDS.map((seed, i) => ({
