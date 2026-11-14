@@ -1111,6 +1111,39 @@ impl Client {
         Ok(attribute & 2 == 2)
     }
 
+    /// 批量查关注状态，返回顺序和入参一致。
+    ///
+    /// 没关注的 mid 直接不出现在 `data` 里，所以缺项按未关注处理。
+    pub async fn relation_followed_many(
+        &self,
+        mids: &[u64],
+    ) -> Result<Vec<(u64, bool)>, BiliError> {
+        if mids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let fids = mids
+            .iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let value = self
+            .get_json(
+                &format!("{API}/x/relation/relations?fids={fids}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let data = &value["data"];
+        Ok(mids
+            .iter()
+            .map(|&mid| {
+                let attribute = data[mid.to_string().as_str()]["attribute"]
+                    .as_u64()
+                    .unwrap_or(0);
+                (mid, attribute & 2 == 2)
+            })
+            .collect())
+    }
+
     /// 投币。`count` 是 1 或 2（B 站上限两枚）；`also_like` 为真时同时点赞，一键三连就是这么来的。
     pub async fn add_coin(&self, aid: u64, count: u8, also_like: bool) -> Result<(), BiliError> {
         let csrf = self

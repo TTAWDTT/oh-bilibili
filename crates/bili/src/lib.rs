@@ -460,6 +460,14 @@ impl Source {
         self.client.is_following(mid).await
     }
 
+    /// 批量查关注状态，顺序与入参一致。
+    pub async fn relation_followed_many(
+        &self,
+        mids: &[u64],
+    ) -> Result<Vec<(u64, bool)>, BiliError> {
+        self.client.relation_followed_many(mids).await
+    }
+
     /// 投币。三连里的「币」，和点赞是同一次操作的两个动作。
     pub async fn add_coin(&self, key: &TrackKey, count: u8, also_like: bool) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

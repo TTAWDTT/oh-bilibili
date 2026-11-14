@@ -1516,6 +1516,10 @@ impl Engine {
         Ok(self.source.is_following(mid).await?)
     }
 
+    pub async fn relation_followed_many(&self, mids: &[u64]) -> Result<Vec<(u64, bool)>, WireError> {
+        Ok(self.source.relation_followed_many(mids).await?)
+    }
+
     pub async fn fav_set(
         &self,
         key: &TrackKey,

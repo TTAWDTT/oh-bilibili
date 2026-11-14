@@ -460,6 +460,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return null
     case 'relation_followed':
       return false
+    case 'relation_followed_many': {
+      const mids = Array.isArray(args.mids) ? (args.mids as number[]) : []
+      return mids.map((mid): [number, boolean] => [mid, false])
+    }
     case 'following': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       const users = FOLLOW_SEEDS.map((seed, i) => ({

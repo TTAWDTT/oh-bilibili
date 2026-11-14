@@ -384,6 +384,11 @@ export function relationFollowed(mid: number): Promise<boolean> {
   return call<boolean>('relation_followed', { mid })
 }
 
+/** 批量查关注状态，顺序与入参一致。 */
+export function relationFollowedMany(mids: number[]): Promise<[number, boolean][]> {
+  return call<[number, boolean][]>('relation_followed_many', { mids })
+}
+
 /** 发评论。root 与 parent 都为空时是评论，否则是回复。 */
 export function commentAdd(
   key: string,

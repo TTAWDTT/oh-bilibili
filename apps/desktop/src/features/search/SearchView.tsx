@@ -196,6 +196,14 @@ export function SearchView() {
           if (usersSeq.current !== ticket) return
           setUsers(list.slice(0, 6))
           setUsersQuery(trimmed)
+          void ipc
+            .relationFollowedMany(list.map((u) => u.mid))
+            .then((rows) => {
+              setFollowedMids(
+                (prev) => new Set([...prev, ...rows.filter(([, on]) => on).map(([mid]) => mid)]),
+              )
+            })
+            .catch(() => {})
         })
         .catch(() => {
           if (usersSeq.current !== ticket) return
