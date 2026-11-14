@@ -281,12 +281,14 @@ export function WatchInfo({
             </span>
           ) : null}
         </button>
-        {data.owner_mid && followed !== null ? (
+        {/* 关注按钮常驻：状态没取到（未登录、接口失败）时按未关注显示，
+           点击后由服务端裁决。整颗按钮消失会让 UP 行缺一块，B 站不会这样。 */}
+        {data.owner_mid ? (
           <button
             type="button"
-            aria-pressed={followed}
+            aria-pressed={followed === true}
             onClick={() => {
-              const next = !followed
+              const next = followed !== true
               void ipc
                 .followSet(data.owner_mid!, next)
                 .then(() => {
@@ -296,12 +298,12 @@ export function WatchInfo({
                 .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
             }}
             className={`t press h-8 shrink-0 rounded-[6px] px-4 text-[13px] ${
-              followed
+              followed === true
                 ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                 : 'bg-[var(--accent)] text-white hover:opacity-90'
             }`}
           >
-            {followed ? '已关注' : '关注'}
+            {followed === true ? '已关注' : '关注'}
           </button>
         ) : null}
       </div>
