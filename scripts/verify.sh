@@ -29,6 +29,7 @@ esac
 step "Rust 测试" cargo test --workspace --quiet
 step "TypeScript 类型" npm run typecheck --silent
 step "浅色主题一致性" node scripts/ui-audit.mjs
+step "IPC 命令注册" node scripts/ipc-audit.mjs
 
 printf '\n'
 if [ "$fail" -eq 0 ]; then

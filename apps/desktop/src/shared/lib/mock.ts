@@ -335,6 +335,29 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             : [],
       }
     }
+    case 'watch_later_set':
+      // 预览里不真的写账号的稍后再看，界面会照常弹「已加入稍后再看」。
+      return null
+    case 'open_external':
+      return null
+    case 'comment_del':
+      return null
+    case 'video_meta': {
+      const track = findTrack(str(args, 'key'))
+      if (!track) throw fail('input', '预览模式没有这条视频')
+      return {
+        pubdate: Math.floor(Date.now() / 1000) - 86400,
+        tname: track.tname ?? null,
+        pages: [],
+        season: null,
+      }
+    }
+    case 'danmaku_heat':
+      return []
+    case 'mv_port':
+      return 0
+    case 'mv_source':
+      return ''
     case 'download_open_dir':
       return null
     case 'follow_set':
