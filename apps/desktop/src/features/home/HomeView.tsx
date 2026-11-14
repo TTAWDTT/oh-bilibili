@@ -252,12 +252,27 @@ export function HomeView() {
        * 而不是一列文字条目。轮播用前 5 条、右栏接 6 条，下面网格从第 11 条开始，
        * 同一批推荐不会在屏上出现两次。
        */}
-      <div className="mb-5 flex items-start gap-3 px-4 pt-4 md:px-8">
-        {/*
-       * B 站 1280 视口实测：轮播约占内容宽 44%，右侧是 3 列 × 2 行六张 16:9 小卡。
-       * 45/55 下右栏每张约 186 宽，轮播 7:5 与两行卡片正好等高，不用给哪一边留空。
-         */}
-        <div className="grid min-w-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+      {hero.length > 0 ? (
+        <div className="mb-4 px-4 pt-4 md:px-8">
+          {/* 标题行给「换一换」一个和内容左右对齐的落点。之前是贴在右边缘的一整条竖卡，
+              宽度顶出内容区，整页就多出一条横向滚动条。 */}
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <h2 className="text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
+            <button
+              type="button"
+              onClick={() => void refreshHero()}
+              disabled={heroLoading}
+              className="t press flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--ga0)] hover:text-[var(--accent)] disabled:pointer-events-none"
+            >
+              <Icon name="refresh" size={13} className={heroLoading ? 'animate-spin' : ''} />
+              换一换
+            </button>
+          </div>
+          {/*
+           * B 站 1280 视口实测：轮播约占内容宽 44%，右侧是 3 列 × 2 行六张 16:9 小卡。
+           * 45/55 下右栏每张约 186 宽，轮播 7:5 与两行卡片正好等高，不用给哪一边留空。
+           */}
+          <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
           <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           {hero.length > 5 ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
@@ -307,36 +322,21 @@ export function HomeView() {
               ))}
             </div>
           ) : null}
+          </div>
         </div>
-        {/* B 站首页轮播右侧那颗竖排「换一换」：整列高度，刷新图标在上、字竖排。 */}
-        <button
-          type="button"
-          onClick={() => void refreshHero()}
-          title="换一换"
-          className="bili-icon-btn t press flex w-9 shrink-0 self-stretch flex-col items-center justify-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[12px] text-[var(--text-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        >
-          <Icon name="refresh" size={14} className={heroLoading ? 'animate-spin' : ''} />
-          <span style={{ writingMode: 'vertical-rl' }} className="leading-none tracking-[0.18em]">
-            换一换
-          </span>
-        </button>
-      </div>
+      ) : null}
 
       {items.length > 0 ? (
-        <>
-          {/* 分区标题：长页面在这里有第一个断点，而不是从轮播一路铺到屏幕外。 */}
-          <div className="px-4 md:px-8">
-            <h2 className="mb-3 text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
+        <div className="px-4 md:px-8">
           <ContentGrid
             tracks={items.slice(11)}
-              activeKey={activeKey}
-              playing={playing}
-              onNeedMore={more}
-              lookahead={600}
-              initialIndex={feedMemory.index}
-            />
-          </div>
-        </>
+            activeKey={activeKey}
+            playing={playing}
+            onNeedMore={more}
+            lookahead={600}
+            initialIndex={feedMemory.index}
+          />
+        </div>
       ) : null}
       {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
