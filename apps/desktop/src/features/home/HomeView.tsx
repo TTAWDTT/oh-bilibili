@@ -164,48 +164,53 @@ export function HomeView() {
       </div>
 
       {/*
-       * 频道条。B 站首页这一块是一张白色圆角卡：左边四个带圆形图标的入口
-       * （综合热门 / 每周必看 / 入站必刷 / 排行榜），右边是一整片描边胶囊的分区。
-       * 之前这里是一排小色点，读起来像图例、不像导航。每一项都真的落到对应页面。
+       * 频道条：四个站级入口铺成四等分的导航位，每个占满 1/4 宽度、中间竖向分隔；
+       * 分区是筛选，不是目的地，所以收成下面一行安静的文本，不再和入口抢视线。
+       * 上一版把四个图标挤在左边、分区挤在右边，右边留一大片空白，读起来像残局。
        */}
-      <nav className="mb-4 rounded-[10px] border border-[var(--line)] bg-[var(--panel)] p-2">
-        <div className="flex flex-wrap items-stretch gap-1">
-          <div className="mr-1 flex shrink-0 items-center gap-1 border-r border-hairline pr-2">
-            {[
-              { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
-              { label: '每周必看', icon: 'calendar' as const, tone: '#ffb027', run: () => navigate({ kind: 'weekly' }) },
-              { label: '入站必刷', icon: 'gift' as const, tone: '#f56c2d', run: () => navigate({ kind: 'precious' }) },
-              { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
-            ].map((entry) => (
-              <button
-                key={entry.label}
-                type="button"
-                onClick={entry.run}
-                className="t press flex w-[52px] shrink-0 flex-col items-center gap-1 rounded-[6px] py-1.5 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+      <nav className="mb-4 overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--panel)]">
+        <div className="grid grid-cols-2 sm:grid-cols-4">
+          {[
+            { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
+            { label: '每周必看', icon: 'calendar' as const, tone: '#ffb027', run: () => navigate({ kind: 'weekly' }) },
+            { label: '入站必刷', icon: 'gift' as const, tone: '#f56c2d', run: () => navigate({ kind: 'precious' }) },
+            { label: '排行', icon: 'rank' as const, tone: 'var(--bili-pink)', run: () => navigate({ kind: 'ranking' }) },
+          ].map((entry, index) => (
+            <button
+              key={entry.label}
+              type="button"
+              onClick={entry.run}
+              style={{ '--i': index } as React.CSSProperties}
+              className={`bili-card-enter t press flex h-14 items-center justify-center gap-2.5 hover:bg-[var(--panel-raised)] ${
+                index > 0 ? 'sm:border-l sm:border-hairline' : ''
+              }`}
+            >
+              <span
+                className="bili-channel-icon flex h-9 w-9 items-center justify-center rounded-full text-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.2)]"
+                style={{ background: entry.tone }}
               >
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-white"
-                  style={{ background: entry.tone }}
-                >
-                  <Icon name={entry.icon} size={15} />
-                </span>
-                {entry.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-wrap content-start gap-1">
-            {PARTS.filter((part) => part.rid !== 0).map((part) => (
-              <button
-                key={part.rid}
-                type="button"
-                onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-                className="t flex shrink-0 items-center gap-1.5 rounded-[6px] border border-transparent bg-[var(--ga1)] px-2.5 py-[5px] text-[13px] text-[var(--text-2)] hover:border-[var(--line)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
-              >
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: partColor(part.name) }} />
-                {part.name}
-              </button>
-            ))}
-          </div>
+                <Icon name={entry.icon} size={18} />
+              </span>
+              <span className="whitespace-nowrap text-[13px] text-[var(--text-2)]">{entry.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline px-4 py-2">
+          {PARTS.filter((part) => part.rid !== 0).map((part) => (
+            <button
+              key={part.rid}
+              type="button"
+              onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+              className="t flex shrink-0 items-center gap-1.5 py-0.5 text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
+            >
+              <span
+                aria-hidden
+                className="bili-channel-icon h-1.5 w-1.5 rounded-full"
+                style={{ background: partColor(part.name) }}
+              />
+              {part.name}
+            </button>
+          ))}
         </div>
       </nav>
 
