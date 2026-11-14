@@ -21,8 +21,8 @@ export function DurationFilter({
   onChange: (key: DurationKey) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <span className="mr-1 text-[12.5px] text-[var(--text-3)]">时长</span>
+    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
+      <span className="mr-1 shrink-0 whitespace-nowrap text-[12.5px] text-[var(--text-3)]">时长</span>
       {OPTIONS.map((option) => {
         const on = option.key === active
         return (
@@ -32,7 +32,7 @@ export function DurationFilter({
             onClick={() => onChange(option.key)}
             aria-pressed={on}
             className={[
-              't rounded-[4px] px-2 py-0.5 text-[13px]',
+            't shrink-0 whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[13px]',
               on
                 ? 'bg-[var(--accent)] text-white'
                 : 'text-[var(--text-2)] hover:text-[var(--accent)]',

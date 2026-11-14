@@ -27,7 +27,7 @@ export function PartitionFilter({
   onChange: (label: string) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
       {PARTITIONS.map((p) => {
         const on = p.label === active
         return (
@@ -37,7 +37,7 @@ export function PartitionFilter({
             onClick={() => onChange(p.label)}
             aria-pressed={on}
             className={[
-              't rounded-[4px] px-2.5 py-1 text-[14px]',
+              't shrink-0 whitespace-nowrap rounded-[4px] px-2.5 py-1 text-[14px]',
               on
                 ? 'bg-[var(--accent)] text-white'
                 : 'bg-[var(--panel-raised)] text-[var(--text-2)] hover:text-[var(--text-1)]',
