@@ -1349,12 +1349,21 @@ impl Engine {
         Ok(tracks)
     }
 
-    pub async fn popular(&self, page: u32) -> Result<(Vec<Track>, bool), WireError> {
-        let (tracks, no_more) = self.source.popular(page).await?;
+    pub async fn popular(&self, page: u32) -> Result<crate::wire::PopularPage, WireError> {
+        let (tracks, no_more, notes) = self.source.popular(page).await?;
         for t in &tracks {
             self.remember(t);
         }
-        Ok((tracks, no_more))
+        Ok(crate::wire::PopularPage {
+            items: tracks
+                .into_iter()
+                .map(|track| crate::wire::PopularItemView {
+                    note: notes.get(track.key.as_opaque()).cloned().unwrap_or_default(),
+                    track,
+                })
+                .collect(),
+            no_more,
+        })
     }
 
     /// 每周必看的期数列表。

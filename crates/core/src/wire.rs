@@ -146,6 +146,20 @@ pub struct SeasonEpisodeView {
 }
 
 /// 入站必刷。`explain` 是 B 站官方文案，原样透传。
+/// 综合热门一页：条目 + 每条 B 站自己印在标题下的橙色小标签（可能是空串）。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PopularPage {
+    pub items: Vec<PopularItemView>,
+    pub no_more: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PopularItemView {
+    pub track: Track,
+    /// 「百万播放」「7万点赞」这类小标签，没有就是空串。
+    pub note: String,
+}
+
 /// 每周必看的一期（列表用）。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct WeeklyIssueView {

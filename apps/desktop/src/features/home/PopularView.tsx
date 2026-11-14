@@ -14,6 +14,8 @@ import { WideCard } from '../tracks/WideCard'
  * 接口用 `no_more` 说到头，之后不再请求。
  */
 export function PopularView() {
+  /** 接口给的小标签按 key 存：换批、翻页都不乱。 */
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -35,10 +37,15 @@ export function PopularView() {
     setError(null)
     void ipc
       .popular(1)
-      .then(([list, end]) => {
+      .then((page) => {
         if (cancelled) return
-        setTracks(list)
-        noMore.current = end
+        setTracks(page.items.map((item) => item.track))
+        setNotes(
+          Object.fromEntries(
+            page.items.filter((item) => item.note).map((item) => [item.track.key, item.note]),
+          ),
+        )
+        noMore.current = page.no_more
       })
       .catch((cause) => {
         if (!cancelled) setError(toWireError(cause).message)
@@ -60,11 +67,20 @@ export function PopularView() {
     setError(null)
     void ipc
       .popular(page)
-      .then(([list, end]) => {
+      .then((next) => {
         nextPage.current = page + 1
+        const list = next.items.map((item) => item.track)
         // 实测翻到第 11 页时接口回空列表但 no_more 仍是 false；
         // 只看 no_more 的话，深预取会对着空页无限翻下去。
-        noMore.current = end || list.length === 0
+        noMore.current = next.no_more || list.length === 0
+        if (list.length > 0) {
+          setNotes((prev) => ({
+            ...prev,
+            ...Object.fromEntries(
+              next.items.filter((item) => item.note).map((item) => [item.track.key, item.note]),
+            ),
+          }))
+        }
         if (list.length > 0) setTracks((prev) => [...(prev ?? []), ...list])
       })
       .catch((cause) => setError(toWireError(cause).message))
@@ -132,6 +148,8 @@ export function PopularView() {
                 <WideCard
                   key={track.key}
                   track={track}
+                  note={notes[track.key] ?? null}
+                  noteAsTag
                   onOpen={() => navigate({ kind: 'watch', track })}
                 />
               ))}

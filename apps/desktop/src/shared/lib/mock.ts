@@ -129,7 +129,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'ranking':
       return CATALOG.slice(0, 20)
     case 'popular':
-      return [CATALOG.slice(0, 20), false]
+      return {
+        items: CATALOG.slice(0, 20).map((track, i) => ({
+          track,
+          // 和真接口一样：多数条目带标签，少数留空。
+          note: i % 3 === 0 ? '' : i % 2 === 0 ? '百万播放' : '7万点赞',
+        })),
+        no_more: false,
+      }
     case 'weekly_issues':
       return Array.from({ length: 8 }, (_, i) => ({
         number: 399 - i,

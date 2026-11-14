@@ -151,6 +151,18 @@ export type PreciousItemView = {
   note: string
 }
 
+/** 综合热门一页：条目 + 每条标题下的橙色小标签（可能为空串）。 */
+export type PopularPage = {
+  items: PopularItemView[]
+  no_more: boolean
+}
+
+export type PopularItemView = {
+  track: Track
+  /** 「百万播放」「7万点赞」这类 B 站自己给的标签。 */
+  note: string
+}
+
 export type QualityOption = {
   id: number
   label: string

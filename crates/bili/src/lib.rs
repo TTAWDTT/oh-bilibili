@@ -366,8 +366,11 @@ impl Source {
         self.client.ranking(rid).await
     }
 
-    /// 综合热门。第二个返回值表示后面还有没有更早的稿件。
-    pub async fn popular(&self, page: u32) -> Result<(Vec<Track>, bool), BiliError> {
+    /// 综合热门。第二个返回值表示后面还有没有更早的稿件，第三个是按 bvid 对齐的小标签。
+    pub async fn popular(
+        &self,
+        page: u32,
+    ) -> Result<(Vec<Track>, bool, std::collections::HashMap<String, String>), BiliError> {
         self.client.popular(page).await
     }
 

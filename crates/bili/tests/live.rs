@@ -498,11 +498,12 @@ async fn 全站排行榜一次给一百条() {
 #[ignore = "真实网络"]
 async fn 热门榜能翻页() {
     let source = Source::open().await.expect("Source");
-    let (first, no_more_first) = source.popular(1).await.expect("热门第 1 页");
-    let (second, no_more_second) = source.popular(2).await.expect("热门第 2 页");
+    let (first, no_more_first, notes) = source.popular(1).await.expect("热门第 1 页");
+    let (second, no_more_second, _) = source.popular(2).await.expect("热门第 2 页");
     println!(
-        "热门 pn=1 {} 条（no_more={no_more_first}），pn=2 {} 条（no_more={no_more_second}）",
+        "热门 pn=1 {} 条（no_more={no_more_first}，{} 条带标签），pn=2 {} 条（no_more={no_more_second}）",
         first.len(),
+        notes.len(),
         second.len()
     );
     let head = first.first().expect("第 1 页有内容");

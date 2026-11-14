@@ -11,10 +11,13 @@ import { Icon } from '../../shared/ui/Icon'
 export function WideCard({
   track,
   note,
+  noteAsTag = false,
   onOpen,
 }: {
   track: Track
   note?: string | null
+  /** 热门页的标签是「百万播放」这种短词，B 站画成一个橙色描边小胶囊；入站必刷是整句话。 */
+  noteAsTag?: boolean
   onOpen: () => void
 }) {
   return (
@@ -52,7 +55,11 @@ export function WideCard({
             </span>
           ) : null}
         </span>
-        {note ? (
+        {note && noteAsTag ? (
+          <span className="mt-1.5 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
+            {note}
+          </span>
+        ) : note ? (
           <span className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ff7a45]">
             <Icon name="flame" size={12} className="shrink-0" />
             <span className="truncate">{note}</span>

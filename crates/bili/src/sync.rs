@@ -709,10 +709,13 @@ impl Client {
     }
 
     /// 综合热门（B 站 popular/all）。一次 50 条，`no_more` 为 true 表示翻到底了。
+    ///
+    /// 每条还带一个 `rcmd_reason.content`，B 站把它印在标题下面当橙色小标签
+    /// （「百万播放」「7万点赞」「人气飙升」），大部分条目是空串。
     pub async fn popular(
         &self,
         page: u32,
-    ) -> Result<(Vec<bilimusic_model::Track>, bool), BiliError> {
+    ) -> Result<(Vec<bilimusic_model::Track>, bool, HashMap<String, String>), BiliError> {
         let v = self
             .get_json(
                 &format!("{API}/x/web-interface/popular?pn={page}&ps=50"),
@@ -720,7 +723,7 @@ impl Client {
             )
             .await?;
         let no_more = v["data"]["no_more"].as_bool().unwrap_or(false);
-        Ok((tracks_from_list(&v["data"]["list"]), no_more))
+        Ok((tracks_from_list(&v["data"]["list"]), no_more, popular_notes(&v["data"]["list"])))
     }
 
     /// 每周必看的一期列表。
@@ -1007,6 +1010,21 @@ fn tracks_from_list(list: &serde_json::Value) -> Vec<bilimusic_model::Track> {
 
 /// 单期片单每条的推荐语。字段名是 `rcmd_reason`，不是入站必刷那个 `achievement`；
 /// 早期按 `achievement` 解析过，结果永远是空表（真实响应里它是 null）。
+/// 热门条目的橙色小标签。`rcmd_reason` 在这里是对象（`{"content": "百万播放"}`），
+/// 而每周必看那边是裸字符串，字段同名、形状不同，别共用解析。
+fn popular_notes(list: &serde_json::Value) -> HashMap<String, String> {
+    let Some(list) = list.as_array() else {
+        return HashMap::new();
+    };
+    list.iter()
+        .filter_map(|m| {
+            let bvid = m["bvid"].as_str()?;
+            let note = m["rcmd_reason"]["content"].as_str().filter(|s| !s.is_empty())?;
+            Some((bvid.to_string(), note.to_string()))
+        })
+        .collect()
+}
+
 fn weekly_notes(list: &serde_json::Value) -> HashMap<String, String> {
     let Some(list) = list.as_array() else {
         return HashMap::new();
@@ -1037,6 +1055,21 @@ mod relation_shape_tests {
         assert_eq!(notes.get("BV1TgWp6MEHJ").map(String::as_str), Some("就在今天"));
         assert!(!notes.contains_key("BV1UB4v67Exr"), "空推荐语不该入表");
         assert!(!notes.contains_key("BV1vmWJ6LEmW"), "没给推荐语就不该有这一项");
+    }
+
+    /// 同一个字段名在热门里是对象（`{"content": "百万播放"}`），在每周必看里是裸字符串。
+    /// 两处共用一套解析的话，其中一边永远是空表。
+    #[test]
+    fn 热门标签取_rcmd_reason_content() {
+        let list = json!([
+            { "bvid": "BV1gCWC6KEtf", "rcmd_reason": { "content": "百万播放", "corner_mark": 0 } },
+            { "bvid": "BV1xx411c7mD", "rcmd_reason": { "content": "", "corner_mark": 0 } },
+            { "bvid": "BV1yy411c7mE" }
+        ]);
+        let notes = super::popular_notes(&list);
+        assert_eq!(notes.get("BV1gCWC6KEtf").map(String::as_str), Some("百万播放"));
+        assert!(!notes.contains_key("BV1xx411c7mD"), "空标签不该入表");
+        assert!(!notes.contains_key("BV1yy411c7mE"), "没有 rcmd_reason 就不该有这一项");
     }
 
     /// 这个结构取自真实登录态响应（2025-11 实测）：

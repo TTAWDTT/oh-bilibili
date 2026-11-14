@@ -603,7 +603,7 @@ async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<
 async fn popular(
     engine: tauri::State<'_, Arc<Engine>>,
     page: u32,
-) -> Result<(Vec<Track>, bool), WireError> {
+) -> Result<bilimusic_core::wire::PopularPage, WireError> {
     engine.popular(page).await
 }
 
