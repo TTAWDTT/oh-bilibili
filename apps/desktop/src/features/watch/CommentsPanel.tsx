@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -91,6 +92,7 @@ function CommentRow({
   onReply?: (c: Comment) => void
   onDelete?: ((c: Comment) => void) | undefined
 }) {
+  const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
   const [loadedReplies, setLoadedReplies] = useState<Comment[]>([])
   const [repliesPage, setRepliesPage] = useState(0)
@@ -143,7 +145,18 @@ function CommentRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             {c.medal ? <CommentMedalBadge medal={c.medal} /> : null}
-            <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
+            {c.mid > 0 ? (
+              <button
+                type="button"
+                onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+                title={`看 ${c.author} 的空间`}
+                className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
+              >
+                {c.author}
+              </button>
+            ) : (
+              <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
+            )}
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
             {c.pinned ? (
               <span className="shrink-0 rounded-[2px] bg-[#fb7299] px-1 text-[10px] leading-[15px] text-white">
