@@ -54,7 +54,9 @@ export function Sidebar() {
         onClick={() => navigate(entry.view)}
         aria-current={active ? 'page' : undefined}
         className={[
-          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[14px]',
+          /* bili-nav-item 给出 B 站侧栏那条左侧粉色竖条：悬停滑入、选中常驻。
+             之前 CSS 里写了但没接上，侧栏选中态只剩一层浅蓝底。 */
+          'bili-nav-item bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[14px]',
           active
             ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',

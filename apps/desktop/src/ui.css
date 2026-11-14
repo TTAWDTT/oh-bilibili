@@ -489,8 +489,7 @@
   position: relative;
   transition:
     background-color var(--dur) var(--ease),
-    color var(--dur) var(--ease),
-    padding-left var(--dur) var(--ease);
+    color var(--dur) var(--ease);
 }
 
 .bili-nav-item::before {
@@ -507,10 +506,6 @@
     height var(--dur) var(--ease),
     opacity var(--dur) var(--ease);
   opacity: 0;
-}
-
-.bili-nav-item:hover {
-  padding-left: 12px;
 }
 
 .bili-nav-item:hover::before,
