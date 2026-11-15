@@ -73,6 +73,8 @@ export type Comment = {
   reply_count: number
   /** UP 主置顶。B 站在这类评论上挂一个位置标记。 */
   pinned: boolean
+  /** UP 主赞过这条评论。 */
+  up_liked: boolean
   /** 评论者戴的粉丝牌。 */
   medal: CommentMedal | null
 }

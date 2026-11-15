@@ -176,6 +176,11 @@ function CommentRow({
               <span className="flex items-center gap-0.5">
                 <Icon name="thumb" size={12} />
                 {c.likes > 0 ? formatCount(c.likes) : null}
+                {c.up_liked ? (
+                  <span title="UP主觉得很赞" className="ml-0.5 text-[var(--accent)]">
+                    <Icon name="thumb" size={12} />
+                  </span>
+                ) : null}
               </span>
               <Icon name="thumbDown" size={12} />
             </span>
@@ -446,6 +451,7 @@ export function CommentsPanel({
             replies: [],
             reply_count: 0,
             pinned: false,
+            up_liked: false,
             medal: null,
           },
           ...prev,

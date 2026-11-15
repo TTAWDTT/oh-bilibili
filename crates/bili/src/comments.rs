@@ -28,6 +28,8 @@ pub struct Comment {
     pub reply_count: u32,
     /// UP 主置顶。B 站在置顶评论上挂一个「UP主觉得很赞」的位置标记。
     pub pinned: bool,
+    /// UP 主赞过这条评论。列表里挂一枚拇指。
+    pub up_liked: bool,
     /// 评论者戴的粉丝牌。没戴时为 None。
     pub medal: Option<CommentMedal>,
 }
@@ -76,6 +78,9 @@ struct RawReply {
     replies: Option<Vec<RawReply>>,
     #[serde(default)]
     rcount: u32,
+    /// UP 主对这条评论的动作（赞/回复）。
+    #[serde(default)]
+    up_action: Option<RawUpAction>,
 }
 
 #[derive(Deserialize)]
@@ -144,7 +149,14 @@ struct RawEmote {
     url: String,
 }
 
+#[derive(Deserialize)]
+struct RawUpAction {
+    #[serde(default)]
+    like: bool,
+}
+
 fn to_comment(raw: RawReply) -> Comment {
+    let up_liked = raw.up_action.as_ref().map(|a| a.like).unwrap_or(false);
     let id = raw
         .rpid_str
         .filter(|s| !s.is_empty())
@@ -222,6 +234,7 @@ fn to_comment(raw: RawReply) -> Comment {
         replies,
         reply_count: raw.rcount,
         pinned: false,
+        up_liked,
         medal,
     }
 }
@@ -353,6 +366,27 @@ mod tests {
             page.items[0].avatar.as_deref(),
             Some("https://i0.hdslb.com/a.jpg")
         );
+    }
+
+    #[test]
+    fn up主赞过的评论带标记() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 2 },
+                "replies": [
+                    { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
+                      "content": { "message": "被 UP 赞了" }, "like": 3, "ctime": 1,
+                      "up_action": { "like": true, "reply": false } },
+                    { "rpid_str": "2", "member": { "mid": 8, "uname": "B" },
+                      "content": { "message": "普通" }, "like": 1, "ctime": 2,
+                      "up_action": { "like": false, "reply": false } }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        assert!(page.items[0].up_liked);
+        assert!(!page.items[1].up_liked);
     }
 
     #[test]

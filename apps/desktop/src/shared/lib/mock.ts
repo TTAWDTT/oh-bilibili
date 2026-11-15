@@ -561,6 +561,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         replies: [],
         reply_count: 0,
         pinned: false,
+        up_liked: false,
         medal: null,
       }))
       return {
@@ -580,6 +581,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           replies: [],
           reply_count: 0,
           pinned: i === 0,
+          up_liked: i === 2,
           medal: seed.medal
             ? {
                 name: seed.medal,
@@ -617,6 +619,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
                   replies: [],
                   reply_count: 0,
                   pinned: false,
+                  up_liked: false,
                   medal: null,
                 },
               ]
