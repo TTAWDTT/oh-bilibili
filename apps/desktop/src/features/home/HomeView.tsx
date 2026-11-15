@@ -62,6 +62,27 @@ export function HomeView() {
   const pending = useRef(false)
   /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
   const exhausted = useRef(false)
+  /** 频道条只在真的横向溢出时才给渐隐：滚到两端时不能还遮住首尾胶囊。 */
+  const channelRef = useRef<HTMLDivElement | null>(null)
+  const [channelFade, setChannelFade] = useState({ left: false, right: false })
+
+  useEffect(() => {
+    const el = channelRef.current
+    if (!el) return
+    const update = (): void => {
+      const left = el.scrollLeft > 1
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      setChannelFade((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    el.addEventListener('scroll', update, { passive: true })
+    return () => {
+      observer.disconnect()
+      el.removeEventListener('scroll', update)
+    }
+  }, [])
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     if (append) setLoadingMore(true)
@@ -234,7 +255,18 @@ export function HomeView() {
             className="relative min-w-0 flex-1"
             onMouseLeave={() => setHoverPart(null)}
           >
-            <div className="bili-channels-scroll no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto border-l border-[var(--line)] pl-5">
+            <div
+              ref={channelRef}
+              className={`no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto border-l border-[var(--line)] pl-5 ${
+                channelFade.left && channelFade.right
+                  ? 'bili-channels-fade-lr'
+                  : channelFade.right
+                    ? 'bili-channels-fade-r'
+                    : channelFade.left
+                      ? 'bili-channels-fade-l'
+                      : ''
+              }`}
+            >
               {PARTS.filter((part) => part.rid !== 0).map((part) => (
                 <button
                   key={part.rid}

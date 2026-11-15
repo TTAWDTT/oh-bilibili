@@ -792,12 +792,20 @@ button:hover > .bili-channel-icon {
   transform: scale(1.15) rotate(-4deg);
 }
 
-/* 窄窗口频道条横向滑动：右缘渐隐，提示后面还有分区。 */
-@media (max-width: 1300px) {
-  .bili-channels-scroll {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-  }
+/* 频道条真的横向溢出时才渐隐；到两端就收回，不能盖住首尾胶囊。 */
+.bili-channels-fade-r {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
+.bili-channels-fade-l {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 24px), transparent);
+}
+
+.bili-channels-fade-lr {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
 }
 
 /* 搜索框聚焦：整个框轻微放大，像被"吸住" */
