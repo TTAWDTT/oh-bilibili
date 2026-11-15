@@ -110,6 +110,12 @@ function quoteNodes(text: string, mentions: ipc.MessageMention[], emotes: Map<st
   const nodes: React.ReactNode[] = []
   let buffer = ''
   let index = 0
+  const nextClose = new Int32Array(text.length).fill(-1)
+  let close = -1
+  for (let cursor = text.length - 1; cursor >= 0; cursor -= 1) {
+    if (text[cursor] === ']') close = cursor
+    nextClose[cursor] = close
+  }
   const flush = (): void => {
     if (!buffer) return
     nodes.push(buffer)
@@ -118,7 +124,7 @@ function quoteNodes(text: string, mentions: ipc.MessageMention[], emotes: Map<st
 
   while (index < text.length) {
     if (text[index] === '[') {
-      const end = text.indexOf(']', index)
+      const end = nextClose[index] ?? -1
       const code = end > index ? text.slice(index, end + 1) : ''
       const url = code ? emotes.get(code) : undefined
       if (url) {
