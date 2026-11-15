@@ -307,6 +307,7 @@ export function TitleBar() {
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault()
+            event.stopPropagation()
             setFocused(false)
             inputRef.current?.blur()
             return
