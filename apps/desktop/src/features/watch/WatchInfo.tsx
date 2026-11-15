@@ -423,6 +423,21 @@ export function WatchInfo({
           <button
             type="button"
             onClick={() => {
+              // B 站分享面板给的就是这段 iframe，页参数从 1 开始。
+              const code = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`
+              void copyText(code).then((ok) => {
+                toastDone(ok ? '嵌入代码已复制' : '复制失败')
+                setShareAt(null)
+              })
+            }}
+            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+          >
+            <Icon name="code" size={15} />
+            复制嵌入代码
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               void ipc.openExternal(`https://www.bilibili.com/video/${track.key}`).catch((cause) => toastFailure('打开链接', cause))
               setShareAt(null)
             }}
