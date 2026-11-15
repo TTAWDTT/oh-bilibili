@@ -9,6 +9,7 @@ pub mod dash;
 pub mod auth;
 pub mod client;
 pub mod media;
+pub mod messages;
 pub mod sync;
 pub mod error;
 pub mod search;
