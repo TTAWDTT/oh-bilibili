@@ -358,6 +358,9 @@ export function WatchPlayer({
     currentHeight.current = 0
     wantHeight.current = 0
     setRetry(0)
+    // 时间与续播提示也属于上一条，跟着清单一起换掉。
+    setNow(0)
+    setResumeNotice(null)
   }, [data.manifest_url])
 
   // 挂载 shaka
