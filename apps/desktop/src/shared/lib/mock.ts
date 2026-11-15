@@ -262,7 +262,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'messages': {
       const kind = str(args, 'kind')
       const page = num(args, 'page')
-      const start = Number(str(args, 'cursor').split(':')[0] || 0)
+      const start = typeof args.cursor === 'string' ? Number(args.cursor.split(':')[0] || 0) : 0
       return {
         items: CATALOG.slice(start, start + 8).map((track, index) => ({
           id: `${kind}-${start + index}`,
