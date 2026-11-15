@@ -46,9 +46,7 @@ export function PreciousView() {
         active="precious"
         title={data?.title ?? '入站必刷'}
         extra={data ? String(data.items.length) : undefined}
-      >
-        {data?.explain ? <p className="text-[12px] text-[var(--text-3)]">{data.explain}</p> : null}
-      </HotTabs>
+      />
       <div className="px-4 md:px-8">
         {data === null ? (
           error ? (

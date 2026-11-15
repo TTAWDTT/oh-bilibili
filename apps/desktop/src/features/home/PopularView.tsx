@@ -121,9 +121,7 @@ export function PopularView() {
             热门规则
           </button>
         }
-      >
-        <p className="text-[12px] text-[var(--text-3)]">各个领域中新奇好玩的优质内容都在这里~</p>
-      </HotTabs>
+      />
       <div className="px-4 md:px-8">
         {tracks === null ? (
           error ? (

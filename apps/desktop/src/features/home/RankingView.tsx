@@ -149,7 +149,6 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           </div>
         }
       >
-        <p className="text-[12px] text-[var(--text-3)]">榜单根据稿件内容质量与近期数据综合排序，动态更新</p>
       </HotTabs>
       <div className="px-4 md:px-8">
       {error ? (

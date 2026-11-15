@@ -145,7 +145,6 @@ export function WeeklyView() {
               ) : null}
             </div>
           ) : null}
-          <p className="text-[12px] text-[var(--text-3)]">每周五晚 18:00 更新</p>
           {/* 398 期，下拉翻起来也慢；前后各给一个。 */}
           <span className="ml-auto flex shrink-0 items-center gap-1">
             {/* 左箭头回到更早的一期，右箭头往前一期：和时间方向一致，不是和横条的排法一致。 */}
