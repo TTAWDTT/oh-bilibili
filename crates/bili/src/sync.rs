@@ -177,6 +177,7 @@ pub enum DynamicKind {
     Opus,
     Forward,
     Article,
+    Live,
 }
 
 /// 关注动态里的一条视频或图文投稿。
@@ -204,6 +205,12 @@ pub struct DynamicItem {
     /// 专栏稿件的 cv 号，`kind == Article` 时才有。
     #[serde(default)]
     pub article_id: String,
+    /// 直播推荐卡片的房间号，`kind == Live` 时才有。
+    #[serde(default)]
+    pub room_id: u64,
+    /// 直播分区名，`kind == Live` 时才有。
+    #[serde(default)]
+    pub live_area: String,
     /// 转发动态里被转的那条。只解析一层：原动态自己也是转发时留空。
     #[serde(default)]
     pub orig: Option<Box<DynamicItem>>,
@@ -1406,6 +1413,8 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
             DynamicKind::Opus
         }
         (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_ARTICLE")) => DynamicKind::Article,
+        // 关注流里夹的直播推荐。B 站网页把这几条画成普通直播卡。
+        (Some("DYNAMIC_TYPE_LIVE_RCMD"), Some("MAJOR_TYPE_LIVE_RCMD")) => DynamicKind::Live,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
         _ => return None,
     };
@@ -1428,7 +1437,8 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
             .map(|t| t as i8),
         vip: author["vip"]["status"].as_u64() == Some(1),
         pub_time: author["pub_time"].as_str().unwrap_or_default().to_string(),
-        pub_ts: author["pub_ts"].as_u64().unwrap_or(0),
+        // 直播推荐里 pub_ts 是字符串，其它动态是数字。
+        pub_ts: dynamic_count(&author["pub_ts"]),
         text: String::new(),
         bvid: String::new(),
         title: String::new(),
@@ -1438,6 +1448,8 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
         views: 0,
         danmaku: 0,
         article_id: String::new(),
+        room_id: 0,
+        live_area: String::new(),
         orig: None,
         forwards: dynamic_count(&item["modules"]["module_stat"]["forward"]["count"]),
         comments: dynamic_count(&item["modules"]["module_stat"]["comment"]["count"]),
@@ -1514,6 +1526,20 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
                 .and_then(|covers| covers.iter().find_map(|cover| cover.as_str()))
                 .map(|url| url.replacen("http://", "https://", 1))
                 .unwrap_or_default();
+        }
+        DynamicKind::Live => {
+            // 推荐卡把房间信息塞在 content 字符串里，是嵌了一层的 JSON。
+            let content = major["live_rcmd"]["content"].as_str().unwrap_or_default();
+            let parsed = serde_json::from_str::<serde_json::Value>(content).unwrap_or_default();
+            let info = &parsed["live_play_info"];
+            dynamic.room_id = info["room_id"].as_u64().unwrap_or(0);
+            dynamic.title = info["title"].as_str().unwrap_or_default().to_string();
+            dynamic.cover = info["cover"]
+                .as_str()
+                .unwrap_or_default()
+                .replacen("http://", "https://", 1);
+            dynamic.live_area = info["area_name"].as_str().unwrap_or_default().to_string();
+            dynamic.views = info["online"].as_u64().unwrap_or(0);
         }
         DynamicKind::Forward => {
             dynamic.text = item["modules"]["module_dynamic"]["desc"]["text"]
@@ -1778,6 +1804,54 @@ mod dynamic_duration_tests {
                 "https://i0.hdslb.com/two.png".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn 直播推荐动态解析房间信息() {
+        let content = json!({
+            "type": 1,
+            "live_play_info": {
+                "room_id": 22084735_u64,
+                "title": "选填题技巧火热报名中",
+                "cover": "http://i0.hdslb.com/live.jpg",
+                "online": 758,
+                "area_name": "教育学习"
+            }
+        })
+        .to_string();
+        let item = json!({
+            "id_str": "9",
+            "type": "DYNAMIC_TYPE_LIVE_RCMD",
+            "modules": {
+                "module_author": {
+                    "mid": 42428180_u64,
+                    "name": "考研竞赛凯哥",
+                    "face": "https://i2.hdslb.com/face.jpg",
+                    "pub_time": "",
+                    "pub_ts": "1794750425"
+                },
+                "module_dynamic": {
+                    "desc": null,
+                    "major": {
+                        "type": "MAJOR_TYPE_LIVE_RCMD",
+                        "live_rcmd": { "content": content }
+                    }
+                },
+                "module_stat": {
+                    "forward": { "count": "0" },
+                    "comment": { "count": 0 },
+                    "like": { "count": 0 }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("直播推荐应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Live);
+        assert_eq!(dynamic.room_id, 22_084_735);
+        assert_eq!(dynamic.title, "选填题技巧火热报名中");
+        assert_eq!(dynamic.cover, "https://i0.hdslb.com/live.jpg");
+        assert_eq!(dynamic.live_area, "教育学习");
+        assert_eq!(dynamic.views, 758);
+        assert_eq!(dynamic.pub_ts, 1_794_750_425);
     }
 
     #[test]

@@ -152,10 +152,41 @@ function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () =>
   )
 }
 
+/** 关注流里夹的直播推荐卡。B 站把它画成普通直播封面 + 主播 + 分区。 */
+function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group/live t flex w-full gap-3 rounded-[6px] bg-[var(--ga1)] p-3 text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
+    >
+      <span
+        className="relative w-[168px] shrink-0 overflow-hidden rounded-[4px]"
+        style={{ aspectRatio: '16 / 10' }}
+      >
+        <Cover cover={item.cover} title={item.title} width={168} className="h-full w-full" />
+        <span className="absolute left-1 top-1 rounded-[2px] bg-[var(--accent)] px-1 text-[10px] font-medium leading-[15px] text-white">
+          LIVE
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="line-clamp-2 text-[14px] leading-[21px] text-[var(--text-1)] transition-colors group-hover/live:text-[var(--accent)]">
+          {item.title}
+        </span>
+        <span className="mt-1 truncate text-[12px] text-[var(--text-3)]">{item.live_area}</span>
+        <span className="num mt-auto text-[12px] text-[var(--text-3)]">
+          {formatCount(item.views)} 人气
+        </span>
+      </span>
+    </button>
+  )
+}
+
 function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   if (item.kind === 'article') return <DynamicArticle item={item} onOpen={onOpen} />
+  if (item.kind === 'live') return <DynamicLive item={item} onOpen={onOpen} />
   return (
     <>
       {item.kind === 'opus' && item.title ? (
@@ -287,6 +318,8 @@ function DynamicCard({
         ? '转发了动态'
         : item.kind === 'article'
           ? '投稿了专栏'
+          : item.kind === 'live'
+            ? '正在直播'
           : '发布了动态'
 
   return (
@@ -562,6 +595,10 @@ export function DynamicView() {
                 void ipc
                   .openExternal(`https://www.bilibili.com/read/cv${item.article_id}`)
                   .catch((cause) => toastFailure('打开专栏', cause))
+              } else if (item.kind === 'live' && item.room_id) {
+                void ipc
+                  .openExternal(`https://live.bilibili.com/${item.room_id}`)
+                  .catch((cause) => toastFailure('打开直播间', cause))
               } else if (item.kind !== 'video') {
                 void ipc
                   .openExternal(`https://www.bilibili.com/opus/${item.id}`)
@@ -576,7 +613,9 @@ export function DynamicView() {
                     ? `https://www.bilibili.com/video/${item.bvid}`
                     : item.kind === 'article' && item.article_id
                       ? `https://www.bilibili.com/read/cv${item.article_id}`
-                      : `https://www.bilibili.com/opus/${item.id}`,
+                      : item.kind === 'live' && item.room_id
+                        ? `https://live.bilibili.com/${item.room_id}`
+                        : `https://www.bilibili.com/opus/${item.id}`,
                 )
                 .catch((cause) => toastFailure('打开链接', cause))
             }}

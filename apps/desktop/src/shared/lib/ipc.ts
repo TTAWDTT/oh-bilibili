@@ -517,7 +517,7 @@ export function homeFeed(fresh: number): Promise<Track[]> {
 
 export type DynamicItem = {
   id: string
-  kind: 'video' | 'opus' | 'forward' | 'article'
+  kind: 'video' | 'opus' | 'forward' | 'article' | 'live'
   mid: number
   author: string
   face: string
@@ -537,6 +537,10 @@ export type DynamicItem = {
   danmaku: number
   /** 专栏稿件的 cv 号，kind 为 article 时才有。 */
   article_id?: string
+  /** 直播推荐卡片的房间号，kind 为 live 时才有。 */
+  room_id?: number
+  /** 直播分区名，kind 为 live 时才有。 */
+  live_area?: string
   /** 转发动态里被转的那条，只嵌套一层。 */
   orig?: DynamicItem | null
   forwards: number
