@@ -1358,18 +1358,61 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
         duration_ms: archive["duration_text"]
             .as_str()
             .and_then(duration_text_ms),
-        views: archive["stat"]["play"].as_u64().unwrap_or(0),
-        danmaku: archive["stat"]["danmaku"].as_u64().unwrap_or(0),
+        views: dynamic_count(&archive["stat"]["play"]),
+        danmaku: dynamic_count(&archive["stat"]["danmaku"]),
     })
+}
+
+fn dynamic_count(value: &serde_json::Value) -> u64 {
+    value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
 mod dynamic_duration_tests {
+    use serde_json::json;
+
     #[test]
     fn 解析动态时长() {
         assert_eq!(super::duration_text_ms("03:12"), Some(192_000));
         assert_eq!(super::duration_text_ms("1:02:33"), Some(3_753_000));
         assert_eq!(super::duration_text_ms("garbage"), None);
+    }
+
+    #[test]
+    fn 动态统计字符串也能读成数字() {
+        let item = json!({
+            "id_str": "1",
+            "type": "DYNAMIC_TYPE_AV",
+            "modules": {
+                "module_author": {
+                    "mid": "946974",
+                    "name": "测试 UP",
+                    "face": "http://i0.hdslb.com/face.jpg",
+                    "pub_time": "刚刚",
+                    "pub_ts": 1
+                },
+                "module_dynamic": {
+                    "desc": { "text": "新投稿" },
+                    "major": {
+                        "type": "MAJOR_TYPE_ARCHIVE",
+                        "archive": {
+                            "bvid": "BV1xx411c7mD",
+                            "title": "测试视频",
+                            "cover": "http://i0.hdslb.com/cover.jpg",
+                            "duration_text": "03:12",
+                            "stat": { "play": "353", "danmaku": 7 }
+                        }
+                    }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("动态应能解析");
+        assert_eq!(dynamic.views, 353);
+        assert_eq!(dynamic.danmaku, 7);
+        assert_eq!(dynamic.face, "https://i0.hdslb.com/face.jpg");
     }
 }
 

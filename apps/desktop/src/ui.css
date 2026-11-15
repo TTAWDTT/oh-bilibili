@@ -663,36 +663,6 @@
   color: var(--accent);
 }
 
-/* 侧栏行：hover / 激活时左侧滑入一条主题色竖条，是 B 站侧边栏的选中样式 */
-.bili-nav-item {
-  position: relative;
-  transition:
-    background-color var(--dur) var(--ease),
-    color var(--dur) var(--ease);
-}
-
-.bili-nav-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 0;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: var(--accent);
-  transform: translateY(-50%);
-  transition:
-    height var(--dur) var(--ease),
-    opacity var(--dur) var(--ease);
-  opacity: 0;
-}
-
-.bili-nav-item:hover::before,
-.bili-nav-item[aria-current='page']::before {
-  height: 60%;
-  opacity: 1;
-}
-
 /* 全局弹幕带：从右向左匀速穿过窗口顶部 */
 .bili-strip-item {
   left: 100%;
