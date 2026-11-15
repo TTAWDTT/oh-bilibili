@@ -3,6 +3,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
+import { Icon } from '../../shared/ui/Icon'
 import { useAppStore } from '../../app/appStore'
 
 /** 直播卡上的封面比例。B 站直播间是 16:10，比视频的 16:9 高一点。 */
@@ -81,11 +82,7 @@ export function LiveRow() {
               <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.62))]" />
               <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1.5 text-[11.5px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 <span className="num flex min-w-0 items-center gap-1">
-                  <span className="bili-live-bars" aria-hidden>
-                    <i />
-                    <i />
-                    <i />
-                  </span>
+                  <Icon name="flame" size={12} />
                   <span className="truncate">{formatCount(room.online)}</span>
                 </span>
                 {room.area ? (

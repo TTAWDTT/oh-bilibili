@@ -323,41 +323,6 @@
   animation: bili-live-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes bili-live-bar {
-  0%,
-  100% {
-    transform: scaleY(0.35);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.bili-live-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 1.5px;
-  height: 9px;
-}
-
-.bili-live-bars i {
-  display: block;
-  width: 2px;
-  height: 100%;
-  border-radius: 1px;
-  background: currentColor;
-  transform-origin: bottom;
-  animation: bili-live-bar 900ms ease-in-out infinite;
-}
-
-.bili-live-bars i:nth-child(2) {
-  animation-delay: 160ms;
-}
-
-.bili-live-bars i:nth-child(3) {
-  animation-delay: 320ms;
-}
-
 /* 顶栏的小电视：每 7 秒眨一次，和图标的眼睛节奏对齐 */
 .bili-tv-mark {
   display: inline-flex;

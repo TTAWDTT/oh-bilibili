@@ -130,11 +130,7 @@ export function LiveView() {
                   <Avatar src={focus.face} alt={focus.uname} size={22} />
                   <span className="truncate">{focus.uname}</span>
                   <span className="num flex items-center gap-1">
-                    <span className="bili-live-bars" aria-hidden>
-                      <i />
-                      <i />
-                      <i />
-                    </span>
+                    <Icon name="flame" size={12} />
                     {formatCount(focus.online)}
                   </span>
                 </span>
@@ -168,13 +164,13 @@ export function LiveView() {
                 />
               ) : null}
               <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.62))]" />
+              <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1 text-[10px] leading-[16px] text-white">
+                <span className="bili-live-dot" aria-hidden />
+                LIVE
+              </span>
               <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1.5 text-[11.5px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
                 <span className="num flex min-w-0 items-center gap-1">
-                  <span className="bili-live-bars" aria-hidden>
-                    <i />
-                    <i />
-                    <i />
-                  </span>
+                  <Icon name="flame" size={12} />
                   <span className="truncate">{formatCount(room.online)}</span>
                 </span>
                 {room.area ? (
