@@ -424,6 +424,12 @@ export function WatchInfo({
             type="button"
             onClick={() => {
               // B 站分享面板给的就是这段 iframe，页参数从 1 开始。
+              // bvid 只允许字母数字，避免异常值把属性引号捅破。
+              if (!/^BV[0-9A-Za-z]{10}$/.test(track.key)) {
+                toastDone('复制失败', 'BV 号格式不对')
+                setShareAt(null)
+                return
+              }
               const code = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`
               void copyText(code).then((ok) => {
                 toastDone(ok ? '嵌入代码已复制' : '复制失败')
