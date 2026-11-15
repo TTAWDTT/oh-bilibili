@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -7,6 +7,7 @@ import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
+import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
@@ -143,7 +144,7 @@ export function WatchInfo({
   const [descOpen, setDescOpen] = useState(false)
   /** 投币浮层的位置，null 表示没开。操作排是 overflow-x-auto，absolute 会被裁掉。 */
   const [coinAt, setCoinAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
-  const coinPanel = useRef<HTMLDivElement | null>(null)
+  const [shareAt, setShareAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
   const [coinPick, setCoinPick] = useState(1)
   const [alsoLike, setAlsoLike] = useState(true)
   /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
@@ -159,6 +160,7 @@ export function WatchInfo({
     setTags([])
     setDescOpen(false)
     setCoinAt(null)
+    setShareAt(null)
     void ipc
       .watchLaterList()
       .then((list) => {
@@ -188,32 +190,6 @@ export function WatchInfo({
       if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
     }
   }, [])
-
-  useEffect(() => {
-    if (!coinAt) return
-    const close = (): void => setCoinAt(null)
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') close()
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [coinAt])
-
-  // 操作排靠近窗口底部时，向下展开会有一半落在窗口外。B 站同样贴着按钮，
-  // 但会往上翻。先按向下渲染一帧，量到真实高度后再翻，避免写死面板高度。
-  useLayoutEffect(() => {
-    const panel = coinPanel.current
-    if (!coinAt || !panel) return
-    const height = panel.offsetHeight
-    const top = coinAt.top + height > window.innerHeight - 8 ? Math.max(8, coinAt.anchorTop - height - 8) : coinAt.top
-    if (top !== coinAt.top) setCoinAt((prev) => (prev ? { ...prev, top } : prev))
-  }, [coinAt])
 
   const openCoin = (event: React.MouseEvent<HTMLButtonElement>): void => {
     if (coins >= 2) {
@@ -316,12 +292,15 @@ export function WatchInfo({
         </button>
         <button
           type="button"
-          title="分享，复制视频链接"
-          aria-label="分享，复制视频链接"
-          onClick={() => {
-            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
-              toastDone(ok ? '链接已复制' : '复制失败'),
-            )
+          title="分享"
+          aria-label="分享"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setShareAt({
+              left: Math.max(8, Math.min(rect.left, window.innerWidth - 276)),
+              top: rect.bottom + 8,
+              anchorTop: rect.top,
+            })
           }}
           className={action(false)}
         >
@@ -350,21 +329,8 @@ export function WatchInfo({
           {saved ? '已加入' : '稍后再看'}
         </button>
       </div>
-      {coinAt ? (
-        <>
-          <button
-            type="button"
-            aria-label="关闭"
-            onClick={() => setCoinAt(null)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <div
-            ref={coinPanel}
-            role="dialog"
-            aria-label="投币"
-            style={{ left: coinAt.left, top: coinAt.top }}
-            className="fixed z-50 w-[268px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.3)]"
-          >
+      <AnchoredPanel anchor={coinAt} onClose={() => setCoinAt(null)} label="投币">
+        <div className="p-3">
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-[var(--text-2)]">给 UP 主投上硬币</span>
               <button
@@ -424,9 +390,49 @@ export function WatchInfo({
                 下次一定
               </button>
             </div>
-          </div>
-        </>
-      ) : null}
+        </div>
+      </AnchoredPanel>
+      <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={240}>
+        <div className="p-2">
+          <button
+            type="button"
+            onClick={() => {
+              void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) => {
+                toastDone(ok ? '链接已复制' : '复制失败')
+                setShareAt(null)
+              })
+            }}
+            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+          >
+            <Icon name="copy" size={15} />
+            复制链接
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void copyText(track.key).then((ok) => {
+                toastDone(ok ? 'BV 号已复制' : '复制失败')
+                setShareAt(null)
+              })
+            }}
+            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+          >
+            <Icon name="copy" size={15} />
+            复制 BV 号
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void ipc.openExternal(`https://www.bilibili.com/video/${track.key}`).catch((cause) => toastFailure('打开链接', cause))
+              setShareAt(null)
+            }}
+            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+          >
+            <Icon name="external" size={15} />
+            在浏览器打开
+          </button>
+        </div>
+      </AnchoredPanel>
 
       {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}
       {ownerRow ? <div className="mt-1">{ownerRow}</div> : null}
