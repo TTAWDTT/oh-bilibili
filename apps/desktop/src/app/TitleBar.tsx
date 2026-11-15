@@ -505,6 +505,16 @@ export function TitleBar() {
               )}
               {accountItem('收藏夹', 'bookmarkStar', () => navigate({ kind: 'favs' }))}
               {accountItem('观看历史', 'clock', () => navigate({ kind: 'history' }))}
+              {accountItem('投稿管理', 'article', () => {
+                void ipc
+                  .openExternal('https://member.bilibili.com/platform/upload-manager/article')
+                  .catch((cause) => toastFailure('打开投稿管理', cause))
+              })}
+              {accountItem('创作中心', 'rank', () => {
+                void ipc
+                  .openExternal('https://member.bilibili.com/platform/home')
+                  .catch((cause) => toastFailure('打开创作中心', cause))
+              })}
               {accountItem('设置', 'settings', () => navigate({ kind: 'settings' }))}
             </div>
             <div className="border-t border-hairline py-1">
