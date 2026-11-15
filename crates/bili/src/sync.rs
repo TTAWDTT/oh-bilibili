@@ -733,7 +733,7 @@ impl Client {
             .unwrap_or_default())
     }
 
-    /// 评论表情面板。取第一包「小黄脸」，颜文字没有图片，跳过。
+    /// 评论表情面板的全部图片表情，并补充经典「2233娘」表情包。
     pub async fn comment_emotes(&self) -> Result<Vec<(String, String)>, BiliError> {
         let v = self
             .get_json(
@@ -741,20 +741,17 @@ impl Client {
                 std::time::Duration::from_millis(300),
             )
             .await?;
-        let Some(pkg) = v["data"]["packages"].as_array().and_then(|list| list.first()) else {
-            return Ok(Vec::new());
-        };
-        let Some(list) = pkg["emote"].as_array() else {
-            return Ok(Vec::new());
-        };
-        Ok(list
-            .iter()
-            .filter_map(|e| {
-                let code = e["text"].as_str()?.to_string();
-                let url = e["url"].as_str().filter(|u| u.starts_with("http"))?;
-                Some((code, url.to_string()))
-            })
-            .collect())
+        let mut pairs = emote_pairs(&v);
+        if let Ok(extra) = self
+            .get_json(
+                &format!("{API}/x/emote/package?business=reply&ids=6"),
+                std::time::Duration::from_millis(300),
+            )
+            .await
+        {
+            pairs.extend(emote_pairs(&extra));
+        }
+        Ok(pairs)
     }
 
     /// 搜 UP 主。和视频搜索同一个端点，只换 search_type。
@@ -1258,6 +1255,24 @@ impl Client {
         .await?;
         Ok(())
     }
+}
+
+fn emote_pairs(value: &serde_json::Value) -> Vec<(String, String)> {
+    let Some(packages) = value["data"]["packages"].as_array() else {
+        return Vec::new();
+    };
+    packages
+        .iter()
+        .filter_map(|package| package["emote"].as_array())
+        .flatten()
+        .filter_map(|emote| {
+            let code = emote["text"].as_str().filter(|text| !text.is_empty())?;
+            let url = emote["url"]
+                .as_str()
+                .filter(|url| url.starts_with("http://") || url.starts_with("https://"))?;
+            Some((code.to_string(), url.to_string()))
+        })
+        .collect()
 }
 
 /// 入站必刷的一条：视频本身加上 B 站给它的推荐语。

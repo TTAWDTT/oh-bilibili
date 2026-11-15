@@ -124,8 +124,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'video_tags':
       return ['翻唱', '虚拟UP主', '音乐']
     case 'comment_emotes':
-      // 只放一张确认能取到的图；编出来的 hash 在面板里就是一个碎图标。
-      return [['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png']]
+      // 只放确认能取到的图；编出来的 hash 在面板里就是一个碎图标。
+      return [
+        ['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png'],
+        ['[2233娘_大笑]', 'https://i0.hdslb.com/bfs/emote/16b8794be990cefa6caeba4d901b934a227ee3b8.png'],
+      ]
     case 'ranking':
       return CATALOG.slice(0, 20)
     case 'live_rooms':
@@ -297,7 +300,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           cover: track.cover,
           url: `https://www.bilibili.com/video/${track.key}`,
           bvid: track.key,
-          quote: kind === 'like' ? '' : kind === 'at' ? '@你 这首歌一起听！' : '这段副歌太好听了，已经循环好多次。',
+          quote: kind === 'like' ? '' : kind === 'at' ? '@你 这首歌一起听！[2233娘_大笑]' : '这段副歌太好听了，已经循环好多次。',
           at: Math.floor(Date.now() / 1000) - (start + index + 1) * 1800,
           count: kind === 'like' ? index + 3 : 1,
           mentions: kind === 'at' ? [{ mid: 1960976249, name: '你' }] : [],

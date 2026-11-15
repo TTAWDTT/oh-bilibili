@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import { useAuthStore } from '../auth/authStore'
@@ -18,7 +18,7 @@ const TABS: { kind: ipc.MessageKind; label: string }[] = [
   { kind: 'like', label: '收到的赞' },
 ]
 
-function MessageCard({ item }: { item: ipc.MessageItem }) {
+function MessageCard({ item, emotes }: { item: ipc.MessageItem; emotes: Map<string, string> }) {
   const navigate = useAppStore((state) => state.navigate)
   const first = item.users[0]
   const author = (user: { name: string; mid: number }) => navigate({ kind: 'author', name: user.name, mid: user.mid })
@@ -80,7 +80,7 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
           </time>
           {item.quote && item.kind !== 'like' ? (
             <blockquote className="mt-3 whitespace-pre-wrap break-words border-l-2 border-[var(--line)] pl-3 text-[14px] leading-[22px] text-[var(--text-2)]">
-              {quoteNodes(item.quote, item.mentions, author)}
+              {quoteNodes(item.quote, item.mentions, emotes, author)}
             </blockquote>
           ) : null}
           <button type="button" onClick={open} className="group mt-3 flex w-full items-center gap-3 rounded-[6px] bg-[var(--ga0)] p-2 text-left">
@@ -104,30 +104,41 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
   )
 }
 
-function quoteNodes(text: string, mentions: ipc.MessageMention[], onMention: (mention: ipc.MessageMention) => void): React.ReactNode[] {
-  if (mentions.length === 0) return [text]
+function quoteNodes(text: string, mentions: ipc.MessageMention[], emotes: Map<string, string>, onMention: (mention: ipc.MessageMention) => void): React.ReactNode[] {
+  if (mentions.length === 0 && emotes.size === 0) return [text]
   const users = new Map(mentions.map((mention) => [`@${mention.name}`, mention]))
-  const names = [...users.keys()]
+  const tokens = [...emotes.keys(), ...users.keys()]
     .sort((a, b) => b.length - a.length)
-    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const nodes: React.ReactNode[] = []
+  let offset = 0
 
-  return text.split(new RegExp(`(${names.join('|')})`, 'g')).map((part, index) => {
-    if (index % 2 === 0) return part
-    const mention = users.get(part)!
-    return (
-      <button
-        key={index}
-        type="button"
-        onClick={() => onMention(mention)}
-        className="t text-left text-[var(--accent)] hover:underline"
-      >
-        {part}
-      </button>
-    )
-  })
+  for (const match of text.matchAll(new RegExp(tokens.join('|'), 'g'))) {
+    const code = match[0]
+    nodes.push(text.slice(offset, match.index))
+    const url = emotes.get(code)
+    if (url) {
+      nodes.push(<img key={match.index} src={url} alt={code} title={code} referrerPolicy="no-referrer" className="mx-[1px] inline-block h-[20px] w-auto align-[-4px]" />)
+    } else {
+      const mention = users.get(code)!
+      nodes.push(
+        <button
+          key={match.index}
+          type="button"
+          onClick={() => onMention(mention)}
+          className="t text-left text-[var(--accent)] hover:underline"
+        >
+          {code}
+        </button>,
+      )
+    }
+    offset = match.index + code.length
+  }
+  nodes.push(text.slice(offset))
+  return nodes
 }
 
-function MessageList({ kind }: { kind: ipc.MessageKind }) {
+function MessageList({ kind, emotes }: { kind: ipc.MessageKind; emotes: Map<string, string> }) {
   const [items, setItems] = useState<ipc.MessageItem[]>([])
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState<string | null>(null)
@@ -190,7 +201,7 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
         {page > 0 && !loading && !error && items.length === 0 ? (
           <EmptyState icon="message" mascot="peek" title="还没有消息" action={{ label: '刷新', onClick: () => void load(null, 1) }} />
         ) : null}
-        {items.map((item) => <MessageCard key={item.id} item={item} />)}
+        {items.map((item) => <MessageCard key={item.id} item={item} emotes={emotes} />)}
         {items.length > 0 && (hasMore || error) ? (
           <div className="flex justify-center py-4">
             <button
@@ -210,9 +221,15 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
 
 export function MessagesView() {
   const [kind, setKind] = useState<ipc.MessageKind>('reply')
+  const [emotePairs, setEmotePairs] = useState<[string, string][]>([])
+  const emotes = useMemo(() => new Map(emotePairs), [emotePairs])
   const auth = useAuthStore((state) => state.auth)
   const unread = useAppStore((state) => state.messageUnread)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
+
+  useEffect(() => {
+    void ipc.commentEmotes().then(setEmotePairs).catch(() => setEmotePairs([]))
+  }, [])
 
   useEffect(() => {
     if (auth && !auth.logged_in) setAuthOpen(true)
@@ -244,7 +261,7 @@ export function MessagesView() {
         </div>
       </header>
       {!auth ? <BiliTvLoading /> : auth.logged_in ? (
-        <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} />
+        <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} emotes={emotes} />
       ) : (
         <EmptyState icon="message" mascot="peek" title="登录后查看消息" action={{ label: '登录', onClick: () => setAuthOpen(true) }} />
       )}
