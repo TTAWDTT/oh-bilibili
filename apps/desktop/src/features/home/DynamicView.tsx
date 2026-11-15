@@ -25,7 +25,8 @@ function DynamicCard({
   onAuthor: () => void
   onExternal: () => void
 }) {
-  const text = item.text.trim() === item.title.trim() ? '' : item.text.trim()
+  const text =
+    item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
 
   return (
     <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
@@ -62,7 +63,7 @@ function DynamicCard({
             ) : null}
           </div>
           <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-3)]">
-            投稿了视频
+            {item.kind === 'video' ? '投稿了视频' : '发布了动态'}
             <span className="px-1">·</span>
             {item.pub_time}
           </p>
@@ -79,54 +80,90 @@ function DynamicCard({
       </div>
 
       <div className="ml-[60px] mt-3">
+        {item.kind === 'opus' && item.title ? (
+          <p className="mb-2 break-words text-[15px] font-medium leading-[24px] text-[var(--text-1)]">
+            {item.title}
+          </p>
+        ) : null}
         {text ? (
           <p className="mb-3 line-clamp-6 whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)]">
             {text}
           </p>
         ) : null}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
-        >
-          <span
-            className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
-            style={{ aspectRatio: '16 / 9' }}
+        {item.kind === 'video' ? (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
           >
-            <Cover
-              cover={item.cover}
-              title={item.title}
-              width={212}
-              className="h-full w-full transition-transform duration-300 group-hover/video:scale-[1.03]"
-            />
             <span
-              aria-hidden
-              className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/video:bg-black/10 group-hover/video:opacity-100"
+              className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
+              style={{ aspectRatio: '16 / 9' }}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white">
-                <Icon name="play" size={16} />
+              <Cover
+                cover={item.cover}
+                title={item.title}
+                width={212}
+                className="h-full w-full transition-transform duration-300 group-hover/video:scale-[1.03]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/video:bg-black/10 group-hover/video:opacity-100"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white">
+                  <Icon name="play" size={16} />
+                </span>
+              </span>
+              <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
+                {formatDuration(item.duration_ms)}
               </span>
             </span>
-            <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
-              {formatDuration(item.duration_ms)}
-            </span>
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
-            <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
-              {item.title}
-            </span>
-            <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
-              <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
-                <Icon name="play" size={12} />
-                {formatCount(item.views)}
+            <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
+              <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
+                {item.title}
               </span>
-              <span className="flex items-center gap-1" aria-label={`弹幕 ${formatCount(item.danmaku)}`}>
-                <Icon name="danmaku" size={12} />
-                {formatCount(item.danmaku)}
+              <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
+                <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
+                  <Icon name="play" size={12} />
+                  {formatCount(item.views)}
+                </span>
+                <span className="flex items-center gap-1" aria-label={`弹幕 ${formatCount(item.danmaku)}`}>
+                  <Icon name="danmaku" size={12} />
+                  {formatCount(item.danmaku)}
+                </span>
               </span>
             </span>
-          </span>
-        </button>
+          </button>
+        ) : null}
+        {item.kind === 'opus' && item.images.length > 0 ? (
+          <div
+            className={`grid gap-1.5 ${item.images.length === 1 ? 'grid-cols-1' : item.images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
+          >
+            {item.images.slice(0, 9).map((url, index) => (
+              <button
+                key={`${url}-${index}`}
+                type="button"
+                onClick={onOpen}
+                aria-label={`打开第 ${index + 1} 张图片`}
+                className={`t relative overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? '' : 'aspect-square'}`}
+              >
+                <img
+                  src={url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  className={`w-full object-cover ${item.images.length === 1 ? 'max-h-[320px]' : 'h-full'}`}
+                />
+                {index === 8 && item.images.length > 9 ? (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[24px] font-medium text-white">
+                    +{item.images.length - 9}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
         <span className="flex items-center gap-1.5" title={`转发 ${formatCount(item.forwards)}`}>
@@ -292,26 +329,36 @@ export function DynamicView() {
           <DynamicCard
             key={item.id}
             item={item}
-            onOpen={() =>
-              navigate({
-                kind: 'watch',
-                track: {
-                  key: item.bvid,
-                  title: item.title,
-                  artist: item.author,
-                  cover: item.cover,
-                  duration_ms: item.duration_ms,
-                  views: item.views,
-                  danmaku: item.danmaku,
-                  up_avatar: item.face,
-                  up_mid: item.mid,
-                },
-              })
-            }
+            onOpen={() => {
+              if (item.kind === 'video' && item.bvid) {
+                navigate({
+                  kind: 'watch',
+                  track: {
+                    key: item.bvid,
+                    title: item.title,
+                    artist: item.author,
+                    cover: item.cover,
+                    duration_ms: item.duration_ms,
+                    views: item.views,
+                    danmaku: item.danmaku,
+                    up_avatar: item.face,
+                    up_mid: item.mid,
+                  },
+                })
+              } else if (item.kind === 'opus') {
+                void ipc
+                  .openExternal(`https://t.bilibili.com/${item.id}`)
+                  .catch((cause) => toastFailure('打开动态', cause))
+              }
+            }}
             onAuthor={() => navigate({ kind: 'author', name: item.author, mid: item.mid })}
             onExternal={() => {
               void ipc
-                .openExternal(`https://www.bilibili.com/video/${item.bvid}`)
+                .openExternal(
+                  item.kind === 'video'
+                    ? `https://www.bilibili.com/video/${item.bvid}`
+                    : `https://t.bilibili.com/${item.id}`,
+                )
                 .catch((cause) => toastFailure('打开链接', cause))
             }}
           />

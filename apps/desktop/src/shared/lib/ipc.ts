@@ -512,6 +512,7 @@ export function homeFeed(fresh: number): Promise<Track[]> {
 
 export type DynamicItem = {
   id: string
+  kind: 'video' | 'opus'
   mid: number
   author: string
   face: string
@@ -525,6 +526,7 @@ export type DynamicItem = {
   bvid: string
   title: string
   cover: string
+  images: string[]
   duration_ms: number | null
   views: number
   danmaku: number

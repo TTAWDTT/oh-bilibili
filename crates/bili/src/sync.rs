@@ -170,10 +170,18 @@ pub struct Followed {
     pub special: bool,
 }
 
-/// 关注动态里的一条视频投稿。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DynamicKind {
+    Video,
+    Opus,
+}
+
+/// 关注动态里的一条视频或图文投稿。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicItem {
     pub id: String,
+    pub kind: DynamicKind,
     pub mid: u64,
     pub author: String,
     pub face: String,
@@ -187,6 +195,7 @@ pub struct DynamicItem {
     pub bvid: String,
     pub title: String,
     pub cover: String,
+    pub images: Vec<String>,
     pub duration_ms: Option<u64>,
     pub views: u64,
     pub danmaku: u64,
@@ -611,7 +620,7 @@ impl Client {
         let v = self
             .get_json(
                 &format!(
-                    "{API}/x/polymer/web-dynamic/v1/feed/all?type=video&page=1&features=itemOpusStyle{suffix}"
+                    "{API}/x/polymer/web-dynamic/v1/feed/all?type=all&page=1&features=itemOpusStyle{suffix}"
                 ),
                 std::time::Duration::from_millis(400),
             )
@@ -1374,20 +1383,19 @@ fn duration_text_ms(text: &str) -> Option<u64> {
 }
 
 fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
-    if item["type"].as_str() != Some("DYNAMIC_TYPE_AV") {
-        return None;
-    }
     let major = &item["modules"]["module_dynamic"]["major"];
-    if major["type"].as_str() != Some("MAJOR_TYPE_ARCHIVE") {
-        return None;
-    }
-    let archive = &major["archive"];
+    let kind = match (item["type"].as_str(), major["type"].as_str()) {
+        (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
+        (Some("DYNAMIC_TYPE_DRAW"), Some("MAJOR_TYPE_OPUS")) => DynamicKind::Opus,
+        _ => return None,
+    };
     let author = &item["modules"]["module_author"];
-    Some(DynamicItem {
+    let mut dynamic = DynamicItem {
         id: item["id_str"]
             .as_str()
             .map(str::to_string)
             .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?,
+        kind,
         mid: dynamic_mid(&author["mid"])?,
         author: author["name"].as_str().unwrap_or_default().to_string(),
         face: author["face"]
@@ -1401,25 +1409,59 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
         vip: author["vip"]["status"].as_u64() == Some(1),
         pub_time: author["pub_time"].as_str().unwrap_or_default().to_string(),
         pub_ts: author["pub_ts"].as_u64().unwrap_or(0),
-        text: item["modules"]["module_dynamic"]["desc"]["text"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
-        bvid: archive["bvid"].as_str()?.to_string(),
-        title: archive["title"].as_str().unwrap_or_default().to_string(),
-        cover: archive["cover"]
-            .as_str()
-            .unwrap_or_default()
-            .replacen("http://", "https://", 1),
-        duration_ms: archive["duration_text"]
-            .as_str()
-            .and_then(duration_text_ms),
-        views: dynamic_count(&archive["stat"]["play"]),
-        danmaku: dynamic_count(&archive["stat"]["danmaku"]),
+        text: String::new(),
+        bvid: String::new(),
+        title: String::new(),
+        cover: String::new(),
+        images: Vec::new(),
+        duration_ms: None,
+        views: 0,
+        danmaku: 0,
         forwards: dynamic_count(&item["modules"]["module_stat"]["forward"]["count"]),
         comments: dynamic_count(&item["modules"]["module_stat"]["comment"]["count"]),
         likes: dynamic_count(&item["modules"]["module_stat"]["like"]["count"]),
-    })
+    };
+    match dynamic.kind {
+        DynamicKind::Video => {
+            let archive = &major["archive"];
+            dynamic.text = item["modules"]["module_dynamic"]["desc"]["text"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            dynamic.bvid = archive["bvid"].as_str()?.to_string();
+            dynamic.title = archive["title"].as_str().unwrap_or_default().to_string();
+            dynamic.cover = archive["cover"]
+                .as_str()
+                .unwrap_or_default()
+                .replacen("http://", "https://", 1);
+            dynamic.duration_ms = archive["duration_text"]
+                .as_str()
+                .and_then(duration_text_ms);
+            dynamic.views = dynamic_count(&archive["stat"]["play"]);
+            dynamic.danmaku = dynamic_count(&archive["stat"]["danmaku"]);
+        }
+        DynamicKind::Opus => {
+            let opus = &major["opus"];
+            dynamic.title = opus["title"].as_str().unwrap_or_default().to_string();
+            dynamic.text = opus["summary"]["text"]
+                .as_str()
+                .unwrap_or_default()
+                .trim_matches(|c: char| c == '\u{200b}' || c.is_whitespace())
+                .to_string();
+            dynamic.images = opus["pics"]
+                .as_array()
+                .map(|pics| {
+                    pics.iter()
+                        .filter_map(|pic| pic["url"].as_str())
+                        .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
+                        .map(|url| url.replacen("http://", "https://", 1))
+                        .collect()
+                })
+                .unwrap_or_default();
+            dynamic.cover = dynamic.images.first().cloned().unwrap_or_default();
+        }
+    }
+    Some(dynamic)
 }
 
 fn dynamic_count(value: &serde_json::Value) -> u64 {
@@ -1476,6 +1518,8 @@ mod dynamic_duration_tests {
             }
         });
         let dynamic = super::dynamic_item(&item).expect("动态应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Video);
+        assert!(dynamic.images.is_empty());
         assert_eq!(dynamic.views, 353);
         assert_eq!(dynamic.danmaku, 7);
         assert_eq!(dynamic.face, "https://i0.hdslb.com/face.jpg");
