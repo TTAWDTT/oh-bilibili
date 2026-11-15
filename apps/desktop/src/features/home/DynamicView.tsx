@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
+import type { Followed } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -10,7 +11,6 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
-import { PageTitle } from '../../shared/ui/PageTitle'
 
 const FEED = 'mx-auto w-full max-w-[700px] px-4 md:px-0'
 
@@ -28,7 +28,7 @@ function DynamicCard({
   const text = item.text.trim() === item.title.trim() ? '' : item.text.trim()
 
   return (
-    <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-3.5 md:px-5">
+    <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -38,15 +38,30 @@ function DynamicCard({
         >
           <Avatar src={item.face} alt={item.author} size={48} />
         </button>
-        <div className="min-w-0 flex-1 pt-0.5">
-          <button
-            type="button"
-            onClick={onAuthor}
-            className="t block max-w-full truncate text-left text-[14px] font-medium leading-[20px] text-[var(--text-1)] hover:text-[var(--accent)]"
-          >
-            {item.author}
-          </button>
-          <p className="mt-0.5 text-[12px] leading-[17px] text-[var(--text-3)]">
+        <div className="min-w-0 flex-1 pt-px">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onAuthor}
+              className="t block max-w-full truncate text-left text-[15px] font-medium leading-[20px] text-[var(--text-1)] hover:text-[var(--accent)]"
+            >
+              {item.author}
+            </button>
+            {item.official != null ? (
+              <span
+                title={item.official === 1 ? '机构认证' : '个人认证'}
+                className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
+              >
+                <Icon name="check" size={9} />
+              </span>
+            ) : null}
+            {item.vip ? (
+              <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+                大会员
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-3)]">
             投稿了视频
             <span className="px-1">·</span>
             {item.pub_time}
@@ -63,36 +78,44 @@ function DynamicCard({
         </button>
       </div>
 
-      <div className="ml-[60px] mt-2.5">
+      <div className="ml-[60px] mt-3">
         {text ? (
-          <p className="mb-2.5 line-clamp-6 whitespace-pre-wrap break-words text-[14px] leading-[22px] text-[var(--text-1)]">
+          <p className="mb-3 line-clamp-6 whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)]">
             {text}
           </p>
         ) : null}
         <button
           type="button"
           onClick={onOpen}
-          className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left hover:bg-[var(--panel-raised)]"
+          className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
         >
-          <span className="relative w-[38%] max-w-[200px] min-w-[132px] shrink-0 overflow-hidden bg-[var(--ga2)]" style={{ aspectRatio: '16 / 9' }}>
+          <span
+            className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
+            style={{ aspectRatio: '16 / 9' }}
+          >
             <Cover
               cover={item.cover}
               title={item.title}
-              width={200}
+              width={212}
               className="h-full w-full transition-transform duration-300 group-hover/video:scale-[1.03]"
             />
-            <span className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/45 text-white">
-              <Icon name="play" size={11} />
+            <span
+              aria-hidden
+              className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/video:bg-black/10 group-hover/video:opacity-100"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white">
+                <Icon name="play" size={16} />
+              </span>
             </span>
             <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
               {formatDuration(item.duration_ms)}
             </span>
           </span>
-          <span className="flex min-w-0 flex-1 flex-col justify-between px-3 py-2.5">
-            <span className="line-clamp-2 text-[14px] leading-[20px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
+          <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
+            <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
               {item.title}
             </span>
-            <span className="num mt-2 flex items-center gap-3.5 text-[12px] leading-[16px] text-[var(--text-3)]">
+            <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
               <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
                 <Icon name="play" size={12} />
                 {formatCount(item.views)}
@@ -111,6 +134,7 @@ function DynamicCard({
 
 export function DynamicView() {
   const navigate = useAppStore((state) => state.navigate)
+  const [following, setFollowing] = useState<Followed[]>([])
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
   const [offset, setOffset] = useState('')
   const [hasMore, setHasMore] = useState(false)
@@ -119,12 +143,12 @@ export function DynamicView() {
   const [error, setError] = useState<string | null>(null)
   const [errorAppend, setErrorAppend] = useState(false)
   const pending = useRef(false)
-  const prefetched = useRef(false)
+  const prefetchPages = useRef(0)
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
     pending.current = true
-    if (!append) prefetched.current = false
+    if (!append) prefetchPages.current = 0
     setLoading(true)
     setError(null)
     try {
@@ -150,11 +174,18 @@ export function DynamicView() {
     void load(null, false)
   }, [load])
 
-  // 首屏只回来 20 条，滑到第二屏就要等。先悄悄补到 40 条，后面的交给滚动续页。
   useEffect(() => {
-    if (!loaded || !hasMore || loading || error || prefetched.current) return
-    if (items.length === 0 || items.length >= 40) return
-    prefetched.current = true
+    void ipc
+      .following(1)
+      .then(([users]) => setFollowing(users))
+      .catch(() => {})
+  }, [])
+
+  // 一页只有 20 条，滑两屏就断粮。首屏之后连补 4 页，把可视区之外垫到 100 条。
+  useEffect(() => {
+    if (!loaded || !hasMore || loading || error) return
+    if (items.length === 0 || items.length >= 100 || prefetchPages.current >= 4) return
+    prefetchPages.current += 1
     void load(offset, true)
   }, [loaded, hasMore, loading, error, items.length, offset, load])
 
@@ -185,33 +216,61 @@ export function DynamicView() {
       onScroll={(event) => {
         if (!hasMore || loading || error || pending.current) return
         const box = event.currentTarget
-        if (box.scrollHeight - box.scrollTop - box.clientHeight < 1200) {
+        if (box.scrollHeight - box.scrollTop - box.clientHeight < 1800) {
           void load(offset, true)
         }
       }}
       className="min-h-0 flex-1 overflow-y-auto bg-[var(--ga0)] pb-10"
     >
-      <header className="pt-5">
-        <div className={FEED}>
-          <PageTitle
-            action={
-              <button
-                type="button"
-                onClick={() => void load(null, false)}
-                disabled={loading}
-                aria-label="刷新动态"
-                title="刷新动态"
-                className="t press flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-50"
-              >
-                <Icon name="refresh" size={16} />
-              </button>
-            }
-          >
-            动态
-          </PageTitle>
+      <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--panel)]">
+        <div className={`${FEED} flex h-[56px] items-center`}>
+          <h2 className="text-[20px] font-medium text-[var(--text-1)]">动态</h2>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void ipc
+                  .openExternal('https://t.bilibili.com/')
+                  .catch((cause) => toastFailure('打开动态页', cause))
+              }
+              className="bili-press flex h-8 items-center gap-1 rounded-[4px] bg-[var(--accent)] px-3 text-[12px] text-white hover:opacity-90"
+            >
+              <Icon name="plus" size={13} />
+              发布动态
+            </button>
+            <button
+              type="button"
+              onClick={() => void load(null, false)}
+              disabled={loading}
+              aria-label="刷新动态"
+              title="刷新动态"
+              className="t press flex h-8 w-8 items-center justify-center rounded-full border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-50"
+            >
+              <Icon name="refresh" size={15} />
+            </button>
+          </div>
         </div>
       </header>
-      <div className={`${FEED} flex flex-col gap-3`}>
+      {following.length > 0 ? (
+        <div className={`${FEED} pt-4`}>
+          <div className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3">
+            {following.map((user) => (
+              <button
+                key={user.mid}
+                type="button"
+                onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
+                className="t press w-[64px] shrink-0 text-center"
+              >
+                <Avatar src={user.face} alt={user.name} size={48} />
+                <span className="mt-1.5 block truncate text-[12px] leading-[16px] text-[var(--text-2)]">
+                  {user.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <div className={`${FEED} flex flex-col gap-3 pt-4`}>
         {items.map((item) => (
           <DynamicCard
             key={item.id}

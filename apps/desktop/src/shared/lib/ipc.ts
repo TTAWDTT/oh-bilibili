@@ -515,6 +515,10 @@ export type DynamicItem = {
   mid: number
   author: string
   face: string
+  /** 0 个人认证、1 机构认证；null 未认证。 */
+  official: number | null
+  /** 大会员。 */
+  vip: boolean
   pub_time: string
   pub_ts: number
   text: string

@@ -177,6 +177,10 @@ pub struct DynamicItem {
     pub mid: u64,
     pub author: String,
     pub face: String,
+    /// 0 个人认证、1 机构认证；None 未认证。
+    pub official: Option<i8>,
+    /// 大会员。
+    pub vip: bool,
     pub pub_time: String,
     pub pub_ts: u64,
     pub text: String,
@@ -1368,6 +1372,11 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
             .as_str()
             .unwrap_or_default()
             .replacen("http://", "https://", 1),
+        official: author["official_verify"]["type"]
+            .as_i64()
+            .filter(|t| (0..=1).contains(t))
+            .map(|t| t as i8),
+        vip: author["vip"]["status"].as_u64() == Some(1),
         pub_time: author["pub_time"].as_str().unwrap_or_default().to_string(),
         pub_ts: author["pub_ts"].as_u64().unwrap_or(0),
         text: item["modules"]["module_dynamic"]["desc"]["text"]
@@ -1416,6 +1425,8 @@ mod dynamic_duration_tests {
                     "mid": "946974",
                     "name": "测试 UP",
                     "face": "http://i0.hdslb.com/face.jpg",
+                    "official_verify": { "type": 1 },
+                    "vip": { "status": 1 },
                     "pub_time": "刚刚",
                     "pub_ts": 1
                 },
@@ -1438,6 +1449,8 @@ mod dynamic_duration_tests {
         assert_eq!(dynamic.views, 353);
         assert_eq!(dynamic.danmaku, 7);
         assert_eq!(dynamic.face, "https://i0.hdslb.com/face.jpg");
+        assert_eq!(dynamic.official, Some(1));
+        assert!(dynamic.vip);
     }
 }
 
