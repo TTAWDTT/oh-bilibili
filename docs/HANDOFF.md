@@ -192,6 +192,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     普通日期、URL 里的冒号不会被误认成时间戳。
 61. **播放设置**：设置页新增「播放」卡，两行拨杆分别控制自动连播与弹幕；状态直接读写
     `bilimusic.autoplay` / `bilimusic.danmaku`，和播放器里的开关是同一份。
+62. **库页标题**：喜欢页标题按 B 站改为「赞过的视频」，历史页改为「历史记录」；
+    侧栏仍保留短名「喜欢 / 历史」，不占用导航宽度。
 
 ## 一句话现状
 
