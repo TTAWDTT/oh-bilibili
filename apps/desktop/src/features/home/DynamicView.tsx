@@ -128,7 +128,11 @@ export function DynamicView() {
     setError(null)
     try {
       const page = await ipc.dynamicFeed(next)
-      setItems((prev) => (append ? [...prev, ...page.items] : page.items))
+      setItems((prev) => {
+        if (!append) return page.items
+        const seen = new Set(prev.map((item) => item.id))
+        return [...prev, ...page.items.filter((item) => !seen.has(item.id))]
+      })
       setOffset(page.offset)
       setHasMore(page.has_more)
       setLoaded(true)
