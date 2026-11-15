@@ -51,14 +51,16 @@ export function LibraryView() {
       >
         <PageTitle
           action={
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="t press flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-            >
-              <Icon name="plus" size={14} />
-              新建歌单
-            </button>
+            playlists && playlists.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="t press flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                <Icon name="plus" size={14} />
+                新建歌单
+              </button>
+            ) : null
           }
         >
           曲库
@@ -73,8 +75,7 @@ export function LibraryView() {
               mascot="cheer"
               icon="library"
               title="还没有歌单"
-              /* 标题行已经有「新建歌单」，这里不再放第二个同样的按钮。 */
-              action={null}
+              action={{ label: '新建歌单', onClick: () => setCreating(true) }}
             />
           </div>
         ) : (
