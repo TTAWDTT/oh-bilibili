@@ -37,8 +37,15 @@ function DynamicCard({
       return
     }
     const element = textRef.current
-    if (!element || expanded) return
-    setOverflow(element.scrollHeight > element.clientHeight + 1)
+    if (!element) return
+    const measure = (): void => {
+      if (expanded) return
+      setOverflow(element.scrollHeight > element.clientHeight + 1)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
   }, [text, expanded])
 
   return (
