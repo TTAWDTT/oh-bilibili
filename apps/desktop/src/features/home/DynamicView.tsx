@@ -117,6 +117,7 @@ export function DynamicView() {
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorAppend, setErrorAppend] = useState(false)
   const pending = useRef(false)
   const prefetched = useRef(false)
 
@@ -138,6 +139,7 @@ export function DynamicView() {
       setLoaded(true)
     } catch (cause) {
       setError(toWireError(cause).message)
+      setErrorAppend(append)
     } finally {
       pending.current = false
       setLoading(false)
@@ -242,7 +244,7 @@ export function DynamicView() {
           <div className="flex justify-center py-5">
             <button
               type="button"
-              onClick={() => void load(offset, true)}
+              onClick={() => void load(errorAppend ? offset : null, errorAppend)}
               className="t press text-[13px] text-[var(--accent)] hover:underline"
             >
               没取到，重试
