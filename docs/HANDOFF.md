@@ -190,6 +190,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     只保留期数选择器、前后期按钮这类可操作元素。
 60. **简介时间戳**：视频简介里的 `00:12` / `1:02:03` 是主题蓝按钮，点一下跳到那一刻；
     普通日期、URL 里的冒号不会被误认成时间戳。
+61. **播放设置**：设置页新增「播放」卡，两行拨杆分别控制自动连播与弹幕；状态直接读写
+    `bilimusic.autoplay` / `bilimusic.danmaku`，和播放器里的开关是同一份。
 
 ## 一句话现状
 
