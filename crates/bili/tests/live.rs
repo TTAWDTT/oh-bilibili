@@ -719,7 +719,7 @@ async fn 直播与番剧都能取到() {
         "第二页不该重复第一页的房间"
     );
 
-    let bangumi = source.bangumi_rank(6).await.expect("番剧排行应该能取到");
+    let bangumi = source.bangumi_rank(6, 1).await.expect("番剧排行应该能取到");
     println!(
         "番剧 {} 部，第一：{} {} {}",
         bangumi.len(),

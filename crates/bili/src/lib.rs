@@ -404,8 +404,12 @@ impl Source {
     }
 
     /// 番剧排行。
-    pub async fn bangumi_rank(&self, count: usize) -> Result<Vec<sync::BangumiItem>, BiliError> {
-        self.client.bangumi_rank(count).await
+    pub async fn bangumi_rank(
+        &self,
+        count: usize,
+        season_type: u32,
+    ) -> Result<Vec<sync::BangumiItem>, BiliError> {
+        self.client.bangumi_rank(count, season_type).await
     }
 
     /// 番剧更新表（周一…周日）。

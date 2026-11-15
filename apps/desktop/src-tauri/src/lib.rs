@@ -648,8 +648,9 @@ async fn live_rooms(
 async fn bangumi_rank(
     engine: tauri::State<'_, Arc<Engine>>,
     count: usize,
+    season_type: u32,
 ) -> Result<Vec<bilimusic_core::wire::BangumiView>, WireError> {
-    engine.bangumi_rank(count).await
+    engine.bangumi_rank(count, season_type).await
 }
 
 #[tauri::command(rename_all = "snake_case")]

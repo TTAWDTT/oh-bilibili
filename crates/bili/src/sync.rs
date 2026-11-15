@@ -967,11 +967,15 @@ impl Client {
 
     /// 番剧排行（`pgc/web/rank/list`）。这是 B 站首页「番剧」区的数据源。
     ///
-    /// 只取前 `count` 名：接口一次给 99 条，首页只需要一排。
-    pub async fn bangumi_rank(&self, count: usize) -> Result<Vec<BangumiItem>, BiliError> {
+    /// 按 `season_type` 取前 `count` 名，首页固定取番剧分类的一排。
+    pub async fn bangumi_rank(
+        &self,
+        count: usize,
+        season_type: u32,
+    ) -> Result<Vec<BangumiItem>, BiliError> {
         let v = self
             .get_json(
-                &bangumi_rank_url(1),
+                &bangumi_rank_url(season_type),
                 std::time::Duration::from_millis(400),
             )
             .await?;

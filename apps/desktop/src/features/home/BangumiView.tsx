@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -6,20 +6,29 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { BangumiTimeline } from './BangumiTimeline'
 
-/**
- * 番剧频道。B 站番剧区的立绘是高封面（3:4），分数压在右下角。
- *
- * 一次取 42 部：接口一次给 99 条，取一半足够铺满一屏再往下翻一点。
- * 番剧播放要大会员与番剧页专用播放器，本机放不了，点开交给系统浏览器。
- */
+const TABS = [
+  { type: 1, label: '番剧' },
+  { type: 2, label: '电影' },
+  { type: 3, label: '纪录片' },
+  { type: 4, label: '国创' },
+  { type: 5, label: '电视剧' },
+]
+
+/** 番剧频道使用高封面，播放交给系统浏览器。 */
 export function BangumiView() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [seasonType, setSeasonType] = useState(1)
+  const [nonce, setNonce] = useState(0)
   const [items, setItems] = useState<ipc.Bangumi[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    setItems(null)
+    setError(null)
+    scrollRef.current?.scrollTo({ top: 0 })
     void ipc
-      .bangumiRank(42)
+      .bangumiRank(42, seasonType)
       .then((list) => {
         if (!cancelled) setItems(list)
       })
@@ -29,17 +38,13 @@ export function BangumiView() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [seasonType, nonce])
 
   return (
-    <div id="scroll-main" className="bili-canvas min-h-0 flex-1 overflow-y-auto pb-10">
-      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
-        <div className="flex items-baseline gap-2">
+    <div ref={scrollRef} id="scroll-main" className="bili-canvas min-h-0 flex-1 overflow-y-auto pb-10">
+      <nav className="mb-4 bg-[var(--panel)] px-4 pt-4 md:px-8">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-[17px] font-medium text-[var(--text-1)]">番剧</h2>
-          {items ? <span className="num text-[12px] text-[var(--text-3)]">{items.length}</span> : null}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="text-[12px] text-[var(--text-3)]">追番排行榜 · 近三天</p>
           <button
             type="button"
             onClick={() => void ipc.openExternal('https://www.bilibili.com/anime/').catch(() => {})}
@@ -49,20 +54,39 @@ export function BangumiView() {
             在浏览器里看
           </button>
         </div>
+        <div className="no-scrollbar flex items-center gap-5 overflow-x-auto">
+          {TABS.map((tab) => (
+            <button
+              key={tab.type}
+              type="button"
+              aria-pressed={seasonType === tab.type}
+              onClick={() => setSeasonType(tab.type)}
+              className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
+                seasonType === tab.type
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </nav>
       {items === null ? (
         error ? (
-          <EmptyState icon="alert" title="番剧榜没取到" detail={error} action={null} />
+          <EmptyState icon="alert" title="榜单没取到" detail={error} action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }} />
         ) : (
-          <BiliLoader label="正在取番剧…" />
+          <BiliLoader label="正在取榜单…" />
         )
       ) : items.length === 0 ? (
-        <EmptyState icon="biliTv" title="番剧榜暂时是空的" action={null} />
+        <EmptyState icon="biliTv" title="榜单暂时是空的" action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }} />
       ) : (
         <>
-          <div className="px-4 md:px-8">
-            <BangumiTimeline />
-          </div>
+          {seasonType === 1 ? (
+            <div className="px-4 md:px-8">
+              <BangumiTimeline />
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-x-3 gap-y-6 px-4 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 md:px-8">
           {items.map((item) => (
             <button

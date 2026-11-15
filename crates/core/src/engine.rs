@@ -1423,8 +1423,12 @@ impl Engine {
     pub async fn bangumi_rank(
         &self,
         count: usize,
+        season_type: u32,
     ) -> Result<Vec<crate::wire::BangumiView>, WireError> {
-        let list = self.source.bangumi_rank(count).await?;
+        if !(1..=5).contains(&season_type) {
+            return Err(WireError::input("season_type", "分类必须为 1 到 5"));
+        }
+        let list = self.source.bangumi_rank(count, season_type).await?;
         Ok(list
             .into_iter()
             .map(|item| crate::wire::BangumiView {

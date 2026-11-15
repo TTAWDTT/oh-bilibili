@@ -297,8 +297,8 @@ export function bangumiTimeline(): Promise<BangumiDay[]> {
 }
 
 /** 番剧排行。 */
-export function bangumiRank(count = 6): Promise<Bangumi[]> {
-  return call<Bangumi[]>('bangumi_rank', { count })
+export function bangumiRank(count = 6, seasonType = 1): Promise<Bangumi[]> {
+  return call<Bangumi[]>('bangumi_rank', { count, season_type: seasonType })
 }
 
 /** 综合热门。一次 50 条，`no_more` 表示是否到底；每条带 B 站的小标签。 */

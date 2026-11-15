@@ -139,7 +139,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         online: 700_000 - i * 90_000,
         url: `https://live.bilibili.com/${1000 + i}`,
       }))
-    case 'bangumi_rank':
+    case 'bangumi_rank': {
+      if (![1, 2, 3, 4, 5].includes(num(args, 'season_type'))) {
+        throw fail('input', '分类必须为 1 到 5')
+      }
       return CATALOG.slice(0, 6).map((track, i) => ({
         season_id: 33_000 + i,
         title: track.title,
@@ -150,6 +153,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         play_text: '1.2亿',
         url: `https://www.bilibili.com/bangumi/play/ss${33_000 + i}`,
       }))
+    }
     case 'bangumi_timeline':
       return Array.from({ length: 7 }, (_, i) => ({
         date: `11-${String(9 + i).padStart(2, '0')}`,

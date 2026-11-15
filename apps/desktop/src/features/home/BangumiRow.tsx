@@ -17,7 +17,7 @@ export function BangumiRow() {
   useEffect(() => {
     let cancelled = false
     void ipc
-      .bangumiRank(6)
+      .bangumiRank(6, 1)
       .then((list) => {
         if (!cancelled) setItems(list)
       })
@@ -64,7 +64,7 @@ export function BangumiRow() {
                   className="h-full w-full object-cover transition-transform duration-[220ms] group-hover:scale-[1.03]"
                 />
               ) : null}
-              {/* 名次压在左上角，前三名用 B 站的粉 / 橙 / 黄 */}
+              {/* 名次压在左上角，前三名用蓝 / 橙 / 黄 */}
               <span
                 className="num absolute left-0 top-0 px-1.5 text-[12px] font-medium leading-[18px] text-white"
                 style={{
