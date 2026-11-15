@@ -21,7 +21,7 @@ const TABS: { kind: ipc.MessageKind; label: string }[] = [
 function MessageCard({ item }: { item: ipc.MessageItem }) {
   const navigate = useAppStore((state) => state.navigate)
   const first = item.users[0]
-  const author = (user: ipc.MessageMention) => navigate({ kind: 'author', name: user.name, mid: user.mid })
+  const author = (user: { name: string; mid: number }) => navigate({ kind: 'author', name: user.name, mid: user.mid })
 
   const open = () => {
     if (item.bvid) {
