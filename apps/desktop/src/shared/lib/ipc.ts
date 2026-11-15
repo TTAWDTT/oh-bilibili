@@ -528,6 +528,9 @@ export type DynamicItem = {
   duration_ms: number | null
   views: number
   danmaku: number
+  forwards: number
+  comments: number
+  likes: number
 }
 
 export type DynamicPage = {

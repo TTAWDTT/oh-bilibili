@@ -128,6 +128,20 @@ function DynamicCard({
           </span>
         </button>
       </div>
+      <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
+        <span className="flex items-center gap-1.5" title={`转发 ${formatCount(item.forwards)}`}>
+          <Icon name="share" size={15} />
+          {formatCount(item.forwards)}
+        </span>
+        <span className="flex items-center gap-1.5" title={`评论 ${formatCount(item.comments)}`}>
+          <Icon name="message" size={15} />
+          {formatCount(item.comments)}
+        </span>
+        <span className="flex items-center gap-1.5" title={`点赞 ${formatCount(item.likes)}`}>
+          <Icon name="thumb" size={15} />
+          {formatCount(item.likes)}
+        </span>
+      </footer>
     </article>
   )
 }

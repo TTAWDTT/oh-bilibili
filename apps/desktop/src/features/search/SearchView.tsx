@@ -72,13 +72,6 @@ export function SearchView() {
   const [ended, setEnded] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
-  // 统计行要说实话：用户选了「最多播放」，这里就不能还写着「按标题匹配排序」。
-  const orderLabel: Record<typeof order, string> = {
-    totalrank: '综合排序',
-    click: '按播放量',
-    pubdate: '按发布时间',
-    danmaku: '按弹幕数',
-  }
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   const clearHistory = useSearchHistory((s) => s.clear)
@@ -474,21 +467,25 @@ export function SearchView() {
                 </div>
               </div>
             ) : null}
-            <div className="mb-2 flex min-h-5 flex-wrap items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] tracking-[0.16em] text-[var(--text-2)]">
+            <div className="mb-2 flex min-h-5 items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] text-[var(--text-3)]">
               <span>
                 {status === 'error'
                   ? '搜索失败'
                   : status === 'loading'
                     ? '正在搜索…'
-                    : status === 'ready'
-                      // 说「已加载」而不是「为你找到」：这个数字随滚动增长，
-                      // 写成结果总数就是把两件事混成一句谎话。
-                      ? `已加载 ${tracks.length} 个 · ${orderLabel[order]}`
+                    : loadingMore
+                      ? '正在加载更多…'
                       : ''}
               </span>
-              {status === 'loading' && tracks.length > 0 ? (
-                <span className="h-3 w-3 animate-spin rounded-full border border-[var(--line)] border-t-white/70" />
-              ) : null}
+              <span className="flex items-center gap-2">
+                {tracks.length > 0 ? (
+                  // 「已加载」不说「共」：这个数字随滚动增长，不是 B 站的结果总数。
+                  <span className="num">已加载 {formatCount(tracks.length)} 个</span>
+                ) : null}
+                {status === 'loading' && tracks.length > 0 ? (
+                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--line)] border-t-white/70" />
+                ) : null}
+              </span>
             </div>
 
             {tracks.length > 0 ? (

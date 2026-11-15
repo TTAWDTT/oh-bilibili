@@ -190,6 +190,10 @@ pub struct DynamicItem {
     pub duration_ms: Option<u64>,
     pub views: u64,
     pub danmaku: u64,
+    /// 动态本身的转发 / 评论 / 点赞数，不是稿件统计。
+    pub forwards: u64,
+    pub comments: u64,
+    pub likes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1394,6 +1398,9 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
             .and_then(duration_text_ms),
         views: dynamic_count(&archive["stat"]["play"]),
         danmaku: dynamic_count(&archive["stat"]["danmaku"]),
+        forwards: dynamic_count(&item["modules"]["module_stat"]["forward"]["count"]),
+        comments: dynamic_count(&item["modules"]["module_stat"]["comment"]["count"]),
+        likes: dynamic_count(&item["modules"]["module_stat"]["like"]["count"]),
     })
 }
 
@@ -1442,6 +1449,11 @@ mod dynamic_duration_tests {
                             "stat": { "play": "353", "danmaku": 7 }
                         }
                     }
+                },
+                "module_stat": {
+                    "forward": { "count": 3 },
+                    "comment": { "count": 12 },
+                    "like": { "count": 45 }
                 }
             }
         });
@@ -1451,6 +1463,9 @@ mod dynamic_duration_tests {
         assert_eq!(dynamic.face, "https://i0.hdslb.com/face.jpg");
         assert_eq!(dynamic.official, Some(1));
         assert!(dynamic.vip);
+        assert_eq!(dynamic.forwards, 3);
+        assert_eq!(dynamic.comments, 12);
+        assert_eq!(dynamic.likes, 45);
     }
 }
 
