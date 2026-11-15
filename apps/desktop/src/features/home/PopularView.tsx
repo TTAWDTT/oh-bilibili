@@ -8,6 +8,7 @@ import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { WideCard } from '../tracks/WideCard'
+import { HotTabs } from './HotTabs'
 
 /**
  * 热门。B 站的综合热门（popular/all）：按时间往下翻，一次 50 条，没有名次。
@@ -106,17 +107,11 @@ export function PopularView() {
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      {/*
-       * B 站热门页是白色 header 带：标题 + 一行副标题、右侧「热门规则」入口。
-       * 下面正文是两列横排大卡，跟发现页的封面网格完全不是一套密度。
-       */}
-      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-[17px] font-medium text-[var(--text-1)]">热门</h2>
-          {tracks ? <span className="num text-[12px] text-[var(--text-3)]">{tracks.length}</span> : null}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="text-[12px] text-[var(--text-3)]">各个领域中新奇好玩的优质内容都在这里~</p>
+      <HotTabs
+        active="popular"
+        title="热门"
+        extra={tracks ? String(tracks.length) : undefined}
+        aside={
           <button
             type="button"
             onClick={() => void ipc.openExternal('https://www.bilibili.com/v/popular/all').catch(() => {})}
@@ -125,8 +120,10 @@ export function PopularView() {
             <Icon name="info" size={12} />
             热门规则
           </button>
-        </div>
-      </nav>
+        }
+      >
+        <p className="text-[12px] text-[var(--text-3)]">各个领域中新奇好玩的优质内容都在这里~</p>
+      </HotTabs>
       <div className="px-4 md:px-8">
         {tracks === null ? (
           error ? (

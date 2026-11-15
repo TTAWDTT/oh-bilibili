@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { PageTitle } from '../../shared/ui/PageTitle'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Cover } from '../../shared/ui/Cover'
@@ -11,6 +10,7 @@ import { formatCount, formatDuration } from '../../shared/lib/format'
 import { usePlayerStore } from '../player/playerStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { useAppStore } from '../../app/appStore'
+import { HotTabs } from './HotTabs'
 
 /** 名次底色：B 站前三是粉红 / 橙 / 黄，其余是一块半透明黑。 */
 function rankTone(rank: number): string {
@@ -121,37 +121,36 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
 
   return (
     <div ref={scrollRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      {/*
-       * B 站排行榜页是白色 header 带：标题、一行口径说明、一排文字 tab（选中项挂蓝色下划线）。
-       * 之前用灰色胶囊平铺在灰底上，跟榜单页原版完全不是一个东西，也没有说清楚这个榜怎么排的。
-       */}
-      <nav className="mb-3 border-b border-[var(--line)] bg-[var(--panel)] px-4 pb-0 pt-4 md:px-8">
-        <PageTitle extra={tracks ? String(tracks.length) : undefined}>排行榜</PageTitle>
-        <p className="-mt-2 mb-3 text-[12px] text-[var(--text-3)]">
-          榜单根据稿件内容质量与近期数据综合排序，动态更新
-        </p>
-        <div className="no-scrollbar -mb-px flex items-center gap-5 overflow-x-auto">
-          {PARTS.map((part) => (
-            <button
-              key={part.rid}
-              type="button"
-              aria-pressed={part.rid === rid}
-              onClick={() => {
-                setRid(part.rid)
-                // 记进当前视图：从视频页返回时还落在同一个分区
-                replace({ kind: 'ranking', rid: part.rid })
-              }}
-              className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
-                part.rid === rid
-                  ? 'border-[var(--accent)] text-[var(--accent)]'
-                  : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
-              }`}
-            >
-              {part.name}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <HotTabs
+        active="ranking"
+        title="排行榜"
+        extra={tracks ? String(tracks.length) : undefined}
+        below={
+          <div className="no-scrollbar -mb-px flex items-center gap-5 overflow-x-auto border-b border-[var(--line)]">
+            {PARTS.map((part) => (
+              <button
+                key={part.rid}
+                type="button"
+                aria-pressed={part.rid === rid}
+                onClick={() => {
+                  setRid(part.rid)
+                  // 记进当前视图：从视频页返回时还落在同一个分区
+                  replace({ kind: 'ranking', rid: part.rid })
+                }}
+                className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
+                  part.rid === rid
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+                }`}
+              >
+                {part.name}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        <p className="text-[12px] text-[var(--text-3)]">榜单根据稿件内容质量与近期数据综合排序，动态更新</p>
+      </HotTabs>
       <div className="px-4 md:px-8">
       {error ? (
         <EmptyState

@@ -7,6 +7,7 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { useAppStore } from '../../app/appStore'
 import { WideCard } from '../tracks/WideCard'
+import { HotTabs } from './HotTabs'
 
 /**
  * 每周必看。B 站自己按周出的片单：一期一个主题，一次 50 条。
@@ -92,13 +93,9 @@ export function WeeklyView() {
        * B 站每周必看：白色 header 带里是「第 N 期(日期更新)」+ 一行更新时间，
        * 正文和热门、入站必刷一样是两列横排大卡，每张卡多一句 B 站写的推荐语。
        */}
-      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
-        {/*
-         * B 站这一带只有一行：左边「第399期(1113更新) ▾」，紧接着「每周五晚 18:00 更新」，
-         * 右边是前后两期。期号同时当标题用——主题句在片单里已经说过一遍。
-         */}
+      <HotTabs active="weekly" title="每周必看">
+        {/* B 站这一带只有一行：左边「第399期(1113更新) ▾」，紧接着更新时间，右边是前后两期。 */}
         <div className="flex items-center gap-3">
-          <h2 className="sr-only">每周必看</h2>
           {issues && issues.length > 0 ? (
             <div className="relative shrink-0">
               <button
@@ -147,9 +144,7 @@ export function WeeklyView() {
                 </div>
               ) : null}
             </div>
-          ) : (
-            <span className="text-[13px] text-[var(--text-2)]">每周必看</span>
-          )}
+          ) : null}
           <p className="text-[12px] text-[var(--text-3)]">每周五晚 18:00 更新</p>
           {/* 398 期，下拉翻起来也慢；前后各给一个。 */}
           <span className="ml-auto flex shrink-0 items-center gap-1">
@@ -176,7 +171,7 @@ export function WeeklyView() {
             </button>
           </span>
         </div>
-      </nav>
+      </HotTabs>
 
       <div className="px-4 md:px-8">
       {error ? (

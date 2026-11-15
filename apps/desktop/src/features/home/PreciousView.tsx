@@ -6,6 +6,7 @@ import { useAppStore } from '../../app/appStore'
 import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { WideCard } from '../tracks/WideCard'
+import { HotTabs } from './HotTabs'
 
 /**
  * 入站必刷。B 站给新用户的首屏片单：一次返回全部条目，每条配一句官方推荐语。
@@ -41,14 +42,13 @@ export function PreciousView() {
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      {/* B 站入站必刷和热门共用同一条白色 header 带，正文也是同一种横排大卡；只有每张卡下面多一句官方推荐语。 */}
-      <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-[17px] font-medium text-[var(--text-1)]">{data?.title ?? '入站必刷'}</h2>
-          {data ? <span className="num text-[12px] text-[var(--text-3)]">{data.items.length}</span> : null}
-        </div>
-        {data?.explain ? <p className="mt-1 text-[12px] text-[var(--text-3)]">{data.explain}</p> : null}
-      </nav>
+      <HotTabs
+        active="precious"
+        title={data?.title ?? '入站必刷'}
+        extra={data ? String(data.items.length) : undefined}
+      >
+        {data?.explain ? <p className="text-[12px] text-[var(--text-3)]">{data.explain}</p> : null}
+      </HotTabs>
       <div className="px-4 md:px-8">
         {data === null ? (
           error ? (
