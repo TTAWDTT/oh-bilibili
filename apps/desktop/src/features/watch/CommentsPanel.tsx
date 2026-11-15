@@ -11,22 +11,77 @@ import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
 
-/** 把评论里的 [表情] 代号换成 B 站表情图，其余文字原样保留。 */
-function CommentText({ text, emotes }: { text: string; emotes: [string, string][] }) {
-  if (emotes.length === 0) return <>{text}</>
+/** 把一段纯文字里的 @名字 换成可点链接；名字必须出现在接口给的 members 里。 */
+function mentionNodes(
+  text: string,
+  mentions: [string, number][],
+  open: (name: string, mid: number) => void,
+  keyBase: number,
+): ReactNode[] {
+  if (mentions.length === 0) return [text]
+  const names = [...mentions]
+    .sort((a, b) => b[0].length - a[0].length)
+    .map(([name]) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(`@(${names.join('|')})`, 'g')
+  const nodes: ReactNode[] = []
+  let last = 0
+  for (const match of text.matchAll(pattern)) {
+    const at = match.index ?? 0
+    if (at > last) nodes.push(text.slice(last, at))
+    const name = match[1] ?? ''
+    const mid = mentions.find(([value]) => value === name)?.[1] ?? 0
+    nodes.push(
+      <button
+        key={`${keyBase}-${at}`}
+        type="button"
+        onClick={() => open(name, mid)}
+        className="t text-[var(--accent)] hover:underline"
+      >
+        @{name}
+      </button>,
+    )
+    last = at + match[0].length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+/** 把评论里的 [表情] 代号换成 B 站表情图，@用户 换成可点链接，其余文字原样保留。 */
+function CommentText({
+  text,
+  emotes,
+  mentions,
+}: {
+  text: string
+  emotes: [string, string][]
+  mentions: [string, number][]
+}) {
+  const navigate = useAppStore((state) => state.navigate)
+  if (emotes.length === 0 && mentions.length === 0) return <>{text}</>
   const map = new Map(emotes)
   const nodes: ReactNode[] = []
   let buffer = ''
+  let chunk = 0
+  const flush = (): void => {
+    if (!buffer) return
+    nodes.push(
+      ...mentionNodes(
+        buffer,
+        mentions,
+        (name, mid) => navigate({ kind: 'author', name, mid }),
+        chunk,
+      ),
+    )
+    buffer = ''
+    chunk += 1
+  }
   for (let i = 0; i < text.length; i += 1) {
     if (text[i] === '[') {
       const end = text.indexOf(']', i)
       const code = end > i ? text.slice(i, end + 1) : ''
       const url = code ? map.get(code) : undefined
       if (url) {
-        if (buffer) {
-          nodes.push(buffer)
-          buffer = ''
-        }
+        flush()
         nodes.push(
           <img
             key={`${i}-${code}`}
@@ -43,7 +98,7 @@ function CommentText({ text, emotes }: { text: string; emotes: [string, string][
     }
     buffer += text[i]
   }
-  if (buffer) nodes.push(buffer)
+  flush()
   return <>{nodes}</>
 }
 
@@ -205,7 +260,7 @@ function CommentRow({
             ) : null}
           </div>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
-            <CommentText text={c.text} emotes={c.emotes} />
+            <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
           </p>
         </div>
       </div>
@@ -445,6 +500,7 @@ export function CommentsPanel({
             avatar: me?.avatar ?? null,
             text,
             emotes: [],
+            mentions: [],
             level: me?.level ?? 0,
             likes: 0,
             at: Math.floor(Date.now() / 1000),

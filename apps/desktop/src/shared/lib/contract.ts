@@ -65,6 +65,8 @@ export type Comment = {
   text: string
   /** 评论里的 B 站表情：代号（如 [doge]）到图片地址。 */
   emotes: [string, string][]
+  /** 评论里 @ 到的用户：名字到 uid。 */
+  mentions: [string, number][]
   /** 评论者等级。 */
   level: number
   likes: number

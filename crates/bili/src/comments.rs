@@ -17,6 +17,8 @@ pub struct Comment {
     pub text: String,
     /// 评论里的 B 站表情：原文代号（如 `[doge]`）到图片地址。
     pub emotes: Vec<(String, String)>,
+    /// 评论里 @ 到的用户：名字到 uid。正文里的 @名字 会做成可点链接。
+    pub mentions: Vec<(String, u64)>,
     /// 评论者等级。B 站把 LV 牌挂在昵称后面。
     pub level: u8,
     pub likes: u32,
@@ -141,12 +143,23 @@ struct RawContent {
     message: String,
     #[serde(default)]
     emote: Option<HashMap<String, RawEmote>>,
+    /// 被 @ 的用户。B 站只在真的有提及时给这个数组。
+    #[serde(default)]
+    members: Option<Vec<RawMention>>,
 }
 
 #[derive(Deserialize)]
 struct RawEmote {
     #[serde(default)]
     url: String,
+}
+
+#[derive(Deserialize)]
+struct RawMention {
+    #[serde(default, deserialize_with = "u64_from_any")]
+    mid: u64,
+    #[serde(default)]
+    uname: String,
 }
 
 #[derive(Deserialize)]
@@ -196,7 +209,7 @@ fn to_comment(raw: RawReply) -> Comment {
         .take(3)
         .map(to_comment)
         .collect();
-    let (text, emotes) = raw
+    let (text, emotes, mentions) = raw
         .content
         .map(|c| {
             let emotes = c
@@ -212,7 +225,14 @@ fn to_comment(raw: RawReply) -> Comment {
                     }
                 })
                 .collect();
-            (c.message, emotes)
+            let mentions = c
+                .members
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|m| m.mid > 0 && !m.uname.is_empty())
+                .map(|m| (m.uname, m.mid))
+                .collect();
+            (c.message, emotes, mentions)
         })
         .unwrap_or_default();
     Comment {
@@ -228,6 +248,7 @@ fn to_comment(raw: RawReply) -> Comment {
         }),
         text,
         emotes,
+        mentions,
         level,
         likes: raw.like,
         at: raw.ctime,
@@ -387,6 +408,35 @@ mod tests {
         let page = page_from(&value, 1, 20);
         assert!(page.items[0].up_liked);
         assert!(!page.items[1].up_liked);
+    }
+
+    #[test]
+    fn 评论里的艾特带出用户() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 1 },
+                "replies": [
+                    { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
+                      "content": {
+                        "message": "@冰冰冰冰茶茶茶 @心儿心儿xm 你们好",
+                        "members": [
+                          { "mid": "293604095", "uname": "冰冰冰冰茶茶茶" },
+                          { "mid": 41405030, "uname": "心儿心儿xm" }
+                        ]
+                      },
+                      "like": 1, "ctime": 1 }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        assert_eq!(
+            page.items[0].mentions,
+            vec![
+                ("冰冰冰冰茶茶茶".to_string(), 293_604_095),
+                ("心儿心儿xm".to_string(), 41_405_030)
+            ]
+        );
     }
 
     #[test]
