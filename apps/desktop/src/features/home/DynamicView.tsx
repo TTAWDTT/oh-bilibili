@@ -158,6 +158,7 @@ export function DynamicView() {
   const [errorAppend, setErrorAppend] = useState(false)
   const pending = useRef(false)
   const prefetchPages = useRef(0)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
@@ -172,6 +173,7 @@ export function DynamicView() {
         const seen = new Set(prev.map((item) => item.id))
         return [...prev, ...page.items.filter((item) => !seen.has(item.id))]
       })
+      if (!append) scrollerRef.current?.scrollTo({ top: 0 })
       setOffset(page.offset)
       setHasMore(page.has_more)
       setLoaded(true)
@@ -226,6 +228,7 @@ export function DynamicView() {
 
   return (
     <div
+      ref={scrollerRef}
       id="scroll-main"
       onScroll={(event) => {
         if (!hasMore || loading || error || pending.current) return
