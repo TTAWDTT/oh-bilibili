@@ -7,12 +7,12 @@ import { Icon } from '../../shared/ui/Icon'
 import { BangumiTimeline } from './BangumiTimeline'
 
 const TABS = [
-  { type: 1, label: '番剧' },
-  { type: 2, label: '电影' },
-  { type: 3, label: '纪录片' },
-  { type: 4, label: '国创' },
-  { type: 5, label: '电视剧' },
-]
+  { type: 1, label: '番剧', url: 'https://www.bilibili.com/anime/' },
+  { type: 2, label: '电影', url: 'https://www.bilibili.com/movie/' },
+  { type: 3, label: '纪录片', url: 'https://www.bilibili.com/documentary/' },
+  { type: 4, label: '国创', url: 'https://www.bilibili.com/guochuang/' },
+  { type: 5, label: '电视剧', url: 'https://www.bilibili.com/tv/' },
+] as const
 
 /** 番剧频道使用高封面，播放交给系统浏览器。 */
 export function BangumiView() {
@@ -21,6 +21,7 @@ export function BangumiView() {
   const [nonce, setNonce] = useState(0)
   const [items, setItems] = useState<ipc.Bangumi[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const activeTab = TABS.find((tab) => tab.type === seasonType) ?? TABS[0]
 
   useEffect(() => {
     let cancelled = false
@@ -47,7 +48,7 @@ export function BangumiView() {
           <h2 className="text-[17px] font-medium text-[var(--text-1)]">番剧</h2>
           <button
             type="button"
-            onClick={() => void ipc.openExternal('https://www.bilibili.com/anime/').catch(() => {})}
+            onClick={() => void ipc.openExternal(activeTab.url).catch(() => {})}
             className="t press flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
           >
             <Icon name="info" size={12} />
