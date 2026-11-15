@@ -196,6 +196,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     `bilimusic.autoplay` / `bilimusic.danmaku`，和播放器里的开关是同一份。
 62. **库页标题**：喜欢页标题按 B 站改为「赞过的视频」，历史页改为「历史记录」；
     侧栏仍保留短名「喜欢 / 历史」，不占用导航宽度。
+63. **评论 @ 用户**：接口 `content.members` 里的用户会按名字匹配正文里的 `@名字`，
+    渲染成主题蓝按钮，点进对应空间；没有公开投稿的用户显示「还没有公开投稿」并给 B 站空间入口。
 
 ## 一句话现状
 
