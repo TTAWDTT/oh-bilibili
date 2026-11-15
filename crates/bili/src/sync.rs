@@ -1485,6 +1485,56 @@ mod dynamic_duration_tests {
         assert_eq!(dynamic.comments, 12);
         assert_eq!(dynamic.likes, 45);
     }
+
+    #[test]
+    fn 图文动态保留标题正文与图片() {
+        let item = json!({
+            "id_str": "2",
+            "type": "DYNAMIC_TYPE_DRAW",
+            "modules": {
+                "module_author": {
+                    "mid": 946974_u64,
+                    "name": "测试 UP",
+                    "face": "http://i0.hdslb.com/face.jpg",
+                    "pub_time": "刚刚",
+                    "pub_ts": 1
+                },
+                "module_dynamic": {
+                    "desc": null,
+                    "major": {
+                        "type": "MAJOR_TYPE_OPUS",
+                        "opus": {
+                            "title": "十一月周边大放送",
+                            "summary": { "text": "\u{200b}抽十份相框" },
+                            "pics": [
+                                { "url": "http://i0.hdslb.com/a.png" },
+                                { "url": "https://i0.hdslb.com/b.png" }
+                            ]
+                        }
+                    }
+                },
+                "module_stat": {
+                    "forward": { "count": 1 },
+                    "comment": { "count": 2 },
+                    "like": { "count": 3 }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("图文动态应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Opus);
+        assert_eq!(dynamic.title, "十一月周边大放送");
+        assert_eq!(dynamic.text, "抽十份相框");
+        assert_eq!(
+            dynamic.images,
+            vec![
+                "https://i0.hdslb.com/a.png".to_string(),
+                "https://i0.hdslb.com/b.png".to_string()
+            ]
+        );
+        assert_eq!(dynamic.bvid, "");
+        assert_eq!(dynamic.views, 0);
+        assert_eq!(dynamic.likes, 3);
+    }
 }
 
 fn bangumi_rank_url(season_type: u32) -> String {
