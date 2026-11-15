@@ -369,8 +369,12 @@ function DynamicCard({
           </div>
           <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-3)]">
             {kindLabel}
-            <span className="px-1">·</span>
-            {item.pub_time}
+            {item.pub_time ? (
+              <>
+                <span className="px-1">·</span>
+                {item.pub_time}
+              </>
+            ) : null}
           </p>
         </div>
         <button

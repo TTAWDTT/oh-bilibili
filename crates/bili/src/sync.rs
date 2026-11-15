@@ -1415,6 +1415,8 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
         (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_ARTICLE")) => DynamicKind::Article,
         // 关注流里夹的直播推荐。B 站网页把这几条画成普通直播卡。
         (Some("DYNAMIC_TYPE_LIVE_RCMD"), Some("MAJOR_TYPE_LIVE_RCMD")) => DynamicKind::Live,
+        // 转发里的原动态常常是直播，信息在 major.live，不走 live_rcmd。
+        (Some("DYNAMIC_TYPE_LIVE"), Some("MAJOR_TYPE_LIVE")) => DynamicKind::Live,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
         _ => return None,
     };
@@ -1528,18 +1530,34 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
                 .unwrap_or_default();
         }
         DynamicKind::Live => {
-            // 推荐卡把房间信息塞在 content 字符串里，是嵌了一层的 JSON。
-            let content = major["live_rcmd"]["content"].as_str().unwrap_or_default();
-            let parsed = serde_json::from_str::<serde_json::Value>(content).unwrap_or_default();
-            let info = &parsed["live_play_info"];
-            dynamic.room_id = info["room_id"].as_u64().unwrap_or(0);
-            dynamic.title = info["title"].as_str().unwrap_or_default().to_string();
-            dynamic.cover = info["cover"]
-                .as_str()
-                .unwrap_or_default()
-                .replacen("http://", "https://", 1);
-            dynamic.live_area = info["area_name"].as_str().unwrap_or_default().to_string();
-            dynamic.views = info["online"].as_u64().unwrap_or(0);
+            let live = &major["live"];
+            if !live.is_null() {
+                dynamic.room_id = live["id"]
+                    .as_str()
+                    .and_then(|id| id.parse().ok())
+                    .or_else(|| live["id"].as_u64())
+                    .unwrap_or(0);
+                dynamic.title = live["title"].as_str().unwrap_or_default().to_string();
+                dynamic.cover = live["cover"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .replacen("http://", "https://", 1);
+                dynamic.live_area = live["desc_first"].as_str().unwrap_or_default().to_string();
+                dynamic.views = audience_count(live["desc_second"].as_str().unwrap_or_default());
+            } else {
+                // 推荐卡把房间信息塞在 content 字符串里，是嵌了一层的 JSON。
+                let content = major["live_rcmd"]["content"].as_str().unwrap_or_default();
+                let parsed = serde_json::from_str::<serde_json::Value>(content).unwrap_or_default();
+                let info = &parsed["live_play_info"];
+                dynamic.room_id = info["room_id"].as_u64().unwrap_or(0);
+                dynamic.title = info["title"].as_str().unwrap_or_default().to_string();
+                dynamic.cover = info["cover"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .replacen("http://", "https://", 1);
+                dynamic.live_area = info["area_name"].as_str().unwrap_or_default().to_string();
+                dynamic.views = info["online"].as_u64().unwrap_or(0);
+            }
         }
         DynamicKind::Forward => {
             dynamic.text = item["modules"]["module_dynamic"]["desc"]["text"]
@@ -1561,6 +1579,17 @@ fn dynamic_count(value: &serde_json::Value) -> u64 {
         .as_u64()
         .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
         .unwrap_or(0)
+}
+
+/// 直播卡的人群文案：「2172人看过」「1.2万人看过」。
+fn audience_count(text: &str) -> u64 {
+    let digits: String = text
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let base: f64 = digits.parse().unwrap_or(0.0);
+    let scale = if text.contains('万') { 10_000.0 } else { 1.0 };
+    (base * scale) as u64
 }
 
 #[cfg(test)]
@@ -1852,6 +1881,45 @@ mod dynamic_duration_tests {
         assert_eq!(dynamic.live_area, "教育学习");
         assert_eq!(dynamic.views, 758);
         assert_eq!(dynamic.pub_ts, 1_794_750_425);
+    }
+
+    #[test]
+    fn 转发里的直播原动态解析房间() {
+        let item = json!({
+            "id_str": "10",
+            "type": "DYNAMIC_TYPE_FORWARD",
+            "modules": {
+                "module_author": { "mid": 1_u64, "name": "转发者", "pub_time": "刚刚" },
+                "module_dynamic": { "desc": { "text": "在播" }, "major": null }
+            },
+            "orig": {
+                "id_str": "11",
+                "type": "DYNAMIC_TYPE_LIVE",
+                "modules": {
+                    "module_author": { "mid": 2_u64, "name": "主播" },
+                    "module_dynamic": {
+                        "desc": null,
+                        "major": {
+                            "type": "MAJOR_TYPE_LIVE",
+                            "live": {
+                                "id": "21204307",
+                                "title": "情感电台欢迎连麦",
+                                "cover": "https://i0.hdslb.com/live.jpg",
+                                "desc_first": "英雄联盟",
+                                "desc_second": "2172人看过"
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("转发应能解析");
+        let orig = dynamic.orig.expect("应带出原直播");
+        assert_eq!(orig.kind, super::DynamicKind::Live);
+        assert_eq!(orig.room_id, 21_204_307);
+        assert_eq!(orig.live_area, "英雄联盟");
+        assert_eq!(orig.views, 2_172);
+        assert_eq!(orig.title, "情感电台欢迎连麦");
     }
 
     #[test]
