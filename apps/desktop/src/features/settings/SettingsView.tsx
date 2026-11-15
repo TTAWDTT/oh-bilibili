@@ -15,6 +15,8 @@ import type { IconName } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { ShortcutTable } from './ShortcutTable'
+import { useAutoplay } from '../watch/autoplay'
+import { useDanmakuSettings } from '../player/danmakuSettings'
 
 /** 窄屏没有侧栏，这些入口收进「我的」，和 B 站 App 的个人页一样排成一排。 */
 const SERVICES: readonly {
@@ -44,6 +46,40 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/** 开关行：左边一项设置，右边 B 站播放器那种 28×16 拨杆。 */
+function SwitchRow({
+  label,
+  on,
+  onChange,
+}: {
+  label: string
+  on: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="t flex w-full items-center justify-between py-2.5 text-left"
+    >
+      <span className="text-[13.5px] text-[var(--text-1)]">{label}</span>
+      <span
+        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+          on ? 'bg-[var(--accent)]' : 'bg-[var(--ga2)]'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+            on ? 'translate-x-3.5' : 'translate-x-0.5'
+          }`}
+        />
+      </span>
+    </button>
+  )
+}
+
 export function SettingsView() {
   const auth = useAuthStore((state) => state.auth)
   const logout = useAuthStore((state) => state.logout)
@@ -56,6 +92,10 @@ export function SettingsView() {
   /** 粉丝与关注数。和 UP 名片同一条接口，读不到就不显示。 */
   const [relation, setRelation] = useState<[number, number] | null>(null)
   const user = auth?.logged_in === true ? auth.user : null
+  const autoplay = useAutoplay((state) => state.enabled)
+  const setAutoplay = useAutoplay((state) => state.setEnabled)
+  const danmakuOn = useDanmakuSettings((state) => state.enabled)
+  const setDanmakuEnabled = useDanmakuSettings((state) => state.setEnabled)
 
   useEffect(() => {
     if (!user) {
@@ -115,6 +155,13 @@ export function SettingsView() {
               <ShortcutTable />
             </Section>
           </div>
+
+          <Section title="播放">
+            <div className="divide-y divide-[var(--hairline)]">
+              <SwitchRow label="自动连播" on={autoplay} onChange={setAutoplay} />
+              <SwitchRow label="弹幕" on={danmakuOn} onChange={setDanmakuEnabled} />
+            </div>
+          </Section>
 
           <Section title="账号">
             {user ? (
