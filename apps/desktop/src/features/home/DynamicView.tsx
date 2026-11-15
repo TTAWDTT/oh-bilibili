@@ -256,6 +256,10 @@ function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
       void ipc
         .openExternal(`https://www.bilibili.com/read/cv${orig.article_id}`)
         .catch((cause) => toastFailure('打开专栏', cause))
+    } else if (orig.kind === 'live' && orig.room_id) {
+      void ipc
+        .openExternal(`https://live.bilibili.com/${orig.room_id}`)
+        .catch((cause) => toastFailure('打开直播间', cause))
     } else {
       void ipc
         .openExternal(`https://www.bilibili.com/opus/${orig.id}`)
@@ -273,6 +277,13 @@ function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
+        // 内层按钮自己要处理键盘：冒泡上来再整卡打开会抢掉它的动作。
+        if (
+          event.target !== event.currentTarget &&
+          (event.target as HTMLElement).closest('button')
+        ) {
+          return
+        }
         event.preventDefault()
         open()
       }}
