@@ -20,7 +20,7 @@ export function LevelBadge({ level }: { level: number }) {
   return (
     <span
       className="shrink-0 rounded-[3px] px-1.5 text-[11.5px] font-semibold leading-[18px] text-white"
-      style={{ background: COLORS[level] ?? COLORS[0] }}
+      style={{ background: COLORS[level] ?? COLORS[0], textShadow: '0 1px 1px rgb(0 0 0 / 0.2)' }}
       title={`LV${level}`}
     >
       LV{level}
