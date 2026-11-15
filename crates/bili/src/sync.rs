@@ -1424,6 +1424,31 @@ fn bangumi_rank_url(season_type: u32) -> String {
     format!("{API}/pgc/web/rank/list?day=3&season_type={season_type}")
 }
 
+fn bangumi_follow_item(value: &serde_json::Value) -> Option<BangumiItem> {
+    Some(BangumiItem {
+        season_id: value["season_id"].as_u64()?,
+        title: value["title"].as_str().unwrap_or_default().to_string(),
+        cover: value["cover"]
+            .as_str()
+            .filter(|cover| !cover.is_empty())
+            .map(|cover| cover.replacen("http://", "https://", 1)),
+        rank: 0,
+        rating: value["rating"]["score"]
+            .as_f64()
+            .map(|score| format!("{score:.1}分"))
+            .unwrap_or_default(),
+        index_show: value["new_ep"]["index_show"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        play_text: if value["is_finish"].as_u64() == Some(1) {
+            "已完结".to_string()
+        } else {
+            String::new()
+        },
+    })
+}
+
 #[cfg(test)]
 mod relation_shape_tests {
     use serde_json::json;
@@ -1431,6 +1456,24 @@ mod relation_shape_tests {
     #[test]
     fn 番剧排行按类别拼接口() {
         assert!(super::bangumi_rank_url(4).ends_with("season_type=4"));
+    }
+
+    #[test]
+    fn 我的追番复用番剧卡并隐藏排行名次() {
+        let value = json!({
+            "season_id": 33378_u64,
+            "title": "名侦探柯南",
+            "cover": "http://i0.hdslb.com/bfs/bangumi/image/cover.png",
+            "rating": { "score": 9.4 },
+            "new_ep": { "index_show": "更新至第1280话" },
+            "is_finish": 0
+        });
+        let item = super::bangumi_follow_item(&value).expect("追番应能解析");
+        assert_eq!(item.season_id, 33378);
+        assert_eq!(item.rank, 0);
+        assert_eq!(item.rating, "9.4分");
+        assert_eq!(item.index_show, "更新至第1280话");
+        assert_eq!(item.cover.as_deref(), Some("https://i0.hdslb.com/bfs/bangumi/image/cover.png"));
     }
 
     /// 真实单期响应里推荐语在 `rcmd_reason`（2026-11 实测，第一条是「就在今天」）。
