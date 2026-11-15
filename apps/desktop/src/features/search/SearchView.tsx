@@ -291,6 +291,7 @@ export function SearchView() {
   const pick = (value: string): void => {
     setQuery(value)
     setPage(1)
+    setTab('all')
     setNonce((current) => current + 1)
   }
 
