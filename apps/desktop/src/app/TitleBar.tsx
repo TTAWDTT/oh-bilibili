@@ -227,6 +227,7 @@ export function TitleBar() {
   const openAccount = (button: HTMLButtonElement): void => {
     const rect = button.getBoundingClientRect()
     const width = 280
+    setSubmitMenu(null)
     setAccount({
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
