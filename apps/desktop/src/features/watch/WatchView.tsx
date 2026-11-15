@@ -47,6 +47,8 @@ export function WatchView({ track }: { track: Track }) {
   const [nonce, setNonce] = useState(0)
   /** 当前在看人数。取不到就不显示，不猜。 */
   const [online, setOnline] = useState<number | null>(null)
+  /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
+  const [resume, setResume] = useState<{ key: string; at: number } | null>(null)
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   const [followed, setFollowed] = useState<boolean | null>(null)
@@ -76,6 +78,20 @@ export function WatchView({ track }: { track: Track }) {
     setLikeDelta(0)
     setFavDelta(0)
     setCoinDelta(0)
+  }, [track.key])
+
+  useEffect(() => {
+    let cancelled = false
+    setResume(null)
+    void ipc
+      .historyPosition(track.key)
+      .then((at) => {
+        if (!cancelled && at) setResume({ key: track.key, at })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [track.key])
 
   const mid = data?.owner_mid ?? null
@@ -302,6 +318,7 @@ export function WatchView({ track }: { track: Track }) {
                 }}
                 next={related[0] ?? null}
                 onNext={(nextTrack) => replace({ kind: 'watch', track: nextTrack })}
+                resumeAt={resume?.key === track.key ? resume.at : null}
               />
             </div>
           ) : (

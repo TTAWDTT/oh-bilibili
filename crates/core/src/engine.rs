@@ -1263,6 +1263,11 @@ impl Engine {
         Ok(self.library.history_with_time(limit)?)
     }
 
+    /// 某条视频上次看到的位置，观看页打开时用来定位。
+    pub fn history_position(&self, key: &str) -> Result<Option<u64>, WireError> {
+        Ok(self.library.history_position(key)?)
+    }
+
     pub fn playlists(&self) -> Result<Vec<bilimusic_store::Playlist>, WireError> {
         Ok(self.library.playlists()?)
     }

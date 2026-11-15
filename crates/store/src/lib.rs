@@ -432,6 +432,21 @@ impl Library {
         })
     }
 
+    /// 某条视频上次看到的位置。没有历史时返回 None，和「看过但从 0 开始」区分开。
+    pub fn history_position(&self, provider_key: &str) -> Result<Option<u64>> {
+        self.with(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT h.position_ms FROM history h
+                     JOIN tracks t ON t.id = h.track_id
+                     WHERE t.provider_key = ?1",
+                    params![provider_key],
+                    |row| Ok(row.get::<_, i64>(0)?.max(0) as u64),
+                )
+                .optional()?)
+        })
+    }
+
     /// 写入一条同步意图。取消不是删行，是把 want 置 0。
     pub fn set_reaction(
         &self,

@@ -221,6 +221,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
     case 'video_online':
       return 128
+    case 'history_position':
+      return null
     case 'fav_tracks': {
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40

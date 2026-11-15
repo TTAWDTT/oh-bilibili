@@ -145,6 +145,11 @@ export function libraryHistoryTimed(limit: number): Promise<HistoryEntry[]> {
   return call<HistoryEntry[]>('library_history_timed', { limit })
 }
 
+/** 某条视频上次看到的位置。没看过返回 null，和「看过但从 0 开始」区分开。 */
+export function historyPosition(key: string): Promise<number | null> {
+  return call<number | null>('history_position', { key })
+}
+
 /** 删掉某首歌的历史。 */
 export function historyDelete(key: string): Promise<null> {
   return call<null>('history_delete', { key })

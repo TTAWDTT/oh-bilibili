@@ -489,6 +489,14 @@ fn library_history(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn history_position(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Option<u64>, WireError> {
+    engine.history_position(&key)
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn library_playlists(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<PlaylistView>, WireError> {
     Ok(engine
         .playlists()?
@@ -1051,6 +1059,7 @@ pub fn run() {
             queue_restore_progress,
             library_history,
             library_history_timed,
+            history_position,
             history_delete,
             history_clear,
             library_playlists,

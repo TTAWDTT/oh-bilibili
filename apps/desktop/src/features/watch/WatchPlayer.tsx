@@ -97,6 +97,7 @@ export function WatchPlayer({
   onReplay,
   next,
   onNext,
+  resumeAt,
   liked,
   faved,
   coins,
@@ -114,6 +115,8 @@ export function WatchPlayer({
   /** 相关推荐里的下一个，播完给个出口。 */
   next: Track | null
   onNext: (track: Track) => void
+  /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
+  resumeAt: number | null
   liked: boolean
   faved: boolean
   coins: number
@@ -147,6 +150,8 @@ export function WatchPlayer({
   const [playing, setPlaying] = useState(false)
   /** 播到结尾就掀开三连面板。 */
   const [finished, setFinished] = useState(false)
+  /** 「已为你定位」提示里显示的位置；null 表示这条不该续播或用户已经撤销。 */
+  const [resumeNotice, setResumeNotice] = useState<number | null>(null)
   /** 自动连播的倒计时；关掉开关或没有下一个时为空。 */
   const [countdown, setCountdown] = useState<number | null>(null)
   const autoplay = useAutoplay((state) => state.enabled)
@@ -231,6 +236,28 @@ export function WatchPlayer({
     setNow(at)
     poke()
   }
+
+  /** 已经为哪条清单续过播。同一份清单（含降档重载）只续一次。 */
+  const resumedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!ready || resumeAt === null) return
+    if (resumedFor.current === data.manifest_url) return
+    const duration = data.duration_ms || track.duration_ms || 0
+    // 太靠前说明只是瞄过一眼，太靠后又基本等于看完了，两种情况都从头放。
+    if (!duration || resumeAt < 5000 || resumeAt > duration - 10_000) {
+      resumedFor.current = data.manifest_url
+      return
+    }
+    resumedFor.current = data.manifest_url
+    seekTo(resumeAt / duration)
+    setResumeNotice(resumeAt)
+  }, [ready, resumeAt, data.manifest_url, data.duration_ms, track.duration_ms])
+
+  useEffect(() => {
+    if (resumeNotice === null) return
+    const timer = window.setTimeout(() => setResumeNotice(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [resumeNotice])
 
   /**
    * 两种「铺满」，和 B 站播放器一一对应：
@@ -550,6 +577,22 @@ export function WatchPlayer({
               </label>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {resumeNotice !== null ? (
+        <div className="absolute bottom-14 left-3 z-30 flex items-center gap-3 rounded-[4px] bg-black/80 px-3 py-1.5 text-[12px] text-white">
+          <span className="num">已为你定位至上次观看位置 {formatTime(resumeNotice)}</span>
+          <button
+            type="button"
+            onClick={() => {
+              seekTo(0)
+              setResumeNotice(null)
+            }}
+            className="t press shrink-0 text-[var(--accent)] hover:underline"
+          >
+            撤销
+          </button>
         </div>
       ) : null}
 
