@@ -971,7 +971,7 @@ impl Client {
     pub async fn bangumi_rank(&self, count: usize) -> Result<Vec<BangumiItem>, BiliError> {
         let v = self
             .get_json(
-                &format!("{API}/pgc/web/rank/list?day=3&season_type=1"),
+                &bangumi_rank_url(1),
                 std::time::Duration::from_millis(400),
             )
             .await?;
@@ -1416,9 +1416,18 @@ mod dynamic_duration_tests {
     }
 }
 
+fn bangumi_rank_url(season_type: u32) -> String {
+    format!("{API}/pgc/web/rank/list?day=3&season_type={season_type}")
+}
+
 #[cfg(test)]
 mod relation_shape_tests {
     use serde_json::json;
+
+    #[test]
+    fn 番剧排行按类别拼接口() {
+        assert!(super::bangumi_rank_url(4).ends_with("season_type=4"));
+    }
 
     /// 真实单期响应里推荐语在 `rcmd_reason`（2026-11 实测，第一条是「就在今天」）。
     /// `achievement` 是入站必刷的字段，在这里是 null，照它解析会永远是空表。
