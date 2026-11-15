@@ -163,9 +163,24 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     return (
       <EmptyState
         icon="biliTv"
-        title="没找到这个 UP 主"
-        detail="这个 UP 主没有可显示的视频，或空间接口取不到。"
-        action={{ label: '回到搜索', onClick: () => navigate({ kind: 'search' }) }}
+        title={mid ? '这个 UP 主还没有公开投稿' : '没找到这个 UP 主'}
+        detail={
+          mid
+            ? '空间接口没有返回可显示的视频。'
+            : '这个 UP 主没有可显示的视频，或空间接口取不到。'
+        }
+        action={
+          mid
+            ? {
+                label: '在 B 站打开空间',
+                onClick: () => {
+                  void ipc
+                    .openExternal(`https://space.bilibili.com/${mid}`)
+                    .catch((cause) => toastFailure('打开空间', cause))
+                },
+              }
+            : { label: '回到搜索', onClick: () => navigate({ kind: 'search' }) }
+        }
       />
     )
   }
