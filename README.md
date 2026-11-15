@@ -79,6 +79,9 @@ npm run bundle        # 产出 target/release/bundle/macos/BiliMusic.app，约 4
 `.app` 未经签名，首次打开要右键 -> 打开。dmg 打包在本机无图形会话时会卡在 Finder AppleScript
 超时，这是环境限制，不影响 `.app` 本身。
 
+应用图标源文件在 `apps/desktop/src-tauri/app-icon.png`。改完后运行
+`npx tauri icon apps/desktop/src-tauri/app-icon.png` 重新生成全平台图标，不要手改 `icons/` 里的产物。
+
 ## 验证
 
 ```sh
