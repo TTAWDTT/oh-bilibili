@@ -424,8 +424,8 @@ export function TitleBar() {
             </button>
           ))}
         </div>
-        {/* B 站顶栏最右边那颗粉色投稿：站里唯一一个实心品牌色按钮。
-            投稿本身在网页端完成，这里如实把官方上传页交给系统浏览器。 */}
+        {/* B 站顶栏最右边那颗实心投稿：站里唯一一个实心品牌色按钮。
+            投稿本身在网页端完成，这里用 B 站式菜单把四个投稿入口交给系统浏览器。 */}
         <button
           type="button"
           onClick={(event) => openSubmit(event.currentTarget)}

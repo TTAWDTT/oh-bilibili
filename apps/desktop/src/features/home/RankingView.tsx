@@ -12,7 +12,7 @@ import { PARTS } from '../../shared/lib/biliParts'
 import { useAppStore } from '../../app/appStore'
 import { HotTabs } from './HotTabs'
 
-/** 名次底色：B 站前三是粉红 / 橙 / 黄，其余是一块半透明黑。 */
+/** 名次底色：B 站前三是红 / 橙 / 黄，其余是一块半透明黑。 */
 function rankTone(rank: number): string {
   if (rank === 1) return 'var(--accent)'
   if (rank === 2) return '#ff8f3f'
