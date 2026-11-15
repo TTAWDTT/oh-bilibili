@@ -412,6 +412,11 @@ impl Source {
         self.client.bangumi_rank(count, season_type).await
     }
 
+    /// 当前账号的追番。
+    pub async fn followed_bangumi(&self, page: u32) -> Result<(Vec<sync::BangumiItem>, u32), BiliError> {
+        self.client.followed_bangumi(page).await
+    }
+
     /// 番剧更新表（周一…周日）。
     pub async fn bangumi_timeline(&self) -> Result<Vec<sync::BangumiDay>, BiliError> {
         self.client.bangumi_timeline().await

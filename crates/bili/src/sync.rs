@@ -1005,6 +1005,27 @@ impl Client {
             .unwrap_or_default())
     }
 
+    /// 当前账号的追番；接口只接受每页 20 条。
+    pub async fn followed_bangumi(&self, page: u32) -> Result<(Vec<BangumiItem>, u32), BiliError> {
+        let mid = self
+            .nav_snapshot()
+            .mid
+            .ok_or_else(|| BiliError::NeedsLogin("登录后查看追番".into()))?;
+        let page = page.max(1);
+        let v = self
+            .get_json(
+                &format!("{API}/x/space/bangumi/follow/list?type=1&follow_status=0&pn={page}&ps=20&vmid={mid}"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        let data = &v["data"];
+        let items = data["list"]
+            .as_array()
+            .map(|list| list.iter().filter_map(bangumi_follow_item).collect())
+            .unwrap_or_default();
+        Ok((items, data["total"].as_u64().unwrap_or(0) as u32))
+    }
+
     /// 番剧更新表。B 站首页右下角那块「周一 周二 …」就是它，一天一组。
     ///
     /// `before` / `after` 是天数：取 6 天前到 6 天后，正好铺满一周。

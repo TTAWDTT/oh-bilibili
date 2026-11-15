@@ -301,6 +301,11 @@ export function bangumiRank(count = 6, seasonType = 1): Promise<Bangumi[]> {
   return call<Bangumi[]>('bangumi_rank', { count, season_type: seasonType })
 }
 
+/** 当前账号的追番，每页 20 条。 */
+export function followedBangumi(page = 1): Promise<[Bangumi[], number]> {
+  return call<[Bangumi[], number]>('followed_bangumi', { page })
+}
+
 /** 综合热门。一次 50 条，`no_more` 表示是否到底；每条带 B 站的小标签。 */
 export function popular(page = 1): Promise<PopularPage> {
   return call<PopularPage>('popular', { page })

@@ -154,6 +154,23 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         url: `https://www.bilibili.com/bangumi/play/ss${33_000 + i}`,
       }))
     }
+    case 'followed_bangumi': {
+      const page = num(args, 'page')
+      const list = page === 1 ? CATALOG.slice(0, 6) : page === 2 ? CATALOG.slice(6, 8) : []
+      return [list.map((track, i) => {
+        const seasonId = 33_000 + (page === 1 ? i : 6 + i)
+        return {
+          season_id: seasonId,
+          title: track.title,
+          cover: track.cover,
+          rank: 0,
+          rating: '9.6分',
+          index_show: '更新至第12话',
+          play_text: '',
+          url: `https://www.bilibili.com/bangumi/play/ss${seasonId}`,
+        }
+      }), 8]
+    }
     case 'bangumi_timeline':
       return Array.from({ length: 7 }, (_, i) => ({
         date: `11-${String(9 + i).padStart(2, '0')}`,

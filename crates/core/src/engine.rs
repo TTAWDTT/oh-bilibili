@@ -1437,19 +1437,16 @@ impl Engine {
             return Err(WireError::input("season_type", "分类必须为 1 到 5"));
         }
         let list = self.source.bangumi_rank(count, season_type).await?;
-        Ok(list
-            .into_iter()
-            .map(|item| crate::wire::BangumiView {
-                url: format!("https://www.bilibili.com/bangumi/play/ss{}", item.season_id),
-                season_id: item.season_id,
-                title: item.title,
-                cover: item.cover,
-                rank: item.rank,
-                rating: item.rating,
-                index_show: item.index_show,
-                play_text: item.play_text,
-            })
-            .collect())
+        Ok(list.into_iter().map(bangumi_view).collect())
+    }
+
+    /// 当前账号的追番。
+    pub async fn followed_bangumi(
+        &self,
+        page: u32,
+    ) -> Result<(Vec<crate::wire::BangumiView>, u32), WireError> {
+        let (list, total) = self.source.followed_bangumi(page).await?;
+        Ok((list.into_iter().map(bangumi_view).collect(), total))
     }
 
     pub async fn popular(&self, page: u32) -> Result<crate::wire::PopularPage, WireError> {
@@ -1858,6 +1855,19 @@ impl Engine {
             self.library.mark_reaction(&reaction, state)?;
         }
         Ok(())
+    }
+}
+
+fn bangumi_view(item: bilimusic_bili::sync::BangumiItem) -> crate::wire::BangumiView {
+    crate::wire::BangumiView {
+        url: format!("https://www.bilibili.com/bangumi/play/ss{}", item.season_id),
+        season_id: item.season_id,
+        title: item.title,
+        cover: item.cover,
+        rank: item.rank,
+        rating: item.rating,
+        index_show: item.index_show,
+        play_text: item.play_text,
     }
 }
 
