@@ -512,7 +512,7 @@ export function homeFeed(fresh: number): Promise<Track[]> {
 
 export type DynamicItem = {
   id: string
-  kind: 'video' | 'opus'
+  kind: 'video' | 'opus' | 'forward' | 'article'
   mid: number
   author: string
   face: string
@@ -530,6 +530,10 @@ export type DynamicItem = {
   duration_ms: number | null
   views: number
   danmaku: number
+  /** 专栏稿件的 cv 号，kind 为 article 时才有。 */
+  article_id?: string
+  /** 转发动态里被转的那条，只嵌套一层。 */
+  orig?: DynamicItem | null
   forwards: number
   comments: number
   likes: number

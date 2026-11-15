@@ -19,41 +19,12 @@ const TABS: { key: 'all' | 'video' | 'opus'; label: string }[] = [
   { key: 'opus', label: '图文' },
 ]
 
-function DynamicCard({
-  item,
-  onOpen,
-  onAuthor,
-  onExternal,
-}: {
-  item: ipc.DynamicItem
-  onOpen: () => void
-  onAuthor: () => void
-  onExternal: () => void
-}) {
-  const text =
-    item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
+/** 动态正文：超过六行折起来，B 站卡片也是先露出前几行再给「展开」。 */
+function RichText({ text }: { text: string }) {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const [expanded, setExpanded] = useState(false)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
-
-  useLayoutEffect(() => {
-    if (!text) {
-      setOverflow(false)
-      return
-    }
-    const element = textRef.current
-    if (!element) return
-    const measure = (): void => {
-      if (expanded) return
-      setOverflow(element.scrollHeight > element.clientHeight + 1)
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [text, expanded])
-
   const bodyNodes = text.split(/(#[^#\s]{1,40}#)/g).map((part, index) => {
     if (!part.startsWith('#') || !part.endsWith('#') || part.length < 3) return part
     return (
@@ -67,6 +38,256 @@ function DynamicCard({
       </button>
     )
   })
+
+  useLayoutEffect(() => {
+    const element = textRef.current
+    if (!element) return
+    const measure = (): void => {
+      if (expanded) return
+      setOverflow(element.scrollHeight > element.clientHeight + 1)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [text, expanded])
+
+  return (
+    <div className="mb-3">
+      <p
+        ref={textRef}
+        className={`whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
+      >
+        {bodyNodes}
+      </p>
+      {overflow || expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="t mt-1 text-[13px] text-[var(--accent)] hover:underline"
+        >
+          {expanded ? '收起' : '展开'}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
+    >
+      <span
+        className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
+        style={{ aspectRatio: '16 / 9' }}
+      >
+        <Cover
+          cover={item.cover}
+          title={item.title}
+          width={212}
+          className="h-full w-full transition-transform duration-300 group-hover/video:scale-[1.03]"
+        />
+        <span
+          aria-hidden
+          className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/video:bg-black/10 group-hover/video:opacity-100"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white">
+            <Icon name="play" size={16} />
+          </span>
+        </span>
+        <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
+          {formatDuration(item.duration_ms)}
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
+        <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
+          {item.title}
+        </span>
+        <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
+          <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
+            <Icon name="play" size={12} />
+            {formatCount(item.views)}
+          </span>
+          <span className="flex items-center gap-1" aria-label={`弹幕 ${formatCount(item.danmaku)}`}>
+            <Icon name="danmaku" size={12} />
+            {formatCount(item.danmaku)}
+          </span>
+        </span>
+      </span>
+    </button>
+  )
+}
+
+/** 专栏投稿：B 站动态里是左边标题摘要、右边封面，底下挂「专栏」。 */
+function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+  const text = item.text.trim()
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group/read t flex w-full gap-3 rounded-[6px] bg-[var(--ga1)] p-3 text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
+    >
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] transition-colors group-hover/read:text-[var(--accent)]">
+          {item.title}
+        </span>
+        {text ? (
+          <span className="mt-1 line-clamp-2 text-[13px] leading-[19px] text-[var(--text-2)]">{text}</span>
+        ) : null}
+        <span className="mt-auto pt-2">
+          <span className="rounded-[2px] bg-[var(--accent-soft)] px-1 text-[11px] leading-[16px] text-[var(--accent)]">
+            专栏
+          </span>
+        </span>
+      </span>
+      {item.cover ? (
+        <span className="h-[100px] w-[100px] shrink-0 overflow-hidden rounded-[4px] bg-[var(--ga2)]">
+          <Cover cover={item.cover} title={item.title} width={100} className="h-full w-full" />
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
+function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+  const text =
+    item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
+  if (item.kind === 'article') return <DynamicArticle item={item} onOpen={onOpen} />
+  return (
+    <>
+      {item.kind === 'opus' && item.title ? (
+        <p className="mb-2 break-words text-[15px] font-medium leading-[24px] text-[var(--text-1)]">
+          {item.title}
+        </p>
+      ) : null}
+      {text ? <RichText text={text} /> : null}
+      {item.kind === 'video' ? <DynamicVideo item={item} onOpen={onOpen} /> : null}
+      {item.kind === 'opus' && item.images.length > 0 ? (
+        <div
+          className={`grid gap-1.5 ${item.images.length === 1 ? 'grid-cols-1' : item.images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
+        >
+          {item.images.slice(0, 9).map((url, index) => (
+            <button
+              key={`${url}-${index}`}
+              type="button"
+              onClick={onOpen}
+              aria-label={`打开第 ${index + 1} 张图片`}
+              className={`t relative flex items-center justify-center overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? 'min-h-[180px]' : 'aspect-square'}`}
+            >
+              <Icon name="biliTv" size={22} className="absolute text-[var(--ga3)]" />
+              <img
+                src={url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className={`relative w-full object-cover ${item.images.length === 1 ? 'max-h-[320px]' : 'h-full'}`}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none'
+                }}
+              />
+              {index === 8 && item.images.length > 9 ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[24px] font-medium text-white">
+                  +{item.images.length - 9}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+/** 转发动态里被转的那条。再套转发只画到这里，不再往下一层。 */
+function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
+  const navigate = useAppStore((state) => state.navigate)
+  const open = (): void => {
+    if (orig.kind === 'video' && orig.bvid) {
+      navigate({
+        kind: 'watch',
+        track: {
+          key: orig.bvid,
+          title: orig.title,
+          artist: orig.author,
+          cover: orig.cover,
+          duration_ms: orig.duration_ms,
+          views: orig.views,
+          danmaku: orig.danmaku,
+          up_avatar: orig.face,
+          up_mid: orig.mid,
+        },
+      })
+    } else if (orig.kind === 'article' && orig.article_id) {
+      void ipc
+        .openExternal(`https://www.bilibili.com/read/cv${orig.article_id}`)
+        .catch((cause) => toastFailure('打开专栏', cause))
+    } else {
+      void ipc
+        .openExternal(`https://www.bilibili.com/opus/${orig.id}`)
+        .catch((cause) => toastFailure('打开原动态', cause))
+    }
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('button')) return
+        open()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        open()
+      }}
+      className="mt-1 cursor-pointer rounded-[6px] border border-[var(--line)] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate({ kind: 'author', name: orig.author, mid: orig.mid })}
+          className="t flex min-w-0 items-center gap-2"
+        >
+          <Avatar src={orig.face} alt={orig.author} size={24} />
+          <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]">
+            {orig.author}
+          </span>
+        </button>
+        <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">
+          {orig.pub_time}
+        </span>
+      </div>
+      <DynamicContent item={orig} onOpen={open} />
+    </div>
+  )
+}
+
+function DynamicCard({
+  item,
+  onOpen,
+  onAuthor,
+  onExternal,
+}: {
+  item: ipc.DynamicItem
+  onOpen: () => void
+  onAuthor: () => void
+  onExternal: () => void
+}) {
+  const text =
+    item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
+  const kindLabel =
+    item.kind === 'video'
+      ? '投稿了视频'
+      : item.kind === 'forward'
+        ? '转发了动态'
+        : item.kind === 'article'
+          ? '投稿了专栏'
+          : '发布了动态'
 
   return (
     <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
@@ -103,7 +324,7 @@ function DynamicCard({
             ) : null}
           </div>
           <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-3)]">
-            {item.kind === 'video' ? '投稿了视频' : '发布了动态'}
+            {kindLabel}
             <span className="px-1">·</span>
             {item.pub_time}
           </p>
@@ -120,108 +341,14 @@ function DynamicCard({
       </div>
 
       <div className="ml-[60px] mt-3">
-        {item.kind === 'opus' && item.title ? (
-          <p className="mb-2 break-words text-[15px] font-medium leading-[24px] text-[var(--text-1)]">
-            {item.title}
-          </p>
-        ) : null}
-        {text ? (
-          <div className="mb-3">
-            <p
-              ref={textRef}
-              className={`whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
-            >
-              {bodyNodes}
-            </p>
-            {overflow || expanded ? (
-              <button
-                type="button"
-                onClick={() => setExpanded((value) => !value)}
-                className="t mt-1 text-[13px] text-[var(--accent)] hover:underline"
-              >
-                {expanded ? '收起' : '展开'}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {item.kind === 'video' ? (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
-          >
-            <span
-              className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
-              style={{ aspectRatio: '16 / 9' }}
-            >
-              <Cover
-                cover={item.cover}
-                title={item.title}
-                width={212}
-                className="h-full w-full transition-transform duration-300 group-hover/video:scale-[1.03]"
-              />
-              <span
-                aria-hidden
-                className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/video:bg-black/10 group-hover/video:opacity-100"
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white">
-                  <Icon name="play" size={16} />
-                </span>
-              </span>
-              <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
-                {formatDuration(item.duration_ms)}
-              </span>
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
-              <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
-                {item.title}
-              </span>
-              <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
-                <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
-                  <Icon name="play" size={12} />
-                  {formatCount(item.views)}
-                </span>
-                <span className="flex items-center gap-1" aria-label={`弹幕 ${formatCount(item.danmaku)}`}>
-                  <Icon name="danmaku" size={12} />
-                  {formatCount(item.danmaku)}
-                </span>
-              </span>
-            </span>
-          </button>
-        ) : null}
-        {item.kind === 'opus' && item.images.length > 0 ? (
-          <div
-            className={`grid gap-1.5 ${item.images.length === 1 ? 'grid-cols-1' : item.images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
-          >
-            {item.images.slice(0, 9).map((url, index) => (
-              <button
-                key={`${url}-${index}`}
-                type="button"
-                onClick={onOpen}
-                aria-label={`打开第 ${index + 1} 张图片`}
-                className={`t relative flex items-center justify-center overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? 'min-h-[180px]' : 'aspect-square'}`}
-              >
-                <Icon name="biliTv" size={22} className="absolute text-[var(--ga3)]" />
-                <img
-                  src={url}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  className={`relative w-full object-cover ${item.images.length === 1 ? 'max-h-[320px]' : 'h-full'}`}
-                  onError={(event) => {
-                    event.currentTarget.style.display = 'none'
-                  }}
-                />
-                {index === 8 && item.images.length > 9 ? (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[24px] font-medium text-white">
-                    +{item.images.length - 9}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        {item.kind === 'forward' ? (
+          <>
+            {text ? <RichText text={text} /> : null}
+            {item.orig ? <OrigCard orig={item.orig} /> : null}
+          </>
+        ) : (
+          <DynamicContent item={item} onOpen={onOpen} />
+        )}
       </div>
       <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
         <span className="flex items-center gap-1.5" title={`转发 ${formatCount(item.forwards)}`}>
@@ -255,7 +382,12 @@ export function DynamicView() {
   const pending = useRef(false)
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
-  const visible = tab === 'all' ? items : items.filter((item) => item.kind === tab)
+  const visible =
+    tab === 'all'
+      ? items
+      : items.filter(
+          (item) => item.kind === tab || (tab === 'opus' && item.kind === 'article'),
+        )
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
@@ -426,7 +558,11 @@ export function DynamicView() {
                     up_mid: item.mid,
                   },
                 })
-              } else if (item.kind === 'opus') {
+              } else if (item.kind === 'article' && item.article_id) {
+                void ipc
+                  .openExternal(`https://www.bilibili.com/read/cv${item.article_id}`)
+                  .catch((cause) => toastFailure('打开专栏', cause))
+              } else if (item.kind !== 'video') {
                 void ipc
                   .openExternal(`https://www.bilibili.com/opus/${item.id}`)
                   .catch((cause) => toastFailure('打开动态', cause))
@@ -438,7 +574,9 @@ export function DynamicView() {
                 .openExternal(
                   item.kind === 'video'
                     ? `https://www.bilibili.com/video/${item.bvid}`
-                    : `https://www.bilibili.com/opus/${item.id}`,
+                    : item.kind === 'article' && item.article_id
+                      ? `https://www.bilibili.com/read/cv${item.article_id}`
+                      : `https://www.bilibili.com/opus/${item.id}`,
                 )
                 .catch((cause) => toastFailure('打开链接', cause))
             }}

@@ -175,6 +175,8 @@ pub struct Followed {
 pub enum DynamicKind {
     Video,
     Opus,
+    Forward,
+    Article,
 }
 
 /// 关注动态里的一条视频或图文投稿。
@@ -199,6 +201,12 @@ pub struct DynamicItem {
     pub duration_ms: Option<u64>,
     pub views: u64,
     pub danmaku: u64,
+    /// 专栏稿件的 cv 号，`kind == Article` 时才有。
+    #[serde(default)]
+    pub article_id: String,
+    /// 转发动态里被转的那条。只解析一层：原动态自己也是转发时留空。
+    #[serde(default)]
+    pub orig: Option<Box<DynamicItem>>,
     /// 动态本身的转发 / 评论 / 点赞数，不是稿件统计。
     pub forwards: u64,
     pub comments: u64,
@@ -1383,10 +1391,18 @@ fn duration_text_ms(text: &str) -> Option<u64> {
 }
 
 fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
+    dynamic_item_at(item, 1)
+}
+
+/// `depth` 是还允许往下解析几层转发。B 站的转发可以套转发，
+/// 界面上只画一层原动态，再往里就是一条没有信息的空引用。
+fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
     let major = &item["modules"]["module_dynamic"]["major"];
     let kind = match (item["type"].as_str(), major["type"].as_str()) {
         (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
         (Some("DYNAMIC_TYPE_DRAW"), Some("MAJOR_TYPE_OPUS")) => DynamicKind::Opus,
+        (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_ARTICLE")) => DynamicKind::Article,
+        (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
         _ => return None,
     };
     let author = &item["modules"]["module_author"];
@@ -1417,6 +1433,8 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
         duration_ms: None,
         views: 0,
         danmaku: 0,
+        article_id: String::new(),
+        orig: None,
         forwards: dynamic_count(&item["modules"]["module_stat"]["forward"]["count"]),
         comments: dynamic_count(&item["modules"]["module_stat"]["comment"]["count"]),
         likes: dynamic_count(&item["modules"]["module_stat"]["like"]["count"]),
@@ -1459,6 +1477,36 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
                 })
                 .unwrap_or_default();
             dynamic.cover = dynamic.images.first().cloned().unwrap_or_default();
+        }
+        DynamicKind::Article => {
+            let article = &major["article"];
+            dynamic.article_id = article["id"]
+                .as_str()
+                .map(str::to_string)
+                .or_else(|| article["id"].as_u64().map(|id| id.to_string()))
+                .unwrap_or_default();
+            dynamic.title = article["title"].as_str().unwrap_or_default().to_string();
+            dynamic.text = article["desc"]
+                .as_str()
+                .unwrap_or_default()
+                .trim_matches(|c: char| c == '\u{200b}' || c.is_whitespace())
+                .to_string();
+            dynamic.cover = article["covers"]
+                .as_array()
+                .and_then(|covers| covers.iter().find_map(|cover| cover.as_str()))
+                .map(|url| url.replacen("http://", "https://", 1))
+                .unwrap_or_default();
+        }
+        DynamicKind::Forward => {
+            dynamic.text = item["modules"]["module_dynamic"]["desc"]["text"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            if depth > 0 {
+                dynamic.orig = dynamic_item_at(&item["orig"], depth - 1)
+                    .filter(|orig| orig.kind != DynamicKind::Forward)
+                    .map(Box::new);
+            }
         }
     }
     Some(dynamic)
@@ -1578,6 +1626,142 @@ mod dynamic_duration_tests {
         assert_eq!(dynamic.bvid, "");
         assert_eq!(dynamic.views, 0);
         assert_eq!(dynamic.likes, 3);
+    }
+
+    #[test]
+    fn 转发动态带出被转的原稿() {
+        let item = json!({
+            "id_str": "3",
+            "type": "DYNAMIC_TYPE_FORWARD",
+            "modules": {
+                "module_author": {
+                    "mid": 946974_u64,
+                    "name": "转发的人",
+                    "face": "https://i0.hdslb.com/face.jpg",
+                    "pub_time": "刚刚",
+                    "pub_ts": 2
+                },
+                "module_dynamic": {
+                    "desc": { "text": "这条必须转 #音乐现场#" },
+                    "major": null
+                },
+                "module_stat": {
+                    "forward": { "count": 8 },
+                    "comment": { "count": 4 },
+                    "like": { "count": 16 }
+                }
+            },
+            "orig": {
+                "id_str": "1",
+                "type": "DYNAMIC_TYPE_AV",
+                "modules": {
+                    "module_author": {
+                        "mid": "946975",
+                        "name": "原作者",
+                        "face": "http://i0.hdslb.com/orig.jpg",
+                        "pub_time": "昨天",
+                        "pub_ts": 1
+                    },
+                    "module_dynamic": {
+                        "desc": null,
+                        "major": {
+                            "type": "MAJOR_TYPE_ARCHIVE",
+                            "archive": {
+                                "bvid": "BV1xx411c7mD",
+                                "title": "被转的视频",
+                                "cover": "http://i0.hdslb.com/cover.jpg",
+                                "duration_text": "03:12",
+                                "stat": { "play": 353, "danmaku": 7 }
+                            }
+                        }
+                    },
+                    "module_stat": {
+                        "forward": { "count": 3 },
+                        "comment": { "count": 12 },
+                        "like": { "count": 45 }
+                    }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("转发动态应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Forward);
+        assert_eq!(dynamic.text, "这条必须转 #音乐现场#");
+        let orig = dynamic.orig.expect("应带出原动态");
+        assert_eq!(orig.kind, super::DynamicKind::Video);
+        assert_eq!(orig.mid, 946975);
+        assert_eq!(orig.author, "原作者");
+        assert_eq!(orig.bvid, "BV1xx411c7mD");
+        assert_eq!(orig.title, "被转的视频");
+        assert_eq!(orig.duration_ms, Some(192_000));
+        assert_eq!(dynamic.forwards, 8);
+    }
+
+    #[test]
+    fn 转发套转发只保留一层() {
+        let outer = json!({
+            "id_str": "4",
+            "type": "DYNAMIC_TYPE_FORWARD",
+            "modules": {
+                "module_author": { "mid": 1_u64, "name": "甲" },
+                "module_dynamic": { "desc": { "text": "转" }, "major": null }
+            },
+            "orig": {
+                "id_str": "5",
+                "type": "DYNAMIC_TYPE_FORWARD",
+                "modules": {
+                    "module_author": { "mid": 2_u64, "name": "乙" },
+                    "module_dynamic": { "desc": { "text": "再转" }, "major": null }
+                },
+                "orig": {
+                    "id_str": "6",
+                    "type": "DYNAMIC_TYPE_DRAW",
+                    "modules": {
+                        "module_author": { "mid": 3_u64, "name": "丙" },
+                        "module_dynamic": {
+                            "desc": null,
+                            "major": { "type": "MAJOR_TYPE_OPUS", "opus": { "summary": { "text": "原图文" } } }
+                        }
+                    }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&outer).expect("转发动态应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Forward);
+        assert!(dynamic.orig.is_none());
+    }
+
+    #[test]
+    fn 专栏动态带出cv号与封面() {
+        let item = json!({
+            "id_str": "7",
+            "type": "DYNAMIC_TYPE_ARTICLE",
+            "modules": {
+                "module_author": { "mid": 946974_u64, "name": "写专栏的人" },
+                "module_dynamic": {
+                    "desc": null,
+                    "major": {
+                        "type": "MAJOR_TYPE_ARTICLE",
+                        "article": {
+                            "id": 123456_u64,
+                            "title": "十一月听歌小结",
+                            "desc": "\u{200b}这张专辑值得反复听",
+                            "covers": ["http://i0.hdslb.com/read.jpg"]
+                        }
+                    }
+                },
+                "module_stat": {
+                    "forward": { "count": 0 },
+                    "comment": { "count": 1 },
+                    "like": { "count": 9 }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("专栏动态应能解析");
+        assert_eq!(dynamic.kind, super::DynamicKind::Article);
+        assert_eq!(dynamic.article_id, "123456");
+        assert_eq!(dynamic.title, "十一月听歌小结");
+        assert_eq!(dynamic.text, "这张专辑值得反复听");
+        assert_eq!(dynamic.cover, "https://i0.hdslb.com/read.jpg");
     }
 }
 
