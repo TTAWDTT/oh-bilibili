@@ -27,9 +27,9 @@ export function BangumiView() {
   const [total, setTotal] = useState<number | null>(null)
   const [page, setPage] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [needLogin, setNeedLogin] = useState(false)
   const loadMoreRef = useRef<() => void>(() => {})
-  const loggedIn = useAuthStore((state) => state.auth?.logged_in ?? false)
-  const mid = useAuthStore((state) => state.auth?.user?.mid)
+  const auth = useAuthStore((state) => state.auth)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const activeTab = TABS.find((tab) => tab.type === seasonType) ?? TABS[0]
 
@@ -40,11 +40,12 @@ export function BangumiView() {
     setTotal(null)
     setPage(0)
     setLoadingMore(false)
+    setNeedLogin(false)
     loadMoreRef.current = () => {}
     scrollRef.current?.scrollTo({ top: 0 })
 
     if (seasonType === 0) {
-      if (!loggedIn) return
+      if (!auth?.logged_in) return
       let pending = false
       let nextPage = 1
       let followed: ipc.Bangumi[] = []
@@ -69,7 +70,11 @@ export function BangumiView() {
           setPage(nextPage)
           nextPage += 1
         } catch (cause) {
-          if (!cancelled) setError(toWireError(cause).message)
+          if (!cancelled) {
+            const failure = toWireError(cause)
+            setError(failure.message)
+            if (failure.class === 'needs_login') setNeedLogin(true)
+          }
         } finally {
           if (!cancelled) {
             pending = false
@@ -92,7 +97,7 @@ export function BangumiView() {
     return () => {
       cancelled = true
     }
-  }, [seasonType, nonce, loggedIn, mid])
+  }, [seasonType, nonce, auth])
 
   const hasMore = seasonType === 0 && page > 0 && items !== null && total !== null && items.length < total
 
@@ -139,7 +144,9 @@ export function BangumiView() {
           ))}
         </div>
       </nav>
-      {seasonType === 0 && !loggedIn ? (
+      {seasonType === 0 && !auth ? (
+        <BiliLoader label="正在确认登录状态…" />
+      ) : seasonType === 0 && (auth?.logged_in !== true || needLogin) ? (
         <EmptyState icon="biliTv" title="登录后查看追番" action={{ label: '登录', onClick: () => setAuthOpen(true) }} />
       ) : items === null ? (
         error ? (
