@@ -106,35 +106,59 @@ function MessageCard({ item, emotes }: { item: ipc.MessageItem; emotes: Map<stri
 
 function quoteNodes(text: string, mentions: ipc.MessageMention[], emotes: Map<string, string>, onMention: (mention: ipc.MessageMention) => void): React.ReactNode[] {
   if (mentions.length === 0 && emotes.size === 0) return [text]
-  const users = new Map(mentions.map((mention) => [`@${mention.name}`, mention]))
-  const tokens = [...emotes.keys(), ...users.keys()]
-    .sort((a, b) => b.length - a.length)
-    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const users = [...mentions].sort((a, b) => b.name.length - a.name.length)
   const nodes: React.ReactNode[] = []
-  let offset = 0
-
-  for (const match of text.matchAll(new RegExp(tokens.join('|'), 'g'))) {
-    const code = match[0]
-    nodes.push(text.slice(offset, match.index))
-    const url = emotes.get(code)
-    if (url) {
-      nodes.push(<img key={match.index} src={url} alt={code} title={code} referrerPolicy="no-referrer" className="mx-[1px] inline-block h-[20px] w-auto align-[-4px]" />)
-    } else {
-      const mention = users.get(code)!
-      nodes.push(
-        <button
-          key={match.index}
-          type="button"
-          onClick={() => onMention(mention)}
-          className="t text-left text-[var(--accent)] hover:underline"
-        >
-          {code}
-        </button>,
-      )
-    }
-    offset = match.index + code.length
+  let buffer = ''
+  let index = 0
+  const flush = (): void => {
+    if (!buffer) return
+    nodes.push(buffer)
+    buffer = ''
   }
-  nodes.push(text.slice(offset))
+
+  while (index < text.length) {
+    if (text[index] === '[') {
+      const end = text.indexOf(']', index)
+      const code = end > index ? text.slice(index, end + 1) : ''
+      const url = code ? emotes.get(code) : undefined
+      if (url) {
+        flush()
+        nodes.push(
+          <img
+            key={index}
+            src={url}
+            alt={code}
+            title={code}
+            referrerPolicy="no-referrer"
+            className="mx-[1px] inline-block h-[20px] w-auto align-[-4px]"
+          />,
+        )
+        index = end + 1
+        continue
+      }
+    }
+    if (text[index] === '@') {
+      const mention = users.find((user) => text.startsWith(user.name, index + 1))
+      if (mention) {
+        flush()
+        nodes.push(
+          <button
+            key={index}
+            type="button"
+            onClick={() => onMention(mention)}
+            className="t text-left text-[var(--accent)] hover:underline"
+          >
+            @{mention.name}
+          </button>,
+        )
+        index += mention.name.length + 1
+        continue
+      }
+    }
+    buffer += text[index]
+    index += 1
+  }
+  flush()
   return nodes
 }
 
