@@ -1592,3 +1592,34 @@ mod relation_shape_tests {
         assert_eq!(parse(&v), (false, false, 1), "liked 是错的字段名");
     }
 }
+
+#[cfg(test)]
+mod emote_tests {
+    use serde_json::json;
+
+    #[test]
+    fn 表情包响应拍平成代号与图片() {
+        let value = json!({
+            "data": {
+                "packages": [
+                    { "emote": [
+                        { "text": "[大笑]", "url": "http://i0.hdslb.com/a.png" },
+                        { "text": "", "url": "http://i0.hdslb.com/b.png" },
+                        { "text": "[坏链接]", "url": "" }
+                    ] },
+                    { "emote": [
+                        { "text": "[2233娘_大笑]", "url": "http://i0.hdslb.com/c.png" }
+                    ] },
+                    { "emote": null }
+                ]
+            }
+        });
+        assert_eq!(
+            super::emote_pairs(&value),
+            vec![
+                ("[大笑]".to_string(), "http://i0.hdslb.com/a.png".to_string()),
+                ("[2233娘_大笑]".to_string(), "http://i0.hdslb.com/c.png".to_string())
+            ]
+        );
+    }
+}
