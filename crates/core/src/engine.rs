@@ -286,8 +286,9 @@ impl Engine {
                 let storing = self.track_of(key)?;
                 let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
                 // 每次真正进入播放才记一条历史，切歌失败不记。
-                // 位置一起写进去：历史卡片上的进度条画的是这一格。
-                let at = self.snapshot().position_ms;
+                // 位置写这次实际开播的起点：刚 load 的音频时钟可能还没重置，
+                // 读 snapshot 会把上一首的位置记到这一条上。
+                let at = bounded;
                 self.library
                     .push_history(track_id, at)
                     .map_err(WireError::from)?;
@@ -983,12 +984,15 @@ impl Engine {
                     ticks += 1;
                     if ticks >= 12 {
                         ticks = 0;
-                        let key = engine.snapshot().track.map(|t| t.key);
-                        if let Some(k) = key {
-                            let at = engine.snapshot().position_ms;
-                            let _ = engine
-                                .library
-                                .set_history_position(k.as_opaque(), at);
+                        let snap = engine.snapshot();
+                        // 切歌加载期间状态已经指向新曲，但音频时钟还停在上一首，
+                        // 这时候回写会把旧位置记到新曲头上，顺带清掉续播点。
+                        if snap.phase == "playing" || snap.phase == "paused" {
+                            if let Some(t) = snap.track {
+                                let _ = engine
+                                    .library
+                                    .set_history_position(t.key.as_opaque(), snap.position_ms);
+                            }
                         }
                     }
                     if engine.reached_track_end() {

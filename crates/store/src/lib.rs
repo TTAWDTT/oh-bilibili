@@ -357,10 +357,15 @@ impl Library {
             conn.execute(
                 // 同一首歌只保留最近一次：历史是「上次看到哪」，不是播放流水。
                 // 位置一起更新，历史卡片才能画出那条播放进度。
+                // 0 是「刚打开、还没开始」：别用它覆盖上次看到的位置，
+                // 否则重新打开视频的瞬间就把续播点清掉了。
                 "INSERT INTO history (track_id, played_at, position_ms) VALUES (?1, ?2, ?3)
                  ON CONFLICT(track_id) DO UPDATE SET
                    played_at = excluded.played_at,
-                   position_ms = excluded.position_ms",
+                   position_ms = CASE
+                     WHEN excluded.position_ms > 0 THEN excluded.position_ms
+                     ELSE history.position_ms
+                   END",
                 params![track_id.0, now_ms(), position_ms as i64],
             )?;
             Ok(())
@@ -900,6 +905,17 @@ mod tests {
         let rows = l.history_with_time(10).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].2, 42_500, "回写之后读到的应该是新位置");
+    }
+
+    #[test]
+    fn 重开时零位置不覆盖已看进度() {
+        let l = lib();
+        let a = l.upsert_track(&track("BVresume")).unwrap();
+        l.push_history(a, 0).unwrap();
+        l.set_history_position("BVBVresume", 42_500).unwrap();
+        // 重新打开视频时先写一条 0 历史，不能把续播点清掉。
+        l.push_history(a, 0).unwrap();
+        assert_eq!(l.history_position("BVBVresume").unwrap(), Some(42_500));
     }
 
     #[test]
