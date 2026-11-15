@@ -69,6 +69,28 @@ pub fn strip_tags(raw: &str) -> String {
     out.replace("&quot;", "\"").replace("&amp;", "&").trim().to_string()
 }
 
+/// 搜索联想。接口给 `result.tag[].term`，同一个词可能重复出现。
+pub fn suggest_terms(value: &serde_json::Value) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    value["result"]["tag"]
+        .as_array()
+        .map(|tags| {
+            tags.iter()
+                .filter_map(|tag| {
+                    tag["term"]
+                        .as_str()
+                        .or_else(|| tag["value"].as_str())
+                        .map(str::trim)
+                        .filter(|term| !term.is_empty())
+                })
+                .filter(|term| seen.insert((*term).to_string()))
+                .take(10)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// 关键词覆盖率：关键词里的每个词在标题里出现就算命中，返回 0 到 1。
 fn keyword_coverage(keyword: &str, title: &str) -> f64 {
     let title_lower = title.to_lowercase();
@@ -219,6 +241,25 @@ mod tests {
     #[test]
     fn 标签被剥掉() {
         assert_eq!(strip_tags("周杰伦 - <em>晴天</em>"), "周杰伦 - 晴天");
+    }
+
+    #[test]
+    fn 搜索联想取_term_并去重() {
+        let value = serde_json::json!({
+            "result": { "tag": [
+                { "value": "周杰伦歌曲全集", "term": "周杰伦歌曲全集" },
+                { "value": "周杰伦", "term": "周杰伦" },
+                { "value": "重复", "term": "周杰伦" },
+                { "value": "周杰伦mv", "term": "" },
+                { "value": "周杰伦现场" }
+            ]}
+        });
+        assert_eq!(
+            suggest_terms(&value),
+            ["周杰伦歌曲全集", "周杰伦", "周杰伦现场"]
+                .map(str::to_string)
+                .to_vec()
+        );
     }
 
     #[test]
