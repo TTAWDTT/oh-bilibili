@@ -262,7 +262,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'messages': {
       const kind = str(args, 'kind')
       const page = num(args, 'page')
-      const start = (page - 1) * 8
+      const start = Number(str(args, 'cursor').split(':')[0] || 0)
       return {
         items: CATALOG.slice(start, start + 8).map((track, index) => ({
           id: `${kind}-${start + index}`,
@@ -281,7 +281,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           count: kind === 'like' ? index + 3 : 1,
         })),
         page,
-        has_more: page < 3,
+        has_more: start + 8 < 24,
+        next_cursor: start + 8 < 24 ? `${start + 8}:0` : null,
       }
     }
     case 'dynamic_feed': {

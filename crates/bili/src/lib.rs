@@ -330,9 +330,10 @@ impl Source {
     pub async fn messages(
         &self,
         kind: messages::MessageKind,
+        cursor: Option<String>,
         page: u32,
     ) -> Result<messages::MessagePage, BiliError> {
-        self.client.messages(kind, page).await
+        self.client.messages(kind, cursor, page).await
     }
 
     /// 稍后再看列表。

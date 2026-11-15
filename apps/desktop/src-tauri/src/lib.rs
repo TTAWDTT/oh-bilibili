@@ -200,9 +200,10 @@ async fn message_unread(
 async fn messages(
     engine: tauri::State<'_, Arc<Engine>>,
     kind: bilimusic_core::wire::MessageKind,
+    cursor: Option<String>,
     page: u32,
 ) -> Result<bilimusic_core::wire::MessagePage, WireError> {
-    engine.messages(kind, page).await
+    engine.messages(kind, cursor, page).await
 }
 
 /// 取一页评论。评论区只读，取不到不该挡住看视频。

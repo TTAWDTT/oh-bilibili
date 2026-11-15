@@ -557,6 +557,7 @@ export type MessagePage = {
   items: MessageItem[]
   page: number
   has_more: boolean
+  next_cursor: string | null
 }
 
 export type MessageUnread = {
@@ -570,8 +571,8 @@ export function messageUnread(): Promise<MessageUnread> {
   return call<MessageUnread>('message_unread', {})
 }
 
-export function messages(kind: MessageKind, page: number): Promise<MessagePage> {
-  return call<MessagePage>('messages', { kind, page })
+export function messages(kind: MessageKind, cursor: string | null, page: number): Promise<MessagePage> {
+  return call<MessagePage>('messages', { kind, cursor, page })
 }
 
 /** 取一页评论。 */

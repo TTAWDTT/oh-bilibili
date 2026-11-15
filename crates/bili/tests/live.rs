@@ -758,3 +758,39 @@ async fn 番剧时间表能取到一周() {
     assert!(!ep.title.is_empty(), "番剧要有名字");
     assert!(ep.cover.is_some(), "时间表条目要带封面");
 }
+
+#[tokio::test]
+#[ignore = "真实网络，需要应用已保存的登录态"]
+async fn messages_live_cursor_pages_are_disjoint() {
+    use bilimusic_bili::messages::MessageKind;
+    use std::collections::HashSet;
+
+    let cookie_path = std::path::PathBuf::from(std::env::var("HOME").expect("HOME"))
+        .join("Library/Application Support/dev.bilimusic.app/cookies.json");
+    let raw = std::fs::read_to_string(cookie_path).expect("需要应用保存的 cookies.json");
+    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+    let source = Source::open().await.expect("Source");
+    source.import_cookies(&pairs);
+    source.refresh_session().await.expect("刷新会话");
+
+    let mut paginated = 0;
+    for kind in [MessageKind::Reply, MessageKind::At, MessageKind::Like] {
+        let first = source.messages(kind, None, 1).await.expect("消息首屏");
+        assert!(!first.items.is_empty(), "{kind:?} 首屏为空，无法验证分页");
+        if !first.has_more {
+            assert_eq!(first.next_cursor, None, "末页不能继续请求");
+            println!("{kind:?}: first={} is_end=true，当前无第二页", first.items.len());
+            continue;
+        }
+        let cursor = first.next_cursor.clone().expect("续页必须包含游标");
+        let second = source.messages(kind, Some(cursor), 2).await.expect("消息续页");
+        let first_ids: HashSet<&str> = first.items.iter().map(|item| item.id.as_str()).collect();
+        let overlap = second.items.iter().filter(|item| first_ids.contains(item.id.as_str())).count();
+        println!("{kind:?}: first={} second={} overlap={overlap}", first.items.len(), second.items.len());
+        assert!(!second.items.is_empty(), "{kind:?} 续页为空，无法证明推进");
+        assert_eq!(overlap, 0, "{kind:?} 相邻两页不能重复");
+        assert_eq!(second.page, 2);
+        paginated += 1;
+    }
+    assert!(paginated >= 2, "至少两类需实际推进到第二页，当前只验证了 {paginated} 类");
+}

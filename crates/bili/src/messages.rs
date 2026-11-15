@@ -39,6 +39,7 @@ pub struct MessagePage {
     pub items: Vec<MessageItem>,
     pub page: u32,
     pub has_more: bool,
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,19 +61,42 @@ impl Client {
         Ok(unread_from(&value))
     }
 
-    pub async fn messages(&self, kind: MessageKind, page: u32) -> Result<MessagePage, BiliError> {
-        let category = match kind {
-            MessageKind::Reply => "reply",
-            MessageKind::At => "at",
-            MessageKind::Like => "like",
-        };
+    pub async fn messages(
+        &self,
+        kind: MessageKind,
+        cursor: Option<String>,
+        page: u32,
+    ) -> Result<MessagePage, BiliError> {
+        let url = messages_url(kind, cursor.as_deref())?;
         let value = self
-            .get_json(
-                &format!("{API}/x/msgfeed/{category}?platform=web&build=0&mobi_app=web&pn={page}&ps=20"),
-                std::time::Duration::from_millis(400),
-            )
+            .get_json(&url, std::time::Duration::from_millis(400))
             .await?;
         Ok(message_page_from(&value, kind, page))
+    }
+}
+
+fn messages_url(kind: MessageKind, cursor: Option<&str>) -> Result<String, BiliError> {
+    let category = match kind {
+        MessageKind::Reply => "reply",
+        MessageKind::At => "at",
+        MessageKind::Like => "like",
+    };
+    let mut url = format!("{API}/x/msgfeed/{category}?platform=web&build=0&mobi_app=web&ps=20");
+    if let Some(cursor) = cursor {
+        let (id, time) = cursor
+            .split_once(':')
+            .and_then(|(id, time)| Some((id.parse::<u64>().ok()?, time.parse::<u64>().ok()?)))
+            .ok_or_else(|| BiliError::Parse("消息游标无效".to_string()))?;
+        url.push_str(&format!("&id={id}&{}={time}", message_time_key(kind)));
+    }
+    Ok(url)
+}
+
+fn message_time_key(kind: MessageKind) -> &'static str {
+    match kind {
+        MessageKind::Reply => "reply_time",
+        MessageKind::At => "at_time",
+        MessageKind::Like => "like_time",
     }
 }
 
@@ -86,10 +110,21 @@ fn message_page_from(value: &serde_json::Value, kind: MessageKind, page: u32) ->
         .as_array()
         .map(|list| list.iter().map(|entry| message_item_from(entry, kind)).collect())
         .unwrap_or_default();
+    let cursor = &data["cursor"];
+    let has_more = !cursor["is_end"].as_bool().unwrap_or(true);
+    let next_cursor = if has_more {
+        cursor["id"]
+            .as_u64()
+            .zip(cursor["time"].as_u64())
+            .map(|(id, time)| format!("{id}:{time}"))
+    } else {
+        None
+    };
     MessagePage {
         items,
         page,
-        has_more: !data["cursor"]["is_end"].as_bool().unwrap_or(true),
+        has_more,
+        next_cursor,
     }
 }
 
@@ -112,11 +147,6 @@ fn message_item_from(entry: &serde_json::Value, kind: MessageKind) -> MessageIte
     } else {
         vec![message_user_from(&entry["user"])]
     };
-    let time_key = match kind {
-        MessageKind::Reply => "reply_time",
-        MessageKind::At => "at_time",
-        MessageKind::Like => "like_time",
-    };
     let quote_key = if kind == MessageKind::Like {
         "desc"
     } else {
@@ -137,7 +167,7 @@ fn message_item_from(entry: &serde_json::Value, kind: MessageKind) -> MessageIte
         url,
         bvid,
         quote: item[quote_key].as_str().unwrap_or_default().to_string(),
-        at: entry[time_key].as_u64().unwrap_or_default(),
+        at: entry[message_time_key(kind)].as_u64().unwrap_or_default(),
         count: entry["counts"].as_u64().unwrap_or(1),
     }
 }
@@ -300,6 +330,43 @@ mod tests {
         let page = message_page_from(&value, MessageKind::Reply, 1);
         assert_eq!(page.items[0].bvid, None);
         assert_eq!(page.items[0].url, "https://t.bilibili.com/123");
+    }
+
+    #[test]
+    fn 三类续页游标使用对应时间参数() {
+        for (kind, category, time_key) in [
+            (MessageKind::Reply, "reply", "reply_time"),
+            (MessageKind::At, "at", "at_time"),
+            (MessageKind::Like, "like", "like_time"),
+        ] {
+            let data = json!({
+                "cursor": { "is_end": false, "id": 9_007_199_254_740_993_u64, "time": 1762914540 },
+                "items": []
+            });
+            let value = if kind == MessageKind::Like {
+                json!({ "data": { "total": data } })
+            } else {
+                json!({ "data": data })
+            };
+            let page = message_page_from(&value, kind, 1);
+            assert_eq!(page.next_cursor.as_deref(), Some("9007199254740993:1762914540"));
+            let url = messages_url(kind, page.next_cursor.as_deref()).expect("续页地址");
+            assert_eq!(url, format!("{API}/x/msgfeed/{category}?platform=web&build=0&mobi_app=web&ps=20&id=9007199254740993&{time_key}=1762914540"));
+            let first = messages_url(kind, None).expect("首屏地址");
+            assert!(!first.contains("&id="));
+            assert!(!first.contains("&pn="));
+        }
+    }
+
+    #[test]
+    fn 最后一页不返回续页游标() {
+        let value = json!({ "data": {
+            "cursor": { "is_end": true, "id": 123, "time": 456 }, "items": []
+        }});
+        let page = message_page_from(&value, MessageKind::Reply, 2);
+        assert!(!page.has_more);
+        assert_eq!(page.next_cursor, None);
+        assert!(messages_url(MessageKind::Reply, Some("invalid")).is_err());
     }
 
     #[test]

@@ -549,9 +549,10 @@ impl Engine {
     pub async fn messages(
         &self,
         kind: crate::wire::MessageKind,
+        cursor: Option<String>,
         page: u32,
     ) -> Result<crate::wire::MessagePage, WireError> {
-        Ok(self.source.messages(kind, page).await?)
+        Ok(self.source.messages(kind, cursor, page).await?)
     }
 
     /// 稍后再看列表。

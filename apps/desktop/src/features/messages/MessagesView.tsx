@@ -70,7 +70,7 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
             ) : null}
             <span className="text-[var(--text-2)]">
               {item.kind === 'like'
-                ? (item.count > 1 ? `等 ${formatCount(item.count)} 人赞了你的视频` : '赞了你的视频')
+                ? (item.count > 1 ? `等 ${formatCount(item.count)} 人赞了你` : '赞了你')
                 : item.kind === 'reply' ? '回复了你' : '在评论中提到了你'}
             </span>
           </div>
@@ -99,23 +99,25 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
 function MessageList({ kind }: { kind: ipc.MessageKind }) {
   const [items, setItems] = useState<ipc.MessageItem[]>([])
   const [page, setPage] = useState(0)
+  const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const pending = useRef(false)
   const request = useRef(0)
 
-  const load = useCallback(async (next: number): Promise<void> => {
+  const load = useCallback(async (nextCursor: string | null, next: number): Promise<void> => {
     if (pending.current) return
     pending.current = true
     const sequence = ++request.current
     setLoading(true)
     setError(null)
     try {
-      const result = await ipc.messages(kind, next)
+      const result = await ipc.messages(kind, nextCursor, next)
       if (sequence !== request.current) return
       setItems((prev) => next === 1 ? result.items : [...prev, ...result.items])
       setPage(result.page)
+      setCursor(result.next_cursor)
       setHasMore(result.has_more)
     } catch (cause) {
       if (sequence !== request.current) return
@@ -131,7 +133,7 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
   }, [kind])
 
   useEffect(() => {
-    void load(1)
+    void load(null, 1)
     return () => {
       request.current += 1
       pending.current = false
@@ -144,7 +146,7 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
       onScroll={(event) => {
         const box = event.currentTarget
         if (hasMore && !loading && !error && box.scrollHeight - box.scrollTop - box.clientHeight < 600) {
-          void load(page + 1)
+          void load(cursor, page + 1)
         }
       }}
       className="min-h-0 flex-1 overflow-y-auto pb-10"
@@ -152,10 +154,10 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
       <div className={`${CONTENT} flex flex-col gap-3 py-5`}>
         {page === 0 && loading ? <BiliTvLoading label="正在取消息" /> : null}
         {error && items.length === 0 ? (
-          <EmptyState icon="alert" title="消息没取到" detail={error} action={{ label: '重试', onClick: () => void load(1) }} />
+          <EmptyState icon="alert" title="消息没取到" detail={error} action={{ label: '重试', onClick: () => void load(null, 1) }} />
         ) : null}
         {page > 0 && !loading && !error && items.length === 0 ? (
-          <EmptyState icon="message" mascot="peek" title="还没有消息" action={{ label: '刷新', onClick: () => void load(1) }} />
+          <EmptyState icon="message" mascot="peek" title="还没有消息" action={{ label: '刷新', onClick: () => void load(null, 1) }} />
         ) : null}
         {items.map((item) => <MessageCard key={item.id} item={item} />)}
         {items.length > 0 && (hasMore || error) ? (
@@ -163,7 +165,7 @@ function MessageList({ kind }: { kind: ipc.MessageKind }) {
             <button
               type="button"
               disabled={loading}
-              onClick={() => void load(page + 1)}
+              onClick={() => void load(cursor, page + 1)}
               className="t press h-8 rounded-[4px] border border-[var(--line)] bg-[var(--panel)] px-4 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
             >
               {loading ? '加载中' : error ? '没取到，重试' : '加载更多'}
