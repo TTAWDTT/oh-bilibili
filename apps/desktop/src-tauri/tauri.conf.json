@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "BiliMusic",
+  "productName": "oh-bilibili",
   "version": "0.1.0",
   "identifier": "dev.bilimusic.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "BiliMusic",
+        "title": "oh-bilibili",
         "url": "/",
         "width": 1320,
         "height": 860,

@@ -1,4 +1,4 @@
-# BiliMusic
+# oh-bilibili
 
 开源桌面 B 站客户端。视频、音频都来自你自己的 B 站账号可访问的内容，本机直连，不经过任何中间服务器。
 
@@ -62,7 +62,7 @@ npm run web
 ```
 
 下载功能需要一个 yt-dlp 可执行文件。源码树里放 `resources/yt-dlp`；**打包后的 `.app` 不认这个路径**，
-要么把它放进 `BiliMusic.app/Contents/MacOS/resources/`，要么装到 PATH 里（brew 或 pip 都行）。
+要么把它放进 `oh-bilibili.app/Contents/MacOS/resources/`，要么装到 PATH 里（brew 或 pip 都行）。
 
 ```sh
 curl -L -o resources/yt-dlp \
@@ -73,7 +73,7 @@ chmod +x resources/yt-dlp
 ## 打包
 
 ```sh
-npm run bundle        # 产出 target/release/bundle/macos/BiliMusic.app，约 46MB
+npm run bundle        # 产出 target/release/bundle/macos/oh-bilibili.app，约 46MB
 ```
 
 `.app` 未经签名，首次打开要右键 -> 打开。dmg 打包在本机无图形会话时会卡在 Finder AppleScript

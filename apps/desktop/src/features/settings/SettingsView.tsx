@@ -216,7 +216,7 @@ export function SettingsView() {
 
           <Section title="关于">
             <p className="num text-[13px] text-[var(--text-2)]">
-              BiliMusic {health?.version ?? '…'} · {health?.platform ?? '…'}
+              oh-bilibili {health?.version ?? '…'} · {health?.platform ?? '…'}
             </p>
             {isTauri ? null : (
               <div className="mt-4 flex items-start gap-2 text-[12px] leading-relaxed text-[var(--accent)]">

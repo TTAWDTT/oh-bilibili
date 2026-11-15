@@ -1,6 +1,12 @@
-# BiliMusic 交接说明
+# oh-bilibili 交接说明
 
 这份文件写给接手的人（包括未来的我）。它记录当前状态、怎么跑、哪些是坑。
+
+## 产品名
+
+对外显示名是 **oh-bilibili**：`productName`、窗口标题、页面标题和「设置 → 关于」都用这个名字。
+Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下载 / 歌词目录**故意没改**——
+改这些会让已登录账号、本地歌单和已下载文件失去关联。
 
 ## 待验收清单（这一轮改动）
 
@@ -147,7 +153,7 @@
 
 50. **应用图标**：官方 B 站 TV 轮廓的蓝色版，白字 wordmark、浅蓝到深蓝渐变，和当前主题色一致。
     源文件是 `apps/desktop/src-tauri/app-icon.png`，全平台图标由 `npx tauri icon` 生成；
-    Dock、访达、打包后的 `BiliMusic.icns` 都是这一版，不再是大色块唱片。
+    Dock、访达、打包后的 `oh-bilibili.icns` 都是这一版，不再是大色块唱片。
 
 ## 一句话现状
 

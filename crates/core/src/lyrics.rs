@@ -248,7 +248,7 @@ async fn query_lrclib(http: &reqwest::Client, keyword: &str) -> Option<LrclibHit
     let fut = async move {
         let resp = client
             .get(url)
-            .header("User-Agent", "BiliMusic/0.1 (https://github.com/bilimusic)")
+            .header("User-Agent", "oh-bilibili/0.1 (https://github.com/bilimusic)")
             .send()
             .await
             .ok()?

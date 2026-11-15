@@ -1,4 +1,4 @@
-//! BiliMusic 的 Tauri 外壳。
+//! oh-bilibili 的 Tauri 外壳。
 //!
 //! 这里只做四件事：创建窗口、注册命令、把引擎事件转成前端事件、跑进度心跳。
 //! 业务逻辑全在 `bilimusic-core` 里。
@@ -1099,5 +1099,5 @@ pub fn run() {
             sync_now,
         ])
         .run(tauri::generate_context!())
-        .expect("BiliMusic 启动失败");
+        .expect("oh-bilibili 启动失败");
 }
