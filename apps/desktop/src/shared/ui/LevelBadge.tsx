@@ -1,5 +1,19 @@
-/** 等级徽章配色：LV1 灰、LV2 绿、LV3 蓝、LV4 青、LV5 紫、LV6 红。 */
-const COLORS = ['#9499a0', '#9499a0', '#7fa93b', '#3fa8d6', '#2fb3a8', '#a674d9', '#e23a5e']
+/**
+ * 等级徽章配色，直接取 B 站官方等级图集 `level.png` 的底色：
+ * LV0/1 灰、LV2 薄荷绿、LV3 浅蓝、LV4 蜜桃橙、LV5 橙、LV6 红、LV7 品红、LV8 紫、LV9 黑。
+ */
+const COLORS = [
+  '#bfbfbf',
+  '#bfbfbf',
+  '#95ddb2',
+  '#92d1e5',
+  '#ffb37c',
+  '#ff6c00',
+  '#ff0000',
+  '#e52fec',
+  '#841cf9',
+  '#151515',
+]
 
 export function LevelBadge({ level }: { level: number }) {
   if (level <= 0) return null
