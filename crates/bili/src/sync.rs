@@ -1400,7 +1400,11 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
     let major = &item["modules"]["module_dynamic"]["major"];
     let kind = match (item["type"].as_str(), major["type"].as_str()) {
         (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
-        (Some("DYNAMIC_TYPE_DRAW"), Some("MAJOR_TYPE_OPUS")) => DynamicKind::Opus,
+        // 图文动态有两种形状：带 opus 摘要的，和只有 draw.items 的老格式。
+        // 转发里被转的图文几乎都是后者，只认 OPUS 会把整张原动态丢掉。
+        (Some("DYNAMIC_TYPE_DRAW"), Some("MAJOR_TYPE_OPUS" | "MAJOR_TYPE_DRAW")) => {
+            DynamicKind::Opus
+        }
         (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_ARTICLE")) => DynamicKind::Article,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
         _ => return None,
@@ -1463,6 +1467,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
             dynamic.title = opus["title"].as_str().unwrap_or_default().to_string();
             dynamic.text = opus["summary"]["text"]
                 .as_str()
+                .or_else(|| item["modules"]["module_dynamic"]["desc"]["text"].as_str())
                 .unwrap_or_default()
                 .trim_matches(|c: char| c == '\u{200b}' || c.is_whitespace())
                 .to_string();
@@ -1476,6 +1481,19 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
                         .collect()
                 })
                 .unwrap_or_default();
+            if dynamic.images.is_empty() {
+                dynamic.images = major["draw"]["items"]
+                    .as_array()
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(|item| item["src"].as_str())
+                            .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
+                            .map(|url| url.replacen("http://", "https://", 1))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+            }
             dynamic.cover = dynamic.images.first().cloned().unwrap_or_default();
         }
         DynamicKind::Article => {
@@ -1694,6 +1712,72 @@ mod dynamic_duration_tests {
         assert_eq!(orig.title, "被转的视频");
         assert_eq!(orig.duration_ms, Some(192_000));
         assert_eq!(dynamic.forwards, 8);
+    }
+
+    #[test]
+    fn 转发里的图文老格式也能带出图片() {
+        let item = json!({
+            "id_str": "8",
+            "type": "DYNAMIC_TYPE_FORWARD",
+            "modules": {
+                "module_author": {
+                    "mid": 1_u64,
+                    "name": "转发的人",
+                    "face": "https://i0.hdslb.com/face.jpg",
+                    "pub_time": "刚刚",
+                    "pub_ts": 2
+                },
+                "module_dynamic": {
+                    "desc": { "text": "看这个" },
+                    "major": null
+                },
+                "module_stat": {
+                    "forward": { "count": 0 },
+                    "comment": { "count": 0 },
+                    "like": { "count": 0 }
+                }
+            },
+            "orig": {
+                "id_str": "7",
+                "type": "DYNAMIC_TYPE_DRAW",
+                "modules": {
+                    "module_author": {
+                        "mid": 2_u64,
+                        "name": "画师",
+                        "face": "https://i0.hdslb.com/face2.jpg",
+                        "pub_time": "昨天",
+                        "pub_ts": 1
+                    },
+                    "module_dynamic": {
+                        "desc": null,
+                        "major": {
+                            "type": "MAJOR_TYPE_DRAW",
+                            "draw": {
+                                "items": [
+                                    { "src": "http://i0.hdslb.com/one.jpg" },
+                                    { "src": "https://i0.hdslb.com/two.png" }
+                                ]
+                            }
+                        }
+                    },
+                    "module_stat": {
+                        "forward": { "count": 1 },
+                        "comment": { "count": 2 },
+                        "like": { "count": 3 }
+                    }
+                }
+            }
+        });
+        let dynamic = super::dynamic_item(&item).expect("转发动态应能解析");
+        let orig = dynamic.orig.expect("应带出原动态");
+        assert_eq!(orig.kind, super::DynamicKind::Opus);
+        assert_eq!(
+            orig.images,
+            vec![
+                "https://i0.hdslb.com/one.jpg".to_string(),
+                "https://i0.hdslb.com/two.png".to_string()
+            ]
+        );
     }
 
     #[test]
