@@ -202,19 +202,36 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 {card ? <LevelBadge level={card.level} /> : null}
               </div>
               {isSelf ? null : (
-                <button
-                  type="button"
-                  onClick={() => void follow()}
-                  className={[
-                    't press ml-auto flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                    followed
-                      ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                      : 'bg-[var(--accent)] text-white hover:opacity-90',
-                  ].join(' ')}
-                >
-                  <Icon name={followed ? 'check' : 'plus'} size={14} />
-                  {followed ? '已关注' : '关注'}
-                </button>
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                  {/* B 站空间页的两颗按钮：消息是描边，关注是实心。 */}
+                  {mid ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void ipc
+                          .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
+                          .catch((cause) => toastFailure('打开私信', cause))
+                      }
+                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                      <Icon name="message" size={14} />
+                      发消息
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void follow()}
+                    className={[
+                      't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
+                      followed
+                        ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                        : 'bg-[var(--accent)] text-white hover:opacity-90',
+                    ].join(' ')}
+                  >
+                    <Icon name={followed ? 'check' : 'plus'} size={14} />
+                    {followed ? '已关注' : '关注'}
+                  </button>
+                </div>
               )}
             </div>
             {card?.official ? (
