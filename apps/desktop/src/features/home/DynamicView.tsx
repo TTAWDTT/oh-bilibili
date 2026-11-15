@@ -65,7 +65,17 @@ export function DynamicView() {
   }
 
   return (
-    <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
+    <div
+      id="scroll-main"
+      onScroll={(event) => {
+        if (!hasMore || loading || error || pending.current) return
+        const box = event.currentTarget
+        if (box.scrollHeight - box.scrollTop - box.clientHeight < 600) {
+          void load(offset, true)
+        }
+      }}
+      className="min-h-0 flex-1 overflow-y-auto pb-10"
+    >
       <header className="bg-[var(--panel)] py-4">
         <div className="mx-auto w-full max-w-[640px] px-4 md:px-8">
           <PageTitle>动态</PageTitle>

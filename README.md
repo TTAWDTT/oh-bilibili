@@ -123,7 +123,7 @@ osascript -e 'tell application "System Events" to tell process "bilimusic" to se
 | 位置 | 能做的事 |
 |---|---|
 | 发现 | 标题下是 B 站式分区频道条（点进对应榜单，悬停展开子分区面板，点子分区带分区筛选去搜）；顶部推荐轮播（5 张、6 秒翻页、悬停暂停），下面一屏推荐可「换一批」（`fresh_idx` 递增，内容确实会换）；卡片角标是 B 站的摆法：左下播放量、右下时长 |
-| 动态 | 关注 UP 的最新投稿 `x/polymer/web-dynamic/v1/feed/all`，一次 20 条，游标 `offset` 翻页；每条是头像 + 时间 + 正文 + 视频卡，点视频进观看页，点名字进 UP 主页 |
+| 动态 | 关注 UP 的最新投稿 `x/polymer/web-dynamic/v1/feed/all`，一次 20 条，游标 `offset` 翻页，滚到底自动续；每条是头像 + 时间 + 正文 + 视频卡，点视频进观看页，点名字进 UP 主页 |
 | 热门 | 综合热门 `x/web-interface/popular`，一次 50 条，滚到底按 `no_more` 续页；实测首屏 50 条、滚动后 100 条 |
 | 入站必刷 | 新用户首屏片单 `x/web-interface/popular/precious`，一次返回全部 98 条（`page_size` 被忽略）；卡片在 UP 主下面多一行 B 站官方推荐语（`achievement`） |
 | 排行 | 全站与 11 个分区的 B 站排行榜，一次 100 条；封面左上角的名次按前三名红 / 橙 / 黄 |
