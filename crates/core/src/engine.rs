@@ -542,6 +542,18 @@ impl Engine {
         Ok(self.source.dynamic_feed(offset).await?)
     }
 
+    pub async fn message_unread(&self) -> Result<crate::wire::MessageUnread, WireError> {
+        Ok(self.source.message_unread().await?)
+    }
+
+    pub async fn messages(
+        &self,
+        kind: crate::wire::MessageKind,
+        page: u32,
+    ) -> Result<crate::wire::MessagePage, WireError> {
+        Ok(self.source.messages(kind, page).await?)
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<bilimusic_model::Track>, WireError> {
         let tracks = self.source.watch_later_list().await?;

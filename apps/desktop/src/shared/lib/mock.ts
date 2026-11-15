@@ -257,6 +257,33 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = (fresh * size) % CATALOG.length
       return CATALOG.slice(start, start + size)
     }
+    case 'message_unread':
+      return { reply: 3, at: 2, like: 5, total: 10 }
+    case 'messages': {
+      const kind = str(args, 'kind')
+      const page = num(args, 'page')
+      const start = (page - 1) * 8
+      return {
+        items: CATALOG.slice(start, start + 8).map((track, index) => ({
+          id: `${kind}-${start + index}`,
+          kind,
+          users: (kind === 'like' ? CATALOG.slice(index, index + 3) : [track]).map((user, i) => ({
+            mid: user.up_mid ?? 5000 + i,
+            name: user.artist,
+            avatar: user.up_avatar ?? '',
+          })),
+          title: track.title,
+          cover: track.cover,
+          url: `https://www.bilibili.com/video/${track.key}`,
+          bvid: track.key,
+          quote: kind === 'like' ? '' : kind === 'at' ? '@你 这首歌一起听！' : '这段副歌太好听了，已经循环好多次。',
+          at: Math.floor(Date.now() / 1000) - (start + index + 1) * 1800,
+          count: kind === 'like' ? index + 3 : 1,
+        })),
+        page,
+        has_more: page < 3,
+      }
+    }
     case 'dynamic_feed': {
       const now = Math.floor(Date.now() / 1000)
       return {

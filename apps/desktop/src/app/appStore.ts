@@ -1,9 +1,11 @@
 import type { Track } from '../shared/lib/contract'
+import type { MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
 
 export type View =
   | { kind: 'home' }
   | { kind: 'dynamic' }
+  | { kind: 'messages' }
   | { kind: 'ranking'; rid?: number }
   | { kind: 'popular' }
   | { kind: 'precious' }
@@ -41,6 +43,8 @@ type AppStore = {
   currentOrder: string
   /** 时长筛选：0 不限，1~4 对应 B 站的 duration 参数。 */
   currentDuration: number
+  messageUnread: MessageUnread | null
+  setMessageUnread: (unread: MessageUnread | null) => void
   authOpen: boolean
   mv: { key: string; title: string } | null
   stage: boolean
@@ -88,6 +92,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   currentPartition: '全部',
   currentOrder: 'totalrank',
   currentDuration: 0,
+  messageUnread: null,
+  setMessageUnread: (messageUnread) => set({ messageUnread }),
   authOpen: false,
   mv: null,
   stage: false,

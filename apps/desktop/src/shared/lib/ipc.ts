@@ -532,6 +532,48 @@ export function dynamicFeed(offset?: string | null): Promise<DynamicPage> {
   return call<DynamicPage>('dynamic_feed', { offset: offset ?? null })
 }
 
+export type MessageKind = 'reply' | 'at' | 'like'
+
+export type MessageUser = {
+  mid: number
+  name: string
+  avatar: string
+}
+
+export type MessageItem = {
+  id: string
+  kind: MessageKind
+  users: MessageUser[]
+  title: string
+  cover: string | null
+  url: string
+  bvid: string | null
+  quote: string
+  at: number
+  count: number
+}
+
+export type MessagePage = {
+  items: MessageItem[]
+  page: number
+  has_more: boolean
+}
+
+export type MessageUnread = {
+  reply: number
+  at: number
+  like: number
+  total: number
+}
+
+export function messageUnread(): Promise<MessageUnread> {
+  return call<MessageUnread>('message_unread', {})
+}
+
+export function messages(kind: MessageKind, page: number): Promise<MessagePage> {
+  return call<MessagePage>('messages', { kind, page })
+}
+
 /** 取一页评论。 */
 export function watchComments(key: string, page: number, hot = true): Promise<CommentPage> {
   return call<CommentPage>('watch_comments', { key, page, hot })

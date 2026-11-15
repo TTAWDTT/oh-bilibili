@@ -189,6 +189,22 @@ async fn dynamic_feed(
     engine.dynamic_feed(offset).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn message_unread(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<bilimusic_core::wire::MessageUnread, WireError> {
+    engine.message_unread().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn messages(
+    engine: tauri::State<'_, Arc<Engine>>,
+    kind: bilimusic_core::wire::MessageKind,
+    page: u32,
+) -> Result<bilimusic_core::wire::MessagePage, WireError> {
+    engine.messages(kind, page).await
+}
+
 /// 取一页评论。评论区只读，取不到不该挡住看视频。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_comments(
@@ -989,6 +1005,8 @@ pub fn run() {
             comment_del,
             home_feed,
             dynamic_feed,
+            message_unread,
+            messages,
             watch_later_list,
             following,
             space_videos,

@@ -106,6 +106,9 @@ export function TitleBar() {
   const goBack = useAppStore((state) => state.goBack)
   const viewing = useAppStore((state) => state.view.kind === 'watch')
   const auth = useAuthStore((state) => state.auth)
+  const messaging = useAppStore((state) => state.view.kind === 'messages')
+  const unread = useAppStore((state) => state.messageUnread)
+  const setUnread = useAppStore((state) => state.setMessageUnread)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
   const [focused, setFocused] = useState(false)
@@ -121,6 +124,22 @@ export function TitleBar() {
   useEffect(() => {
     setText(currentQuery)
   }, [currentQuery])
+
+  useEffect(() => {
+    if (!auth?.logged_in) {
+      setUnread(null)
+      return
+    }
+    let cancelled = false
+    void ipc.messageUnread()
+      .then((next) => {
+        if (!cancelled) setUnread(next)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [auth?.logged_in, auth?.user?.mid, messaging, setUnread])
 
   const submit = (): void => {
     setQuery(text.trim())
@@ -240,6 +259,20 @@ export function TitleBar() {
          * 每一项都进对应的真实页面，不摆点不动的装饰；窄屏收进侧栏与「我的」，
          * 所以这里只在 md 以上出现。
          */}
+        <button
+          type="button"
+          onClick={() => navigate({ kind: 'messages' })}
+          title="消息"
+          aria-label={unread?.total ? `消息，${unread.total} 条未读` : '消息'}
+          className="bili-icon-btn t press relative flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+        >
+          <Icon name="message" size={18} />
+          {unread && unread.total > 0 ? (
+            <span className="num absolute -right-1 -top-0.5 min-w-4 rounded-full bg-[var(--accent)] px-1 text-[10px] leading-4 text-white">
+              {unread.total > 99 ? '99+' : unread.total}
+            </span>
+          ) : null}
+        </button>
         <div className="hidden items-center gap-1 md:flex">
           {[
             { kind: 'history' as const, label: '历史', icon: 'clock' as const },

@@ -323,6 +323,18 @@ impl Source {
         self.client.dynamic_feed(offset).await
     }
 
+    pub async fn message_unread(&self) -> Result<messages::MessageUnread, BiliError> {
+        self.client.message_unread().await
+    }
+
+    pub async fn messages(
+        &self,
+        kind: messages::MessageKind,
+        page: u32,
+    ) -> Result<messages::MessagePage, BiliError> {
+        self.client.messages(kind, page).await
+    }
+
     /// 稍后再看列表。
     pub async fn watch_later_list(&self) -> Result<Vec<Track>, BiliError> {
         self.client.watch_later_tracks().await

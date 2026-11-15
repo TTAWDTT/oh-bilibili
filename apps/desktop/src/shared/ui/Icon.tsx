@@ -71,6 +71,12 @@ const ICONS = {
       <path d="M12 11.4v1.6l1.2.9" strokeWidth="1.3" />
     </>
   ),
+  message: (
+    <>
+      <path d="M7 4.5h10a3.5 3.5 0 0 1 3.5 3.5v6a3.5 3.5 0 0 1-3.5 3.5h-6l-5 3v-3.2A3.5 3.5 0 0 1 3.5 14V8A3.5 3.5 0 0 1 7 4.5Z" />
+      <path d="M8 9h8M8 13h5" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.4" />

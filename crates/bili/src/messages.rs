@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::client::{Client, API};
+use crate::error::BiliError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageKind {
@@ -25,6 +28,7 @@ pub struct MessageItem {
     pub title: String,
     pub cover: Option<String>,
     pub url: String,
+    pub bvid: Option<String>,
     pub quote: String,
     pub at: u64,
     pub count: u64,
@@ -45,16 +49,121 @@ pub struct MessageUnread {
     pub total: u64,
 }
 
-fn message_page_from(
-    _value: &serde_json::Value,
-    _kind: MessageKind,
-    _page: u32,
-) -> MessagePage {
-    todo!()
+impl Client {
+    pub async fn message_unread(&self) -> Result<MessageUnread, BiliError> {
+        let value = self
+            .get_json(
+                &format!("{API}/x/msgfeed/unread"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(unread_from(&value))
+    }
+
+    pub async fn messages(&self, kind: MessageKind, page: u32) -> Result<MessagePage, BiliError> {
+        let category = match kind {
+            MessageKind::Reply => "reply",
+            MessageKind::At => "at",
+            MessageKind::Like => "like",
+        };
+        let value = self
+            .get_json(
+                &format!("{API}/x/msgfeed/{category}?platform=web&build=0&mobi_app=web&pn={page}&ps=20"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(message_page_from(&value, kind, page))
+    }
 }
 
-fn unread_from(_value: &serde_json::Value) -> MessageUnread {
-    todo!()
+fn message_page_from(value: &serde_json::Value, kind: MessageKind, page: u32) -> MessagePage {
+    let data = if kind == MessageKind::Like {
+        &value["data"]["total"]
+    } else {
+        &value["data"]
+    };
+    let items = data["items"]
+        .as_array()
+        .map(|list| list.iter().map(|entry| message_item_from(entry, kind)).collect())
+        .unwrap_or_default();
+    MessagePage {
+        items,
+        page,
+        has_more: !data["cursor"]["is_end"].as_bool().unwrap_or(true),
+    }
+}
+
+fn message_item_from(entry: &serde_json::Value, kind: MessageKind) -> MessageItem {
+    let item = &entry["item"];
+    let url = item["uri"].as_str().unwrap_or_default().to_string();
+    let bvid = url
+        .split("/video/")
+        .nth(1)
+        .map(|tail| tail.split(['/', '?', '#']).next().unwrap_or_default())
+        .filter(|id| {
+            id.len() == 12 && id.starts_with("BV") && id.bytes().all(|c| c.is_ascii_alphanumeric())
+        })
+        .map(str::to_string);
+    let users = if kind == MessageKind::Like {
+        entry["users"]
+            .as_array()
+            .map(|users| users.iter().map(message_user_from).collect())
+            .unwrap_or_default()
+    } else {
+        vec![message_user_from(&entry["user"])]
+    };
+    let time_key = match kind {
+        MessageKind::Reply => "reply_time",
+        MessageKind::At => "at_time",
+        MessageKind::Like => "like_time",
+    };
+    let quote_key = if kind == MessageKind::Like {
+        "desc"
+    } else {
+        "source_content"
+    };
+    MessageItem {
+        id: entry["id"]
+            .as_u64()
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| entry["id"].as_str().unwrap_or_default().to_string()),
+        kind,
+        users,
+        title: item["title"].as_str().unwrap_or_default().to_string(),
+        cover: item["image"]
+            .as_str()
+            .filter(|url| !url.is_empty())
+            .map(|url| url.replacen("http://", "https://", 1)),
+        url,
+        bvid,
+        quote: item[quote_key].as_str().unwrap_or_default().to_string(),
+        at: entry[time_key].as_u64().unwrap_or_default(),
+        count: entry["counts"].as_u64().unwrap_or(1),
+    }
+}
+
+fn message_user_from(value: &serde_json::Value) -> MessageUser {
+    MessageUser {
+        mid: value["mid"].as_u64().unwrap_or_default(),
+        name: value["nickname"].as_str().unwrap_or_default().to_string(),
+        avatar: value["avatar"]
+            .as_str()
+            .unwrap_or_default()
+            .replacen("http://", "https://", 1),
+    }
+}
+
+fn unread_from(value: &serde_json::Value) -> MessageUnread {
+    let data = &value["data"];
+    let reply = data["reply"].as_u64().unwrap_or_default();
+    let at = data["at"].as_u64().unwrap_or_default();
+    let like = data["like"].as_u64().unwrap_or_default();
+    MessageUnread {
+        reply,
+        at,
+        like,
+        total: reply + at + like,
+    }
 }
 
 #[cfg(test)]
@@ -170,6 +279,27 @@ mod tests {
         assert_eq!(item.quote, "https://github.com/TTAWDTT/dsh-plugin-wallpapers");
         assert_eq!(item.at, 1_788_896_933);
         assert!(page.has_more);
+    }
+
+    #[test]
+    fn 视频链接提取编号并保留外链() {
+        let mut value = json!({
+            "data": {
+                "cursor": { "is_end": true },
+                "items": [{
+                    "id": "message-1",
+                    "user": { "mid": 1, "nickname": "UP", "avatar": "http://i0.hdslb.com/avatar.jpg" },
+                    "item": { "uri": "https://www.bilibili.com/video/BV1JxNnz9ENZ/?p=2#reply" }
+                }]
+            }
+        });
+        let page = message_page_from(&value, MessageKind::Reply, 1);
+        assert_eq!(page.items[0].bvid.as_deref(), Some("BV1JxNnz9ENZ"));
+        assert_eq!(page.items[0].users[0].avatar, "https://i0.hdslb.com/avatar.jpg");
+        value["data"]["items"][0]["item"]["uri"] = json!("https://t.bilibili.com/123");
+        let page = message_page_from(&value, MessageKind::Reply, 1);
+        assert_eq!(page.items[0].bvid, None);
+        assert_eq!(page.items[0].url, "https://t.bilibili.com/123");
     }
 
     #[test]
