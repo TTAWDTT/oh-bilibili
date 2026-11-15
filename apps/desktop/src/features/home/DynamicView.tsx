@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
@@ -27,6 +27,19 @@ function DynamicCard({
 }) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
+  const [expanded, setExpanded] = useState(false)
+  const [overflow, setOverflow] = useState(false)
+  const textRef = useRef<HTMLParagraphElement | null>(null)
+
+  useLayoutEffect(() => {
+    if (!text) {
+      setOverflow(false)
+      return
+    }
+    const element = textRef.current
+    if (!element || expanded) return
+    setOverflow(element.scrollHeight > element.clientHeight + 1)
+  }, [text, expanded])
 
   return (
     <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
@@ -86,9 +99,23 @@ function DynamicCard({
           </p>
         ) : null}
         {text ? (
-          <p className="mb-3 line-clamp-6 whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)]">
-            {text}
-          </p>
+          <div className="mb-3">
+            <p
+              ref={textRef}
+              className={`whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
+            >
+              {text}
+            </p>
+            {overflow || expanded ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((value) => !value)}
+                className="t mt-1 text-[13px] text-[var(--accent)] hover:underline"
+              >
+                {expanded ? '收起' : '展开'}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {item.kind === 'video' ? (
           <button
@@ -145,15 +172,19 @@ function DynamicCard({
                 type="button"
                 onClick={onOpen}
                 aria-label={`打开第 ${index + 1} 张图片`}
-                className={`t relative overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? '' : 'aspect-square'}`}
+                className={`t relative flex items-center justify-center overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? 'min-h-[180px]' : 'aspect-square'}`}
               >
+                <Icon name="biliTv" size={22} className="absolute text-[var(--ga3)]" />
                 <img
                   src={url}
                   alt=""
                   loading="lazy"
                   decoding="async"
                   referrerPolicy="no-referrer"
-                  className={`w-full object-cover ${item.images.length === 1 ? 'max-h-[320px]' : 'h-full'}`}
+                  className={`relative w-full object-cover ${item.images.length === 1 ? 'max-h-[320px]' : 'h-full'}`}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none'
+                  }}
                 />
                 {index === 8 && item.images.length > 9 ? (
                   <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[24px] font-medium text-white">
@@ -347,7 +378,7 @@ export function DynamicView() {
                 })
               } else if (item.kind === 'opus') {
                 void ipc
-                  .openExternal(`https://t.bilibili.com/${item.id}`)
+                  .openExternal(`https://www.bilibili.com/opus/${item.id}`)
                   .catch((cause) => toastFailure('打开动态', cause))
               }
             }}
@@ -357,7 +388,7 @@ export function DynamicView() {
                 .openExternal(
                   item.kind === 'video'
                     ? `https://www.bilibili.com/video/${item.bvid}`
-                    : `https://t.bilibili.com/${item.id}`,
+                    : `https://www.bilibili.com/opus/${item.id}`,
                 )
                 .catch((cause) => toastFailure('打开链接', cause))
             }}
