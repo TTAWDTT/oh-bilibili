@@ -159,11 +159,13 @@ function CommentRow({
             )}
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
             {c.pinned ? (
-              <span className="shrink-0 rounded-[2px] bg-[var(--accent)] px-1 text-[10px] leading-[15px] text-white">
-                置顶
+              <span className="flex shrink-0 items-center gap-0.5 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+                <Icon name="thumb" size={9} />
+                UP主觉得很赞
               </span>
             ) : null}
-            {ownerMid && c.mid === ownerMid ? (
+            {/* 置顶标记本身已经写明 UP 主，再挂一枚「UP主」就成了并排两块蓝底。 */}
+            {!c.pinned && ownerMid && c.mid === ownerMid ? (
               <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 UP主
               </span>
