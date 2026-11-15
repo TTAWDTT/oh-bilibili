@@ -59,6 +59,8 @@ export function LiveView() {
     load(pageRef.current + 1)
   }
 
+  const focus = rooms[0]
+
   if (page === 0 && loading) return <BiliLoader label="正在取直播间…" />
   if (page === 0 && error) {
     return (
@@ -79,27 +81,74 @@ export function LiveView() {
       className="bili-canvas min-h-0 flex-1 overflow-y-auto pb-10"
     >
       <nav className="mb-4 bg-[var(--panel)] px-4 py-4 md:px-8">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[17px] font-medium text-[var(--text-1)]">直播</h2>
-          <span className="flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 text-[11px] leading-[17px] text-white">
-            <span className="bili-live-dot" aria-hidden />
-            LIVE
-          </span>
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <p className="text-[12px] text-[var(--text-3)]">正在直播的房间</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-[17px] font-medium text-[var(--text-1)]">直播</h2>
+            <span className="flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 text-[11px] leading-[17px] text-white">
+              <span className="bili-live-dot" aria-hidden />
+              LIVE
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => void ipc.openExternal('https://live.bilibili.com/').catch(() => {})}
             className="t press flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
           >
-            <Icon name="info" size={12} />
-            在浏览器里看
+            全部直播
+            <Icon name="external" size={12} />
           </button>
         </div>
       </nav>
+      {focus ? (
+        <div className="mb-4 px-4 md:px-8">
+          <button
+            type="button"
+            onClick={() => void ipc.openExternal(focus.url).catch(() => {})}
+            title={focus.title}
+            className="group relative block h-[220px] w-full overflow-hidden rounded-[8px] bg-[var(--ga1)] text-left sm:h-[280px] lg:h-[320px]"
+          >
+            {focus.cover ? (
+              <img
+                src={focus.cover}
+                alt=""
+                referrerPolicy="no-referrer"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-[320ms] group-hover:scale-[1.015]"
+              />
+            ) : null}
+            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_20%,rgba(0,0,0,0.78)_100%)]" />
+            <span className="absolute left-3 top-3 flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 py-0.5 text-[11px] font-medium leading-[16px] text-white">
+              <span className="bili-live-dot" aria-hidden />
+              LIVE
+            </span>
+            <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-6 p-4 text-white md:p-5">
+              <span className="min-w-0">
+                <span className="line-clamp-2 text-[18px] font-medium leading-[26px] [text-shadow:0_1px_6px_rgba(0,0,0,0.55)] md:text-[22px] md:leading-[30px]">
+                  {focus.title}
+                </span>
+                <span className="mt-2 flex items-center gap-2 text-[12.5px] [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">
+                  <Avatar src={focus.face} alt={focus.uname} size={22} />
+                  <span className="truncate">{focus.uname}</span>
+                  <span className="num flex items-center gap-1">
+                    <span className="bili-live-bars" aria-hidden>
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    {formatCount(focus.online)}
+                  </span>
+                </span>
+              </span>
+              <span className="hidden shrink-0 items-center gap-1 rounded-[4px] bg-black/35 px-2 py-1 text-[12px] backdrop-blur-sm sm:flex">
+                <Icon name="external" size={13} />
+                在浏览器打开
+              </span>
+            </span>
+          </button>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 px-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 md:px-8">
-        {rooms.map((room) => (
+        {rooms.slice(1).map((room) => (
           <button
             key={`${room.room_id}`}
             type="button"
