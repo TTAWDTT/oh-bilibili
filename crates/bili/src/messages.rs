@@ -269,6 +269,51 @@ mod tests {
     }
 
     #[test]
+    fn 引用里的_at_用户保留成可点名单() {
+        let value = json!({
+            "data": {
+                "cursor": { "is_end": true },
+                "items": [{
+                    "id": 694642073067530_u64,
+                    "user": {
+                        "mid": 506211595,
+                        "nickname": "撒沙鲨杀傻莎莎",
+                        "avatar": "https://i1.hdslb.com/face.jpg"
+                    },
+                    "item": {
+                        "title": "壁柜园",
+                        "image": "",
+                        "uri": "https://www.bilibili.com/video/BV1kKiCYsEvj",
+                        "source_content": "@测试UP 这段副歌太好听了",
+                        "at_details": [
+                            {
+                                "mid": 1960976249_u64,
+                                "nickname": "测试UP",
+                                "avatar": "https://i2.hdslb.com/face.jpg"
+                            },
+                            {
+                                "mid": 7_u64,
+                                "nickname": "",
+                                "avatar": ""
+                            }
+                        ]
+                    },
+                    "at_time": 1734142181_u64
+                }]
+            }
+        });
+
+        let page = message_page_from(&value, MessageKind::At, 2);
+        assert_eq!(
+            page.items[0].mentions,
+            vec![MessageMention {
+                mid: 1_960_976_249,
+                name: "测试UP".to_string()
+            }]
+        );
+    }
+
+    #[test]
     fn 获赞消息保留多人与点赞总数() {
         let value = json!({
             "data": {
