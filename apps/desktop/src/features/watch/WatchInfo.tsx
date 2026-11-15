@@ -12,18 +12,42 @@ import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
 /** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
-function descriptionNodes(text: string): React.ReactNode[] {
-  return text.split(/(https?:\/\/[^\s]+)/g).map((part, index) => {
-    if (!/^https?:\/\//.test(part)) return part
-    const url = part.replace(/[.,;:!?，。；、）…]+$/, '')
+/** `01:23` / `1:02:03` 转毫秒。B 站简介里的时间戳点一下就跳到那一刻。 */
+function timestampMs(token: string): number | null {
+  const parts = token.split(':').map(Number)
+  if (parts.some((n) => Number.isNaN(n))) return null
+  if (parts.length === 2) return ((parts[0] ?? 0) * 60 + (parts[1] ?? 0)) * 1000
+  if (parts.length === 3) {
+    return ((parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)) * 1000
+  }
+  return null
+}
+
+function descriptionNodes(text: string, onSeek: (ms: number) => void): React.ReactNode[] {
+  return text.split(/(https?:\/\/[^\s]+|\b(?:\d{1,2}:)?[0-5]?\d:[0-5]\d\b)/g).map((part, index) => {
+    if (/^https?:\/\//.test(part)) {
+      const url = part.replace(/[.,;:!?，。；、）…]+$/, '')
+      return (
+        <button
+          key={index}
+          type="button"
+          onClick={() => void ipc.openExternal(url).catch((cause) => toastFailure('打开链接', cause))}
+          className="t break-all text-left text-[var(--accent)] hover:underline"
+        >
+          {url}
+        </button>
+      )
+    }
+    const at = timestampMs(part)
+    if (at === null) return part
     return (
       <button
         key={index}
         type="button"
-        onClick={() => void ipc.openExternal(url).catch((cause) => toastFailure('打开链接', cause))}
-        className="t break-all text-left text-[var(--accent)] hover:underline"
+        onClick={() => onSeek(at)}
+        className="t text-[var(--accent)] hover:underline"
       >
-        {url}
+        {part}
       </button>
     )
   })
@@ -116,6 +140,7 @@ export function WatchInfo({
   onFav,
   onCoin,
   onTriple,
+  onSeek,
   ownerRow,
 }: {
   track: Track
@@ -130,6 +155,8 @@ export function WatchInfo({
   onCoin: (count: number, alsoLike: boolean) => void
   /** 长按点赞：B 站的一键三连。 */
   onTriple: () => void
+  /** 简介里的时间戳跳转。 */
+  onSeek: (ms: number) => void
   /** 宽屏主栏的 UP 主行，插在标签之后、分P 之前。 */
   ownerRow?: React.ReactNode
 }) {
@@ -465,7 +492,7 @@ export function WatchInfo({
               descOpen ? '' : 'line-clamp-2'
             }`}
           >
-            {descriptionNodes(data.desc)}
+            {descriptionNodes(data.desc, onSeek)}
           </p>
           {/* 长简介按 B 站收两行；短简介不需要那个按钮。 */}
           {data.desc.length > 90 ? (

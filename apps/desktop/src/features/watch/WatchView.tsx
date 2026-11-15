@@ -348,6 +348,9 @@ export function WatchView({ track }: { track: Track }) {
               onLike={like}
               onFav={openFav}
               onTriple={triple}
+              onSeek={(ms) => {
+                void ipc.playerSeek(ms).catch(() => {})
+              }}
               ownerRow={
                 <OwnerCard
                   data={data}
