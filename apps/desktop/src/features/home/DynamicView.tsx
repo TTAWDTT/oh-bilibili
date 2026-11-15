@@ -13,6 +13,11 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
 const FEED = 'mx-auto w-full max-w-[700px] px-4 md:px-0'
+const TABS: { key: 'all' | 'video' | 'opus'; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'video', label: '视频投稿' },
+  { key: 'opus', label: '图文' },
+]
 
 function DynamicCard({
   item,
@@ -240,6 +245,7 @@ export function DynamicView() {
   const navigate = useAppStore((state) => state.navigate)
   const [following, setFollowing] = useState<Followed[]>([])
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
+  const [tab, setTab] = useState<'all' | 'video' | 'opus'>('all')
   const [offset, setOffset] = useState('')
   const [hasMore, setHasMore] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -249,6 +255,7 @@ export function DynamicView() {
   const pending = useRef(false)
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const visible = tab === 'all' ? items : items.filter((item) => item.kind === tab)
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
@@ -357,6 +364,27 @@ export function DynamicView() {
             </button>
           </div>
         </div>
+        <div className={FEED}>
+          <nav aria-label="动态分类" className="flex gap-6 border-t border-[var(--hairline)]">
+            {TABS.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                onClick={() => {
+                  setTab(entry.key)
+                  scrollerRef.current?.scrollTo({ top: 0 })
+                }}
+                className={`t border-b-2 py-2 text-[14px] ${
+                  tab === entry.key
+                    ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
+                    : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+                }`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </nav>
+        </div>
       </header>
       {following.length > 0 ? (
         <div className={`${FEED} pt-4`}>
@@ -378,7 +406,7 @@ export function DynamicView() {
         </div>
       ) : null}
       <div className={`${FEED} flex flex-col gap-3 pt-4`}>
-        {items.map((item) => (
+        {visible.map((item) => (
           <DynamicCard
             key={item.id}
             item={item}
@@ -416,6 +444,11 @@ export function DynamicView() {
             }}
           />
         ))}
+        {visible.length === 0 && items.length > 0 ? (
+          <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
+            这个分类还没有动态
+          </p>
+        ) : null}
         {error && items.length > 0 ? (
           <div className="flex justify-center py-5">
             <button
