@@ -27,6 +27,7 @@ function DynamicCard({
 }) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
+  const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const [expanded, setExpanded] = useState(false)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
@@ -47,6 +48,20 @@ function DynamicCard({
     observer.observe(element)
     return () => observer.disconnect()
   }, [text, expanded])
+
+  const bodyNodes = text.split(/(#[^#\s]{1,40}#)/g).map((part, index) => {
+    if (!part.startsWith('#') || !part.endsWith('#') || part.length < 3) return part
+    return (
+      <button
+        key={index}
+        type="button"
+        onClick={() => setHeroQuery(part.slice(1, -1))}
+        className="t text-left text-[var(--accent)] hover:underline"
+      >
+        {part}
+      </button>
+    )
+  })
 
   return (
     <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
@@ -111,7 +126,7 @@ function DynamicCard({
               ref={textRef}
               className={`whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
             >
-              {text}
+              {bodyNodes}
             </p>
             {overflow || expanded ? (
               <button
