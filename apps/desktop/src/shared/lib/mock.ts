@@ -297,7 +297,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
     }
     case 'hot_search':
-      return ['周杰伦', '晴天', '纯音乐', '夜空中最亮的星', '起风了', '海底']
+      return [
+        { keyword: '周杰伦', label: '周杰伦', icon: '', heat: 98_200 },
+        { keyword: '晴天', label: '晴天', icon: '', heat: 76_500 },
+        { keyword: '纯音乐', label: '纯音乐', icon: '', heat: 61_300 },
+        { keyword: '夜空中最亮的星', label: '夜空中最亮的星', icon: '', heat: 45_100 },
+        { keyword: '起风了', label: '起风了', icon: '', heat: 33_800 },
+        { keyword: '海底', label: '海底', icon: '', heat: 21_600 },
+      ]
     case 'watch_open': {
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')

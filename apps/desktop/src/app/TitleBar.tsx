@@ -3,6 +3,7 @@ import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { Avatar } from '../shared/ui/Avatar'
 import * as ipc from '../shared/lib/ipc'
+import type { HotSearchItem } from '../shared/lib/ipc'
 import { toastFailure } from './notice'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon } from '../shared/ui/Icon'
@@ -17,7 +18,7 @@ import { useSearchHistory } from '../shared/lib/searchHistory'
 function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
   const history = useSearchHistory((state) => state.items)
   const clear = useSearchHistory((state) => state.clear)
-  const [trending, setTrending] = useState<string[]>([])
+  const [trending, setTrending] = useState<HotSearchItem[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -35,7 +36,7 @@ function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
   if (history.length === 0 && trending.length === 0) return null
 
   return (
-    /* 用 onMouseDown 而不是 onClick：先于 input 的 blur 触发，点得中 */
+    /* 按下时挡掉 input 的 blur，动作仍走 onClick，键盘与辅助技术也能触发 */
     <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
       {history.length > 0 ? (
         <div className="px-3 pb-1.5">
@@ -43,10 +44,8 @@ function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
             <span className="text-[12px] text-[var(--text-3)]">搜索历史</span>
             <button
               type="button"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                clear()
-              }}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={clear}
               className="text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
             >
               清空
@@ -57,10 +56,8 @@ function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
               <button
                 key={word}
                 type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  onPick(word)
-                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onPick(word)}
                 className="max-w-full truncate rounded-[12px] bg-[var(--ga0)] px-2.5 py-0.5 text-[12.5px] text-[var(--text-2)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
               >
                 {word}
@@ -73,20 +70,19 @@ function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
         <div className={history.length > 0 ? 'mt-1 border-t border-hairline px-3 pt-2' : 'px-3'}>
           <div className="mb-1 text-[12px] text-[var(--text-3)]">大家都在搜</div>
           <div className="grid grid-cols-2 gap-x-3">
-            {trending.map((word, i) => (
+            {trending.map((item, i) => (
               <button
-                key={word}
+                key={item.keyword}
                 type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  onPick(word)
-                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onPick(item.keyword)}
                 className="flex min-w-0 items-center gap-2 py-[3px] text-left text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]"
               >
                 <span className={`num w-3 shrink-0 text-[12px] ${i < 3 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'}`}>
                   {i + 1}
                 </span>
-                <span className="truncate">{word}</span>
+                {item.icon ? <img src={item.icon} alt="" className="h-3.5 w-auto shrink-0" /> : null}
+                <span className="truncate">{item.label}</span>
               </button>
             ))}
           </div>

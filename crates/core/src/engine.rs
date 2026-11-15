@@ -584,7 +584,7 @@ impl Engine {
     }
 
     /// 搜索页的热搜榜。取不到就返回空表，界面退回内置建议。
-    pub async fn hot_search(&self) -> Vec<String> {
+    pub async fn hot_search(&self) -> Vec<crate::wire::HotSearchItem> {
         self.source.hot_search().await.unwrap_or_default()
     }
 

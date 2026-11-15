@@ -542,9 +542,17 @@ export function watchReplies(key: string, root: string, page: number): Promise<C
   return call<CommentPage>('watch_replies', { key, root, page })
 }
 
+/** 热搜榜的一条。`keyword` 是真正要搜的词，`label` 是展示名。 */
+export type HotSearchItem = {
+  keyword: string
+  label: string
+  icon: string
+  heat: number
+}
+
 /** 搜索页热搜榜。游客可用；失败时返回空表。 */
-export function hotSearch(): Promise<string[]> {
-  return call<string[]>('hot_search', {})
+export function hotSearch(): Promise<HotSearchItem[]> {
+  return call<HotSearchItem[]>('hot_search', {})
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */

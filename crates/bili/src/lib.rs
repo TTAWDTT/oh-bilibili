@@ -44,6 +44,16 @@ pub struct VideoMeta {
     pub likes: u64,
 }
 
+/// 搜索页热搜榜的一条。`keyword` 是真正拿去搜的词，`label` 是榜单上的展示名。
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct HotSearchItem {
+    pub keyword: String,
+    pub label: String,
+    /// 榜单自带的角标图，可能为空。
+    pub icon: String,
+    pub heat: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct TrackDetail {
     pub track: Track,
@@ -624,7 +634,7 @@ impl Source {
     /// 搜索页的热搜榜。B 站搜索页左栏就是这份榜单，带名次。
     ///
     /// 游客也能拿到，不需要登录；失败就返回空表，由界面退回内置建议。
-    pub async fn hot_search(&self) -> Result<Vec<String>, BiliError> {
+    pub async fn hot_search(&self) -> Result<Vec<HotSearchItem>, BiliError> {
         let value = self
             .client
             .get_json_allowing_guest(
@@ -637,8 +647,24 @@ impl Source {
             .map(|items| {
                 items
                     .iter()
-                    .filter_map(|item| item["show_name"].as_str())
-                    .map(|s| s.to_string())
+                    .filter_map(|item| {
+                        let raw_keyword = item["keyword"].as_str().unwrap_or("");
+                        let raw_label = item["show_name"].as_str().unwrap_or("");
+                        let keyword = if raw_keyword.is_empty() { raw_label } else { raw_keyword };
+                        let label = if raw_label.is_empty() { raw_keyword } else { raw_label };
+                        if keyword.is_empty() && label.is_empty() {
+                            return None;
+                        }
+                        Some(HotSearchItem {
+                            keyword: keyword.to_string(),
+                            label: label.to_string(),
+                            icon: item["icon"]
+                                .as_str()
+                                .unwrap_or("")
+                                .replacen("http://", "https://", 1),
+                            heat: item["heat_score"].as_u64().unwrap_or(0),
+                        })
+                    })
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();

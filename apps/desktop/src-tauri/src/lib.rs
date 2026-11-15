@@ -217,7 +217,9 @@ async fn watch_replies(
 
 /// 搜索页热搜榜。拿不到就是空表，界面会用内置建议。
 #[tauri::command(rename_all = "snake_case")]
-async fn hot_search(engine: tauri::State<'_, Arc<Engine>>) -> Result<Vec<String>, WireError> {
+async fn hot_search(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<bilimusic_core::wire::HotSearchItem>, WireError> {
     Ok(engine.hot_search().await)
 }
 

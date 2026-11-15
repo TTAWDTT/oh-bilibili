@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastDone } from '../../app/notice'
 import type { Track, WireError } from '../../shared/lib/contract'
+import type { HotSearchItem } from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { formatCount } from '../../shared/lib/format'
@@ -83,7 +84,7 @@ export function SearchView() {
   const clearHistory = useSearchHistory((s) => s.clear)
   const removeHistory = useSearchHistory((s) => s.remove)
   /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
-  const [hotWords, setHotWords] = useState<string[]>([])
+  const [hotWords, setHotWords] = useState<HotSearchItem[]>([])
   useEffect(() => {
     let cancelled = false
     void ipc
@@ -96,7 +97,10 @@ export function SearchView() {
       cancelled = true
     }
   }, [])
-  const trending = hotWords.length > 0 ? hotWords : SUGGESTIONS
+  const trending: HotSearchItem[] =
+    hotWords.length > 0
+      ? hotWords
+      : SUGGESTIONS.map((s) => ({ keyword: s, label: s, icon: '', heat: 0 }))
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
   const heroQuery = useAppStore((state) => state.heroQuery)
@@ -367,11 +371,11 @@ export function SearchView() {
                 <span className="text-[12px] text-[var(--text-3)]">大家都在搜</span>
               </div>
               <ol className="mt-3 grid grid-cols-1 gap-x-8 gap-y-1.5 md:grid-cols-2 xl:grid-cols-3">
-                {trending.map((word, index) => (
-                  <li key={`${word}-${index}`}>
+                {trending.map((item, index) => (
+                  <li key={`${item.keyword}-${index}`}>
                     <button
                       type="button"
-                      onClick={() => pick(word)}
+                      onClick={() => pick(item.keyword)}
                       className="t flex w-full items-baseline gap-2.5 rounded-[4px] py-1 text-left hover:bg-[var(--panel-alt)]"
                     >
                       <span
@@ -381,8 +385,9 @@ export function SearchView() {
                       >
                         {index + 1}
                       </span>
+                      {item.icon ? <img src={item.icon} alt="" className="h-3.5 w-auto shrink-0" /> : null}
                       <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--text-1)]">
-                        {word}
+                        {item.label}
                       </span>
                     </button>
                   </li>
@@ -570,21 +575,29 @@ export function SearchView() {
                 {/* 给几条可点的替代词：优先用搜过的历史，其次用内置建议 */}
                 {(() => {
                   // 历史和热搜会撞词，去重后再截：一排「试试」里出现两次同一个词很像 bug。
-                  const words = [...new Set([...history, ...trending])]
-                    .filter((w) => w !== trimmed)
+                  const seen = new Set<string>()
+                  const words = [
+                    ...history.map((w) => ({ keyword: w, label: w, icon: '', heat: 0 })),
+                    ...trending,
+                  ]
+                    .filter((item) => {
+                      if (item.keyword === trimmed || seen.has(item.keyword)) return false
+                      seen.add(item.keyword)
+                      return true
+                    })
                     .slice(0, 5)
                   if (words.length === 0) return null
                   return (
                     <div className="-mt-8 flex flex-wrap items-center justify-center gap-1.5">
                       <span className="text-[12px] text-[var(--text-3)]">试试：</span>
-                      {words.map((word) => (
+                      {words.map((item) => (
                         <button
-                          key={word}
+                          key={item.keyword}
                           type="button"
-                          onClick={() => pick(word)}
+                          onClick={() => pick(item.keyword)}
                           className="rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
                         >
-                          {word}
+                          {item.label}
                         </button>
                       ))}
                     </div>
