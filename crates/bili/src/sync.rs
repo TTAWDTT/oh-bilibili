@@ -1270,7 +1270,10 @@ fn emote_pairs(value: &serde_json::Value) -> Vec<(String, String)> {
             let url = emote["url"]
                 .as_str()
                 .filter(|url| url.starts_with("http://") || url.starts_with("https://"))?;
-            Some((code.to_string(), url.to_string()))
+            Some((
+                code.to_string(),
+                url.replacen("http://", "https://", 1),
+            ))
         })
         .collect()
 }
@@ -1613,7 +1616,7 @@ mod emote_tests {
     use serde_json::json;
 
     #[test]
-    fn 表情包响应拍平成代号与图片() {
+    fn 表情包响应拍平成代号与_https_图片() {
         let value = json!({
             "data": {
                 "packages": [
@@ -1632,8 +1635,8 @@ mod emote_tests {
         assert_eq!(
             super::emote_pairs(&value),
             vec![
-                ("[大笑]".to_string(), "http://i0.hdslb.com/a.png".to_string()),
-                ("[2233娘_大笑]".to_string(), "http://i0.hdslb.com/c.png".to_string())
+                ("[大笑]".to_string(), "https://i0.hdslb.com/a.png".to_string()),
+                ("[2233娘_大笑]".to_string(), "https://i0.hdslb.com/c.png".to_string())
             ]
         );
     }
