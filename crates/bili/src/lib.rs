@@ -650,9 +650,6 @@ impl Source {
     }
 
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {
-        if term.is_empty() {
-            return Ok(Vec::new());
-        }
         self.client.search_suggest(term).await
     }
 
