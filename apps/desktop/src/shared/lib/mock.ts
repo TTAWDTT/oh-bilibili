@@ -300,6 +300,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           quote: kind === 'like' ? '' : kind === 'at' ? '@你 这首歌一起听！' : '这段副歌太好听了，已经循环好多次。',
           at: Math.floor(Date.now() / 1000) - (start + index + 1) * 1800,
           count: kind === 'like' ? index + 3 : 1,
+          mentions: kind === 'at' ? [{ mid: 1960976249, name: '你' }] : [],
         })),
         page,
         has_more: start + 8 < 24,

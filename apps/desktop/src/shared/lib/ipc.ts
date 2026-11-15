@@ -552,6 +552,11 @@ export type MessageUser = {
   avatar: string
 }
 
+export type MessageMention = {
+  mid: number
+  name: string
+}
+
 export type MessageItem = {
   id: string
   kind: MessageKind
@@ -563,6 +568,7 @@ export type MessageItem = {
   quote: string
   at: number
   count: number
+  mentions: MessageMention[]
 }
 
 export type MessagePage = {

@@ -21,7 +21,7 @@ const TABS: { kind: ipc.MessageKind; label: string }[] = [
 function MessageCard({ item }: { item: ipc.MessageItem }) {
   const navigate = useAppStore((state) => state.navigate)
   const first = item.users[0]
-  const author = (user: ipc.MessageUser) => navigate({ kind: 'author', name: user.name, mid: user.mid })
+  const author = (user: ipc.MessageMention) => navigate({ kind: 'author', name: user.name, mid: user.mid })
 
   const open = () => {
     if (item.bvid) {
@@ -80,7 +80,7 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
           </time>
           {item.quote && item.kind !== 'like' ? (
             <blockquote className="mt-3 whitespace-pre-wrap break-words border-l-2 border-[var(--line)] pl-3 text-[14px] leading-[22px] text-[var(--text-2)]">
-              {item.quote}
+              {quoteNodes(item.quote, item.mentions, author)}
             </blockquote>
           ) : null}
           <button type="button" onClick={open} className="group mt-3 flex w-full items-center gap-3 rounded-[6px] bg-[var(--ga0)] p-2 text-left">
@@ -102,6 +102,29 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
       </div>
     </article>
   )
+}
+
+function quoteNodes(text: string, mentions: ipc.MessageMention[], onMention: (mention: ipc.MessageMention) => void): React.ReactNode[] {
+  if (mentions.length === 0) return [text]
+  const users = new Map(mentions.map((mention) => [`@${mention.name}`, mention]))
+  const names = [...users.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+
+  return text.split(new RegExp(`(${names.join('|')})`, 'g')).map((part, index) => {
+    if (index % 2 === 0) return part
+    const mention = users.get(part)!
+    return (
+      <button
+        key={index}
+        type="button"
+        onClick={() => onMention(mention)}
+        className="t text-left text-[var(--accent)] hover:underline"
+      >
+        {part}
+      </button>
+    )
+  })
 }
 
 function MessageList({ kind }: { kind: ipc.MessageKind }) {

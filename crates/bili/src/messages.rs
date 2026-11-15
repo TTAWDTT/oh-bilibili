@@ -21,6 +21,12 @@ pub struct MessageUser {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageMention {
+    pub mid: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageItem {
     pub id: String,
     pub kind: MessageKind,
@@ -32,6 +38,7 @@ pub struct MessageItem {
     pub quote: String,
     pub at: u64,
     pub count: u64,
+    pub mentions: Vec<MessageMention>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -169,6 +176,24 @@ fn message_item_from(entry: &serde_json::Value, kind: MessageKind) -> MessageIte
         quote: item[quote_key].as_str().unwrap_or_default().to_string(),
         at: entry[message_time_key(kind)].as_u64().unwrap_or_default(),
         count: entry["counts"].as_u64().unwrap_or(1),
+        mentions: item["at_details"]
+            .as_array()
+            .map(|mentions| {
+                mentions
+                    .iter()
+                    .filter_map(|mention| {
+                        let name = mention["nickname"].as_str().filter(|name| !name.is_empty())?;
+                        let mid = mention["mid"]
+                            .as_u64()
+                            .or_else(|| mention["mid"].as_str()?.parse().ok())?;
+                        Some(MessageMention {
+                            mid,
+                            name: name.to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
     }
 }
 
@@ -311,6 +336,31 @@ mod tests {
                 name: "测试UP".to_string()
             }]
         );
+    }
+
+    #[test]
+    fn at_名单兼容字符串编号且不从消息用户推断() {
+        let mut entry = json!({
+            "user": { "mid": 9, "nickname": "消息用户" },
+            "item": {
+                "source_content": "@消息用户 @测试UP [doge]",
+                "at_details": [{ "mid": "1960976249", "nickname": "测试UP" }]
+            }
+        });
+        let item = message_item_from(&entry, MessageKind::At);
+        assert_eq!(item.quote, "@消息用户 @测试UP [doge]");
+        assert_eq!(
+            item.mentions,
+            vec![MessageMention {
+                mid: 1_960_976_249,
+                name: "测试UP".to_string()
+            }]
+        );
+
+        entry["item"]["at_details"] = serde_json::Value::Null;
+        assert!(message_item_from(&entry, MessageKind::At).mentions.is_empty());
+        entry["item"].as_object_mut().unwrap().remove("at_details");
+        assert!(message_item_from(&entry, MessageKind::At).mentions.is_empty());
     }
 
     #[test]
