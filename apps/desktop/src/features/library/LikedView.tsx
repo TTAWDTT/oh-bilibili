@@ -59,7 +59,7 @@ export function LikedView() {
   if (tracks === null) {
     return (
       <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-        <PageTitle>喜欢</PageTitle>
+        <PageTitle>赞过的视频</PageTitle>
         <div className="mt-4">
           <CardGridSkeleton cards={8} />
         </div>
@@ -93,7 +93,7 @@ export function LikedView() {
           </button>
         }
       >
-        喜欢
+        赞过的视频
       </PageTitle>
       <ContentGrid tracks={tracks} activeKey={snapshot?.track?.key ?? null} playing={snapshot?.phase === 'playing'} />
     </div>

@@ -102,7 +102,7 @@ export function HistoryView() {
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <div className="mb-4 flex items-center justify-between">
-        <PageTitle>历史</PageTitle>
+        <PageTitle>历史记录</PageTitle>
         {confirmingClear ? (
           <div className="flex items-center gap-2">
             <span className="text-[12px] text-[var(--text-3)]">清空后无法恢复</span>
