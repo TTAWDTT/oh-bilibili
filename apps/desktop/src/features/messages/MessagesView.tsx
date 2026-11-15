@@ -9,6 +9,7 @@ import { Avatar } from '../../shared/ui/Avatar'
 import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { Icon } from '../../shared/ui/Icon'
 
 const CONTENT = 'mx-auto w-full max-w-[760px] px-4 md:px-6'
 const TABS: { kind: ipc.MessageKind; label: string }[] = [
@@ -83,8 +84,15 @@ function MessageCard({ item }: { item: ipc.MessageItem }) {
             </blockquote>
           ) : null}
           <button type="button" onClick={open} className="group mt-3 flex w-full items-center gap-3 rounded-[6px] bg-[var(--ga0)] p-2 text-left">
-            <span className="block aspect-video w-28 shrink-0 overflow-hidden rounded-[4px] sm:w-36">
+            <span className="relative block aspect-video w-28 shrink-0 overflow-hidden rounded-[4px] sm:w-36">
               <Cover cover={item.cover} title={item.title} width={144} className="h-full w-full" />
+              {item.bvid ? (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white">
+                    <Icon name="play" size={14} />
+                  </span>
+                </span>
+              ) : null}
             </span>
             <span className="line-clamp-2 min-w-0 text-[14px] leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
               {item.title}
