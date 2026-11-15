@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAppStore } from './appStore'
 import { useAuthStore } from '../features/auth/authStore'
 import { Avatar } from '../shared/ui/Avatar'
@@ -23,6 +24,16 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
   const [trending, setTrending] = useState<HotSearchItem[]>([])
   const [suggestions, setSuggestions] = useState<{ query: string; terms: string[] }>({ query: '', terms: [] })
   const trimmed = query.trim()
+
+  const moveInPanel = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')]
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+    if (index < 0) return
+    event.preventDefault()
+    const next = event.key === 'ArrowDown' ? Math.min(index + 1, buttons.length - 1) : Math.max(index - 1, 0)
+    buttons[next]?.focus()
+  }
 
   useEffect(() => {
     setSuggestions({ query: trimmed, terms: [] })
@@ -58,7 +69,11 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
     const terms = suggestions.query === trimmed ? suggestions.terms.slice(0, 8) : []
     const pattern = new RegExp(`(${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig')
     return (
-      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
+      <div
+        data-search-suggest-panel
+        onKeyDown={moveInPanel}
+        className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
+      >
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -92,7 +107,11 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
 
   return (
     /* 按下时挡掉 input 的 blur，动作仍走 onClick，键盘与辅助技术也能触发 */
-    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
+    <div
+      data-search-suggest-panel
+      onKeyDown={moveInPanel}
+      className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
+    >
       {history.length > 0 ? (
         <div className="px-3 pb-1.5">
           <div className="mb-1 flex items-center justify-between">
@@ -284,6 +303,19 @@ export function TitleBar() {
       <div
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            setFocused(false)
+            inputRef.current?.blur()
+            return
+          }
+          if (event.key !== 'ArrowDown' || event.target !== inputRef.current) return
+          const first = event.currentTarget.querySelector<HTMLButtonElement>('[data-search-suggest-panel] button')
+          if (!first) return
+          event.preventDefault()
+          first.focus()
         }}
         className="relative min-w-0 max-w-[520px] flex-1"
       >
