@@ -59,6 +59,7 @@ export function SearchView() {
   const [tracks, setTracks] = useState<Track[]>(restored?.tracks ?? [])
   const [users, setUsers] = useState<ipc.UserHit[]>(restored?.users ?? [])
   const [usersQuery, setUsersQuery] = useState(restored?.users.length ? query.trim() : '')
+  const [usersError, setUsersError] = useState(false)
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
   const skipFirstFetch = useRef(restored !== null)
@@ -184,6 +185,7 @@ export function SearchView() {
   useEffect(() => {
     if (usersQuery === trimmed) return
     const ticket = ++usersSeq.current
+    setUsersError(false)
     if (trimmed.length === 0) {
       setUsers([])
       setUsersQuery('')
@@ -196,6 +198,7 @@ export function SearchView() {
           if (usersSeq.current !== ticket) return
           setUsers(list)
           setUsersQuery(trimmed)
+          setUsersError(false)
           void ipc
             .relationFollowedMany(list.map((u) => u.mid))
             .then((rows) => {
@@ -209,6 +212,7 @@ export function SearchView() {
           if (usersSeq.current !== ticket) return
           setUsers([])
           setUsersQuery(trimmed)
+          setUsersError(true)
         })
     }, 320)
     return () => {
@@ -283,7 +287,7 @@ export function SearchView() {
 
   /** 卡片网格的缓冲浅到阈值就来要下一页。 */
   const needMore = (): void => {
-    if (status !== 'ready' || loadingMore || moreError || reachedEnd.current) return
+    if (tab === 'user' || status !== 'ready' || loadingMore || moreError || reachedEnd.current) return
     setLoadingMore(true)
     setPage((p) => p + 1)
   }
@@ -506,10 +510,26 @@ export function SearchView() {
                 </div>
               </div>
             ) : null}
-            {tab === 'user' && usersQuery === trimmed && users.length === 0 && status === 'ready' ? (
+            {tab === 'user' && usersQuery !== trimmed ? (
+              <p className="py-16 text-center text-[13px] text-[var(--text-3)]">正在找 UP 主…</p>
+            ) : null}
+            {tab === 'user' && usersQuery === trimmed && usersError ? (
+              <div className="py-16 text-center text-[13px] text-[var(--text-3)]">
+                UP 主没取到
+                <button
+                  type="button"
+                  onClick={() => setUsersQuery('')}
+                  className="t press ml-2 text-[var(--accent)] hover:underline"
+                >
+                  重试
+                </button>
+              </div>
+            ) : null}
+            {tab === 'user' && usersQuery === trimmed && !usersError && users.length === 0 ? (
               <p className="py-16 text-center text-[13px] text-[var(--text-3)]">没有找到相关 UP 主</p>
             ) : null}
-            <div className={tab === 'user' ? 'hidden' : undefined}>
+            {tab === 'user' ? null : (
+            <div>
             <div className="mb-2 flex min-h-5 items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] text-[var(--text-3)]">
               <span>
                 {status === 'error'
@@ -681,6 +701,7 @@ export function SearchView() {
               </div>
             ) : null}
             </div>
+            )}
           </section>
         )}
       </div>
