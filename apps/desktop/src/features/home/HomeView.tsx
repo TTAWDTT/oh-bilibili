@@ -234,26 +234,28 @@ export function HomeView() {
             className="relative min-w-0 flex-1"
             onMouseLeave={() => setHoverPart(null)}
           >
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 border-l border-[var(--line)] pl-5">
+            <div className="bili-channels-scroll no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto border-l border-[var(--line)] pl-5">
               {PARTS.filter((part) => part.rid !== 0).map((part) => (
                 <button
                   key={part.rid}
                   type="button"
                   onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
-                  onMouseEnter={(event) =>
+                  onMouseEnter={(event) => {
+                    const el = event.currentTarget
                     setHoverPart({
                       name: part.name,
-                      left: event.currentTarget.offsetLeft,
-                      top: event.currentTarget.offsetTop,
+                      left: el.offsetLeft - (el.parentElement?.scrollLeft ?? 0),
+                      top: el.offsetTop,
                     })
-                  }
-                  onFocus={(event) =>
+                  }}
+                  onFocus={(event) => {
+                    const el = event.currentTarget
                     setHoverPart({
                       name: part.name,
-                      left: event.currentTarget.offsetLeft,
-                      top: event.currentTarget.offsetTop,
+                      left: el.offsetLeft - (el.parentElement?.scrollLeft ?? 0),
+                      top: el.offsetTop,
                     })
-                  }
+                  }}
                   className="t h-7 w-[62px] shrink-0 rounded-[4px] bg-[var(--ga0)] text-[12.5px] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]"
                 >
                   {part.name}
@@ -263,7 +265,7 @@ export function HomeView() {
             {hoverPart && PART_CHILDREN[hoverPart.name] ? (
               /* pt-2 是这块面板的悬停桥：留成 margin 的话，鼠标往下走的 8px 会
                  先离开外层，面板在指针到达前就关了。top 跟着被悬停的胶囊走，
-                 窄窗口胶囊折成两三行时，面板不会落到整块区域的底部。 */
+                 频道条横向滚动时 left 也要减掉 scrollLeft，面板才不会跑偏。 */
               <div
                 className="absolute z-30 pt-2"
                 style={{

@@ -792,6 +792,14 @@ button:hover > .bili-channel-icon {
   transform: scale(1.15) rotate(-4deg);
 }
 
+/* 窄窗口频道条横向滑动：右缘渐隐，提示后面还有分区。 */
+@media (max-width: 1300px) {
+  .bili-channels-scroll {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+}
+
 /* 搜索框聚焦：整个框轻微放大，像被"吸住" */
 .bili-focus-scale {
   transition: transform 200ms var(--spring), border-color 200ms var(--ease), box-shadow 200ms var(--ease);

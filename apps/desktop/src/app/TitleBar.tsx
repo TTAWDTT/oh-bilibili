@@ -303,7 +303,7 @@ export function TitleBar() {
               label: '游戏中心',
               run: () => {
                 void ipc
-                  .openExternal('https://www.bilibili.com/game/')
+                  .openExternal('https://game.bilibili.com/')
                   .catch((cause) => toastFailure('打开游戏中心', cause))
               },
             },
