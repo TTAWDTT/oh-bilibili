@@ -6,8 +6,11 @@ import * as ipc from '../shared/lib/ipc'
 import type { HotSearchItem } from '../shared/lib/ipc'
 import { toastFailure } from './notice'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
-import { Icon } from '../shared/ui/Icon'
+import { Icon, type IconName } from '../shared/ui/Icon'
 import { useSearchHistory } from '../shared/lib/searchHistory'
+import { AnchoredPanel } from '../shared/ui/AnchoredPanel'
+import type { Anchor } from '../shared/ui/AnchoredPanel'
+import { LevelBadge } from '../shared/ui/LevelBadge'
 
 /**
  * 顶栏搜索框下面的建议面板。
@@ -106,12 +109,14 @@ export function TitleBar() {
   const goBack = useAppStore((state) => state.goBack)
   const viewing = useAppStore((state) => state.view.kind === 'watch')
   const auth = useAuthStore((state) => state.auth)
+  const user = auth?.user ?? null
   const messaging = useAppStore((state) => state.view.kind === 'messages')
   const unread = useAppStore((state) => state.messageUnread)
   const setUnread = useAppStore((state) => state.setMessageUnread)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
   const [focused, setFocused] = useState(false)
+  const [account, setAccount] = useState<Anchor | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const drag = useWindowDrag()
 
@@ -144,6 +149,31 @@ export function TitleBar() {
   const submit = (): void => {
     setQuery(text.trim())
   }
+
+  const openAccount = (button: HTMLButtonElement): void => {
+    const rect = button.getBoundingClientRect()
+    const width = 280
+    setAccount({
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: rect.bottom + 8,
+      anchorTop: rect.top,
+    })
+  }
+
+  const accountItem = (label: string, icon: IconName, run: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={() => {
+        setAccount(null)
+        run()
+      }}
+      className="t flex h-10 w-full items-center gap-2.5 px-4 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+    >
+      <Icon name={icon} size={16} />
+      {label}
+    </button>
+  )
 
   return (
     <div
@@ -304,15 +334,16 @@ export function TitleBar() {
         >
           投稿
         </button>
-        {auth?.user ? (
+        {user ? (
           <button
             type="button"
-            onClick={() => navigate({ kind: 'settings' })}
-            title={auth.user.uname}
-            aria-label="账号设置"
+            onClick={(event) => openAccount(event.currentTarget)}
+            title={user.uname}
+            aria-label="账号菜单"
+            aria-expanded={account !== null}
             className="bili-press"
           >
-            <Avatar src={auth.user.avatar} alt={auth.user.uname} size={26} />
+            <Avatar src={user.avatar} alt={user.uname} size={26} />
           </button>
         ) : (
           <button
@@ -324,6 +355,48 @@ export function TitleBar() {
           </button>
         )}
       </div>
+      <AnchoredPanel anchor={account} onClose={() => setAccount(null)} label="账号菜单" width={280}>
+        {user ? (
+          <>
+            <div className="px-4 pb-3 pt-4">
+              <div className="flex items-center gap-3">
+                <Avatar src={user.avatar} alt={user.uname} size={44} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-[15px] font-medium text-[var(--text-1)]">{user.uname}</span>
+                    <LevelBadge level={user.level} />
+                  </div>
+                  <span className="num mt-1 flex items-center gap-1 text-[12px] text-[var(--text-3)]">
+                    <Icon name="coin" size={13} className="text-[var(--accent)]" />
+                    {user.coins.toFixed(1)} 硬币
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-hairline py-1">
+              {accountItem('个人空间', 'user', () =>
+                navigate({ kind: 'author', name: user.uname, mid: user.mid }),
+              )}
+              {accountItem('收藏夹', 'bookmarkStar', () => navigate({ kind: 'favs' }))}
+              {accountItem('观看历史', 'clock', () => navigate({ kind: 'history' }))}
+              {accountItem('设置', 'settings', () => navigate({ kind: 'settings' }))}
+            </div>
+            <div className="border-t border-hairline py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccount(null)
+                  void useAuthStore.getState().logout()
+                }}
+                className="t flex h-10 w-full items-center gap-2.5 px-4 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+              >
+                <Icon name="logout" size={16} />
+                退出登录
+              </button>
+            </div>
+          </>
+        ) : null}
+      </AnchoredPanel>
     </div>
   )
 }
