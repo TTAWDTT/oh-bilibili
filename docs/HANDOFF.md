@@ -120,6 +120,7 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     获赞读 `data.total.items` 和 `data.total.cursor.is_end`，另两类读 `data.items` 和 `data.cursor.is_end`。
     未读总数只加 reply、at、like，登录和进入消息页时刷新，失败静默；分类未读为 0 时不显示数字。
     回复和 @ 展示头像、用户名、时间、引用评论与视频卡，获赞最多叠放 3 个头像并显示「赞了你」或「等 N 人赞了你」，内容可为视频、文章、动态或评论。
+    引用里的 `@` 用户从 `item.at_details` 解析，渲染成主题蓝可点链接，直接进被提及者空间；未出现在名单里的文本和表情 token 保持原样。
     点用户进主页，视频 URI 在 bili 层提取 BV 号后进入观看页，其他链接交给浏览器。
     未登录拉起登录框；首屏使用小电视加载，空态用 2233 娘，失败可重试。
     离底部 600px 自动续页，保留「加载更多」；切分类后旧请求不会回写当前列表。
