@@ -444,7 +444,7 @@ export function DynamicView() {
             }}
           />
         ))}
-        {visible.length === 0 && items.length > 0 ? (
+        {visible.length === 0 && items.length > 0 && !loading && !hasMore && !error ? (
           <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
             这个分类还没有动态
           </p>
