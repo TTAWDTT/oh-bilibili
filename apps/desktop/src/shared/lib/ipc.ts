@@ -593,6 +593,10 @@ export type HotSearchItem = {
   heat: number
 }
 
+export function searchSuggest(term: string): Promise<string[]> {
+  return call<string[]>('search_suggest', { term })
+}
+
 /** 搜索页热搜榜。游客可用；失败时返回空表。 */
 export function hotSearch(): Promise<HotSearchItem[]> {
   return call<HotSearchItem[]>('hot_search', {})

@@ -596,6 +596,14 @@ impl Engine {
             .await?)
     }
 
+    pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, WireError> {
+        let term = term.trim();
+        if term.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(self.source.search_suggest(term).await?)
+    }
+
     /// 搜索页的热搜榜。取不到就返回空表，界面退回内置建议。
     pub async fn hot_search(&self) -> Vec<crate::wire::HotSearchItem> {
         self.source.hot_search().await.unwrap_or_default()

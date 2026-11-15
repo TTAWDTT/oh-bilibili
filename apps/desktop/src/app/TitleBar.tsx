@@ -15,13 +15,31 @@ import { LevelBadge } from '../shared/ui/LevelBadge'
 /**
  * 顶栏搜索框下面的建议面板。
  *
- * B 站这块是两栏：左边搜索历史，右边热搜榜。热搜走 search/square，
- * 取不到就只显示历史，面板不会因为一个可选接口挂掉。
+ * 空输入显示历史与热搜，输入后显示当前词和真实联想词。
  */
-function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
+function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string) => void }) {
   const history = useSearchHistory((state) => state.items)
   const clear = useSearchHistory((state) => state.clear)
   const [trending, setTrending] = useState<HotSearchItem[]>([])
+  const [suggestions, setSuggestions] = useState<{ query: string; terms: string[] }>({ query: '', terms: [] })
+  const trimmed = query.trim()
+
+  useEffect(() => {
+    setSuggestions({ query: trimmed, terms: [] })
+    if (!trimmed) return
+    let cancelled = false
+    const timeout = window.setTimeout(() => {
+      void ipc.searchSuggest(trimmed)
+        .then((terms) => {
+          if (!cancelled) setSuggestions({ query: trimmed, terms })
+        })
+        .catch(() => {})
+    }, 220)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [trimmed])
 
   useEffect(() => {
     let cancelled = false
@@ -36,11 +54,45 @@ function SearchSuggest({ onPick }: { onPick: (word: string) => void }) {
     }
   }, [])
 
+  if (trimmed) {
+    const terms = suggestions.query === trimmed ? suggestions.terms.slice(0, 8) : []
+    const pattern = new RegExp(`(${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig')
+    return (
+      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onPick(trimmed)}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)]"
+        >
+          <Icon name="search" size={14} className="shrink-0 text-[var(--text-3)]" />
+          <span className="truncate">搜索 “{trimmed}”</span>
+        </button>
+        {terms.map((word) => (
+          <button
+            key={word}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onPick(word)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)]"
+          >
+            <Icon name="search" size={14} className="shrink-0 text-[var(--text-3)]" />
+            <span className="truncate">
+              {word.split(pattern).map((part, index) => index % 2 === 1
+                ? <span key={index} className="text-[var(--accent)]">{part}</span>
+                : part)}
+            </span>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   if (history.length === 0 && trending.length === 0) return null
 
   return (
     /* 按下时挡掉 input 的 blur，动作仍走 onClick，键盘与辅助技术也能触发 */
-    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
+    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]">
       {history.length > 0 ? (
         <div className="px-3 pb-1.5">
           <div className="mb-1 flex items-center justify-between">
@@ -147,6 +199,8 @@ export function TitleBar() {
   }, [auth?.logged_in, auth?.user?.mid, messaging, setUnread])
 
   const submit = (): void => {
+    setFocused(false)
+    inputRef.current?.blur()
     setQuery(text.trim())
   }
 
@@ -227,7 +281,12 @@ export function TitleBar() {
         </nav>
       ) : null}
 
-      <div className="relative min-w-0 max-w-[520px] flex-1">
+      <div
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+        }}
+        className="relative min-w-0 max-w-[520px] flex-1"
+      >
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -241,7 +300,6 @@ export function TitleBar() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
             placeholder="搜索视频、UP 主"
             aria-label="顶栏搜索"
             className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
@@ -269,13 +327,12 @@ export function TitleBar() {
             搜索
           </button>
         </form>
-        {/*
-         * B 站搜索框点进去会落下一块建议面板：历史 + 热搜。
-         * 只在输入为空时出现——已经在打字的人要的是自己的词，不是别人的榜。
-         */}
-        {focused && text.trim().length === 0 ? (
+        {focused ? (
           <SearchSuggest
+            query={text}
             onPick={(word) => {
+              setFocused(false)
+              inputRef.current?.blur()
               setText(word)
               setQuery(word)
             }}

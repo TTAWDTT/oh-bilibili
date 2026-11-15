@@ -5,6 +5,24 @@
 
 use bilimusic_model::{Millis, TrackKey};
 
+use crate::client::Client;
+use crate::error::BiliError;
+
+impl Client {
+    pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {
+        let value = self
+            .get_json(
+                &format!(
+                    "https://s.search.bilibili.com/main/suggest?main_ver=v1&term={}",
+                    crate::wbi::encode_uri_component(term)
+                ),
+                std::time::Duration::from_millis(250),
+            )
+            .await?;
+        Ok(suggest_terms(&value))
+    }
+}
+
 /// 一条搜索候选，来自 wire，但在本模块内就清洗成领域形状。
 #[derive(Debug, Clone)]
 pub struct Candidate {

@@ -328,6 +328,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         has_more: false,
       }
     }
+    case 'search_suggest': {
+      const term = str(args, 'term').trim()
+      return term ? [term, `${term} 完整版`, `${term} MV`, `${term} 现场`, `${term} 合集`] : []
+    }
     case 'hot_search':
       return [
         { keyword: '周杰伦', label: '周杰伦', icon: '', heat: 98_200 },

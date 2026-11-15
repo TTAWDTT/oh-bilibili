@@ -649,6 +649,13 @@ impl Source {
         Ok(crate::comments::replies_page_from(&value, page, per_page))
     }
 
+    pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {
+        if term.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.client.search_suggest(term).await
+    }
+
     /// 搜索页的热搜榜。B 站搜索页左栏就是这份榜单，带名次。
     ///
     /// 游客也能拿到，不需要登录；失败就返回空表，由界面退回内置建议。
