@@ -20,7 +20,7 @@ import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
 /** 观看页的倍速档位，和 B 站播放器一致。 */
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const
 /**
  * 音画偏差的三段处理。
  *
@@ -136,6 +136,7 @@ export function WatchPlayer({
   const [activeId, setActiveId] = useState<number | null>(null)
   const [controls, setControls] = useState(true)
   const [qualityOpen, setQualityOpen] = useState(false)
+  const [speedOpen, setSpeedOpen] = useState(false)
   const [now, setNow] = useState(0)
   const [draft, setDraft] = useState('')
   /** 发弹幕时用的颜色与位置，和 B 站播放器那排按钮一致。 */
@@ -740,7 +741,10 @@ export function WatchPlayer({
             />
             <button
               type="button"
-              onClick={() => setDraftPicker((open) => !open)}
+              onClick={() => {
+                setSpeedOpen(false)
+                setDraftPicker((open) => !open)
+              }}
               aria-expanded={draftPicker}
               aria-label="弹幕颜色与位置"
               title="弹幕颜色与位置"
@@ -823,6 +827,7 @@ export function WatchPlayer({
               type="button"
               onClick={() => {
                 setQualityOpen(false)
+                setSpeedOpen(false)
                 setDanmakuPanel((open) => !open)
               }}
               aria-expanded={danmakuPanel}
@@ -863,18 +868,45 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              const i = SPEEDS.indexOf(speed as (typeof SPEEDS)[number])
-              void setSpeed(SPEEDS[(i + 1) % SPEEDS.length] ?? 1)
-            }}
-            title="播放倍速"
-            aria-label={`播放倍速 ${speed}x`}
-            className="t press num hidden h-7 shrink-0 rounded-[4px] px-2 text-[12px] hover:bg-white/15 md:block"
-          >
-            {speed}x
-          </button>
+          <div className="relative hidden shrink-0 md:block">
+            <button
+              type="button"
+              onClick={() => {
+                setDanmakuPanel(false)
+                setQualityOpen(false)
+                setSpeedOpen((open) => !open)
+              }}
+              aria-expanded={speedOpen}
+              title="播放倍速"
+              aria-label={`播放倍速 ${speed}x`}
+              className={`t press num flex h-7 items-center rounded-[4px] px-2 text-[12px] ${
+                speedOpen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
+              }`}
+            >
+              {speed}x
+            </button>
+            {speedOpen ? (
+              <div className="absolute bottom-8 right-0 z-30 flex w-[84px] flex-col rounded-[6px] border border-white/15 bg-black/90 py-1 text-white backdrop-blur">
+                {[...SPEEDS].reverse().map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => {
+                      void setSpeed(rate)
+                      setSpeedOpen(false)
+                    }}
+                    className={`t press px-3 py-1 text-left text-[12px] ${
+                      rate === speed
+                        ? 'text-[var(--accent)]'
+                        : 'text-white/85 hover:bg-white/10'
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
           {/* 音量与倍速在窄屏交给系统：手机上调的是系统音量，不是应用音量。 */}
           <span
@@ -890,6 +922,7 @@ export function WatchPlayer({
                 type="button"
                 onClick={() => {
                   setDanmakuPanel(false)
+                  setSpeedOpen(false)
                   setQualityOpen((open) => !open)
                 }}
                 aria-expanded={qualityOpen}
