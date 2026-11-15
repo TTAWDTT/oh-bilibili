@@ -314,7 +314,7 @@ export function WatchView({ track }: { track: Track }) {
                 onCoin={() => coin(1, true)}
                 coins={coins}
                 onReplay={() => {
-                  void ipc.playerSeek(0).catch(() => {})
+                  void ipc.playerReplay().catch(() => {})
                 }}
                 next={related[0] ?? null}
                 onNext={(nextTrack) => replace({ kind: 'watch', track: nextTrack })}

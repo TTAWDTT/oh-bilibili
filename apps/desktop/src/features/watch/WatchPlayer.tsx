@@ -331,6 +331,12 @@ export function WatchPlayer({
       }
       const head = readPlayhead()
       const drift = v.currentTime * 1000 - head
+      // 重播时画面还停在片尾、声音已从头走：这个差距等不回来，直接拉回声音位置。
+      if (drift > 5000) {
+        v.currentTime = head / 1000
+        void v.play().catch(() => {})
+        return
+      }
       // 画面比声音快：停下来等声音。seek 回去会把缓冲区丢掉，等于用一次卡顿换对齐。
       if (drift > DRIFT_SEEK_MS) {
         if (!v.paused) v.pause()

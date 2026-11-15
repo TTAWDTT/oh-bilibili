@@ -829,6 +829,21 @@ impl Engine {
         self.snapshot()
     }
 
+    /// 从头重播当前视频。结束态的 PlayerState 不保留解码准备信息，
+    /// 单靠 seek(0) 回不到 playing，所以重新走一次 play_key。
+    pub async fn replay(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        let key = lock(&self.queue).current().map(|e| e.track.key.clone());
+        match key {
+            Some(k) => {
+                let snap = self.play_key(&k).await?;
+                // 重播是从头看，历史进度也该归零。
+                let _ = self.library.set_history_position(k.as_opaque(), 0);
+                Ok(snap)
+            }
+            None => Ok(self.snapshot()),
+        }
+    }
+
     pub fn set_volume(&self, volume: f32) -> PlayerSnapshot {
         let v = volume.clamp(0.0, 1.0);
         *lock(&self.volume) = v;

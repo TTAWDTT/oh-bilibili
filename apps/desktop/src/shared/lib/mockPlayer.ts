@@ -66,6 +66,11 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
     case 'player_seek':
       setPosition(num(args, 'position_ms'))
       return snapshot()
+    case 'player_replay':
+      state.position = 0
+      state.phase = 'playing'
+      setPosition(0)
+      return snapshot()
     case 'player_volume':
       state.volume = clamp(num(args, 'volume'), 0, 1)
       return snapshot()

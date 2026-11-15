@@ -389,6 +389,13 @@ fn player_seek(engine: tauri::State<'_, Arc<Engine>>, position_ms: u64) -> Playe
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn player_replay(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<PlayerSnapshot, WireError> {
+    engine.replay().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn player_speed(engine: tauri::State<'_, Arc<Engine>>, speed: f32) -> PlayerSnapshot {
     engine.set_speed(speed)
 }
@@ -1048,6 +1055,7 @@ pub fn run() {
             player_next,
             player_prev,
             player_seek,
+            player_replay,
             player_volume,
             player_speed,
             player_repeat,

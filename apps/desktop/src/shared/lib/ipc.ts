@@ -85,6 +85,11 @@ export function playerSeek(positionMs: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_seek', { position_ms: Math.max(0, Math.round(positionMs)) })
 }
 
+/** 从头重播当前视频。结束态只 seek 回不到 playing，要重新挂载一次。 */
+export function playerReplay(): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('player_replay', {})
+}
+
 /** 设置播放倍速 0.5..2.0。 */
 export function playerSetSpeed(speed: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_speed', { speed })
