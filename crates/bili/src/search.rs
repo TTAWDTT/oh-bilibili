@@ -10,17 +10,22 @@ use crate::error::BiliError;
 
 impl Client {
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {
+        let url = suggest_url(term)?;
         let value = self
-            .get_json(
-                &format!(
-                    "https://s.search.bilibili.com/main/suggest?main_ver=v1&term={}",
-                    crate::wbi::encode_uri_component(term)
-                ),
-                std::time::Duration::from_millis(250),
-            )
+            .get_json(&url, std::time::Duration::from_millis(250))
             .await?;
         Ok(suggest_terms(&value))
     }
+}
+
+fn suggest_url(term: &str) -> Result<String, BiliError> {
+    let mut url = reqwest::Url::parse("https://s.search.bilibili.com/main/suggest")
+        .map_err(|error| BiliError::Parse(error.to_string()))?;
+    url.query_pairs_mut()
+        .append_pair("main_ver", "v1")
+        .append_pair("term", term);
+    // 表单查询编码会保留 *，这里也把它编码为 %2A。
+    Ok(url.to_string().replace('*', "%2A"))
 }
 
 /// 一条搜索候选，来自 wire，但在本模块内就清洗成领域形状。
@@ -259,6 +264,21 @@ mod tests {
     #[test]
     fn 标签被剥掉() {
         assert_eq!(strip_tags("周杰伦 - <em>晴天</em>"), "周杰伦 - 晴天");
+    }
+
+    #[test]
+    fn suggest_url_保留搜索词标点() {
+        let term = "Love Live! What's Up (Live) *";
+        let url = suggest_url(term).unwrap();
+        assert_eq!(
+            url,
+            "https://s.search.bilibili.com/main/suggest?main_ver=v1&term=Love+Live%21+What%27s+Up+%28Live%29+%2A"
+        );
+        let parsed = reqwest::Url::parse(&url).unwrap();
+        assert_eq!(
+            parsed.query_pairs().find(|(key, _)| key == "term").unwrap().1,
+            term
+        );
     }
 
     #[test]
