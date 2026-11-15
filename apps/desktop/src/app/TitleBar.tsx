@@ -188,6 +188,7 @@ export function TitleBar() {
   const [text, setText] = useState(currentQuery)
   const [focused, setFocused] = useState(false)
   const [account, setAccount] = useState<Anchor | null>(null)
+  const [submitMenu, setSubmitMenu] = useState<Anchor | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const drag = useWindowDrag()
 
@@ -227,6 +228,17 @@ export function TitleBar() {
     const rect = button.getBoundingClientRect()
     const width = 280
     setAccount({
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: rect.bottom + 8,
+      anchorTop: rect.top,
+    })
+  }
+
+  const openSubmit = (button: HTMLButtonElement): void => {
+    const rect = button.getBoundingClientRect()
+    const width = 280
+    setAccount(null)
+    setSubmitMenu({
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
       anchorTop: rect.top,
@@ -415,11 +427,9 @@ export function TitleBar() {
             投稿本身在网页端完成，这里如实把官方上传页交给系统浏览器。 */}
         <button
           type="button"
-          onClick={() =>
-            void ipc
-              .openExternal('https://member.bilibili.com/platform/upload/video/frame')
-              .catch((cause) => toastFailure('打开投稿页', cause))
-          }
+          onClick={(event) => openSubmit(event.currentTarget)}
+          aria-expanded={submitMenu !== null}
+          aria-haspopup="menu"
           className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--accent)] px-3.5 text-[13px] text-white hover:opacity-90 sm:flex"
         >
           投稿
@@ -445,6 +455,31 @@ export function TitleBar() {
           </button>
         )}
       </div>
+      <AnchoredPanel anchor={submitMenu} onClose={() => setSubmitMenu(null)} label="投稿" width={280}>
+        <div className="grid grid-cols-2 gap-1 p-2">
+          {(
+            [
+              ['视频投稿', 'play', 'https://member.bilibili.com/platform/upload/video/frame'],
+              ['专栏投稿', 'article', 'https://member.bilibili.com/platform/upload/text/edit'],
+              ['动态投稿', 'dynamic', 'https://t.bilibili.com/'],
+              ['直播开播', 'live', 'https://link.bilibili.com/p/center/index'],
+            ] as const
+          ).map(([label, icon, url]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                void ipc.openExternal(url).catch((cause) => toastFailure('打开投稿页', cause))
+                setSubmitMenu(null)
+              }}
+              className="t press flex h-[68px] flex-col items-center justify-center gap-1.5 rounded-[6px] text-[12px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+            >
+              <Icon name={icon} size={20} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </AnchoredPanel>
       <AnchoredPanel anchor={account} onClose={() => setAccount(null)} label="账号菜单" width={280}>
         {user ? (
           <>
