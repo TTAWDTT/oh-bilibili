@@ -72,6 +72,8 @@ export function SearchView() {
   const [ended, setEnded] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
+  /** B 站搜索页的结果分类。默认综合，视频与 UP 主分开看。 */
+  const [tab, setTab] = useState<'all' | 'video' | 'user'>('all')
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   const clearHistory = useSearchHistory((s) => s.clear)
@@ -116,6 +118,7 @@ export function SearchView() {
     if (heroQuery === null) return
     setQuery(heroQuery)
     setPage(1)
+    setTab('all')
     setNonce((n) => n + 1)
     setHeroQuery(null)
   }, [heroQuery, setHeroQuery])
@@ -191,7 +194,7 @@ export function SearchView() {
         .searchUsers(trimmed, 1)
         .then((list) => {
           if (usersSeq.current !== ticket) return
-          setUsers(list.slice(0, 6))
+          setUsers(list)
           setUsersQuery(trimmed)
           void ipc
             .relationFollowedMany(list.map((u) => u.mid))
@@ -390,14 +393,49 @@ export function SearchView() {
           </div>
         ) : (
           <section className="mt-6">
-            {usersQuery === trimmed && users.length > 0 ? (
+            {/* B 站搜索页的分类 tab：综合里同时有 UP 主和视频，也可以只看其中一类。 */}
+            <nav aria-label="搜索结果分类" className="-mt-2 mb-4 flex gap-6 border-b border-[var(--line)]">
+              {(
+                [
+                  ['all', '综合'],
+                  ['video', '视频'],
+                  ['user', 'UP 主'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-current={tab === value ? 'page' : undefined}
+                  onClick={() => {
+                    setTab(value)
+                    scrollerRef.current?.scrollTo({ top: 0 })
+                  }}
+                  className={`t border-b-2 pb-2 text-[14px] ${
+                    tab === value
+                      ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
+                      : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+            {tab !== 'video' && usersQuery === trimmed && users.length > 0 ? (
               <div className="mb-4">
-                <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
-                <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-                  {users.map((user) => (
+                {tab === 'user' ? null : (
+                  <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
+                )}
+                <div
+                  className={
+                    tab === 'user'
+                      ? 'grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3'
+                      : 'no-scrollbar flex gap-2 overflow-x-auto pb-1'
+                  }
+                >
+                  {(tab === 'user' ? users : users.slice(0, 6)).map((user) => (
                     <div
                       key={user.mid}
-                      className="bili-card flex w-[248px] shrink-0 items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)]"
+                      className={`bili-card flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)] ${tab === 'user' ? 'w-full' : 'w-[248px] shrink-0'}`}
                     >
                     <button
                       type="button"
@@ -467,6 +505,10 @@ export function SearchView() {
                 </div>
               </div>
             ) : null}
+            {tab === 'user' && usersQuery === trimmed && users.length === 0 && status === 'ready' ? (
+              <p className="py-16 text-center text-[13px] text-[var(--text-3)]">没有找到相关 UP 主</p>
+            ) : null}
+            <div className={tab === 'user' ? 'hidden' : undefined}>
             <div className="mb-2 flex min-h-5 items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] text-[var(--text-3)]">
               <span>
                 {status === 'error'
@@ -637,6 +679,7 @@ export function SearchView() {
                 )}
               </div>
             ) : null}
+            </div>
           </section>
         )}
       </div>
