@@ -289,8 +289,8 @@ export function TitleBar() {
       )}
 
       {/*
-       * B 站网页端 header 里 logo 右边那排频道：首页 / 番剧 / 直播 / 游戏中心 / 会员购。
-       * 前三个进站内页；游戏中心与会员购没有站内实现，如实交给系统浏览器，
+       * B 站网页端 header 里 logo 右边那排频道：首页 / 番剧 / 直播 / 游戏中心 / 会员购 / 漫画 / 赛事。
+       * 前三个进站内页；后四个没有站内实现，如实交给系统浏览器，
        * 不做成点了没反应的假入口。窄窗口收起来，避免和搜索框抢位置。
        */}
       {!viewing ? (
@@ -299,6 +299,38 @@ export function TitleBar() {
             { label: '首页', run: () => navigate({ kind: 'home' }) },
             { label: '番剧', run: () => navigate({ kind: 'bangumi' }) },
             { label: '直播', run: () => navigate({ kind: 'live' }) },
+            {
+              label: '游戏中心',
+              run: () => {
+                void ipc
+                  .openExternal('https://www.bilibili.com/game/')
+                  .catch((cause) => toastFailure('打开游戏中心', cause))
+              },
+            },
+            {
+              label: '会员购',
+              run: () => {
+                void ipc
+                  .openExternal('https://show.bilibili.com/')
+                  .catch((cause) => toastFailure('打开会员购', cause))
+              },
+            },
+            {
+              label: '漫画',
+              run: () => {
+                void ipc
+                  .openExternal('https://manga.bilibili.com/')
+                  .catch((cause) => toastFailure('打开漫画', cause))
+              },
+            },
+            {
+              label: '赛事',
+              run: () => {
+                void ipc
+                  .openExternal('https://www.bilibili.com/v/game/match/')
+                  .catch((cause) => toastFailure('打开赛事', cause))
+              },
+            },
           ].map((entry) => (
             <button
               key={entry.label}
