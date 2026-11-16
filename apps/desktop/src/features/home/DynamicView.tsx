@@ -4,6 +4,7 @@ import { useAppStore } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed } from '../../shared/lib/contract'
+import { useAuthStore } from '../auth/authStore'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -449,6 +450,8 @@ function DynamicCard({
 
 export function DynamicView() {
   const navigate = useAppStore((state) => state.navigate)
+  const auth = useAuthStore((state) => state.auth)
+  const me = auth?.logged_in ? auth.user : null
   const [following, setFollowing] = useState<Followed[]>([])
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
   const [tab, setTab] = useState<'all' | 'video' | 'opus'>('all')
@@ -555,18 +558,6 @@ export function DynamicView() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                void ipc
-                  .openExternal('https://t.bilibili.com/')
-                  .catch((cause) => toastFailure('打开动态页', cause))
-              }
-              className="bili-press flex h-8 items-center gap-1 rounded-[4px] bg-[var(--accent)] px-3 text-[12px] text-white hover:opacity-90"
-            >
-              <Icon name="plus" size={13} />
-              发布动态
-            </button>
-            <button
-              type="button"
               onClick={() => void load(null, false)}
               disabled={loading}
               aria-label="刷新动态"
@@ -599,6 +590,27 @@ export function DynamicView() {
           </nav>
         </div>
       </header>
+      <div className={`${FEED} pt-4`}>
+        <button
+          type="button"
+          onClick={() =>
+            void ipc
+              .openExternal('https://t.bilibili.com/')
+              .catch((cause) => toastFailure('打开发布页', cause))
+          }
+          aria-label="发布动态"
+          title="在 B 站发布动态"
+          className="group flex w-full items-center gap-3 rounded-[6px] bg-[var(--panel)] px-4 py-3 text-left"
+        >
+          <Avatar src={me?.avatar ?? null} alt={me?.uname ?? '我'} size={44} />
+          <span className="min-w-0 flex-1 truncate rounded-[6px] bg-[var(--ga1)] px-3 py-2 text-[14px] text-[var(--text-3)] transition-colors group-hover:bg-[var(--ga2)] group-hover:text-[var(--text-2)]">
+            分享新鲜事…
+          </span>
+          <span className="shrink-0 rounded-[6px] bg-[var(--accent)] px-4 py-1.5 text-[13px] text-white transition-opacity group-hover:opacity-90">
+            发布
+          </span>
+        </button>
+      </div>
       {following.length > 0 ? (
         <div className={`${FEED} pt-4`}>
           <div className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3">
