@@ -36,9 +36,14 @@ export function BangumiTimeline() {
 
   if (error || !days || days.length === 0) return null
 
-  // 同一天不在列表里时不显示这一格，避免点开一片空白。
+  // 接口给的是 6 天前到 6 天后。直接按 weekday 取第一条会拿到上周三到周日，
+  // 所以从今天往回退到本周一，再连续取 7 天。
+  const todayIndex = days.findIndex((day) => day.today)
+  const today = todayIndex >= 0 ? days[todayIndex] : undefined
+  const start = today ? Math.max(0, todayIndex - (today.weekday - 1)) : 0
+  const week = days.slice(start, start + 7)
   const byWeekday = new Map<number, ipc.BangumiDay>()
-  for (const day of days) if (!byWeekday.has(day.weekday)) byWeekday.set(day.weekday, day)
+  for (const day of week) byWeekday.set(day.weekday, day)
   const active = picked !== null ? byWeekday.get(picked) : undefined
 
   return (
