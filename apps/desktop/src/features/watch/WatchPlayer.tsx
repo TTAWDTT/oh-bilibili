@@ -896,6 +896,42 @@ export function WatchPlayer({
             ) : null}
           </div>
 
+          {data.qualities.length > 0 ? (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setDanmakuPanel(false)
+                  setSpeedOpen(false)
+                  setQualityOpen((open) => !open)
+                }}
+                aria-expanded={qualityOpen}
+                className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+              >
+                {data.qualities.find((q) => q.id === activeId)?.label ?? '画质'}
+              </button>
+              {qualityOpen ? (
+                <div className="absolute bottom-8 right-0 z-30 flex max-h-[220px] w-[104px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                  {data.qualities.map((q) => (
+                    <button
+                      key={`${q.id}-${q.height}`}
+                      type="button"
+                      onClick={() => {
+                        pickQuality(q)
+                        setQualityOpen(false)
+                      }}
+                      className={`t press px-2 py-1 text-left text-[12px] ${
+                        activeId === q.id ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                      }`}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="relative hidden shrink-0 md:block">
             <button
               type="button"
@@ -943,42 +979,6 @@ export function WatchPlayer({
           >
             <VolumeControl />
           </span>
-
-          {data.qualities.length > 0 ? (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setDanmakuPanel(false)
-                  setSpeedOpen(false)
-                  setQualityOpen((open) => !open)
-                }}
-                aria-expanded={qualityOpen}
-                className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
-              >
-                {data.qualities.find((q) => q.id === activeId)?.label ?? '画质'}
-              </button>
-              {qualityOpen ? (
-                <div className="absolute bottom-8 right-0 z-30 flex max-h-[220px] w-[104px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
-                  {data.qualities.map((q) => (
-                    <button
-                      key={`${q.id}-${q.height}`}
-                      type="button"
-                      onClick={() => {
-                        pickQuality(q)
-                        setQualityOpen(false)
-                      }}
-                      className={`t press px-2 py-1 text-left text-[12px] ${
-                        activeId === q.id ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
-                      }`}
-                    >
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
 
           {/* B 站播放器在这两个位置摆的是「网页全屏」和「全屏」。
               桌面端也保留这个层次：前者只铺满窗口，后者再进系统全屏。 */}
