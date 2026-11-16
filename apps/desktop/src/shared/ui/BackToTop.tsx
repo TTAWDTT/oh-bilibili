@@ -33,9 +33,12 @@ export function BackToTop({ targetId }: { targetId: string }) {
       onClick={() => {
         document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' })
       }}
-      className="t press fixed bottom-24 right-6 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel)] text-[var(--text-2)] shadow-md hover:text-[var(--accent)]"
+      className="t press group fixed bottom-24 right-6 z-30 flex h-10 w-10 items-center overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-[var(--text-2)] shadow-md transition-[width,color,border-color]! duration-200! hover:w-[96px] hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:w-[96px] focus-visible:border-[var(--accent)] focus-visible:text-[var(--accent)] motion-reduce:transition-none!"
     >
-      <Icon name="chevronLeft" size={16} className="rotate-90" />
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+        <Icon name="rocket" size={17} className="transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5 motion-safe:group-focus-visible:-translate-y-0.5 motion-reduce:transition-none" />
+      </span>
+      <span className="shrink-0 whitespace-nowrap pr-3 text-[12px] opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">回顶部</span>
     </button>
   )
 }

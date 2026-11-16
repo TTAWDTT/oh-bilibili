@@ -293,6 +293,14 @@ const ICONS = {
   ),
   chevronLeft: <path d="m14.5 6-6 6 6 6" />,
   chevronRight: <path d="m9.5 6 6 6-6 6" />,
+  rocket: (
+    <>
+      <path d="M12 3c-2.7 1.8-4 4.6-4 8v4h8v-4c0-3.4-1.3-6.2-4-8Z" />
+      <circle cx="12" cy="8.5" r="1.6" />
+      <path d="m8 10-3 3v4l3-2M16 10l3 3v4l-3-2" />
+      <path d="M10 18c0 1.5 2 3 2 3s2-1.5 2-3" />
+    </>
+  ),
   music: (
     <>
       <path d="M9.5 18V6.8l9-2v11" />
