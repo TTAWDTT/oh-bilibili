@@ -163,11 +163,19 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     return (
       <EmptyState
         icon="biliTv"
-        title={mid ? '这个 UP 主还没有公开投稿' : '没找到这个 UP 主'}
+        title={
+          !mid
+            ? '没找到这个 UP 主'
+            : isFallback
+              ? '空间内容没取到'
+              : '这个 UP 主还没有公开投稿'
+        }
         detail={
-          mid
-            ? '空间接口没有返回可显示的视频。'
-            : '这个 UP 主没有可显示的视频，或空间接口取不到。'
+          !mid
+            ? '这个 UP 主没有可显示的视频，或空间接口取不到。'
+            : isFallback
+              ? '空间接口没有取到，可能被限流；可以稍后再试或直接去 B 站看。'
+              : '空间接口没有返回可显示的视频。'
         }
         action={
           mid
