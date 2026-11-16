@@ -10,10 +10,17 @@ import { PART_CHILDREN, PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { LiveRow } from './LiveRow'
 import { BangumiRow } from './BangumiRow'
+import { PartitionRow } from './PartitionRow'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
 import { formatCount, formatDuration } from '../../shared/lib/format'
+
+const PARTITION_FLOORS = [
+  { rid: 1, title: '动画' },
+  { rid: 3, title: '音乐' },
+  { rid: 4, title: '游戏' },
+]
 
 /**
  * 发现页。
@@ -417,6 +424,9 @@ export function HomeView() {
       {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
       <LiveRow />
       <BangumiRow />
+      {PARTITION_FLOORS.map((part) => (
+        <PartitionRow key={part.rid} rid={part.rid} title={part.title} />
+      ))}
 
       {items.length > 0 ? (
         <div className="px-4 md:px-8">
