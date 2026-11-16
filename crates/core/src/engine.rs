@@ -311,7 +311,7 @@ impl Engine {
                 drop(st);
                 self.emit(AppEvent::Notice {
                     error: err.clone(),
-                    op: "play".into(),
+                    op: "播放".into(),
                 });
                 Err(err)
             }
