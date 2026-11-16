@@ -15,6 +15,7 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
   const opacity = useDanmakuSettings((s) => s.opacity)
   const size = useDanmakuSettings((s) => s.size)
   const speed = useDanmakuSettings((s) => s.speed)
+  const area = useDanmakuSettings((s) => s.area)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const sent = useSentDanmaku((s) => s.byTrack[trackKey] ?? EMPTY)
 
@@ -53,6 +54,7 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
       opacity={opacity}
       size={size}
       speed={speed}
+      area={area}
       fade={fade}
     />
   )

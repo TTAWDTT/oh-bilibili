@@ -169,6 +169,7 @@ export function WatchPlayer({
   const danmakuOpacity = useDanmakuSettings((s) => s.opacity)
   const danmakuSize = useDanmakuSettings((s) => s.size)
   const danmakuSpeed = useDanmakuSettings((s) => s.speed)
+  const danmakuArea = useDanmakuSettings((s) => s.area)
   const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
   const patchDanmaku = useDanmakuSettings((s) => s.patch)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
@@ -497,6 +498,7 @@ export function WatchPlayer({
         opacity={danmakuOpacity}
         size={danmakuSize}
         speed={danmakuSpeed}
+        area={danmakuArea}
         fade
       />
       {!ready && !error ? (
@@ -634,7 +636,7 @@ export function WatchPlayer({
             onKeyDown={(event) => {
               if (event.key === 'Enter') void sendDanmaku()
             }}
-            placeholder="发一条友善的弹幕"
+            placeholder="发个友善的弹幕见证当下"
             aria-label="发弹幕"
             className="h-7 min-w-0 flex-1 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
           />
@@ -735,7 +737,7 @@ export function WatchPlayer({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void sendDanmaku()
               }}
-              placeholder="发一条友善的弹幕"
+              placeholder="发个友善的弹幕见证当下"
               aria-label="发弹幕"
               className="h-7 w-[150px] shrink-0 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
             />
@@ -821,7 +823,7 @@ export function WatchPlayer({
             弹
           </button>
 
-          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮，四项可调。 */}
+          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮，五项可调。 */}
           <div className="relative shrink-0">
             <button
               type="button"
@@ -864,6 +866,32 @@ export function WatchPlayer({
                     />
                   </label>
                 ))}
+                <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2">
+                  <span className="text-[11px] text-white/70">显示区域</span>
+                  <div className="ml-auto flex gap-1">
+                    {(
+                      [
+                        { value: 0.25, name: '1/4' },
+                        { value: 0.5, name: '1/2' },
+                        { value: 1, name: '全屏' },
+                      ] as const
+                    ).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={danmakuArea === option.value}
+                        onClick={() => patchDanmaku({ area: option.value })}
+                        className={`t press rounded-[3px] px-1.5 py-0.5 text-[11px] ${
+                          danmakuArea === option.value
+                            ? 'bg-[var(--accent)] text-white'
+                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                        }`}
+                      >
+                        {option.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

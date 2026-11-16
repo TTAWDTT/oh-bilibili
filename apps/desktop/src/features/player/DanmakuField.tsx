@@ -34,6 +34,7 @@ export function DanmakuField({
   opacity,
   size,
   speed,
+  area,
   fade = false,
 }: {
   items: DanmakuItem[]
@@ -44,6 +45,8 @@ export function DanmakuField({
   opacity: number
   size: number
   speed: number
+  /** 弹幕只铺画面的这个比例：0.25 / 0.5 / 1。 */
+  area: number
   /** 画面模式下降低不透明度，别挡画面。 */
   fade?: boolean
 }) {
@@ -77,11 +80,21 @@ export function DanmakuField({
   }, [])
 
   const all = useMemo(() => [...items].sort((a, b) => a.at - b.at), [items])
+  /** 显示区域越小，可用车道越少，避免把十条车道压进 1/4 屏里互相叠字。 */
+  const lanes = Math.max(1, Math.round(LANES * area))
 
   useEffect(() => {
     cursor.current = 0
     lastPos.current = -1
   }, [all])
+
+  useEffect(() => {
+    // 区域变了就重排：超出现有区域的车道直接收掉。
+    laneBorn.current.fill(-Infinity)
+    const kept = flightsRef.current.filter((f) => f.lane < lanes)
+    flightsRef.current = kept
+    setFlights(kept)
+  }, [lanes])
 
   useEffect(() => {
     if (!enabled) return
@@ -109,7 +122,7 @@ export function DanmakuField({
       const prev = flightsRef.current
       const alive = prev.filter((f) => pos - f.born < lifeMs)
       // 活着但已经过了独占期的车道要放回去，否则吞吐被寿命卡死。
-      for (let c = 0; c < LANES; c += 1) {
+      for (let c = 0; c < lanes; c += 1) {
         if (pos - laneBorn.current[c]! >= reuseMs) laneBorn.current[c] = -Infinity
       }
       if (!playing) {
@@ -128,7 +141,7 @@ export function DanmakuField({
         const item = all[i]!
         if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
         let lane = -1
-        for (let c = 0; c < LANES; c += 1) {
+        for (let c = 0; c < lanes; c += 1) {
           if (laneBorn.current[c] === -Infinity && !fresh.some((f) => f.lane === c)) {
             lane = c
             break
@@ -154,7 +167,10 @@ export function DanmakuField({
     }
     const timer = window.setInterval(tick, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
-  }, [all, enabled, playing, speed])
+  }, [all, enabled, playing, speed, lanes])
+
+  /** 车道间距不变，区域越小能用的车道越少：1/4 屏只占画面顶部一条窄带。 */
+  const laneStep = 72 / LANES
 
   return (
     <div
@@ -170,9 +186,9 @@ export function DanmakuField({
               key={f.id}
               className="danmaku absolute whitespace-nowrap"
               style={{
-                /* 车道只铺到画面 78%：底下 22% 留给进度条与控制条，
-                   否则最下面一两条会正好压在进度条上，读不清也看不清。 */
-                top: `${6 + (f.lane * 72) / LANES}%`,
+                /* 车道只铺到画面 70.8%：底下留给进度条与控制条；
+                   选了 1/4 或 1/2 屏就压进对应的上半部分。 */
+                top: `${6 + f.lane * laneStep}%`,
                 animationDuration: `${LIFE_MS / speed / 1000}s`,
                 animationPlayState: playing ? 'running' : 'paused',
                 color: f.color,

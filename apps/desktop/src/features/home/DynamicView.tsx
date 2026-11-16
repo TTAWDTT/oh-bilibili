@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
-import { toastFailure } from '../../app/notice'
+import { toastDone, toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -74,10 +75,30 @@ function RichText({ text }: { text: string }) {
 }
 
 function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+  const later = (event: MouseEvent): void => {
+    event.stopPropagation()
+    if (!item.bvid) return
+    void ipc
+      .watchLaterSet(item.bvid, true)
+      .then(() => toastDone('已加入稍后再看'))
+      .catch((cause) => toastFailure('稍后再看', cause))
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        // 封面右下角的「稍后再看」自己处理点击，别让整卡跟着进视频。
+        if ((event.target as HTMLElement).closest('button')) return
+        onOpen()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        if (event.target !== event.currentTarget) return
+        event.preventDefault()
+        onOpen()
+      }}
       className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
       <span
@@ -98,9 +119,19 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => v
             <Icon name="play" size={16} />
           </span>
         </span>
-        <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white">
+        <span className="num absolute bottom-1.5 right-1.5 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[15px] text-white transition-opacity group-hover/video:opacity-0">
           {formatDuration(item.duration_ms)}
         </span>
+        {/* B 站动态里的视频卡：悬停时右下角的时长换成「稍后再看」。 */}
+        <button
+          type="button"
+          onClick={later}
+          aria-label="稍后再看"
+          title="稍后再看"
+          className="t absolute bottom-1.5 right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-[3px] bg-black/65 text-white opacity-0 transition-opacity duration-150 hover:bg-[var(--accent)] focus-visible:opacity-100 group-hover/video:opacity-100"
+        >
+          <Icon name="watchLater" size={12} />
+        </button>
       </span>
       <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
         <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
@@ -117,7 +148,7 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => v
           </span>
         </span>
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -487,6 +518,7 @@ export function DynamicView() {
     return (
       <EmptyState
         icon="alert"
+        mascot="hug"
         title="动态没取到"
         detail={error}
         action={{ label: '重试', onClick: () => void load(null, false) }}
@@ -497,6 +529,7 @@ export function DynamicView() {
     return (
       <EmptyState
         icon="biliTv"
+        mascot="missYou"
         title="关注的人还没有新视频"
         action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
       />
@@ -545,7 +578,7 @@ export function DynamicView() {
           </div>
         </div>
         <div className={FEED}>
-          <nav aria-label="动态分类" className="flex gap-6 border-t border-[var(--hairline)]">
+          <nav aria-label="动态分类" className="flex gap-6">
             {TABS.map((entry) => (
               <button
                 key={entry.key}
@@ -576,7 +609,17 @@ export function DynamicView() {
                 onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
                 className="t press w-[64px] shrink-0 text-center"
               >
-                <Avatar src={user.face} alt={user.name} size={48} />
+                <span className="relative inline-flex">
+                  <Avatar src={user.face} alt={user.name} size={48} />
+                  {user.special ? (
+                    <span
+                      title="特别关注"
+                      className="absolute -right-0.5 -top-0.5 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-[var(--panel)] text-[#ffb027]"
+                    >
+                      <Icon name="star" size={11} />
+                    </span>
+                  ) : null}
+                </span>
                 <span className="mt-1.5 block truncate text-[12px] leading-[16px] text-[var(--text-2)]">
                   {user.name}
                 </span>
