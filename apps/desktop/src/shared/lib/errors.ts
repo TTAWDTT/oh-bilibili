@@ -26,6 +26,9 @@ function explainTransport(message: string): string {
   if (/error sending request|error trying to connect|operation timed out|dns error/i.test(message)) {
     return '连不上 B 站，检查一下网络。'
   }
+  if (/request was banned/i.test(message)) {
+    return '请求太频繁，等一会儿再试。'
+  }
   return message
 }
 
