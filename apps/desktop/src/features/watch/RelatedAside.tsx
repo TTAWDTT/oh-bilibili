@@ -13,9 +13,9 @@ export function RelatedAside({ items }: { items: Track[] }) {
   if (items.length === 0) return null
 
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-3">
       <div className="mb-1.5 flex items-center gap-2">
-        <h3 className="text-[12px] text-[var(--text-3)]">相关推荐</h3>
+        <h3 className="text-[14px] font-medium text-[var(--text-1)]">相关推荐</h3>
         <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
         {/* B 站把自动连播开关挂在相关推荐标题行右侧：不开播完不跳，不用等倒计时才关。 */}
         <button
@@ -40,7 +40,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
           </span>
         </button>
       </div>
-      <div className="flex flex-col gap-y-2">
+      <div className="flex flex-col gap-y-2.5">
         {items.map((item) => (
           <button
             key={item.key}
@@ -62,7 +62,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
               ) : null}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 text-[13px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+              <span className="line-clamp-2 text-[13.5px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                 {item.title}
               </span>
               <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)]">
