@@ -11,9 +11,8 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
-import { PREFETCH_PX } from '../../shared/lib/prefetch'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
+import { PREFETCH_PX } from '../../shared/lib/prefetch'
 
 /** 名片按 mid 缓存，同一个 UP 反复悬停不再打接口。 */
 const cards = new Map<number, Promise<AuthorCard>>()
@@ -153,7 +152,7 @@ export function FollowingView() {
     )
   }
 
-  if (page === 0 && loading) return <TrackListSkeleton rows={5} />
+  if (page === 0 && loading) return <BiliLoader label="正在取关注…" />
 
   if (done && items.length === 0) {
     return (

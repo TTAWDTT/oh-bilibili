@@ -10,7 +10,7 @@ import { toastDone } from '../../app/notice'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { thumbUrl } from '../../shared/lib/thumb'
 import { useAuthStore } from './authStore'
 import { QrPanel } from './QrPanel'
@@ -145,11 +145,7 @@ export function AuthModal() {
           compact
         />
       ) : !challenge ? (
-        <div className="space-y-3" aria-hidden>
-          <Skeleton className="h-[168px] w-full" />
-          <Skeleton className="h-3 w-3/5" />
-          <Skeleton className="h-3 w-2/5" />
-        </div>
+        <BiliLoader compact label="正在取二维码…" />
       ) : (
         <>
           <QrPanel state={panelState} url={challenge.url} svg={challenge.svg} />

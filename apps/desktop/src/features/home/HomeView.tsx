@@ -3,7 +3,6 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PART_CHILDREN, PARTS } from '../../shared/lib/biliParts'
@@ -440,7 +439,7 @@ export function HomeView() {
           />
         </div>
       ) : null}
-      {loading && items.length === 0 ? <CardGridSkeleton cards={10} /> : null}
+      {loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
       {error && items.length > 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">

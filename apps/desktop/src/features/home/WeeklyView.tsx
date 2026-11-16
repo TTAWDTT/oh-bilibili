@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
@@ -181,7 +180,7 @@ export function WeeklyView() {
           action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
         />
       ) : issues === null || (number !== null && page === null) ? (
-        <CardGridSkeleton cards={8} />
+        <BiliLoader label="正在取本期…" />
       ) : page && page.tracks.length > 0 ? (
         <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
           {page.tracks.map((track) => (
@@ -196,8 +195,6 @@ export function WeeklyView() {
       ) : (
         <EmptyState mascot="missYou" icon="biliTv" title="这一期暂时是空的" action={null} />
       )}
-
-      {number !== null && page === null && !error ? <BiliLoader compact label="正在取这一期…" /> : null}
       </div>
     </div>
   )

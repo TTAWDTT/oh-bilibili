@@ -5,7 +5,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { PlaylistRowsSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
 import { thumbUrl } from '../../shared/lib/thumb'
 import { useLibraryStore } from './libraryStore'
@@ -67,7 +67,7 @@ export function LibraryView() {
         </PageTitle>
         {playlists === null ? (
           <div className="mt-8">
-            <PlaylistRowsSkeleton rows={4} />
+            <BiliLoader compact label="正在取歌单…" />
           </div>
         ) : playlists.length === 0 ? (
           <div className="pt-6">

@@ -14,7 +14,7 @@ export function BiliLoader({
   if (compact) {
     return (
       <div
-        className="flex items-center justify-center gap-2 py-4 text-[12px] text-[var(--text-3)]"
+        className="flex items-center justify-center gap-2 py-2 text-[12px] text-[var(--text-3)]"
         role="status"
         aria-live="polite"
       >

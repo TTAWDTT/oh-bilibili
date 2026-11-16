@@ -8,7 +8,6 @@ import { useAuthStore } from '../auth/authStore'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
-import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -516,7 +515,7 @@ export function DynamicView() {
     void load(offset, true)
   }, [loaded, hasMore, loading, error, items.length, offset, load])
 
-  if (!loaded && loading) return <BiliTvLoading label="正在取动态" />
+  if (!loaded && loading) return <BiliLoader label="正在取动态…" />
   if (error && items.length === 0) {
     return (
       <EmptyState

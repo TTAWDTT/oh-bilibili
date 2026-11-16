@@ -511,7 +511,7 @@ export function SearchView() {
               </div>
             ) : null}
             {tab === 'user' && usersQuery !== trimmed ? (
-              <p className="py-16 text-center text-[13px] text-[var(--text-3)]">正在找 UP 主…</p>
+              <BiliLoader label="正在找 UP 主…" />
             ) : null}
             {tab === 'user' && usersQuery === trimmed && usersError ? (
               <div className="py-16 text-center text-[13px] text-[var(--text-3)]">
@@ -544,9 +544,6 @@ export function SearchView() {
                 {tracks.length > 0 ? (
                   // 「已加载」不说「共」：这个数字随滚动增长，不是 B 站的结果总数。
                   <span className="num">已加载 {formatCount(tracks.length)} 个</span>
-                ) : null}
-                {status === 'loading' && tracks.length > 0 ? (
-                  <span className="h-3 w-3 animate-spin rounded-full border border-[var(--line)] border-t-white/70" />
                 ) : null}
               </span>
             </div>

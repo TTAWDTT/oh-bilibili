@@ -6,7 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
-import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
@@ -224,7 +224,7 @@ function MessageList({ kind, emotes }: { kind: ipc.MessageKind; emotes: Map<stri
       className="min-h-0 flex-1 overflow-y-auto pb-10"
     >
       <div className={`${CONTENT} flex flex-col gap-3 py-5`}>
-        {page === 0 && loading ? <BiliTvLoading label="正在取消息" /> : null}
+        {page === 0 && loading ? <BiliLoader label="正在取消息…" /> : null}
         {error && items.length === 0 ? (
           <EmptyState icon="alert" title="消息没取到" detail={error} action={{ label: '重试', onClick: () => void load(null, 1) }} />
         ) : null}
@@ -290,7 +290,7 @@ export function MessagesView() {
           </nav>
         </div>
       </header>
-      {!auth ? <BiliTvLoading /> : auth.logged_in ? (
+      {!auth ? <BiliLoader label="正在确认登录…" /> : auth.logged_in ? (
         <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} emotes={emotes} />
       ) : (
         <EmptyState icon="message" mascot="peek" title="登录后查看消息" action={{ label: '登录', onClick: () => setAuthOpen(true) }} />

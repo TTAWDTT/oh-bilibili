@@ -10,7 +10,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { useAuthStore } from '../auth/authStore'
@@ -158,7 +158,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }
 
-  if (tracks === null) return <TrackListSkeleton rows={6} />
+  if (tracks === null) return <BiliLoader label="正在取投稿…" />
   if (tracks.length === 0) {
     return (
       <EmptyState
@@ -331,7 +331,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       />
 
       {loadingMore ? (
-        <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取更多投稿…</p>
+        <BiliLoader compact label="正在取更多投稿…" />
       ) : null}
 
       {isFallback ? (

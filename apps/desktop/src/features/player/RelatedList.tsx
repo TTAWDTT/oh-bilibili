@@ -3,7 +3,7 @@ import type { Track } from '../../shared/lib/contract'
 import { formatDuration } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import { Cover } from '../../shared/ui/Cover'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { useAppStore } from '../../app/appStore'
 
 function formatCount(n: number): string {
@@ -39,15 +39,7 @@ export function RelatedList({ trackKey }: { trackKey: string }) {
     }
   }, [trackKey])
 
-  if (tracks === null) {
-    return (
-      <div className="space-y-1.5 px-4 py-3">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
-    )
-  }
+  if (tracks === null) return <BiliLoader compact label="正在取相关推荐…" />
   if (tracks.length === 0) return null
 
   return (

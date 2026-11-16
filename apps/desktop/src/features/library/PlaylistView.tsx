@@ -7,7 +7,7 @@ import { useAppStore } from '../../app/appStore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { usePlayerStore } from '../player/playerStore'
 import { useLibraryStore } from '../library/libraryStore'
 import { TrackList } from '../tracks/TrackList'
@@ -80,7 +80,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
           {name}
         </PageTitle>
         <div className="flex min-h-0 flex-col">
-          {tracks === null ? <TrackListSkeleton rows={6} /> : null}
+          {tracks === null ? <BiliLoader label="正在取歌单…" /> : null}
 
           {error ? (
             <div className="pt-6">

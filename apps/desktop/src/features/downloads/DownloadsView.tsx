@@ -8,7 +8,7 @@ import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { useDownloadsStore } from './downloadsStore'
 
 const STATE: Record<DownloadState, { label: string; tone: string }> = {
@@ -78,17 +78,7 @@ export function DownloadsView() {
           已下载
         </PageTitle>
         {items === null ? (
-          <div aria-hidden>
-            {Array.from({ length: 3 }, (_, index) => (
-              <div key={index} className="flex items-center gap-2 border-b border-hairline px-4 py-4">
-                <Skeleton className="h-10 w-10 shrink-0 rounded-[4px]" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3 w-48 max-w-[45%]" />
-                  <Skeleton className="h-2.5 w-64 max-w-[60%]" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <BiliLoader compact label="正在取下载…" />
         ) : items.length === 0 ? (
           <div className="pt-6">
             <EmptyState

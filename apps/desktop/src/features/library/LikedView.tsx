@@ -6,7 +6,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -61,7 +61,7 @@ export function LikedView() {
       <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
         <PageTitle>赞过的视频</PageTitle>
         <div className="mt-4">
-          <CardGridSkeleton cards={8} />
+          <BiliLoader label="正在取赞过的视频…" />
         </div>
       </div>
     )
