@@ -19,16 +19,40 @@ function mentionNodes(
   keyBase: number,
 ): ReactNode[] {
   if (mentions.length === 0) return [text]
+  // URL 整段保留，@ 只在非 URL 段落里找，避免把链接路径里的 @ 拆开。
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  const nodes: ReactNode[] = []
+  parts.forEach((part, index) => {
+    if (/^https?:\/\//.test(part)) {
+      nodes.push(part)
+      return
+    }
+    nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index))
+  })
+  return nodes
+}
+
+/** 在纯文字里找已知用户名的 @；前后都留边界，避免 @foo 命中 @foobar。 */
+function mentionLinks(
+  text: string,
+  mentions: [string, number][],
+  open: (name: string, mid: number) => void,
+  keyBase: number,
+): ReactNode[] {
   const names = [...mentions]
     .sort((a, b) => b[0].length - a[0].length)
     .map(([name]) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const pattern = new RegExp(`@(${names.join('|')})`, 'g')
+  const pattern = new RegExp(
+    `(^|[^/\\s@])@(${names.join('|')})(?![\\p{L}\\p{N}_])`,
+    'gu',
+  )
   const nodes: ReactNode[] = []
   let last = 0
   for (const match of text.matchAll(pattern)) {
-    const at = match.index ?? 0
+    const prefix = match[1] ?? ''
+    const at = (match.index ?? 0) + prefix.length
     if (at > last) nodes.push(text.slice(last, at))
-    const name = match[1] ?? ''
+    const name = match[2] ?? ''
     const mid = mentions.find(([value]) => value === name)?.[1] ?? 0
     nodes.push(
       <button
@@ -40,7 +64,7 @@ function mentionNodes(
         @{name}
       </button>,
     )
-    last = at + match[0].length
+    last = (match.index ?? 0) + match[0].length
   }
   if (last < text.length) nodes.push(text.slice(last))
   return nodes
