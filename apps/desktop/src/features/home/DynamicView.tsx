@@ -8,6 +8,7 @@ import { useAuthStore } from '../auth/authStore'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
+import { AuthorHoverCard, useAuthorHover } from '../../shared/ui/AuthorHoverCard'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -452,6 +453,7 @@ export function DynamicView() {
   const auth = useAuthStore((state) => state.auth)
   const me = auth?.logged_in ? auth.user : null
   const [following, setFollowing] = useState<Followed[]>([])
+  const authorHover = useAuthorHover()
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
   const [tab, setTab] = useState<'all' | 'video' | 'opus'>('all')
   const [offset, setOffset] = useState('')
@@ -543,6 +545,7 @@ export function DynamicView() {
       ref={scrollerRef}
       id="scroll-main"
       onScroll={(event) => {
+        authorHover.hide()
         if (!hasMore || loading || error || pending.current) return
         const box = event.currentTarget
         if (box.scrollHeight - box.scrollTop - box.clientHeight < 1800) {
@@ -612,12 +615,22 @@ export function DynamicView() {
       </div>
       {following.length > 0 ? (
         <div className={`${FEED} pt-4`}>
-          <div className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3">
+          <div
+            onScroll={authorHover.hide}
+            className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3"
+          >
             {following.map((user) => (
               <button
                 key={user.mid}
                 type="button"
-                onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
+                onClick={() => {
+                  authorHover.hide()
+                  navigate({ kind: 'author', name: user.name, mid: user.mid })
+                }}
+                onPointerEnter={(event) => authorHover.show(user, event.currentTarget)}
+                onPointerLeave={authorHover.hide}
+                onFocus={(event) => authorHover.show(user, event.currentTarget)}
+                onBlur={authorHover.hide}
                 className="t press w-[64px] shrink-0 text-center"
               >
                 <span className="relative inline-flex">
@@ -639,6 +652,16 @@ export function DynamicView() {
           </div>
         </div>
       ) : null}
+      <AuthorHoverCard
+        hover={authorHover.hover}
+        card={authorHover.card}
+        onHide={authorHover.hide}
+        onKeep={authorHover.keep}
+        onOpen={(user) => {
+          authorHover.hide()
+          navigate({ kind: 'author', name: user.name, mid: user.mid })
+        }}
+      />
       <div className={`${FEED} flex flex-col gap-3 pt-4`}>
         {visible.map((item) => (
           <DynamicCard
