@@ -6,6 +6,13 @@ import { formatCount, formatDuration } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import type { IconName } from '../../shared/ui/Icon'
+
+const FLOOR_ICONS: Record<string, IconName> = {
+  动画: 'biliTv',
+  音乐: 'music',
+  游戏: 'game',
+}
 
 type PartitionRowProps = {
   rid: number
@@ -38,10 +45,10 @@ export function PartitionRow({ rid, title }: PartitionRowProps) {
         <h2 className="flex items-center gap-2 text-[17px] font-medium text-[var(--text-1)]">
           <span
             aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-[14px] text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-white"
             style={{ background: partColor(title) }}
           >
-            {title[0]}
+            <Icon name={FLOOR_ICONS[title] ?? 'biliTv'} size={16} />
           </span>
           {title}
         </h2>
