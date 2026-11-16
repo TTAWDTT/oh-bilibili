@@ -217,7 +217,7 @@ const TrackCard = memo(function TrackCard({
                 </>
               ) : null}
             </span>
-            <span className="num shrink-0 rounded-[2px] bg-black/60 px-1 [text-shadow:none]">
+            <span className="num shrink-0 rounded-[2px] bg-black/60 px-1 transition-opacity group-hover:opacity-0 [text-shadow:none]">
               {formatDuration(track.duration_ms)}
             </span>
           </span>
@@ -226,6 +226,16 @@ const TrackCard = memo(function TrackCard({
               <Icon name={active && playing ? 'pause' : 'play'} size={18} />
             </span>
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onLater(track)}
+          aria-label="稍后再看"
+          title="稍后再看"
+          className="t press pointer-events-none absolute bottom-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-[3px] bg-black/65 text-white opacity-0 transition-opacity duration-150 hover:bg-[var(--accent)] focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+        >
+          <Icon name="watchLater" size={12} />
         </button>
 
         <CardActions
