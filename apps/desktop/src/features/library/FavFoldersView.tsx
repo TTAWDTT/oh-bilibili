@@ -9,9 +9,8 @@ import type { FavFolder } from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { thumbWide } from '../../shared/lib/thumb'
 import { PageTitle } from '../../shared/ui/PageTitle'
-import { BiliTvLoading } from '../../shared/ui/BiliTvLoading'
 import { Icon } from '../../shared/ui/Icon'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -152,7 +151,7 @@ export function FavFoldersView() {
       />
     )
   }
-  if (folders === null) return <BiliTvLoading label="正在读 B 站收藏夹" />
+  if (folders === null) return <BiliLoader label="正在读 B 站收藏夹…" />
 
   if (picked) {
     return (
@@ -196,7 +195,7 @@ export function FavFoldersView() {
           ) : null}
         </div>
         {tracks === null ? (
-          <TrackListSkeleton rows={6} />
+          <BiliLoader label="正在取收藏夹…" />
         ) : tracks.length === 0 ? (
           <EmptyState
             mascot="hug"

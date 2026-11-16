@@ -7,7 +7,7 @@ import type { Track } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Equalizer } from '../../shared/ui/Equalizer'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { VirtualList } from '../../shared/ui/VirtualList'
 import { usePlayerStore } from './playerStore'
 
@@ -138,18 +138,7 @@ export function QueueList() {
   }, [])
   const navigate = useAppStore((state) => state.navigate)
 
-  if (!queue) {
-    return (
-      <div aria-hidden>
-        {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="flex h-[60px] items-center gap-2.5 border-b border-hairline px-4">
-            <Skeleton className="h-2.5 w-3" />
-            <Skeleton className="h-3 w-2/3" />
-          </div>
-        ))}
-      </div>
-    )
-  }
+  if (!queue) return <BiliLoader compact label="正在取队列…" />
 
   if (queue.items.length === 0) {
     return (

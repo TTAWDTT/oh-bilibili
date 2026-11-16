@@ -3,7 +3,7 @@ import type { Track } from '../../shared/lib/contract'
 import { useLibraryStore } from './libraryStore'
 import { Modal } from '../../shared/ui/Modal'
 import { Icon } from '../../shared/ui/Icon'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 
 type AddToPlaylistModalProps = {
   track: Track | null
@@ -51,10 +51,7 @@ export function AddToPlaylistModal({ track, open, onClose }: AddToPlaylistModalP
     <Modal open={open} title="加入歌单" description={`${track.title} · ${track.artist}`} onClose={onClose}>
       <div className="flex flex-col">
         {playlists === null ? (
-          <div className="space-y-2 py-1" aria-hidden>
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </div>
+          <BiliLoader compact label="正在取歌单…" />
         ) : playlists.length === 0 ? (
           <p className="border-b border-hairline py-4 text-center text-[14px] text-[var(--text-2)]">还没有歌单，在下面直接建一个。</p>
         ) : (

@@ -573,28 +573,6 @@
   }
 }
 
-/* 加载骨架：一道微光从左扫到右 */
-@keyframes bili-shimmer {
-  from {
-    background-position: -200% 0;
-  }
-  to {
-    background-position: 200% 0;
-  }
-}
-
-.bili-skeleton {
-  /* 中性灰的流光：一整屏彩色占位比空白更吵。 */
-  background: linear-gradient(
-    90deg,
-    var(--panel-raised) 0%,
-    color-mix(in oklab, var(--text-3) 12%, var(--panel-raised)) 50%,
-    var(--panel-raised) 100%
-  );
-  background-size: 200% 100%;
-  animation: bili-shimmer 1.6s linear infinite;
-}
-
 /* 播放条封面上的三根小柱：正在播放时上下跳，和 B 站列表里的动态图标一个意思 */
 .bili-playing-bars i {
   display: block;
@@ -899,20 +877,6 @@ select:focus-visible {
     right: auto;
     left: 6px;
   }
-}
-
-/* 小电视加载：轻微起伏 + 极短的高光呼吸，幅度小到不打扰 */
-@keyframes bili-tv-load-bob {
-  0%, 100% { transform: translateY(0); opacity: .85; }
-  50% { transform: translateY(-5px); opacity: 1; }
-}
-
-.bili-tv-load {
-  animation: bili-tv-load-bob 1.15s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bili-tv-load { animation: none; opacity: 1; }
 }
 
 /* ── 移动端安全区 ───────────────────────────────────────────────

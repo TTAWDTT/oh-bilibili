@@ -3,7 +3,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { PreciousView as PreciousData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { useAppStore } from '../../app/appStore'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { WideCard } from '../tracks/WideCard'
 import { HotTabs } from './HotTabs'
@@ -57,7 +57,7 @@ export function PreciousView() {
               action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
             />
           ) : (
-            <CardGridSkeleton cards={8} />
+            <BiliLoader label="正在取片单…" />
           )
         ) : data.items.length === 0 ? (
           <EmptyState mascot="missYou" icon="biliTv" title="这个片单暂时是空的" action={null} />

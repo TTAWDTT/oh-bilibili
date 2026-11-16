@@ -4,7 +4,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { PageTitle } from '../../shared/ui/PageTitle'
@@ -55,7 +55,7 @@ export function WatchLaterView() {
     }
   }, [])
 
-  if (tracks === null) return <TrackListSkeleton rows={6} />
+  if (tracks === null) return <BiliLoader label="正在取稍后再看…" />
 
   if (error) {
     return (

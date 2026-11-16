@@ -7,6 +7,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { COMMENT_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { Avatar } from '../../shared/ui/Avatar'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { useAuthStore } from '../auth/authStore'
@@ -305,7 +306,7 @@ function CommentRow({
                 <>
                   {repliesHasMore ? (
                     repliesLoading ? (
-                      <span className="text-[var(--text-3)]">正在取回复…</span>
+                      <BiliLoader compact label="正在取回复…" />
                     ) : repliesError ? (
                       <button
                         type="button"
@@ -325,7 +326,7 @@ function CommentRow({
                       </button>
                     )
                   ) : repliesLoading ? (
-                    <span className="text-[var(--text-3)]">正在取回复…</span>
+                    <BiliLoader compact label="正在取回复…" />
                   ) : null}
                   <button
                     type="button"
@@ -338,7 +339,7 @@ function CommentRow({
                   </button>
                 </>
               ) : repliesLoading ? (
-                <span className="text-[var(--text-3)]">正在取回复…</span>
+                <BiliLoader compact label="正在取回复…" />
               ) : repliesError ? (
                 <button
                   type="button"
@@ -628,7 +629,7 @@ export function CommentsPanel({
             {emojiOpen ? (
               <div className="absolute bottom-10 right-0 z-30 w-[304px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
                 {emotes === null ? (
-                  <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">正在读表情…</p>
+                  <BiliLoader compact label="正在读表情…" />
                 ) : emotes.length === 0 ? (
                   <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">表情没取到</p>
                 ) : (
@@ -706,7 +707,7 @@ export function CommentsPanel({
           ))}
         </ul>
         {loading ? (
-          <p className="py-3 text-center text-[12px] text-[var(--text-3)]">正在取评论…</p>
+          <BiliLoader compact label="正在取评论…" />
         ) : null}
         {!loading && !hasMore && items.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>

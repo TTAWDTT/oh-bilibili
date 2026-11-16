@@ -3,6 +3,7 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import type { FavFolder } from '../../shared/lib/ipc'
 import { Icon } from '../../shared/ui/Icon'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Modal } from '../../shared/ui/Modal'
 
 /**
@@ -51,7 +52,7 @@ export function FavPicker({
       width="max-w-[420px]"
     >
       {folders === null && !error ? (
-        <p className="text-[13px] text-[var(--text-3)]">正在读取收藏夹…</p>
+        <BiliLoader compact label="正在读收藏夹…" />
       ) : null}
 
       {error ? (

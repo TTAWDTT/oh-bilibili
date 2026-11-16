@@ -5,7 +5,7 @@ import { clamp } from '../../shared/lib/format'
 import { toWireError } from '../../shared/lib/errors'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { Skeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { toastFailure } from '../../app/notice'
 import { useAppStore } from '../../app/appStore'
 import { usePlayerStore } from './playerStore'
@@ -133,15 +133,7 @@ export function LyricsView({ track }: { track: Track | null }) {
     }
   }, [active, doc])
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center gap-4 px-7 py-10" aria-hidden>
-        {Array.from({ length: 7 }, (_, index) => (
-          <Skeleton key={index} className={index % 2 === 0 ? 'h-3.5 w-4/5' : 'h-3.5 w-3/5'} />
-        ))}
-      </div>
-    )
-  }
+  if (loading) return <BiliLoader compact label="正在取歌词…" />
 
   if (!doc || doc.lines.length === 0) {
     return (

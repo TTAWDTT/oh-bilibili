@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { TrackListSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { PageTitle } from '../../shared/ui/PageTitle'
@@ -83,7 +83,7 @@ export function HistoryView() {
   if (error) {
     return <EmptyState icon="alert" title="读取历史失败" detail={error} action={null} />
   }
-  if (entries === null) return <TrackListSkeleton rows={6} />
+  if (entries === null) return <BiliLoader label="正在取历史…" />
   if (entries.length === 0) {
     return (
       <EmptyState

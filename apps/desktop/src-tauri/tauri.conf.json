@@ -20,8 +20,8 @@
         "minWidth": 380,
         "minHeight": 560,
         "center": true,
-        "theme": "Dark",
-        "backgroundColor": "#050507",
+        "theme": "Light",
+        "backgroundColor": "#f6f7f8",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "dragDropEnabled": false

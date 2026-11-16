@@ -4,7 +4,6 @@ import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { useAppStore } from '../../app/appStore'
 import { Icon } from '../../shared/ui/Icon'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { WideCard } from '../tracks/WideCard'
@@ -132,7 +131,7 @@ export function PopularView() {
               action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
             />
           ) : (
-            <CardGridSkeleton cards={8} />
+            <BiliLoader label="正在取热门…" />
           )
         ) : tracks.length === 0 ? (
           <EmptyState mascot="missYou" icon="biliTv" title="热门榜暂时是空的" action={null} />

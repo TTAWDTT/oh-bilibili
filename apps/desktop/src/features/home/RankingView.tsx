@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { CardGridSkeleton } from '../../shared/ui/Skeleton'
+import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
@@ -159,7 +159,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
         />
       ) : tracks === null ? (
-        <CardGridSkeleton cards={10} />
+        <BiliLoader label="正在取榜单…" />
       ) : tracks.length === 0 ? (
         <EmptyState mascot="missYou" icon="biliTv" title="这个分区今天没有榜单" action={null} />
       ) : (
