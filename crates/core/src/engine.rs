@@ -57,6 +57,9 @@ pub struct Engine {
     tickets: crate::tickets::Tickets,
     /// 引擎启动时刻，用来给进度事件打时间戳。
     started_at: std::time::Instant,
+    /// 最近一次 load、seek 或续播动作。看门狗在这之后留出缓冲，避免把
+    /// 大跨度 seek 的解码停顿误判成网络卡死，然后重载回 0。
+    last_transport_at: Mutex<std::time::Instant>,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
 }
@@ -96,6 +99,7 @@ impl Engine {
             mode: Mutex::new(crate::wire::PlayMode::Listen),
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
+            last_transport_at: Mutex::new(std::time::Instant::now()),
         });
         engine.restore_queue();
         engine.start_progress_persist();
@@ -242,6 +246,7 @@ impl Engine {
 
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        *lock(&self.last_transport_at) = std::time::Instant::now();
         let token = self.next_token();
         {
             let mut st = lock(&self.state);
@@ -271,6 +276,7 @@ impl Engine {
                 if bounded > 0 {
                     lock(&self.player).seek(bounded);
                 }
+                *lock(&self.last_transport_at) = std::time::Instant::now();
                 let mut st = lock(&self.state);
                 *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
                 drop(st);
@@ -354,6 +360,18 @@ impl Engine {
                 queue.jump_by_key(key);
             }
         }
+        // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
+        // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
+        // 不会出现「进度条先跳过去、音频还在 0」的竞态。
+        *lock(&self.resume_at_ms) = if page.is_none() {
+            self.library
+                .history_position(key.as_opaque())
+                .ok()
+                .flatten()
+                .unwrap_or(0)
+        } else {
+            0
+        };
         // 打开观看页就要有声音。引擎是唯一的发声者，这里顺手把它挂上：
         // 前端不需要再补一次「开始播放」，也就不会因为调用失败而静音。
         // 起播要等拉流，放后台跑，页面先出来。
@@ -809,6 +827,7 @@ impl Engine {
     }
 
     pub fn seek(&self, position_ms: u64) -> PlayerSnapshot {
+        *lock(&self.last_transport_at) = std::time::Instant::now();
         // 正好落在曲目时长上的 seek 会被解码器拒掉（实测按 End 之后位置不动、
         // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
         // 播完该切歌仍由 reached_track_end 负责。
@@ -999,14 +1018,19 @@ impl Engine {
                     ticks += 1;
                     if ticks >= 12 {
                         ticks = 0;
-                        let snap = engine.snapshot();
-                        // 切歌加载期间状态已经指向新曲，但音频时钟还停在上一首，
-                        // 这时候回写会把旧位置记到新曲头上，顺带清掉续播点。
-                        if snap.phase == "playing" || snap.phase == "paused" {
-                            if let Some(t) = snap.track {
-                                let _ = engine
-                                    .library
-                                    .set_history_position(t.key.as_opaque(), snap.position_ms);
+                        // seek 刚发出时时钟还在 0，这时候回写会清掉续播点。
+                        if lock(&engine.last_transport_at).elapsed()
+                            >= std::time::Duration::from_secs(5)
+                        {
+                            let snap = engine.snapshot();
+                            // 切歌加载期间状态已经指向新曲，但音频时钟还停在上一首，
+                            // 这时候回写会把旧位置记到新曲头上，顺带清掉续播点。
+                            if snap.phase == "playing" || snap.phase == "paused" {
+                                if let Some(t) = snap.track {
+                                    let _ = engine
+                                        .library
+                                        .set_history_position(t.key.as_opaque(), snap.position_ms);
+                                }
                             }
                         }
                     }
@@ -1034,6 +1058,10 @@ impl Engine {
                     }
                     // 没到末尾却停了，说明是卡住（网络断、解码出错）。
                     // 从当前位置原地续播，而不是当成播完跳下一首。
+                    if lock(&engine.last_transport_at).elapsed() < std::time::Duration::from_secs(5) {
+                        stalled = 0;
+                        continue;
+                    }
                     if !engine.stalled_midway() {
                         stalled = 0;
                         continue;
