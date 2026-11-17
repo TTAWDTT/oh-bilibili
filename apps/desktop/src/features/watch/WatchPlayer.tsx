@@ -29,7 +29,7 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const
  * 画面播放速度慢慢追，观众察觉不到，缓冲区也不会被打断。
  */
 const DRIFT_SEEK_MS = 1200
-const DRIFT_NUDGE_MS = 250
+const DRIFT_NUDGE_MS = 80
 /**
  * 画面落后声音多少才值得 seek。
  *
@@ -37,7 +37,7 @@ const DRIFT_NUDGE_MS = 250
  * 观感就是一顿。让它原地等一下声音就行。只有画面落后太多（跳转、解码卡顿）
  * 才值得往前追。
  */
-const DRIFT_LAG_SEEK_MS = 2500
+const DRIFT_LAG_SEEK_MS = 1500
 /** 追偏差时最多把画面速度改这么多，再多就看得出来变速了。 */
 const NUDGE_RATIO = 0.06
 
@@ -241,6 +241,9 @@ export function WatchPlayer({
 
   /** 已经为哪条清单续过播。同一份清单（含降档重载）只续一次。 */
   const resumedFor = useRef<string | null>(null)
+  /** 声音真的开始走之前的进度锚点；画面要等它越过锚点才起播。 */
+  const audioAnchor = useRef<number | null>(null)
+  const audioLive = useRef(false)
   useEffect(() => {
     if (!ready || resumeAt === null) return
     if (resumedFor.current === data.manifest_url) return
@@ -251,7 +254,13 @@ export function WatchPlayer({
       return
     }
     resumedFor.current = data.manifest_url
-    seekTo(resumeAt / duration)
+    // 声音已经在 resume_at_ms 起播，这里再把音频 seek 回去会倒带已播的部分。
+    // 只把画面对齐到声音的当前进度；声音若还没加载好，就落在续播点上等它。
+    const head = localPlayhead()
+    const at = head > resumeAt ? head : resumeAt
+    const v = videoRef.current
+    if (v) v.currentTime = at / 1000
+    setNow(at)
     setResumeNotice(resumeAt)
   }, [ready, resumeAt, data.manifest_url, data.duration_ms, track.duration_ms])
 
@@ -331,6 +340,18 @@ export function WatchPlayer({
         if (!v.paused) v.pause()
         return
       }
+      // 拉流时状态已经是 playing，但声卡可能还没拿到第一个样本。这时先让画面
+      // 停住，等音频时钟真的走起来，再把画面接到同一个位置起播。
+      if (!audioLive.current) {
+        const reported = usePlayerStore.getState().progress.position_ms
+        if (audioAnchor.current === null) audioAnchor.current = reported
+        if (reported < audioAnchor.current + 150) {
+          if (!v.paused) v.pause()
+          return
+        }
+        audioLive.current = true
+        v.currentTime = reported / 1000
+      }
       const head = readPlayhead()
       const drift = v.currentTime * 1000 - head
       // 重播时画面还停在片尾、声音已从头走：这个差距等不回来，直接拉回声音位置。
@@ -366,6 +387,8 @@ export function WatchPlayer({
     currentHeight.current = 0
     wantHeight.current = 0
     setRetry(0)
+    audioAnchor.current = null
+    audioLive.current = false
     // 时间与续播提示也属于上一条，跟着清单一起换掉。
     setNow(0)
     setResumeNotice(null)
