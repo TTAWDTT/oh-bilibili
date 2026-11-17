@@ -65,31 +65,18 @@ export function OwnerCard({
             </p>
           ) : null}
         </div>
-        {data.owner_mid ? (
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              title="去 B 站给 UP 主充电"
-              onClick={() => void ipc.openExternal(`https://space.bilibili.com/${data.owner_mid}`)}
-              className="t press flex h-7 items-center gap-1 rounded-[4px] border border-[color-mix(in_oklab,var(--accent)_45%,white)] px-2.5 text-[12.5px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_8%,white)]"
-            >
-              <Icon name="battery" size={13} />
-              充电
-            </button>
-            <button
-              type="button"
-              aria-pressed={followed === true}
-              onClick={onFollow}
-              className={`t press flex h-7 items-center rounded-[4px] px-3 text-[12.5px] ${
-                followed === true
-                  ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                  : 'bg-[var(--accent)] text-white hover:opacity-90'
-              }`}
-            >
-              {followed === true ? '已关注' : '关注'}
-            </button>
-          </div>
-        ) : null}
+        <button
+          type="button"
+          aria-pressed={followed === true}
+          onClick={onFollow}
+          className={`t press flex h-7 shrink-0 items-center rounded-[4px] px-3 text-[12.5px] ${
+            followed === true
+              ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              : 'bg-[var(--accent)] text-white hover:opacity-90'
+          }`}
+        >
+          {followed === true ? '已关注' : '关注'}
+        </button>
       </div>
     )
   }
@@ -131,38 +118,23 @@ export function OwnerCard({
           ) : null}
         </div>
       </div>
-      {/*
-       * B 站这一排是两颗等高的窄胶囊靠右：左边「充电」（粉色描边），右边关注（蓝色实心）。
-       * 之前是一颗占满整行的按钮，右栏一窄就像一条横贯的色带，把下面的弹幕列表压住。
-       */}
-      {data.owner_mid ? (
-        <div className="flex items-center justify-end gap-2">
-          {/* 充电是 B 站的付费流程，客户端不替它走一遍；点开空间页由 B 站自己承接。 */}
-          <button
-            type="button"
-            title="去 B 站给 UP 主充电"
-            onClick={() => void ipc.openExternal(`https://space.bilibili.com/${data.owner_mid}`)}
-            className="t press flex h-8 items-center gap-1 rounded-[4px] border border-[color-mix(in_oklab,var(--accent)_45%,white)] px-3 text-[13px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_8%,white)]"
-          >
-            <Icon name="battery" size={14} />
-            充电
-          </button>
-          <button
-            type="button"
-            aria-pressed={followed === true}
-            onClick={onFollow}
-            className={`t press flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
-              followed === true
-                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                : 'bg-[var(--accent)] text-white hover:opacity-90'
-            }`}
-          >
-            {followed === true
-              ? '已关注'
-              : `+ 关注 ${card ? formatCount(Math.max(0, card.fans + (fansDelta ?? 0))) : ''}`.trim()}
-          </button>
-        </div>
-      ) : null}
+      {/* 关注靠右一颗窄胶囊：占满整行的话，右栏一窄就像一条横贯的色带。 */}
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          aria-pressed={followed === true}
+          onClick={onFollow}
+          className={`t press flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
+            followed === true
+              ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              : 'bg-[var(--accent)] text-white hover:opacity-90'
+          }`}
+        >
+          {followed === true
+            ? '已关注'
+            : `+ 关注 ${card ? formatCount(Math.max(0, card.fans + (fansDelta ?? 0))) : ''}`.trim()}
+        </button>
+      </div>
     </div>
   )
 }

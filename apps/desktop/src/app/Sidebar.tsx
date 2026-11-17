@@ -48,6 +48,8 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
 export function Sidebar() {
   const view = useAppStore((state) => state.view)
   const navigate = useAppStore((state) => state.navigate)
+  const collapsed = useAppStore((state) => state.sidebar === 'rail')
+  const toggleSidebar = useAppStore((state) => state.toggleSidebar)
 
   const item = (entry: Item): ReactNode => {
     const active = view.kind === entry.view.kind
@@ -57,15 +59,18 @@ export function Sidebar() {
         type="button"
         onClick={() => navigate(entry.view)}
         aria-current={active ? 'page' : undefined}
+        aria-label={collapsed ? entry.label : undefined}
+        title={collapsed ? entry.label : undefined}
         className={[
-          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] px-2.5 text-[14px]',
+          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] text-[14px]',
+          collapsed ? 'justify-center px-0' : 'px-2.5',
           active
             ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
         <Icon name={entry.icon} size={16} className={active ? 'bili-icon-pop' : ''} />
-        {entry.label}
+        {collapsed ? null : entry.label}
       </button>
     )
   }
@@ -73,18 +78,37 @@ export function Sidebar() {
   return (
     <nav
       aria-label="主导航"
-      className="hidden h-full w-[208px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-hairline bg-[var(--panel)] px-3 py-4 md:flex"
+      className={`bili-sidebar hidden h-full shrink-0 flex-col gap-5 overflow-y-auto border-r border-hairline bg-[var(--panel)] py-4 md:flex ${
+        collapsed ? 'w-[60px] px-2' : 'w-[208px] px-3'
+      }`}
     >
       {GROUPS.map((group, index) => (
         <div key={group.title ?? `g${index}`} className="flex flex-col gap-0.5">
-          {group.title ? (
+          {group.title && !collapsed ? (
             <h2 className="px-2.5 pb-1 text-[12px] font-normal text-[var(--text-3)]">{group.title}</h2>
+          ) : null}
+          {group.title && collapsed && index > 0 ? (
+            <span className="mx-1 mb-1 border-t border-hairline" />
           ) : null}
           {group.items.map(item)}
         </div>
       ))}
-      <div className="mt-auto flex flex-col gap-0.5">
+      {/* 设置与收起键钉在底部：收起之后条目变窄但数量不变，靠滚动才能碰到它们就没法展开了。 */}
+      <div className="sticky bottom-0 mt-auto flex flex-col gap-0.5 bg-[var(--panel)] pt-1">
         {item({ view: { kind: 'settings' }, label: '设置', icon: 'settings' })}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          aria-expanded={!collapsed}
+          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          className={`bili-icon-btn t press flex h-9 items-center gap-2.5 rounded-[6px] text-[13px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] ${
+            collapsed ? 'justify-center px-0' : 'px-2.5'
+          }`}
+        >
+          <Icon name="chevronLeft" size={15} className={collapsed ? 'rotate-180' : ''} />
+          {collapsed ? null : '收起'}
+        </button>
       </div>
     </nav>
   )

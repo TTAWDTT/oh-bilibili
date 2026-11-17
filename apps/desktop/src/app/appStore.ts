@@ -24,10 +24,30 @@ export type View =
   | { kind: 'settings' }
 
 export type RailTab = 'lyrics' | 'queue'
+export type SidebarMode = 'full' | 'rail'
 export type ToastTone = 'error' | 'warn' | 'info' | 'success'
 export type Toast = { id: number; tone: ToastTone; title: string; detail: string | null }
 
 let toastSeq = 0
+
+/** 左栏收起状态跟着窗口走：关掉再打开还是上次那种宽度。 */
+const SIDEBAR_KEY = 'oh-bilibili:sidebar'
+
+function loadSidebar(): SidebarMode {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'rail' ? 'rail' : 'full'
+  } catch {
+    return 'full'
+  }
+}
+
+function saveSidebar(mode: SidebarMode): void {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, mode)
+  } catch {
+    // 隐私模式写不进去，按当前会话生效即可
+  }
+}
 
 type AppStore = {
   view: View
@@ -60,6 +80,9 @@ type AppStore = {
   toasts: Toast[]
   /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
   history: View[]
+  /** 左栏是完整标签版还是只剩图标的窄条。 */
+  sidebar: SidebarMode
+  toggleSidebar: () => void
   navigate: (view: View) => void
   /** 换一条视频但不进历史：观看页里点相关推荐或自动连播，返回该回到来的那一页。 */
   replace: (view: View) => void
@@ -84,6 +107,12 @@ type AppStore = {
 export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'home' },
   history: [],
+  sidebar: loadSidebar(),
+  toggleSidebar: () => {
+    const next: SidebarMode = get().sidebar === 'full' ? 'rail' : 'full'
+    saveSidebar(next)
+    set({ sidebar: next })
+  },
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,

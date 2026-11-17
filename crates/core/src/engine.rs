@@ -645,6 +645,17 @@ impl Engine {
         Ok(())
     }
 
+    /// 给一条评论点赞或取消点赞。
+    pub async fn comment_like(
+        &self,
+        key: &TrackKey,
+        rpid: &str,
+        like: bool,
+    ) -> Result<(), WireError> {
+        self.source.comment_like(key, rpid, like).await?;
+        Ok(())
+    }
+
     /// 把一条远端地址换成不透明句柄。句柄是前端能拿到的唯一地址形态。
     pub fn mint_stream(&self, url: impl Into<String>) -> String {
         self.tickets.mint(url)

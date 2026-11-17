@@ -71,9 +71,11 @@ export function DanmakuComposer({
       <button
         type="submit"
         disabled={!trackKey || text.trim().length === 0 || busy}
-        className="t shrink-0 rounded-[4px] bg-[var(--accent)] px-2.5 py-0.5 text-[12px] text-white disabled:opacity-40"
+        aria-label="发送"
+        title="发送"
+        className="t press flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
       >
-        {busy ? '发送中' : '发送'}
+        <Icon name="send" size={13} />
       </button>
     </form>
   )

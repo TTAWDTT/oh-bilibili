@@ -11,6 +11,18 @@ import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 
+/** 状态翻过一次才换 key，让扩散环重播；初次挂载返回 0，进页面时不会三颗一起闪。 */
+function useFlipKey(value: boolean | number): number {
+  const [key, setKey] = useState(0)
+  const previous = useRef(value)
+  useEffect(() => {
+    if (previous.current === value) return
+    previous.current = value
+    setKey((n) => n + 1)
+  }, [value])
+  return key
+}
+
 /** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
 /** `01:23` / `1:02:03` 转毫秒。B 站简介里的时间戳点一下就跳到那一刻。 */
 function timestampMs(token: string): number | null {
@@ -163,6 +175,9 @@ export function WatchInfo({
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
+  const likeRing = useFlipKey(liked)
+  const coinRing = useFlipKey(coins)
+  const favRing = useFlipKey(faved)
 
   const [saved, setSaved] = useState(false)
   /** 视频标签。公开接口，取不到就不显示这一行。 */
@@ -280,11 +295,20 @@ export function WatchInfo({
             }
             onLike()
           }}
-          className={`${action(liked)} relative overflow-hidden`}
+          className={`${action(liked)} bili-tri-btn relative overflow-hidden`}
           title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
-          <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
-            <BiliThumb size={19} filled={liked} />
+          {likeRing > 0 ? (
+            <span
+              key={likeRing}
+              aria-hidden
+              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
+            />
+          ) : null}
+          <span className="bili-tri-glyph">
+            <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
+              <BiliThumb size={19} filled={liked} />
+            </span>
           </span>
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
           {holding ? (
@@ -296,11 +320,20 @@ export function WatchInfo({
           aria-pressed={coins > 0}
           aria-label="投币"
           onClick={openCoin}
-          className={action(coins > 0)}
+          className={`${action(coins > 0)} bili-tri-btn relative overflow-hidden`}
           title="投币"
         >
-          <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
-            <BiliCoin size={19} />
+          {coinRing > 0 ? (
+            <span
+              key={coinRing}
+              aria-hidden
+              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
+            />
+          ) : null}
+          <span className="bili-tri-glyph">
+            <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
+              <BiliCoin size={19} />
+            </span>
           </span>
           {formatCount(data.stats.coins + coinDelta)}
         </button>
@@ -309,11 +342,20 @@ export function WatchInfo({
           aria-pressed={faved}
           aria-label={faved ? '取消收藏' : '收藏'}
           onClick={onFav}
-          className={action(faved)}
+          className={`${action(faved)} bili-tri-btn relative overflow-hidden`}
           title={faved ? '取消收藏' : '收藏'}
         >
-          <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
-            <BiliStar size={19} filled={faved} />
+          {favRing > 0 ? (
+            <span
+              key={favRing}
+              aria-hidden
+              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
+            />
+          ) : null}
+          <span className="bili-tri-glyph">
+            <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
+              <BiliStar size={19} filled={faved} />
+            </span>
           </span>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
         </button>

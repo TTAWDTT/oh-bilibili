@@ -563,6 +563,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         reply_count: 0,
         pinned: false,
         up_liked: false,
+        liked: false,
         medal: null,
       }))
       return {
@@ -584,6 +585,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           reply_count: 0,
           pinned: i === 0,
           up_liked: i === 2,
+          liked: false,
           medal: seed.medal
             ? {
                 name: seed.medal,
@@ -623,6 +625,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
                   reply_count: 0,
                   pinned: false,
                   up_liked: false,
+                  liked: false,
                   medal: null,
                 },
               ]
@@ -635,6 +638,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'open_external':
       return null
     case 'comment_del':
+      return null
+    case 'comment_like':
       return null
     case 'video_meta': {
       const track = findTrack(str(args, 'key'))
