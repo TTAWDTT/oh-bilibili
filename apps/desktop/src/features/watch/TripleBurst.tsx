@@ -37,7 +37,7 @@ export function TripleBurst({ run }: { run: number }) {
       className="pointer-events-none fixed inset-0 z-[80] flex items-center justify-center bg-white/55 backdrop-blur-[2px]"
     >
       <div className="flex flex-col items-center gap-5">
-        <span className="triple-title text-[15px] font-medium tracking-[0.18em] text-[var(--accent)]">
+        <span className="triple-title text-[17px] font-semibold tracking-[0.2em] text-[var(--accent)] [text-shadow:0_1px_10px_rgba(255,255,255,0.9)]">
           一键三连
         </span>
         <div className="relative">
