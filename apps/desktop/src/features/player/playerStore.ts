@@ -39,7 +39,9 @@ type PlayerStore = {
 
 export const usePlayerStore = create<PlayerStore>()((set, get) => {
   const apply = (next: PlayerSnapshot): void => {
-    set({ snapshot: next })
+    // 进度与快照一起换。换曲时只更新快照会让 progress 停在上一条的位置，
+    // 观看页拿它判断声音是否真的起播，就会误判。
+    set({ snapshot: next, progress: { position_ms: next.position_ms, duration_ms: next.duration_ms } })
     syncPlayhead(next.position_ms, next.phase === 'playing', next.duration_ms)
   }
 

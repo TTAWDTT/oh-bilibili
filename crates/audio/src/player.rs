@@ -3,7 +3,7 @@
 //! 声卡回调在自己的线程上，解码在另一个线程上，中间是一个无锁环形缓冲。
 //! 位置由回调按帧数推进，是全应用唯一的时间真值。
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -58,6 +58,23 @@ fn advance_played(clock: &Clock, written_samples: usize, channels: usize) {
     if frames > 0 {
         clock.advance(frames);
     }
+}
+
+/// 让声卡回调丢弃环形缓冲里还没播的旧样本。
+///
+/// 回调线程是唯一持有消费者的一端，所以用代际号握手：解码线程先请求、
+/// 等回调确认清空后再从新位置解码。否则 seek 之后会先响几秒旧位置的音频，
+/// 画面却已经跳走了。
+fn request_flush(requested: &AtomicU64, done: &AtomicU64) {
+    let next = requested.fetch_add(1, Ordering::AcqRel) + 1;
+    // 回调通常十毫秒级就会跑一次；设备异常时不能把命令线程永远挂在这里。
+    for _ in 0..100 {
+        if done.load(Ordering::Acquire) >= next {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    eprintln!("清空音频缓冲超时");
 }
 
 pub struct Player {
@@ -236,12 +253,21 @@ fn run_engine(
 
     let rb = HeapRb::<f32>::new(RING_CAPACITY);
     let (mut producer, mut consumer) = rb.split();
+    let flush_requested = Arc::new(AtomicU64::new(0));
+    let flush_done = Arc::new(AtomicU64::new(0));
 
     let cb_clock = clock.clone();
     let cb_volume = volume_bits.clone();
+    let cb_flush_requested = flush_requested.clone();
+    let cb_flush_done = flush_done.clone();
     let stream = device.build_output_stream(
         config,
         move |out: &mut [f32], _| {
+            let requested = cb_flush_requested.load(Ordering::Acquire);
+            if cb_flush_done.load(Ordering::Relaxed) != requested {
+                consumer.clear();
+                cb_flush_done.store(requested, Ordering::Release);
+            }
             let gain = f32::from_bits(cb_volume.load(Ordering::Relaxed));
             // 暂停时不要再吐缓冲：环里存着最多 2 秒已解码的音频，
             // 无条件 pop 会让「点暂停」之后还继续响两秒——这就是暂停的延迟来源。
@@ -258,9 +284,6 @@ fn run_engine(
             for s in out.iter_mut().skip(written) {
                 *s = 0.0;
             }
-            // 只按「真的送到声卡的那部分」推进时钟：
-            // 原先按 out.len() 推进，缓冲空了（歌播完或网络卡住）也照走，
-            // 位置会一直涨到远超时长——实测一首 2:17 的歌被存成了 42:02。
             // RMS 才是「有多响」，取绝对值平均会虚高。
             if written > 0 {
                 let mut sum = 0.0f32;
@@ -271,12 +294,7 @@ fn run_engine(
             } else {
                 cb_clock.set_level(0.0);
             }
-            // 时钟按「声卡这一拍消费掉的时间」推进，而不是「真的有多少样本」。
-            //
-            // 缓冲欠载时声卡照样走时间（放的是静音），只按 written 推进会让时钟
-            // 落后于真实时间——实测 20.4 秒墙钟只推进了 16 秒位置（慢 21%），
-            // 歌词于是越唱越落后。播完的边界由解码线程 set_playing(false) 管。
-            advance_played(&cb_clock, out.len(), channels);
+            advance_played(&cb_clock, written, channels);
         },
         |err| eprintln!("音频输出错误: {err}"),
         None,
@@ -304,29 +322,33 @@ fn run_engine(
     loop {
         while let Ok(cmd) = rx.try_recv() {
             match cmd {
-                Cmd::Load(media) => match open_decoder(media) {
-                    Ok(d) => {
-                        let rate = d
-                            .format
-                            .tracks()
-                            .iter()
-                            .find(|t| t.id == d.track_id)
-                            .and_then(|t| t.codec_params.sample_rate)
-                            .unwrap_or(48_000);
-                        base_rate = rate as f64;
-                        resampler.set_source_rate(base_rate * speed);
-                        clock.reset(device_rate);
-                        clock.set_playing(true);
-                        trace("已加载并开始推进");
-                        ended.store(false, Ordering::Relaxed);
-                        decoder = Some(d);
+                Cmd::Load(media) => {
+                    // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
+                    request_flush(&flush_requested, &flush_done);
+                    match open_decoder(media) {
+                        Ok(d) => {
+                            let rate = d
+                                .format
+                                .tracks()
+                                .iter()
+                                .find(|t| t.id == d.track_id)
+                                .and_then(|t| t.codec_params.sample_rate)
+                                .unwrap_or(48_000);
+                            base_rate = rate as f64;
+                            resampler.set_source_rate(base_rate * speed);
+                            clock.reset(device_rate);
+                            clock.set_playing(true);
+                            trace("已加载并开始推进");
+                            ended.store(false, Ordering::Relaxed);
+                            decoder = Some(d);
+                        }
+                        Err(e) => {
+                            eprintln!("打开媒体失败: {e}");
+                            clock.set_playing(false);
+                            decoder = None;
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("打开媒体失败: {e}");
-                        clock.set_playing(false);
-                        decoder = None;
-                    }
-                },
+                }
                 Cmd::SetSpeed(next) => {
                     // 0.5..=2.0，超出范围夹住；0 或负数会让重采样除零
                     speed = next.clamp(0.5, 2.0);
@@ -336,17 +358,22 @@ fn run_engine(
                 Cmd::Pause => clock.set_playing(false),
                 Cmd::Seek(ms) => {
                     if let Some(d) = decoder.as_mut() {
+                        request_flush(&flush_requested, &flush_done);
                         let target = SeekTo::Time {
                             time: Time::from(ms as f64 / 1000.0),
                             track_id: Some(d.track_id),
                         };
                         match d.format.seek(SeekMode::Accurate, target) {
-                            Ok(_) => clock.seek_to_ms(ms),
+                            Ok(_) => {
+                                clock.seek_to_ms(ms);
+                                resampler.set_source_rate(base_rate * speed);
+                            }
                             Err(e) => eprintln!("seek 失败: {e}"),
                         }
                     }
                 }
                 Cmd::Stop => {
+                    request_flush(&flush_requested, &flush_done);
                     decoder = None;
                     clock.set_playing(false);
                     clock.reset(device_rate);
