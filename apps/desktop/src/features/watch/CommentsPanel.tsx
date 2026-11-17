@@ -419,10 +419,12 @@ export function CommentsPanel({
   const [hot, setHot] = useState(true)
   const [items, setItems] = useState<Comment[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** 被 B 站限流时记下重试时刻，到点自己再试一次。 */
+  const [retry, setRetry] = useState<{ at: number } | null>(null)
+  const [, setTick] = useState(0)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
@@ -437,7 +439,8 @@ export function CommentsPanel({
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
-  const pageRef = useRef(0)
+  /** 下一批的游标；null 表示还没开始或已经到底。 */
+  const cursorRef = useRef<string | null>(null)
   const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
 
@@ -470,7 +473,7 @@ export function CommentsPanel({
     const root = sentinel.closest('[data-scroll-root]')
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load(page + 1)
+        if (entries.some((e) => e.isIntersecting) && hasMore && !loading) void load()
       },
       // 评论一页 20 条，提前几屏取下一页，滚起来才不会一顿一顿
       { root: root instanceof Element ? root : null, rootMargin: `${COMMENT_PREFETCH_PX}px` },
@@ -478,24 +481,29 @@ export function CommentsPanel({
     observer.observe(sentinel)
     return () => observer.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flow, hasMore, loading, page, trackKey])
+  }, [flow, hasMore, loading, trackKey])
 
-  const load = async (next: number, byHot = hot): Promise<void> => {
-    if (loadingRef.current || next <= pageRef.current) return
+  const load = async (byHot = hot): Promise<void> => {
+    if (loadingRef.current) return
     const seq = seqRef.current
     loadingRef.current = true
     setLoading(true)
     setError(null)
+    setRetry(null)
     try {
-      const res: CommentPage = await ipc.watchComments(trackKey, next, byHot)
+      const res: CommentPage = await ipc.watchComments(trackKey, cursorRef.current, byHot)
       if (seq !== seqRef.current) return
-      setItems((prev) => (next === 1 ? res.items : [...prev, ...res.items]))
+      setItems((prev) => [...prev, ...res.items])
       setTotal(res.total)
-      pageRef.current = next
-      setPage(res.page)
-      setHasMore(res.has_more)
+      cursorRef.current = res.next
+      setHasMore(res.next !== null)
     } catch (e) {
-      setError(toWireError(e).message)
+      const wire = toWireError(e)
+      if (wire.class === 'rate_limited') {
+        setRetry({ at: Date.now() + (wire.retry_after_ms ?? 60_000) })
+      } else {
+        setError(wire.message)
+      }
     } finally {
       if (seq === seqRef.current) {
         loadingRef.current = false
@@ -504,16 +512,28 @@ export function CommentsPanel({
     }
   }
 
+  // 限流不是故障：到点自己重试一次，用户不用盯着倒计时去点按钮。
+  useEffect(() => {
+    if (!retry) return
+    const timer = window.setInterval(() => {
+      setTick((n) => n + 1)
+      if (Date.now() < retry.at) return
+      window.clearInterval(timer)
+      void load(hot)
+    }, 1000)
+    return () => window.clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retry, hot])
+
   useEffect(() => {
     seqRef.current += 1
     loadingRef.current = false
     setItems([])
     setReplyTo(null)
     setTotal(0)
-    setPage(0)
-    pageRef.current = 0
+    cursorRef.current = null
     setHasMore(false)
-    void load(1, hot)
+    void load(hot)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackKey, hot])
 
@@ -524,21 +544,21 @@ export function CommentsPanel({
     if (flow) {
       const mark = sentinelRef.current
       if (mark && mark.getBoundingClientRect().top < window.innerHeight + COMMENT_PREFETCH_PX) {
-        void load(page + 1)
+        void load()
       }
       return
     }
     const box = boxRef.current
     if (box && box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) {
-      void load(page + 1)
+      void load()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, page, hasMore, loading, flow])
+  }, [items, hasMore, loading, flow])
 
   const onScroll = (): void => {
     const box = boxRef.current
     if (!box || loading || !hasMore) return
-    if (box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) void load(page + 1)
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < COMMENT_PREFETCH_PX) void load()
   }
 
   const submit = async (): Promise<void> => {
@@ -594,7 +614,9 @@ export function CommentsPanel({
         next.delete(c.id)
         return next
       })
-      await load(1)
+      cursorRef.current = null
+      setItems([])
+      await load()
     } catch (e) {
       setError(toWireError(e).message)
     }
@@ -739,12 +761,30 @@ export function CommentsPanel({
             这条视频还没有评论。
           </p>
         ) : null}
+        {retry ? (
+          <div className="py-6 text-center text-[12px] text-[var(--text-3)]">
+            <p>
+              B 站限流了，
+              {Math.max(0, Math.ceil((retry.at - Date.now()) / 1000))} 秒后自动重试
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setRetry(null)
+                void load()
+              }}
+              className="t press mt-2 rounded-[6px] border border-[var(--line)] px-3 py-1 hover:bg-[var(--panel-alt)]"
+            >
+              立即重试
+            </button>
+          </div>
+        ) : null}
         {error ? (
           <div className="py-6 text-center text-[12px] text-[var(--text-3)]">
             <p>评论没取到：{error}</p>
             <button
               type="button"
-              onClick={() => void load(Math.max(1, page))}
+              onClick={() => void load()}
               className="t press mt-2 rounded-[6px] border border-[var(--line)] px-3 py-1 hover:bg-[var(--panel-alt)]"
             >
               重试

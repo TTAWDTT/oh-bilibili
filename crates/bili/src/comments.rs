@@ -57,6 +57,8 @@ pub struct CommentMedal {
 pub struct CommentPage {
     pub total: u32,
     pub page: u32,
+    /// 下一页的游标。只有主评论列表用它，楼中楼还是按页码翻。
+    pub next: Option<String>,
     pub items: Vec<Comment>,
     /// 还有下一页。
     pub has_more: bool,
@@ -267,26 +269,21 @@ fn to_comment(raw: RawReply) -> Comment {
     }
 }
 
-/// 从 `x/v2/reply` 的响应里取一页评论。字段缺失时返回空页而不是报错，
-/// 评论区拿不到内容不该挡住看视频。
-pub fn page_from(value: &serde_json::Value, page: u32, per_page: u32) -> CommentPage {
+/// 从 `x/v2/reply/wbi/main` 的响应里取一页评论。
+///
+/// 这个接口不用页码，翻页靠 `cursor.pagination_reply.next_offset` 游标；B 站桌面端
+/// 和网页端的评论区现在都走它。老的 `x/v2/reply?pn=` 照样能用，但连翻几页就会被
+/// -352/412 拦下，所以这里改成和官方客户端一致的协议。
+pub fn cursor_page_from(value: &serde_json::Value, first: bool) -> CommentPage {
     let data = &value["data"];
-    let total = data["page"]["count"].as_u64().unwrap_or(0) as u32;
-    // UP 主置顶：rpid 在 `data.upper.top.rpid`（`upper.rpid` 是旧的空壳）。
-    // 这条可能出现在普通分页里，也可能只在 `top_replies` 里，两种都要覆盖：
-    // 先按 rpid 把列表里那条标成置顶，没有的话再从 `top_replies` 补一条到最前。
+    let cursor = &data["cursor"];
+    let total = cursor["all_count"].as_u64().unwrap_or(0) as u32;
     let top = &data["upper"]["top"];
     let pinned_id = top["rpid_str"]
         .as_str()
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
-        .or_else(|| top["rpid"].as_u64().map(|n| n.to_string()))
-        .or_else(|| {
-            data["upper"]["rpid_str"]
-                .as_str()
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-        });
+        .or_else(|| top["rpid"].as_u64().map(|n| n.to_string()));
     let parse = |r: &serde_json::Value| -> Option<Comment> {
         let mut c = to_comment(serde_json::from_value::<RawReply>(r.clone()).ok()?);
         c.pinned = Some(&c.id) == pinned_id.as_ref();
@@ -296,8 +293,8 @@ pub fn page_from(value: &serde_json::Value, page: u32, per_page: u32) -> Comment
         .as_array()
         .map(|list| list.iter().filter_map(parse).collect())
         .unwrap_or_default();
-    // 第 1 页把置顶挪到最前；它已经在列表里时只挪位置，不新增一条。
-    if page <= 1 {
+    // 置顶只在第一页补：调用方知道这次是不是空游标发出去的。
+    if first {
         if let Some(top) = data["top_replies"].as_array() {
             for raw in top {
                 let Some(mut c) = parse(raw) else { continue };
@@ -313,11 +310,16 @@ pub fn page_from(value: &serde_json::Value, page: u32, per_page: u32) -> Comment
             }
         }
     }
-    let loaded = page.saturating_mul(per_page);
+    let next = cursor["pagination_reply"]["next_offset"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let ended = cursor["is_end"].as_bool().unwrap_or(false);
     CommentPage {
         total,
-        page,
-        has_more: (loaded as u64) < total as u64 && !items.is_empty(),
+        page: 1,
+        has_more: !ended && next.is_some(),
+        next,
         items,
     }
 }
@@ -341,6 +343,7 @@ pub fn replies_page_from(value: &serde_json::Value, page: u32, per_page: u32) ->
     CommentPage {
         total,
         page,
+        next: None,
         has_more: page.saturating_mul(per_page) < total,
         items,
     }
@@ -354,7 +357,7 @@ mod tests {
         serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 240921, "size": 3, "num": 1 },
+                "cursor": { "all_count": 240921, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     {
                         "rpid_str": "111",
@@ -373,7 +376,7 @@ mod tests {
 
     #[test]
     fn 解析出作者文本与点赞() {
-        let page = page_from(&sample(), 1, 20);
+        let page = cursor_page_from(&sample(), true);
         assert_eq!(page.total, 240921);
         assert_eq!(page.items.len(), 1);
         let c = &page.items[0];
@@ -389,7 +392,7 @@ mod tests {
 
     #[test]
     fn 头像是双斜杠时补协议() {
-        let page = page_from(&sample(), 1, 20);
+        let page = cursor_page_from(&sample(), true);
         assert_eq!(
             page.items[0].avatar.as_deref(),
             Some("https://i0.hdslb.com/a.jpg")
@@ -401,7 +404,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 2 },
+                "cursor": { "all_count": 2, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
                       "content": { "message": "被 UP 赞了" }, "like": 3, "ctime": 1,
@@ -412,7 +415,7 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         assert!(page.items[0].up_liked);
         assert!(!page.items[1].up_liked);
     }
@@ -422,7 +425,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 2 },
+                "cursor": { "all_count": 2, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
                       "content": { "message": "赞过" }, "like": 3, "ctime": 1, "action": 1 },
@@ -431,7 +434,7 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         assert!(page.items[0].liked);
         assert!(!page.items[1].liked);
     }
@@ -441,7 +444,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 1 },
+                "cursor": { "all_count": 1, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
                       "content": {
@@ -455,7 +458,7 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         assert_eq!(
             page.items[0].mentions,
             vec![
@@ -471,7 +474,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 900 },
+                "cursor": { "all_count": 900, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "upper": { "rpid_str": "999", "rpid": 999 },
                 "top_replies": [
                     { "rpid_str": "999", "member": { "mid": 42, "uname": "UP" },
@@ -483,13 +486,16 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         assert_eq!(page.items.len(), 2, "置顶不该和普通列表重复");
         assert_eq!(page.items[0].id, "999");
         assert!(page.items[0].pinned, "第一条应该是置顶");
         assert!(!page.items[1].pinned);
-        // 第 2 页不再重复塞置顶
-        let later = page_from(&value, 2, 20);
+        // 游标翻到第二页时不再重复塞置顶
+        let mut second = value.clone();
+        second["data"]["cursor"]["pagination_reply"]["next_offset"] =
+            serde_json::json!("o2");
+        let later = cursor_page_from(&second, false);
         assert_eq!(later.items.len(), 1);
         assert!(!later.items[0].pinned);
     }
@@ -499,7 +505,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 1 },
+                "cursor": { "all_count": 1, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     {
                         "rpid_str": "333",
@@ -519,7 +525,7 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         let c = &page.items[0];
         assert_eq!(c.mid, 946974);
         assert_eq!(c.level, 6);
@@ -534,7 +540,7 @@ mod tests {
 
     #[test]
     fn 字段缺失时给空页不报错() {
-        let page = page_from(&serde_json::json!({ "code": -404 }), 1, 20);
+        let page = cursor_page_from(&serde_json::json!({ "code": -404 }), true);
         assert_eq!(page.total, 0);
         assert!(page.items.is_empty());
         assert!(!page.has_more);
@@ -545,7 +551,7 @@ mod tests {
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 2 },
+                "cursor": { "all_count": 2, "is_end": false, "pagination_reply": { "next_offset": "o1" } },
                 "replies": [
                     {
                         "rpid_str": "444",
@@ -573,7 +579,7 @@ mod tests {
                 ]
             }
         });
-        let page = page_from(&value, 1, 20);
+        let page = cursor_page_from(&value, true);
         let medal = page.items[0]
             .medal
             .as_ref()
@@ -600,7 +606,7 @@ mod tests {
             }))
             .collect();
         raw["data"]["replies"][0]["replies"] = serde_json::Value::Array(many);
-        let page = page_from(&raw, 1, 20);
+        let page = cursor_page_from(&raw, true);
         assert_eq!(page.items[0].replies.len(), 3);
         assert_eq!(page.items[0].reply_count, 3);
     }

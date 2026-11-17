@@ -86,6 +86,8 @@ export type Comment = {
 export type CommentPage = {
   total: number
   page: number
+  /** 下一页的游标；主评论列表用它翻页，没有下一页时为 null。 */
+  next: string | null
   items: Comment[]
   has_more: boolean
 }

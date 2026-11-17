@@ -596,10 +596,10 @@ impl Engine {
     pub async fn comments(
         &self,
         key: &TrackKey,
-        page: u32,
+        cursor: Option<&str>,
         hot: bool,
     ) -> Result<crate::wire::CommentPage, WireError> {
-        Ok(self.source.comments(key, page.max(1), hot).await?)
+        Ok(self.source.comments(key, cursor, hot).await?)
     }
 
     /// 取一页楼中楼。
@@ -609,10 +609,7 @@ impl Engine {
         root: &str,
         page: u32,
     ) -> Result<crate::wire::CommentPage, WireError> {
-        Ok(self
-            .source
-            .comment_replies(key, root, page.max(1))
-            .await?)
+        Ok(self.source.comment_replies(key, root, page.max(1)).await?)
     }
 
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, WireError> {

@@ -947,10 +947,17 @@ impl Client {
     }
 
     /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
+    ///
+    /// 走 wbi 版：官方桌面端播放器请求的就是 /x/player/wbi/v2，未签名的
+    /// /x/player/v2 在频繁进入视频页时更容易吃到 -352。
     pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
         let v = self
-            .get_json(
-                &format!("{API}/x/player/v2?bvid={bvid}&cid={cid}"),
+            .signed_get(
+                &format!("{API}/x/player/wbi/v2"),
+                vec![
+                    ("bvid", bvid.to_string()),
+                    ("cid", cid.to_string()),
+                ],
                 std::time::Duration::from_millis(300),
             )
             .await?;

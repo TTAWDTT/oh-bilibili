@@ -374,7 +374,7 @@ fn 评论能取到真实数据与嵌套回复() {
     rt.block_on(async {
         let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
         let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
-        let page = engine.comments(&key, 1, true).await.expect("取评论");
+        let page = engine.comments(&key, None, true).await.expect("取评论");
         println!("总数 {} 条，本页 {} 条，还有更多={}", page.total, page.items.len(), page.has_more);
         for c in page.items.iter().take(3) {
             println!("  {} 赞{}  {} 字", c.author, c.likes, c.text.chars().count());
@@ -388,9 +388,9 @@ fn 评论能取到真实数据与嵌套回复() {
         assert!(page.has_more, "24 万条的视频第一页之后应该还有");
 
         // 第二页必须真的换了一批，而不是把第一页再发一次
-        let second = engine.comments(&key, 2, true).await.expect("取第 2 页");
+        let next = page.next.clone().expect("第一页应该给下一页游标");
+        let second = engine.comments(&key, Some(&next), true).await.expect("取第 2 页");
         println!("第 2 页 {} 条", second.items.len());
-        assert_eq!(second.page, 2);
         assert!(!second.items.is_empty(), "第 2 页不该是空的");
         let first_ids: Vec<&str> = page.items.iter().map(|c| c.id.as_str()).collect();
         assert!(
