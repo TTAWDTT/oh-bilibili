@@ -81,6 +81,59 @@ async fn 打开观看页会让音频引擎自己起播() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
+async fn 打开观看页会从历史位置续播() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-resume-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
+    let track = tracks.first().cloned().expect("至少一条结果");
+    println!("续播用：{}", track.title);
+
+    engine.play_key(&track.key).await.expect("第一次播放");
+    let mut played = 0;
+    for _ in 0..40 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let snap = engine.snapshot();
+        if snap.position_ms > 6000 {
+            played = snap.position_ms;
+            break;
+        }
+    }
+    assert!(played > 6000, "第一次播放应该走到 6 秒以后");
+
+    // 历史进度每 4.8 秒写一次，等写入后再退出。
+    tokio::time::sleep(Duration::from_millis(5500)).await;
+    let saved = engine
+        .history_position(track.key.as_opaque())
+        .expect("读历史")
+        .unwrap_or(0);
+    println!("退出时历史位置：{saved}ms");
+    assert!(saved > 6000, "退出前应该已经写入历史进度");
+    engine.close_watch(Some(&track.key));
+
+    engine
+        .open_watch(&track.key, "http://127.0.0.1:9")
+        .await
+        .expect("重新打开观看页");
+    let mut resumed = 0;
+    for _ in 0..30 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let snap = engine.snapshot();
+        println!("重新打开后 相位={} 位置={}ms", snap.phase, snap.position_ms);
+        if snap.phase == "playing" && snap.position_ms > 1000 {
+            resumed = snap.position_ms;
+            break;
+        }
+    }
+    assert!(
+        resumed + 3000 >= saved,
+        "重新打开后应该从历史位置 {saved}ms 附近续播，实际 {resumed}ms"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与 yt-dlp"]
 async fn 能把一首歌下载到本地并落到磁盘() {
     let dir = std::env::temp_dir().join(format!("bilimusic-dl-{}", std::process::id()));
