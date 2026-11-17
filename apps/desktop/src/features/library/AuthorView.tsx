@@ -226,20 +226,35 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               </div>
               {isSelf ? null : (
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                  {/* B 站空间页的两颗按钮：消息是描边，关注是实心。 */}
+                  {/* B 站空间页的按钮：充电与消息是描边，关注是实心。 */}
                   {mid ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void ipc
-                          .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
-                          .catch((cause) => toastFailure('打开私信', cause))
-                      }
-                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                    >
-                      <Icon name="message" size={14} />
-                      发消息
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        title="去 B 站给 UP 主充电"
+                        onClick={() =>
+                          void ipc
+                            .openExternal(`https://space.bilibili.com/${mid}`)
+                            .catch((cause) => toastFailure('打开充电页', cause))
+                        }
+                        className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      >
+                        <Icon name="battery" size={14} />
+                        充电
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void ipc
+                            .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
+                            .catch((cause) => toastFailure('打开私信', cause))
+                        }
+                        className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      >
+                        <Icon name="message" size={14} />
+                        发消息
+                      </button>
+                    </>
                   ) : null}
                   <button
                     type="button"

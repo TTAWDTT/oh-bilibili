@@ -60,6 +60,13 @@ const DANMAKU_MODES: { name: string; value: number }[] = [
   { name: '底部', value: 4 },
 ]
 
+/** 弹幕可出现的画面高度，和 B 站播放器一样分三档。 */
+const DANMAKU_AREAS = [
+  { name: '1/4', value: 0.25 },
+  { name: '1/2', value: 0.5 },
+  { name: '全屏', value: 1 },
+] as const
+
 const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '0')}`
 
 /**
@@ -142,7 +149,6 @@ export function WatchPlayer({
   /** 发弹幕时用的颜色与位置，和 B 站播放器那排按钮一致。 */
   const [draftColor, setDraftColor] = useState(0xffffff)
   const [draftMode, setDraftMode] = useState(1)
-  const [draftPicker, setDraftPicker] = useState(false)
   const [sending, setSending] = useState(false)
   const cinema = useAppStore((state) => state.cinema)
   const setCinema = useAppStore((state) => state.setCinema)
@@ -639,7 +645,7 @@ export function WatchPlayer({
         }`}
       >
         {/* 窄屏把发弹幕单独放一行：控制条一行塞不下输入框，挤压后会与画面字幕糊在一起。 */}
-        <div className="mb-1.5 flex items-center gap-2 md:hidden">
+        <div className="mb-1.5 flex items-center gap-2 lg:hidden">
           {!signedIn ? (
             <button
               type="button"
@@ -653,24 +659,25 @@ export function WatchPlayer({
             </button>
           ) : (
             <>
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void sendDanmaku()
-            }}
-            placeholder="发个友善的弹幕见证当下"
-            aria-label="发弹幕"
-            className="h-7 min-w-0 flex-1 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
-          />
-          <button
-            type="button"
-            onClick={() => void sendDanmaku()}
-            disabled={!draft.trim() || sending}
-            className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
-          >
-            发送
-          </button>
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void sendDanmaku()
+                }}
+                placeholder="发个友善的弹幕见证当下"
+                aria-label="发弹幕"
+                className="h-7 min-w-0 flex-1 rounded-[4px] border border-white/15 bg-white/[0.08] px-2 text-[12px] text-white placeholder-white/55 outline-none transition-colors hover:border-white/25 hover:bg-white/[0.12] focus:border-[var(--accent)] focus:bg-white/[0.12]"
+              />
+              <button
+                type="button"
+                onClick={() => void sendDanmaku()}
+                disabled={!draft.trim() || sending}
+                aria-label="发送"
+                className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
+              >
+                <Icon name="send" size={14} />
+              </button>
             </>
           )}
         </div>
@@ -731,12 +738,13 @@ export function WatchPlayer({
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
           <span className="num shrink-0 text-[12px] text-white/80">
-            {formatTime(now)} / {formatTime(duration)}
+            {formatTime(now)}
+            <span className="hidden sm:inline"> / {formatTime(duration)}</span>
           </span>
 
           <div className="min-w-0 flex-1" />
 
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             {/*
              * 未登录时 B 站不给输入框，而是把「请先登录或注册」摊在同一行：
              * 让人能打字再说「发送失败」是最差的一种。登录态取不到也按未登录处理。
@@ -754,84 +762,27 @@ export function WatchPlayer({
               </button>
             ) : (
               <>
-            <input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void sendDanmaku()
-              }}
-              placeholder="发个友善的弹幕见证当下"
-              aria-label="发弹幕"
-              className="h-7 w-[150px] shrink-0 rounded-[4px] bg-black/45 px-2 text-[12px] text-white placeholder-white/60 outline-none focus:bg-black/60"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setSpeedOpen(false)
-                setDraftPicker((open) => !open)
-              }}
-              aria-expanded={draftPicker}
-              aria-label="弹幕颜色与位置"
-              title="弹幕颜色与位置"
-              className={`bili-icon-btn t press flex h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] ${
-                draftPicker ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
-              }`}
-            >
-              <span
-                className="block h-3.5 w-3.5 rounded-full border border-white/60"
-                style={{ background: cssColor(draftColor) }}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => void sendDanmaku()}
-              disabled={!draft.trim() || sending}
-              className="t press h-7 shrink-0 rounded-[4px] bg-[var(--accent)] px-2 text-[12px] text-white disabled:opacity-40"
-            >
-              发送
-            </button>
+                <input
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void sendDanmaku()
+                  }}
+                  placeholder="发个友善的弹幕见证当下"
+                  aria-label="发弹幕"
+                  className="h-7 w-[150px] shrink-0 rounded-[4px] border border-white/15 bg-white/[0.08] px-2 text-[12px] text-white placeholder-white/55 outline-none transition-colors hover:border-white/25 hover:bg-white/[0.12] focus:border-[var(--accent)] focus:bg-white/[0.12]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void sendDanmaku()}
+                  disabled={!draft.trim() || sending}
+                  aria-label="发送"
+                  className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
+                >
+                  <Icon name="send" size={14} />
+                </button>
               </>
             )}
-            {draftPicker ? (
-              <div className="absolute bottom-9 right-2 z-30 w-[212px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
-                <div className="mb-2 flex items-center justify-between text-[11px] text-white/70">
-                  <span>颜色</span>
-                  <span>{DANMAKU_MODES.find((m) => m.value === draftMode)?.name}</span>
-                </div>
-                <div className="grid grid-cols-8 gap-1.5">
-                  {DANMAKU_COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      aria-label={`弹幕颜色 ${color.name}`}
-                      aria-pressed={draftColor === color.value}
-                      onClick={() => setDraftColor(color.value)}
-                      className={`h-4 w-4 rounded-full border ${
-                        draftColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
-                      }`}
-                      style={{ background: cssColor(color.value) }}
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-1.5">
-                  {DANMAKU_MODES.map((mode) => (
-                    <button
-                      key={mode.value}
-                      type="button"
-                      aria-pressed={draftMode === mode.value}
-                      onClick={() => setDraftMode(mode.value)}
-                      className={`t press flex-1 rounded-[4px] py-1 text-[11px] ${
-                        draftMode === mode.value
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'bg-white/10 text-white/80 hover:bg-white/20'
-                      }`}
-                    >
-                      {mode.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <button
@@ -846,7 +797,7 @@ export function WatchPlayer({
             弹
           </button>
 
-          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮，五项可调。 */}
+          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮：显示区域、样式、颜色、位置都在这里。 */}
           <div className="relative shrink-0">
             <button
               type="button"
@@ -858,14 +809,35 @@ export function WatchPlayer({
               aria-expanded={danmakuPanel}
               aria-label="弹幕设置"
               title="弹幕设置"
-              className={`bili-icon-btn t press flex h-[22px] w-9 items-center justify-center rounded-[4px] ${
+              className={`bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
                 danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
-              <Icon name="settings" size={14} />
+              <Icon name="gear" size={16} />
             </button>
             {danmakuPanel ? (
-              <div className="absolute bottom-9 right-0 z-30 w-[196px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+              <div className="absolute bottom-9 right-0 z-30 w-[236px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+                <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                  <span>显示区域</span>
+                  <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
+                </div>
+                <div className="mt-1.5 flex gap-1">
+                  {DANMAKU_AREAS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={danmakuArea === option.value}
+                      onClick={() => patchDanmaku({ area: option.value })}
+                      className={`t press flex-1 rounded-[3px] py-1 text-[11px] leading-none ${
+                        danmakuArea === option.value
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-white/10 text-white/80 hover:bg-white/20'
+                      }`}
+                    >
+                      {option.name}
+                    </button>
+                  ))}
+                </div>
                 {(
                   [
                     { key: 'opacity', label: '不透明度', min: 0.2, max: 1, step: 0.1, value: danmakuOpacity },
@@ -873,9 +845,9 @@ export function WatchPlayer({
                     { key: 'speed', label: '速度', min: 0.6, max: 2, step: 0.2, value: danmakuSpeed },
                   ] as const
                 ).map((row) => (
-                  <label key={row.key} className="mb-2 block last:mb-0">
-                    <span className="flex items-center justify-between text-[11px] text-white/70">
-                      {row.label}
+                  <label key={row.key} className="block border-t border-white/10 pt-2">
+                    <span className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                      <span>{row.label}</span>
                       <span className="num">{row.key === 'opacity' ? `${Math.round(row.value * 100)}%` : row.value}</span>
                     </span>
                     <input
@@ -885,32 +857,52 @@ export function WatchPlayer({
                       step={row.step}
                       value={row.value}
                       onChange={(event) => patchDanmaku({ [row.key]: Number(event.target.value) })}
-                      className="mt-1 w-full accent-[var(--accent)]"
+                      className="bili-range mt-1 w-full"
                     />
                   </label>
                 ))}
-                <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2">
-                  <span className="text-[11px] text-white/70">显示区域</span>
-                  <div className="ml-auto flex gap-1">
-                    {(
-                      [
-                        { value: 0.25, name: '1/4' },
-                        { value: 0.5, name: '1/2' },
-                        { value: 1, name: '全屏' },
-                      ] as const
-                    ).map((option) => (
+
+                <div className="border-t border-white/10 pt-2">
+                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                    <span>弹幕颜色</span>
+                    <span>{DANMAKU_COLORS.find((color) => color.value === draftColor)?.name}</span>
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-8 gap-1.5">
+                    {DANMAKU_COLORS.map((color) => (
                       <button
-                        key={option.value}
+                        key={color.value}
                         type="button"
-                        aria-pressed={danmakuArea === option.value}
-                        onClick={() => patchDanmaku({ area: option.value })}
-                        className={`t press rounded-[3px] px-1.5 py-0.5 text-[11px] ${
-                          danmakuArea === option.value
+                        aria-label={`弹幕颜色 ${color.name}`}
+                        aria-pressed={draftColor === color.value}
+                        onClick={() => setDraftColor(color.value)}
+                        className={`h-4 w-4 rounded-full border ${
+                          draftColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
+                        }`}
+                        style={{ background: cssColor(color.value) }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-2">
+                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                    <span>位置</span>
+                    <span>{DANMAKU_MODES.find((mode) => mode.value === draftMode)?.name}</span>
+                  </div>
+                  <div className="mt-1.5 flex gap-1">
+                    {DANMAKU_MODES.map((mode) => (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        aria-pressed={draftMode === mode.value}
+                        onClick={() => setDraftMode(mode.value)}
+                        className={`t press flex-1 rounded-[4px] py-1 text-[11px] leading-none ${
+                          draftMode === mode.value
                             ? 'bg-[var(--accent)] text-white'
                             : 'bg-white/10 text-white/80 hover:bg-white/20'
                         }`}
                       >
-                        {option.name}
+                        {mode.name}
                       </button>
                     ))}
                   </div>
@@ -955,7 +947,7 @@ export function WatchPlayer({
             </div>
           ) : null}
 
-          <div className="relative hidden shrink-0 md:block">
+          <div className="relative hidden shrink-0 lg:block">
             <button
               type="button"
               onClick={() => {
@@ -997,7 +989,7 @@ export function WatchPlayer({
 
           {/* 音量与倍速在窄屏交给系统：手机上调的是系统音量，不是应用音量。 */}
           <span
-            className="hidden shrink-0 items-center md:flex"
+            className="hidden shrink-0 items-center xl:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
           >
             <VolumeControl />
@@ -1010,7 +1002,7 @@ export function WatchPlayer({
             onClick={() => setStageMode(!cinema, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`bili-icon-btn t press flex h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] ${
+            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >

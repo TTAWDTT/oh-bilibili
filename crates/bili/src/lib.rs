@@ -758,6 +758,33 @@ impl Source {
         Ok(())
     }
 
+    /// 给一条评论点赞或取消点赞。
+    pub async fn comment_like(
+        &self,
+        key: &TrackKey,
+        rpid: &str,
+        like: bool,
+    ) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        let csrf = self
+            .client
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        self.client
+            .post_form(
+                &format!("{}/x/v2/reply/action", client::API),
+                vec![
+                    ("type", "1".to_string()),
+                    ("oid", detail.aid.to_string()),
+                    ("rpid", rpid.to_string()),
+                    ("action", if like { "1" } else { "0" }.to_string()),
+                    ("csrf", csrf),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     /// 取 DASH 的视频轨。只返回视频，音频永远走音频引擎。
     ///
     /// 用 fnval=4048 拿到全部特性与全部档位（含 1080P+），并且 fourk=1

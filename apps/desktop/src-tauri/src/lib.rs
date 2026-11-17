@@ -275,6 +275,18 @@ async fn comment_del(
     engine.comment_del(&TrackKey::from_provider(key), &rpid).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn comment_like(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    rpid: String,
+    like: bool,
+) -> Result<(), WireError> {
+    engine
+        .comment_like(&TrackKey::from_provider(key), &rpid, like)
+        .await
+}
+
 /// 打开观看页。一次给齐清单地址与画质档位，前端看不到任何远端地址。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_open(
@@ -1037,6 +1049,7 @@ pub fn run() {
             hot_search,
             comment_add,
             comment_del,
+            comment_like,
             home_feed,
             dynamic_feed,
             message_unread,

@@ -32,6 +32,8 @@ pub struct Comment {
     pub pinned: bool,
     /// UP 主赞过这条评论。列表里挂一枚拇指。
     pub up_liked: bool,
+    /// 当前登录账号赞过这条评论。接口 `action` 为 1，游客恒为 0。
+    pub liked: bool,
     /// 评论者戴的粉丝牌。没戴时为 None。
     pub medal: Option<CommentMedal>,
 }
@@ -83,6 +85,9 @@ struct RawReply {
     /// UP 主对这条评论的动作（赞/回复）。
     #[serde(default)]
     up_action: Option<RawUpAction>,
+    /// 当前用户操作状态：0 无、1 已点赞、2 已点踩。
+    #[serde(default)]
+    action: u32,
 }
 
 #[derive(Deserialize)]
@@ -170,6 +175,7 @@ struct RawUpAction {
 
 fn to_comment(raw: RawReply) -> Comment {
     let up_liked = raw.up_action.as_ref().map(|a| a.like).unwrap_or(false);
+    let liked = raw.action == 1;
     let id = raw
         .rpid_str
         .filter(|s| !s.is_empty())
@@ -256,6 +262,7 @@ fn to_comment(raw: RawReply) -> Comment {
         reply_count: raw.rcount,
         pinned: false,
         up_liked,
+        liked,
         medal,
     }
 }
@@ -408,6 +415,25 @@ mod tests {
         let page = page_from(&value, 1, 20);
         assert!(page.items[0].up_liked);
         assert!(!page.items[1].up_liked);
+    }
+
+    #[test]
+    fn 当前用户赞过的评论带liked() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "page": { "count": 2 },
+                "replies": [
+                    { "rpid_str": "1", "member": { "mid": 7, "uname": "A" },
+                      "content": { "message": "赞过" }, "like": 3, "ctime": 1, "action": 1 },
+                    { "rpid_str": "2", "member": { "mid": 8, "uname": "B" },
+                      "content": { "message": "点踩" }, "like": 1, "ctime": 2, "action": 2 }
+                ]
+            }
+        });
+        let page = page_from(&value, 1, 20);
+        assert!(page.items[0].liked);
+        assert!(!page.items[1].liked);
     }
 
     #[test]

@@ -164,6 +164,7 @@ function CommentRow({
   ownerMid,
   onReply,
   onDelete,
+  replyComposer,
 }: {
   c: Comment
   depth?: number
@@ -171,6 +172,7 @@ function CommentRow({
   ownerMid?: number | null | undefined
   onReply?: (c: Comment) => void
   onDelete?: ((c: Comment) => void) | undefined
+  replyComposer?: ReactNode
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -179,6 +181,25 @@ function CommentRow({
   const [repliesHasMore, setRepliesHasMore] = useState(false)
   const [repliesLoading, setRepliesLoading] = useState(false)
   const [repliesError, setRepliesError] = useState(false)
+  const [liked, setLiked] = useState(c.liked)
+  const [likes, setLikes] = useState(c.likes)
+  const likingRef = useRef(false)
+
+  const toggleLike = async (): Promise<void> => {
+    if (likingRef.current) return
+    likingRef.current = true
+    const next = !liked
+    setLiked(next)
+    setLikes((count) => Math.max(0, count + (next ? 1 : -1)))
+    try {
+      await ipc.commentLike(trackKey, c.id, next)
+    } catch {
+      setLiked(!next)
+      setLikes((count) => Math.max(0, count + (next ? -1 : 1)))
+    } finally {
+      likingRef.current = false
+    }
+  }
 
   const loadReplies = async (next: number): Promise<void> => {
     if (repliesLoading) return
@@ -254,8 +275,19 @@ function CommentRow({
                 即使 0 赞也留着位置，一排评论扫下来才是同一个形状。 */}
             <span className="num ml-auto flex shrink-0 items-center gap-3 text-[11px] text-[var(--text-3)]">
               <span className="flex items-center gap-0.5">
-                <Icon name="thumb" size={12} />
-                {c.likes > 0 ? formatCount(c.likes) : null}
+                <button
+                  type="button"
+                  aria-pressed={liked}
+                  aria-label={liked ? '取消点赞' : '点赞'}
+                  title={liked ? '取消点赞' : '点赞'}
+                  onClick={() => void toggleLike()}
+                  className={`t press flex items-center gap-0.5 rounded-[3px] ${
+                    liked ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]'
+                  }`}
+                >
+                  <Icon name={liked ? 'thumbFilled' : 'thumb'} size={12} />
+                  {likes > 0 ? formatCount(likes) : null}
+                </button>
                 {c.up_liked ? (
                   <span title="UP主觉得很赞" className="ml-0.5 text-[var(--accent)]">
                     <Icon name="thumb" size={12} />
@@ -289,6 +321,7 @@ function CommentRow({
           </p>
         </div>
       </div>
+      {replyComposer ? <div className="mt-2 pl-8">{replyComposer}</div> : null}
       {c.replies.length > 0 || (depth === 0 && c.reply_count > 0) ? (
         <ul className="mt-1 pl-8">
           {shownReplies.map((r) => (
@@ -400,12 +433,17 @@ export function CommentsPanel({
   /** 图挂了的代号。表情图来自远端，个别 404 时不该在面板里留一个碎图。 */
   const [brokenEmotes, setBrokenEmotes] = useState<ReadonlySet<string>>(new Set())
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
   const pageRef = useRef(0)
   const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
+
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus()
+  }, [replyTo])
 
   useEffect(() => {
     if (!emojiOpen || emotes !== null) return
@@ -470,6 +508,7 @@ export function CommentsPanel({
     seqRef.current += 1
     loadingRef.current = false
     setItems([])
+    setReplyTo(null)
     setTotal(0)
     setPage(0)
     pageRef.current = 0
@@ -533,6 +572,7 @@ export function CommentsPanel({
             reply_count: 0,
             pinned: false,
             up_liked: false,
+            liked: false,
             medal: null,
           },
           ...prev,
@@ -559,6 +599,102 @@ export function CommentsPanel({
       setError(toWireError(e).message)
     }
   }
+
+  const composer = (reply: { id: string; author: string } | null): ReactNode => (
+    <div>
+      {reply ? (
+        <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-3)]">
+          <span className="min-w-0 truncate">回复 @{reply.author}</span>
+          <button
+            type="button"
+            aria-label="取消回复"
+            title="取消回复"
+            onClick={() => setReplyTo(null)}
+            className="t press flex h-5 w-5 items-center justify-center rounded-[3px] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]"
+          >
+            <Icon name="close" size={12} />
+          </button>
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && reply) {
+              setReplyTo(null)
+              return
+            }
+            if (event.key === 'Enter') void submit()
+          }}
+          placeholder={reply ? `回复 @${reply.author}` : '发一条评论'}
+          aria-label={reply ? `回复 @${reply.author}` : '发评论'}
+          className="h-8 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+        />
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            aria-label="表情"
+            aria-expanded={emojiOpen}
+            onClick={() => setEmojiOpen((open) => !open)}
+            className={`t press flex h-8 w-8 items-center justify-center rounded-[6px] ${
+              emojiOpen
+                ? 'text-[var(--accent)]'
+                : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]'
+            }`}
+          >
+            <Icon name="emoji" size={15} />
+          </button>
+          {emojiOpen ? (
+            <div className="absolute bottom-10 right-0 z-30 w-[304px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
+              {emotes === null ? (
+                <BiliLoader compact label="正在读表情…" />
+              ) : emotes.length === 0 ? (
+                <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">表情没取到</p>
+              ) : (
+                <div className="grid max-h-[220px] grid-cols-8 gap-1 overflow-y-auto">
+                  {emotes
+                    .filter(([code]) => !brokenEmotes.has(code))
+                    .map(([code, url]) => (
+                      <button
+                        key={code}
+                        type="button"
+                        title={code}
+                        aria-label={code}
+                        onClick={() => setDraft((draft) => draft + code)}
+                        className="flex h-8 items-center justify-center rounded-[4px] hover:bg-[var(--panel-alt)]"
+                      >
+                        <img
+                          src={url}
+                          alt={code}
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          onError={() =>
+                            setBrokenEmotes((prev) => new Set(prev).add(code))
+                          }
+                          className="h-6 w-6 object-contain"
+                        />
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!draft.trim() || sending}
+          aria-label="发送"
+          title="发送"
+          className="t press flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] bg-[var(--accent)] text-white disabled:opacity-40"
+        >
+          <Icon name="send" size={15} />
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
@@ -588,90 +724,11 @@ export function CommentsPanel({
           ))}
         </div>
       </div>
-      <div className={`border-b border-hairline pb-3 ${flow ? '' : 'px-3'}`}>
-        {replyTo ? (
-          <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--text-3)]">
-            <span>回复 @{replyTo.author}</span>
-            <button
-              type="button"
-              onClick={() => setReplyTo(null)}
-              className="t press hover:text-[var(--text-1)]"
-            >
-              取消
-            </button>
-          </div>
-        ) : null}
-        <div className="flex gap-2">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void submit()
-            }}
-            placeholder={replyTo ? `回复 @${replyTo.author}` : '发一条评论'}
-            aria-label="发评论"
-            className="h-8 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 text-[12px] outline-none focus:border-[var(--accent)]"
-          />
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              aria-label="表情"
-              aria-expanded={emojiOpen}
-              onClick={() => setEmojiOpen((open) => !open)}
-              className={`t press h-8 rounded-[6px] px-2 text-[12px] ${
-                emojiOpen
-                  ? 'text-[var(--accent)]'
-                  : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]'
-              }`}
-            >
-              表情
-            </button>
-            {emojiOpen ? (
-              <div className="absolute bottom-10 right-0 z-30 w-[304px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
-                {emotes === null ? (
-                  <BiliLoader compact label="正在读表情…" />
-                ) : emotes.length === 0 ? (
-                  <p className="px-2 py-3 text-[12px] text-[var(--text-3)]">表情没取到</p>
-                ) : (
-                  <div className="grid max-h-[220px] grid-cols-8 gap-1 overflow-y-auto">
-                    {emotes
-                      .filter(([code]) => !brokenEmotes.has(code))
-                      .map(([code, url]) => (
-                      <button
-                        key={code}
-                        type="button"
-                        title={code}
-                        aria-label={code}
-                        onClick={() => setDraft((draft) => draft + code)}
-                        className="flex h-8 items-center justify-center rounded-[4px] hover:bg-[var(--panel-alt)]"
-                      >
-                        <img
-                          src={url}
-                          alt={code}
-                          referrerPolicy="no-referrer"
-                          loading="lazy"
-                          onError={() =>
-                            setBrokenEmotes((prev) => new Set(prev).add(code))
-                          }
-                          className="h-6 w-6 object-contain"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => void submit()}
-            disabled={!draft.trim() || sending}
-            className="t press h-8 shrink-0 rounded-[6px] bg-[var(--accent)] px-3 text-[12px] text-white disabled:opacity-40"
-          >
-            {sending ? '发送中…' : '发送'}
-          </button>
+      {replyTo ? null : (
+        <div className={`border-b border-hairline pb-3 ${flow ? '' : 'px-3'}`}>
+          {composer(null)}
         </div>
-      </div>
+      )}
       <div
         ref={boxRef}
         onScroll={flow ? undefined : onScroll}
@@ -703,6 +760,7 @@ export function CommentsPanel({
               ownerMid={ownerMid}
               onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
               onDelete={mine.has(c.id) ? remove : undefined}
+              replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
             />
           ))}
         </ul>

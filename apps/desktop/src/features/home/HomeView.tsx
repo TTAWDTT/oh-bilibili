@@ -183,10 +183,13 @@ export function HomeView() {
     setFresh(next)
     try {
       const list = await ipc.homeFeed(next)
-      const seen = new Set(itemsRef.current.map((t) => t.key))
-      const swapped = list.filter((t) => !seen.has(t.key)).slice(0, 11)
+      // 只跟当前首屏比：拿整条推荐流去重的话，划得越深新一页被筛掉的越多，
+      // 最后换一换一颗也不换。
+      const shown = new Set(heroRef.current.map((t) => t.key))
+      const swapped = list.filter((t) => !shown.has(t.key)).slice(0, 11)
       if (swapped.length > 0) {
         heroRef.current = swapped
+        feedMemory.hero = swapped
         setHero(swapped)
       }
     } catch {

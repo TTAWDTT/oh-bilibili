@@ -77,6 +77,8 @@ export type Comment = {
   pinned: boolean
   /** UP 主赞过这条评论。 */
   up_liked: boolean
+  /** 当前登录账号赞过这条评论。 */
+  liked: boolean
   /** 评论者戴的粉丝牌。 */
   medal: CommentMedal | null
 }

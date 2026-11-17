@@ -419,6 +419,11 @@ export function commentDel(key: string, rpid: string): Promise<null> {
   return call<null>('comment_del', { key, rpid })
 }
 
+/** 给一条评论点赞或取消点赞。 */
+export function commentLike(key: string, rpid: string, like: boolean): Promise<null> {
+  return call<null>('comment_like', { key, rpid, like })
+}
+
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
 /** 批量读互动状态：[key, liked, faved, coin][]。 */
 export function relationStates(keys: string[]): Promise<[string, boolean, boolean, number][]> {

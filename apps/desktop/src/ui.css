@@ -391,6 +391,12 @@
   box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
 }
 
+/* 侧边栏收起/展开：只动宽度，标签直接切掉不参与动画，
+   免得文字在 60px 里被挤成一行一行的。 */
+.bili-sidebar {
+  transition: width 160ms var(--ease);
+}
+
 /* 卡片进场：错峰淡入上移。--i 是序号，由组件传入 */
 @keyframes bili-card-in {
   from {
@@ -415,6 +421,54 @@
 
 .bili-press:active {
   transform: scale(0.96);
+}
+
+/* 播放器里的滑杆：系统默认那根又粗又黑，和 B 站播放器的 2px 细线差得远。
+   轨道 2px，圆点 10px，悬停再放大一点。 */
+.bili-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bili-range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.28);
+}
+
+.bili-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  transition: transform 120ms var(--ease);
+}
+
+.bili-range:hover::-webkit-slider-thumb,
+.bili-range:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+
+.bili-range::-moz-range-track {
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.28);
+}
+
+.bili-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
 }
 
 /* 长按点赞：一条从左往右填满的细条，填满就是「一键三连」触发。
@@ -463,16 +517,65 @@
 .bili-tri-flip { animation: bili-tri-flip 420ms var(--ease); }
 .bili-tri-spin { animation: bili-tri-spin 420ms var(--spring); }
 
+/* 悬停时只让图标自己活一下：小幅摆头，播一遍就停，不做无限循环。 */
+@keyframes bili-tri-wobble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  52% { transform: rotate(5deg); }
+  78% { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.bili-tri-btn:hover {
+  transform: translateY(-1px);
+}
+
+.bili-tri-btn:active {
+  transform: translateY(-1px) scale(0.94);
+}
+
+.bili-tri-btn:hover .bili-tri-glyph {
+  animation: bili-tri-wobble 520ms var(--ease);
+}
+
+.bili-tri-glyph {
+  display: inline-flex;
+}
+
+/* 状态翻过时贴着按钮内沿闪一圈；key 换掉重播，平时透明。
+   按钮本身 overflow-hidden（长按进度条要裁住），所以这里只做内缩到满框的脉冲。 */
+@keyframes bili-tri-ring {
+  from {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.bili-tri-ring {
+  animation: bili-tri-ring 360ms var(--ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bili-tri-pop,
   .bili-tri-flip,
-  .bili-tri-spin {
+  .bili-tri-spin,
+  .bili-tri-ring,
+  .bili-tri-btn:hover .bili-tri-glyph {
     animation: none;
+  }
+
+  .bili-tri-btn:hover,
+  .bili-tri-btn:active {
+    transform: none;
   }
 }
 
 /* ── 一键三连的整屏庆祝 ─────────────────────────────
- * 三拍：图标带旋转弹出 → 文字跟上 → 三枚一起收拢淡出。
+ * 四拍：中心光环 → 图标带旋转弹出 → 文字跟上 → 三枚一起收拢淡出。
  * 收拢在 1180ms 走完，TripleBurst.tsx 的 1200ms 计时器随即卸载。
  */
 @keyframes triple-pop {
@@ -523,6 +626,38 @@
   --dx: -26px;
 }
 
+/* 中心先闪一圈光环：比三枚图标先到，交代「成了」，然后让位给图标。 */
+@keyframes bili-triple-ring {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+.triple-ring {
+  animation: bili-triple-ring 320ms var(--ease);
+}
+
+/* 「一键三连」自己一拍：淡入的同时上移，不挤进图标的 90ms 错峰。 */
+@keyframes triple-title {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.triple-title {
+  animation: triple-title 240ms var(--ease) 80ms both;
+}
+
 .triple-pop {
   animation: triple-pop 420ms var(--spring) both;
   animation-delay: calc(var(--i, 0) * 90ms);
@@ -538,7 +673,9 @@
 @media (prefers-reduced-motion: reduce) {
   .triple-cell,
   .triple-pop,
-  .triple-label {
+  .triple-label,
+  .triple-ring,
+  .triple-title {
     animation: none;
   }
 }
