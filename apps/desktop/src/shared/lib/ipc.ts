@@ -619,8 +619,8 @@ export function messages(kind: MessageKind, cursor: string | null, page: number)
 }
 
 /** 取一页评论。 */
-export function watchComments(key: string, page: number, hot = true): Promise<CommentPage> {
-  return call<CommentPage>('watch_comments', { key, page, hot })
+export function watchComments(key: string, cursor: string | null, hot = true): Promise<CommentPage> {
+  return call<CommentPage>('watch_comments', { key, cursor, hot })
 }
 
 /** 取一页楼中楼。`root` 是一级评论的 rpid。 */

@@ -545,9 +545,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return id
     }
     case 'watch_comments': {
-      const page = Math.max(1, Math.trunc(num(args, 'page')))
-      // 预览只造一页评论：第二页再回同一批，界面上就会原样重复一遍。
-      if (page > 1) return { total: COMMENT_SEEDS.length, page, items: [], has_more: false }
+      const cursor = args.cursor == null ? null : str(args, 'cursor')
+      // 预览只造一页评论：带游标再来就回空，界面上不会原样重复一遍。
+      if (cursor) return { total: COMMENT_SEEDS.length, page: 1, next: null, items: [], has_more: false }
       const mine = (sentComments.get(str(args, 'key')) ?? []).map((c) => ({
         id: c.id,
         mid: 1,
@@ -568,10 +568,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }))
       return {
         total: COMMENT_SEEDS.length + mine.length,
-        page,
+        page: 1,
+        next: null,
         has_more: false,
         items: [...mine, ...COMMENT_SEEDS.map((seed, i) => ({
-          id: `${page}-${i}`,
+          id: `seed-${i}`,
           mid: seed.mid,
           author: seed.author,
           avatar: null,
@@ -606,6 +607,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return {
         total: 2,
         page,
+        next: null,
         has_more: false,
         items:
           page === 1

@@ -601,34 +601,45 @@ impl Source {
     }
 
     /// 取一页评论。aid 来自详情，评论区只读，失败就返回空页。
+    ///
+    /// 走 `x/v2/reply/wbi/main`：游标翻页，参数和 B 站桌面端一致。老接口
+    /// `x/v2/reply?pn=` 连翻几页就会被风控拦下。
     pub async fn comments(
         &self,
         key: &TrackKey,
-        page: u32,
+        cursor: Option<&str>,
         hot: bool,
     ) -> Result<crate::comments::CommentPage, BiliError> {
         let detail = self.detail(key).await?;
-        let per_page = 20u32;
-        // 2 是「按热度」，0 是「按时间」。这两档是 B 站网页上那一对按钮。
-        let sort = if hot { "2" } else { "0" };
+        // 3 是「按热度」，2 是「按时间」，和桌面端 `mode` 一致。
+        let mode = if hot { "3" } else { "2" };
+        let offset = cursor.unwrap_or("");
         let value = self
             .client
             .signed_get(
-                &format!("{}/x/v2/reply", client::API),
+                &format!("{}/x/v2/reply/wbi/main", client::API),
                 vec![
                     ("type", "1".to_string()),
                     ("oid", detail.aid.to_string()),
-                    ("sort", sort.to_string()),
-                    ("ps", per_page.to_string()),
-                    ("pn", page.to_string()),
+                    ("mode", mode.to_string()),
+                    (
+                        "pagination_str",
+                        format!("{{\"offset\":\"{offset}\"}}"),
+                    ),
+                    ("plat", "1".to_string()),
+                    ("web_location", "1315875".to_string()),
                 ],
                 std::time::Duration::from_millis(400),
             )
             .await?;
-        Ok(crate::comments::page_from(&value, page, per_page))
+        Ok(crate::comments::cursor_page_from(&value, cursor.is_none()))
     }
 
     /// 取一页楼中楼。`root` 是一级评论的 rpid。
+    ///
+    /// 这里保留 `reply/reply` 的页码翻页：官方的 `dialog/cursor` 是按「某一条二级评论
+    /// 所在的对话分支」翻页的（`dialog` 必须是一条二级 rpid，传一级 rpid 会回空），
+    /// 拿它列整栋楼并不对。楼中楼只在用户点开时取一次，不像主列表那样连着翻十几页。
     pub async fn comment_replies(
         &self,
         key: &TrackKey,

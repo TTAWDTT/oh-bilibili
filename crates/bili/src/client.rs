@@ -238,7 +238,7 @@ impl Client {
     }
 
     pub async fn get_json(&self, url: &str, min_interval: Duration) -> Result<Value, BiliError> {
-        self.get_json_inner(url, min_interval, false, false).await
+        self.get_json_inner(url, min_interval, false, false, false).await
     }
 
     /// 关系接口：独立闸门，避免被列表预取挡住。
@@ -247,7 +247,7 @@ impl Client {
         url: &str,
         min_interval: Duration,
     ) -> Result<Value, BiliError> {
-        self.get_json_inner(url, min_interval, false, true).await
+        self.get_json_inner(url, min_interval, false, true, false).await
     }
 
     /// 允许未登录响应的版本。只有 nav 这种「游客也能拿到有用数据」的接口该用它。
@@ -256,7 +256,7 @@ impl Client {
         url: &str,
         min_interval: Duration,
     ) -> Result<Value, BiliError> {
-        self.get_json_inner(url, min_interval, true, false).await
+        self.get_json_inner(url, min_interval, true, false, false).await
     }
 
     async fn get_json_inner(
@@ -265,8 +265,13 @@ impl Client {
         min_interval: Duration,
         allow_guest: bool,
         relation: bool,
+        ignore_cooldown: bool,
     ) -> Result<Value, BiliError> {
-        self.wait_cooldown().await?;
+        // 冷却只压普通接口。播放链路是主路径：评论区被限流不该顺手把视频也停了，
+        // 真被风控拦下时 classify 仍会重新记一次冷却。
+        if !ignore_cooldown {
+            self.wait_cooldown().await?;
+        }
         if relation {
             Client::wait_slot(&self.relation_gate, min_interval).await;
         } else {
@@ -476,8 +481,9 @@ impl Client {
             .unwrap_or(0);
         let query = keys.sign(&params, wts);
         self.gate_play(min_interval).await;
-        // 闸门已经过完了，这里用零间隔再走一遍完整流程（含风控冷却与 cookie 吸收）
-        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false, false)
+        // 闸门已经过完了，这里用零间隔再走一遍完整流程（含 cookie 吸收），
+        // 但不吃别的接口留下的冷却。
+        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false, false, true)
             .await
     }
 

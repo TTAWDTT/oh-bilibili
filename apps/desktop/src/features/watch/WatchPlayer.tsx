@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '../../app/appStore'
+import { reportActionError } from '../../shared/lib/actionError'
 import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
@@ -322,8 +323,9 @@ export function WatchPlayer({
       setDraft('')
       onDanmakuSent({ at, text, color: cssColor(draftColor) })
       poke()
-    } catch {
-      // 发不出去就留着草稿，不假装成功
+    } catch (cause) {
+      // 草稿留着，但失败原因要说出来：B 站限流时静默不动，看起来就是「点了没反应」。
+      reportActionError('发弹幕', cause)
     } finally {
       setSending(false)
     }

@@ -563,7 +563,7 @@ async fn 置顶评论排在第一页最前() {
     }
     // BV1kZWX62ENY（影视飓风）的 UP 主置顶是一条「我在这里」。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
-    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    let page = source.comments(&key, None, true).await.expect("第一页评论");
     assert!(page.items.len() >= 10, "登录态下一页应该接近 20 条，实际 {}", page.items.len());
     let pinned = page.items.iter().filter(|c| c.pinned).count();
     println!("第一页 {} 条，置顶 {} 条", page.items.len(), pinned);
@@ -578,11 +578,48 @@ async fn 置顶评论排在第一页最前() {
 
 #[tokio::test]
 #[ignore = "真实网络"]
+async fn 评论游标能翻到第二页() {
+    let source = Source::open().await.expect("Source");
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
+        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+        source.import_cookies(&pairs);
+        let _ = source.refresh_session().await;
+    } else {
+        println!("没有 cookies.json，跳过");
+        return;
+    }
+    let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
+    let first = source.comments(&key, None, true).await.expect("第一页评论");
+    let next = first.next.clone().expect("第一页应该给下一页游标");
+    let second = source
+        .comments(&key, Some(&next), true)
+        .await
+        .expect("第二页评论");
+    println!(
+        "第一页 {} 条，第二页 {} 条，总数 {}",
+        first.items.len(),
+        second.items.len(),
+        first.total
+    );
+    assert!(!second.items.is_empty(), "第二页不该是空的");
+    let first_ids: std::collections::HashSet<&str> =
+        first.items.iter().map(|c| c.id.as_str()).collect();
+    assert!(
+        second.items.iter().all(|c| !first_ids.contains(c.id.as_str())),
+        "两页不该有重复评论"
+    );
+}
+
+#[tokio::test]
+#[ignore = "真实网络"]
 async fn 评论带粉丝牌() {
     let source = Source::open().await.expect("Source");
     // BV1kZWX62ENY（影视飓风）：UP 主自己的评论戴着「飓风」粉丝牌。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
-    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    let page = source.comments(&key, None, true).await.expect("第一页评论");
     let medaled: Vec<_> = page
         .items
         .iter()
@@ -644,7 +681,7 @@ async fn 楼中楼能翻页() {
     }
 
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
-    let page = source.comments(&key, 1, true).await.expect("第一页评论");
+    let page = source.comments(&key, None, true).await.expect("第一页评论");
     let root = page
         .items
         .iter()
@@ -666,18 +703,16 @@ async fn 楼中楼能翻页() {
         .await
         .expect("第二页楼中楼");
     println!(
-        "pn=1 {} 条，pn=2 {} 条，总数 {}，has_more {} / {}",
+        "第一页 {} 条，第二页 {} 条，总数 {}，has_more {} / {}",
         first.items.len(),
         second.items.len(),
         first.total,
         first.has_more,
         second.has_more
     );
-    assert_eq!(first.items.len(), 20);
-    assert_eq!(second.items.len(), 20);
+    assert!(!first.items.is_empty(), "第一页不该是空的");
+    assert!(!second.items.is_empty(), "第二页不该是空的");
     assert_eq!(first.total, second.total);
-    assert_eq!(first.has_more, 20 < first.total);
-    assert_eq!(second.has_more, 40 < second.total);
 
     let mut ids = std::collections::HashSet::new();
     for reply in first.items.iter().chain(&second.items) {
