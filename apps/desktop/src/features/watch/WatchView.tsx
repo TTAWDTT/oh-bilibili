@@ -383,18 +383,6 @@ export function WatchView({ track }: { track: Track }) {
               }
             />
           ) : null}
-          {/* 右栏在窄屏收起，UP 名片跟着回到正文里，否则没有地方关注。 */}
-          {!cinema && data ? (
-            <div className="border-b border-hairline md:hidden">
-              <OwnerCard
-                data={data}
-                card={card}
-                followed={followed}
-                fansDelta={fansDelta}
-                onFollow={toggleFollow}
-              />
-            </div>
-          ) : null}
           {!cinema && data && data.pages.length > 1 ? (
             <div className="border-t border-hairline md:hidden">
               <PageList pages={data.pages} current={page ?? data.current_page} onPage={setPage} />
