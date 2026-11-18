@@ -127,6 +127,21 @@ pub struct Source {
 /// 详情缓存最多留这么多条。
 const DETAIL_CACHE_MAX: usize = 128;
 
+/// 弹幕正文是 XML 文本，`<` `>` `&` 都以实体出现。
+///
+/// 不解码的话，弹幕里的 `>ᗜ<` 会原样显示成 `&gt;ᗜ&lt;`。
+fn xml_unescape(text: &str) -> String {
+    if !text.contains('&') {
+        return text.to_string();
+    }
+    text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        // `&amp;` 放最后：`&amp;lt;` 这类转义过的字面量不该被二次解开。
+        .replace("&amp;", "&")
+}
+
 impl Source {
     pub async fn open() -> Result<Source, BiliError> {
         let client = Client::new()?;
@@ -939,7 +954,7 @@ impl Source {
             let Some((attrs, rest)) = chunk.split_once('>') else {
                 continue;
             };
-            let text = rest.split("</d>").next().unwrap_or("").trim();
+            let text = xml_unescape(rest.split("</d>").next().unwrap_or("").trim());
             if text.is_empty() || text.chars().count() > 40 {
                 continue;
             }
@@ -958,7 +973,7 @@ impl Source {
                 .unwrap_or(1);
             out.push(DanmakuLine {
                 secs,
-                text: text.to_string(),
+                text,
                 color,
                 mode,
             });
@@ -1316,6 +1331,17 @@ fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 弹幕 XML 里的 `<` `>` `&` 是实体；真实数据里就有 `>ᗜ<` 这种颜文字。
+    #[test]
+    fn 弹幕里的实体要解开() {
+        assert_eq!(xml_unescape("好肥啊˶&gt;ᗜ&lt;˶"), "好肥啊˶>ᗜ<˶");
+        assert_eq!(xml_unescape("A &amp; B"), "A & B");
+        // 已经被转义过一次的字面量不该被二次解开。
+        assert_eq!(xml_unescape("&amp;lt;"), "&lt;");
+        // 没有 & 的串原样返回，不复制。
+        assert_eq!(xml_unescape("普通弹幕"), "普通弹幕");
+    }
 
     #[test]
     fn 无音轨时报错而不是返回空() {
