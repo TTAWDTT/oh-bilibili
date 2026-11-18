@@ -1,7 +1,9 @@
+import type { MouseEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
-import type { WatchView as WatchData } from '../../shared/lib/contract'
+import type { Followed, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount } from '../../shared/lib/format'
+import { AuthorHoverCard, useAuthorHover } from '../../shared/ui/AuthorHoverCard'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
@@ -27,14 +29,47 @@ export function OwnerCard({
   inline?: boolean
 }) {
   const navigate = useAppStore((state) => state.navigate)
+  const hover = useAuthorHover()
   const goAuthor = (): void => {
     navigate({ kind: 'author', name: data.owner, mid: data.owner_mid ?? null })
   }
+  const ownerUser: Followed | null = data.owner_mid
+    ? {
+        mid: data.owner_mid,
+        name: data.owner,
+        face: data.owner_avatar,
+        sign: card?.sign ?? '',
+        official: card?.official_type ?? null,
+        vip: card?.vip ?? false,
+      }
+    : null
+  const hoverProps = ownerUser
+    ? {
+        onMouseEnter: (event: MouseEvent<HTMLButtonElement>) =>
+          hover.show(ownerUser, event.currentTarget),
+        onMouseLeave: hover.hide,
+      }
+    : {}
+  const hoverCard = (
+    <AuthorHoverCard
+      hover={hover.hover}
+      card={hover.card}
+      onHide={hover.hide}
+      onKeep={hover.keep}
+      onOpen={(user) => navigate({ kind: 'author', name: user.name, mid: user.mid })}
+    />
+  )
 
   if (inline) {
     return (
       <div className="flex w-fit max-w-full flex-wrap items-center gap-3 py-1">
-        <button type="button" onClick={goAuthor} aria-label={`看 ${data.owner} 的更多视频`} className="t shrink-0">
+        <button
+          type="button"
+          onClick={goAuthor}
+          aria-label={`看 ${data.owner} 的更多视频`}
+          className="t shrink-0"
+          {...hoverProps}
+        >
           <Avatar src={data.owner_avatar} alt={data.owner} size={38} />
         </button>
         <div className="min-w-0">
@@ -44,6 +79,7 @@ export function OwnerCard({
               onClick={goAuthor}
               title={`看 ${data.owner} 的更多视频`}
               className="t max-w-[220px] truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
+              {...hoverProps}
             >
               {data.owner}
             </button>
@@ -77,6 +113,7 @@ export function OwnerCard({
         >
           {followed === true ? '已关注' : '关注'}
         </button>
+        {hoverCard}
       </div>
     )
   }
@@ -84,7 +121,13 @@ export function OwnerCard({
   return (
     <div className="flex flex-col gap-2.5 px-3 py-3">
       <div className="flex items-start gap-3">
-        <button type="button" onClick={goAuthor} aria-label={`看 ${data.owner} 的更多视频`} className="t shrink-0">
+        <button
+          type="button"
+          onClick={goAuthor}
+          aria-label={`看 ${data.owner} 的更多视频`}
+          className="t shrink-0"
+          {...hoverProps}
+        >
           <Avatar src={data.owner_avatar} alt={data.owner} size={48} />
         </button>
         <div className="min-w-0 flex-1">
@@ -94,6 +137,7 @@ export function OwnerCard({
               onClick={goAuthor}
               title={`看 ${data.owner} 的更多视频`}
               className="t max-w-full truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
+              {...hoverProps}
             >
               {data.owner}
             </button>
@@ -135,6 +179,7 @@ export function OwnerCard({
             : `+ 关注 ${card ? formatCount(Math.max(0, card.fans + (fansDelta ?? 0))) : ''}`.trim()}
         </button>
       </div>
+      {hoverCard}
     </div>
   )
 }
