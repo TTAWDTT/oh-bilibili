@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -45,6 +45,8 @@ export function WatchView({ track }: { track: Track }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
+  /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
+  const lastTrackRef = useRef<string | null>(null)
   const [nonce, setNonce] = useState(0)
   /** 当前在看人数。取不到就不显示，不猜。 */
   const [online, setOnline] = useState<number | null>(null)
@@ -220,7 +222,11 @@ export function WatchView({ track }: { track: Track }) {
   // 取清单与档位
   useEffect(() => {
     let cancelled = false
-    setData(null)
+    // 同一条视频换 P 时保留旧清单：播放器先停在旧画面上，
+    // 新清单到了再换流，避免中间闪一块黑骨架。换视频仍然清空。
+    const sameTrack = lastTrackRef.current === track.key
+    lastTrackRef.current = track.key
+    if (!sameTrack) setData(null)
     setError(null)
     void (async () => {
       try {
@@ -391,7 +397,7 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
             <div className="border-t border-hairline md:hidden">
-              <PageList pages={data.pages} current={data.current_page} onPage={setPage} />
+              <PageList pages={data.pages} current={page ?? data.current_page} onPage={setPage} />
             </div>
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
@@ -424,7 +430,7 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
-            {data ? <PageList pages={data.pages} current={data.current_page} onPage={setPage} /> : null}
+            {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={setPage} /> : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>
