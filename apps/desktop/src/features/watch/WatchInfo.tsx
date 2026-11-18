@@ -377,7 +377,7 @@ export function WatchInfo({
           <Icon name="share" size={22} />
           {formatCount(data.stats.shares)}
         </button>
-        <span className="mx-1.5 ml-auto h-5 w-px shrink-0 bg-[var(--line)]" />
+        <span className="mx-1.5 h-5 w-px shrink-0 bg-[var(--line)]" />
         <button
           type="button"
           aria-pressed={saved}
