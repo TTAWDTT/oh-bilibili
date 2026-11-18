@@ -391,7 +391,13 @@ impl Engine {
         let page_cid = current.map(|p| p.cid);
         let page_no = current.map(|p| p.no).unwrap_or(1);
         let video = self.source.dash_video_at(key, page_cid).await?;
-        let duration = detail.track.duration.unwrap_or(Millis(0));
+        // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
+        // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
+        let duration = current
+            .filter(|p| p.duration_ms > 0)
+            .map(|p| Millis(p.duration_ms))
+            .or(detail.track.duration)
+            .unwrap_or(Millis(0));
         let origin = proxy_origin.trim_end_matches('/').to_string();
         let engine = self;
         let mpd = crate::dash_bridge::video_mpd(&video, duration.0, |url| {
