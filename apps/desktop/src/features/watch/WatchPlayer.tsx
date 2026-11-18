@@ -217,6 +217,9 @@ export function WatchPlayer({
   const [countdown, setCountdown] = useState<number | null>(null)
   /** 只取消这一次自动连播，不改「自动连播」偏好。 */
   const [countdownCancelled, setCountdownCancelled] = useState(false)
+  /** 鼠标停在倒计时行上时冻结倒计时，给「取消」留出点击时间。 */
+  const countdownHovered = useRef(false)
+  const [countdownHover, setCountdownHover] = useState(false)
   const autoplay = useAutoplay((state) => state.enabled)
   const setAutoplay = useAutoplay((state) => state.setEnabled)
   /** 没登录就没有发弹幕资格：把「请先登录或注册」摆在输入框的位置上。 */
@@ -295,6 +298,7 @@ export function WatchPlayer({
     let left = 5
     setCountdown(left)
     const timer = window.setInterval(() => {
+      if (countdownHovered.current) return
       left -= 1
       setCountdown(left)
       if (left <= 0) window.clearInterval(timer)
@@ -303,8 +307,10 @@ export function WatchPlayer({
   }, [finished, next, autoplay, countdownCancelled])
 
   useEffect(() => {
-    if (countdown === 0 && finished && next && !countdownCancelled) onNextRef.current(next)
-  }, [countdown, finished, next, countdownCancelled])
+    if (countdown === 0 && finished && next && !countdownCancelled && !countdownHovered.current) {
+      onNextRef.current(next)
+    }
+  }, [countdown, countdownHover, finished, next, countdownCancelled])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
@@ -840,7 +846,17 @@ export function WatchPlayer({
           {next ? (
             <div className="flex flex-col items-center gap-1.5">
               {autoplay && countdown !== null ? (
-                <div className="flex max-w-full items-center gap-3">
+                <div
+                  className="flex max-w-full items-center gap-3"
+                  onPointerEnter={() => {
+                    countdownHovered.current = true
+                    setCountdownHover(true)
+                  }}
+                  onPointerLeave={() => {
+                    countdownHovered.current = false
+                    setCountdownHover(false)
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => onNext(next)}
