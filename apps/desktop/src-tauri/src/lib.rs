@@ -372,6 +372,11 @@ async fn player_play_context(
 }
 
 #[tauri::command]
+fn player_pause(engine: tauri::State<'_, Arc<Engine>>) -> PlayerSnapshot {
+    engine.pause()
+}
+
+#[tauri::command]
 async fn player_toggle(
     engine: tauri::State<'_, Arc<Engine>>,
 ) -> Result<PlayerSnapshot, WireError> {
@@ -1076,6 +1081,7 @@ pub fn run() {
             player_state,
             player_play,
             player_play_context,
+            player_pause,
             player_toggle,
             player_next,
             player_prev,

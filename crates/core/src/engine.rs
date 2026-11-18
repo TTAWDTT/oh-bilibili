@@ -791,6 +791,22 @@ impl Engine {
         self.snapshot()
     }
 
+    /// 只暂停，不切换播放态。离开观看页时用它收声音。
+    ///
+    /// 引擎不知道用户什么时候离开页面，早先实测退出后声音还在放，
+    /// 而那时连播放条都不显示，等于声音失去控制。
+    pub fn pause(&self) -> PlayerSnapshot {
+        let playing = lock(&self.player).clock().is_playing();
+        if playing {
+            lock(&self.player).pause();
+            let mut st = lock(&self.state);
+            let current = std::mem::replace(&mut *st, PlayerState::Idle);
+            *st = current.pause();
+            self.emit_state();
+        }
+        self.snapshot()
+    }
+
     pub async fn next(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
         // 单曲循环：播完重放同一首，而不是走到下一首。
         if *lock(&self.repeat) == "one" {

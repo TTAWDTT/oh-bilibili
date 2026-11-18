@@ -74,6 +74,14 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key, data])
 
+  // 离开观看页就收声音。引擎感知不到页面切换，之前退出后声音会一直放，
+  // 而那时连播放条都不显示，用户没有任何地方能把它停掉。
+  useEffect(() => {
+    return () => {
+      void ipc.playerPause().catch(() => {})
+    }
+  }, [])
+
   useEffect(() => {
     setLikeDelta(0)
     setFavDelta(0)
