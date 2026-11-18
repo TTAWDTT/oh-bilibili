@@ -692,6 +692,11 @@ export function authQrCode(): Promise<QrChallenge> {
   return call<QrChallenge>('auth_qrcode', {})
 }
 
+/** 把文本渲染成二维码 SVG。分享面板在本地生成，不走第三方二维码服务。 */
+export function qrSvg(text: string): Promise<string> {
+  return call<string>('qr_svg', { text })
+}
+
 export function authPoll(key: string): Promise<QrStatus> {
   return call<QrStatus>('auth_poll', { key })
 }

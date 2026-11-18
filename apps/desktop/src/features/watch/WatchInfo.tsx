@@ -10,6 +10,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
+import { SharePanel } from './SharePanel'
 
 /** 状态翻过一次才换 key，让扩散环重播；初次挂载返回 0，进页面时不会三颗一起闪。 */
 function useFlipKey(value: boolean | number): number {
@@ -271,7 +272,7 @@ export function WatchInfo({
    */
   const action = (on: boolean): string =>
     [
-      'bili-icon-btn t press flex h-9 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px]',
+      'bili-icon-btn t press flex h-10 shrink-0 items-center gap-2 rounded-[6px] px-2.5 text-[13px]',
       on
         ? 'text-[var(--accent)]'
         : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]',
@@ -279,7 +280,7 @@ export function WatchInfo({
 
   return (
     <div className="pb-4 pt-3">
-      <div className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto border-y border-hairline py-1.5">
+      <div className="no-scrollbar mt-2 flex items-center gap-3 overflow-x-auto border-y border-hairline py-1.5">
         <button
           type="button"
           aria-pressed={liked}
@@ -307,7 +308,7 @@ export function WatchInfo({
           ) : null}
           <span className="bili-tri-glyph">
             <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
-              <BiliThumb size={19} filled={liked} />
+              <BiliThumb size={26} filled={liked} />
             </span>
           </span>
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
@@ -321,7 +322,7 @@ export function WatchInfo({
           aria-label="投币"
           onClick={openCoin}
           className={`${action(coins > 0)} bili-tri-btn relative overflow-hidden`}
-          title="投币"
+          title="投币（W）"
         >
           {coinRing > 0 ? (
             <span
@@ -332,7 +333,7 @@ export function WatchInfo({
           ) : null}
           <span className="bili-tri-glyph">
             <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
-              <BiliCoin size={19} />
+              <BiliCoin size={24} />
             </span>
           </span>
           {formatCount(data.stats.coins + coinDelta)}
@@ -343,7 +344,7 @@ export function WatchInfo({
           aria-label={faved ? '取消收藏' : '收藏'}
           onClick={onFav}
           className={`${action(faved)} bili-tri-btn relative overflow-hidden`}
-          title={faved ? '取消收藏' : '收藏'}
+          title={faved ? '取消收藏（E）' : '收藏（E）'}
         >
           {favRing > 0 ? (
             <span
@@ -354,7 +355,7 @@ export function WatchInfo({
           ) : null}
           <span className="bili-tri-glyph">
             <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
-              <BiliStar size={19} filled={faved} />
+              <BiliStar size={24} filled={faved} />
             </span>
           </span>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
@@ -366,17 +367,17 @@ export function WatchInfo({
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect()
             setShareAt({
-              left: Math.max(8, Math.min(rect.left, window.innerWidth - 276)),
+              left: Math.max(8, Math.min(rect.left, window.innerWidth - 536)),
               top: rect.bottom + 8,
               anchorTop: rect.top,
             })
           }}
           className={action(false)}
         >
-          <Icon name="share" size={19} />
+          <Icon name="share" size={22} />
           {formatCount(data.stats.shares)}
         </button>
-        <span className="mx-1.5 h-4 w-px shrink-0 bg-[var(--line)]" />
+        <span className="mx-1.5 ml-auto h-5 w-px shrink-0 bg-[var(--line)]" />
         <button
           type="button"
           aria-pressed={saved}
@@ -394,7 +395,7 @@ export function WatchInfo({
           }}
           className={action(false)}
         >
-          <Icon name="watchLater" size={18} />
+          <Icon name="watchLater" size={20} />
           {saved ? '已加入' : '稍后再看'}
         </button>
       </div>
@@ -461,67 +462,8 @@ export function WatchInfo({
             </div>
         </div>
       </AnchoredPanel>
-      <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={240}>
-        <div className="p-2">
-          <button
-            type="button"
-            onClick={() => {
-              void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) => {
-                toastDone(ok ? '链接已复制' : '复制失败')
-                setShareAt(null)
-              })
-            }}
-            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
-          >
-            <Icon name="copy" size={15} />
-            复制链接
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void copyText(track.key).then((ok) => {
-                toastDone(ok ? 'BV 号已复制' : '复制失败')
-                setShareAt(null)
-              })
-            }}
-            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
-          >
-            <Icon name="copy" size={15} />
-            复制 BV 号
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              // B 站分享面板给的就是这段 iframe，页参数从 1 开始。
-              // bvid 只允许字母数字，避免异常值把属性引号捅破。
-              if (!/^BV[0-9A-Za-z]{10}$/.test(track.key)) {
-                toastDone('复制失败', 'BV 号格式不对')
-                setShareAt(null)
-                return
-              }
-              const code = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`
-              void copyText(code).then((ok) => {
-                toastDone(ok ? '嵌入代码已复制' : '复制失败')
-                setShareAt(null)
-              })
-            }}
-            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
-          >
-            <Icon name="code" size={15} />
-            复制嵌入代码
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void ipc.openExternal(`https://www.bilibili.com/video/${track.key}`).catch((cause) => toastFailure('打开链接', cause))
-              setShareAt(null)
-            }}
-            className="flex h-9 items-center gap-2 rounded-[4px] px-2 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
-          >
-            <Icon name="external" size={15} />
-            在浏览器打开
-          </button>
-        </div>
+      <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={520}>
+        <SharePanel track={track} onClose={() => setShareAt(null)} />
       </AnchoredPanel>
 
       {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}

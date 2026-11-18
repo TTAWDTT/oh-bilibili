@@ -1765,6 +1765,11 @@ impl Engine {
         Ok(self.source.login_qr().await?)
     }
 
+    /// 把文本渲染成二维码 SVG。分享面板的二维码只在本地生成。
+    pub fn qr_svg(&self, text: &str) -> Result<String, WireError> {
+        Ok(bilimusic_bili::auth::qr_svg(text)?)
+    }
+
     pub async fn auth_poll(&self, key: &str) -> Result<(String, AuthSnapshot), WireError> {
         use bilimusic_bili::auth::QrStatus;
         let status = self.source.poll_qr(key).await?;
