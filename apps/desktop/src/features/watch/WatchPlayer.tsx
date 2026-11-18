@@ -867,8 +867,9 @@ export function WatchPlayer({
                   </button>
                   <button
                     type="button"
+                    aria-label="取消本次自动连播"
                     onClick={() => setCountdownCancelled(true)}
-                    className="t shrink-0 text-[12px] text-white/55 hover:text-white"
+                    className="t press shrink-0 rounded-[4px] px-2 py-1 text-[12px] text-white/65 hover:bg-white/10 hover:text-white"
                   >
                     取消
                   </button>
