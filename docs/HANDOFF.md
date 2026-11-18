@@ -368,6 +368,8 @@ model  ← bili / store / audio
 | 评论 UP 主置顶 | `data.upper.top.rpid` 是置顶那条的 rpid（`upper.rpid` 是空壳）；置顶可能在 `top_replies`、也可能就在普通分页里，两种都要处理。实测影视飓风那条：第一页 20 条、置顶 1 条排最前、25875 赞 |
 | 评论粉丝牌 | `member.fans_detail` 带勋章名、等级和 6 个颜色（0xAARRGGBB）；实测「飓风 18」按接口配色渲染在作者名前，粉白渐变 + 玫红边框，没戴牌不渲染。楼中楼共用同一个渲染函数 |
 | 楼中楼翻页 | `x/v2/reply/detail` 用 `oid + root + pagination_str` 取子回复，游标在 `data.cursor.pagination_reply.next_offset`，条目在 `data.root.replies`，总数是 `data.root.rcount`；游标是不透明 base64，原样回填。实测 root 3596982434（3442 条）第一页 20 条 floor 1..29，第二页 20 条 floor 31..53，无重复。`dialog/cursor` 只给单条对话分支，不能拿来列楼（同一 root 传二级 dialog 只回 14 条）。收起再展开保留已翻到的页；展开的回复共用粉丝牌与表情渲染 |
+| 评论「查看对话」 | 二级评论右边的「查看对话」是另一支接口，不是楼中楼列表 | `x/v2/reply/dialog/cursor`，参数 `oid + type=1 + root + dialog + size=20 + pagination_str + plat=1`；`dialog` 必须是分支里的二级 rpid。`next_offset` 是 JSON 字符串 `{"type":3,"direction":1,"Data":{"cursor":170}}`，回填时要整体作为 `offset` 的值做 JSON 转义（手拼引号会 -400）。实测 root 3596982434 / dialog 3837986036：第一页 20 条，第二页 20 条 |
+
 | 评论表情面板 | `x/emote/user/panel/web` 的全部面板包，再补 `x/emote/package?ids=6` 的经典 2233 娘包；点一个把代号插进草稿，实测 [呲牙] 写入成功 |
 | 退出停声 | 观看页点返回后，`sample` 显示音频线程停在信号量等待、不再解码；播放条也不出现 |
 | 拖到末尾 | 进度条提交 100% 按切歌处理；不会再出现参数类型错误，也不会原地重放同一首 |

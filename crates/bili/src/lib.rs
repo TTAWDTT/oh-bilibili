@@ -753,8 +753,9 @@ impl Source {
     ) -> Result<crate::comments::CommentPage, BiliError> {
         let detail = self.detail(key).await?;
         let offset = cursor.unwrap_or("");
-        let pagination =
-            crate::wbi::encode_uri_component(&format!("{{\"offset\":\"{offset}\"}}"));
+        let pagination = crate::wbi::encode_uri_component(
+            &serde_json::json!({ "offset": offset }).to_string(),
+        );
         let value = self
             .client
             .get_json(
@@ -769,6 +770,40 @@ impl Source {
             )
             .await?;
         Ok(crate::comments::detail_page_from(&value))
+    }
+
+    /// 取一页「查看对话」。`root` 是一级评论 rpid，`dialog` 是分支里某条
+    /// 二级评论的 rpid；`cursor` 是上一页的 `next`，第一页传 None。
+    ///
+    /// 走官方 `x/v2/reply/dialog/cursor`：它按一条对话分支翻页，和楼中楼列表
+    /// 的 `reply/detail` 是两件事。`dialog` 必须指向真实二级评论，传一级 rpid 回空。
+    pub async fn comment_dialog(
+        &self,
+        key: &TrackKey,
+        root: &str,
+        dialog: &str,
+        cursor: Option<&str>,
+    ) -> Result<crate::comments::CommentPage, BiliError> {
+        let detail = self.detail(key).await?;
+        let offset = cursor.unwrap_or("");
+        let pagination = crate::wbi::encode_uri_component(
+            &serde_json::json!({ "offset": offset }).to_string(),
+        );
+        let value = self
+            .client
+            .get_json(
+                &format!(
+                    "{}/x/v2/reply/dialog/cursor?type=1&oid={}&root={}&dialog={}&size=20&pagination_str={}&plat=1",
+                    client::API,
+                    detail.aid,
+                    root,
+                    dialog,
+                    pagination
+                ),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(crate::comments::dialog_page_from(&value))
     }
 
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {

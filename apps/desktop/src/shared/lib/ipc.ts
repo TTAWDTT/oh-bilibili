@@ -662,6 +662,16 @@ export function watchReplies(key: string, root: string, cursor: string | null): 
   return call<CommentPage>('watch_replies', { key, root, cursor })
 }
 
+/** 取一页「查看对话」。`root` 是一级评论，`dialog` 是分支里的二级评论。 */
+export function watchDialog(
+  key: string,
+  root: string,
+  dialog: string,
+  cursor: string | null,
+): Promise<CommentPage> {
+  return call<CommentPage>('watch_dialog', { key, root, dialog, cursor })
+}
+
 /** 热搜榜的一条。`keyword` 是真正要搜的词，`label` 是展示名。 */
 export type HotSearchItem = {
   keyword: string

@@ -612,6 +612,16 @@ impl Engine {
         Ok(self.source.comment_replies(key, root, cursor).await?)
     }
 
+    pub async fn comment_dialog(
+        &self,
+        key: &TrackKey,
+        root: &str,
+        dialog: &str,
+        cursor: Option<&str>,
+    ) -> Result<crate::wire::CommentPage, WireError> {
+        Ok(self.source.comment_dialog(key, root, dialog, cursor).await?)
+    }
+
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, WireError> {
         let term = term.trim();
         if term.is_empty() {

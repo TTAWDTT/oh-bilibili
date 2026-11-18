@@ -727,6 +727,41 @@ async fn 楼中楼能翻页() {
     );
 }
 
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 查看对话能翻页() {
+    let source = Source::open().await.expect("Source");
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
+        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+        source.import_cookies(&pairs);
+        let _ = source.refresh_session().await;
+    }
+
+    // BV1GJ411x7h7：已知这条一级评论下有 3442 条回复，取一条二级评论当对话锚点。
+    let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
+    let root = "3596982434";
+    let dialog = "3837986036";
+    let first = source
+        .comment_dialog(&key, root, dialog, None)
+        .await
+        .expect("第一页对话");
+    println!("对话第一页 {} 条，下一页 {:?}", first.items.len(), first.next);
+    assert!(!first.items.is_empty(), "对话第一页不该是空的");
+    assert!(first.items.iter().any(|c| c.dialog.to_string() == dialog), "锚点应该在这条对话里");
+
+    if let Some(cursor) = first.next.clone() {
+        let second = source
+            .comment_dialog(&key, root, dialog, Some(&cursor))
+            .await
+            .expect("第二页对话");
+        println!("对话第二页 {} 条", second.items.len());
+        assert!(!second.items.is_empty(), "第二页不该是空的");
+    }
+}
+
 /// 发现页底部两块：直播推荐与番剧排行。
 /// 都是公开接口，未登录也要能取到，否则这两块在真机上就是空的。
 #[tokio::test(flavor = "multi_thread")]

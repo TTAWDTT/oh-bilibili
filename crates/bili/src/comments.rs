@@ -10,6 +10,12 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
+    /// 一级评论的 rpid。楼中楼的「查看对话」要用它和 `dialog` 一起请求。
+    pub root: u64,
+    /// 直接回复的 rpid。等于 `root` 表示直接回一级评论。
+    pub parent: u64,
+    /// 对话分支的起点 rpid。`dialog/cursor` 用它定位一条对话。
+    pub dialog: u64,
     /// 评论者 uid。和视频作者对上时，界面标「UP主」。
     pub mid: u64,
     pub author: String,
@@ -67,6 +73,12 @@ pub struct CommentPage {
 
 #[derive(Deserialize)]
 struct RawReply {
+    #[serde(default, deserialize_with = "u64_from_any")]
+    root: u64,
+    #[serde(default, deserialize_with = "u64_from_any")]
+    parent: u64,
+    #[serde(default, deserialize_with = "u64_from_any")]
+    dialog: u64,
     #[serde(default)]
     rpid_str: Option<String>,
     #[serde(default)]
@@ -246,6 +258,9 @@ fn to_comment(raw: RawReply) -> Comment {
         .unwrap_or_default();
     Comment {
         id,
+        root: raw.root,
+        parent: raw.parent,
+        dialog: raw.dialog,
         mid,
         author: raw.member.map(|m| m.uname).unwrap_or_default(),
         avatar: avatar.map(|a| {
@@ -325,6 +340,19 @@ pub fn cursor_page_from(value: &serde_json::Value, first: bool) -> CommentPage {
     }
 }
 
+fn comments_from(list: Option<&Vec<serde_json::Value>>) -> Vec<Comment> {
+    list.map(|list| {
+        list.iter()
+            .filter_map(|r| {
+                serde_json::from_value::<RawReply>(r.clone())
+                    .ok()
+                    .map(to_comment)
+            })
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
 /// 从 `x/v2/reply/detail` 的响应里取一页楼中楼。
 ///
 /// 官方桌面端的楼中楼列表就走这个接口，翻页靠不透明的
@@ -338,18 +366,7 @@ pub fn detail_page_from(value: &serde_json::Value) -> CommentPage {
         .as_u64()
         .or_else(|| data["page"]["count"].as_u64())
         .unwrap_or(0) as u32;
-    let items: Vec<Comment> = root["replies"]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|r| {
-                    serde_json::from_value::<RawReply>(r.clone())
-                        .ok()
-                        .map(to_comment)
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let items = comments_from(root["replies"].as_array());
     let next = data["cursor"]["pagination_reply"]["next_offset"]
         .as_str()
         .filter(|s| !s.is_empty())
@@ -357,6 +374,28 @@ pub fn detail_page_from(value: &serde_json::Value) -> CommentPage {
     let ended = data["cursor"]["is_end"].as_bool().unwrap_or(false);
     CommentPage {
         total,
+        page: 0,
+        has_more: !ended && next.is_some(),
+        next,
+        items,
+    }
+}
+
+/// 从 `x/v2/reply/dialog/cursor` 的响应里取一页对话。
+///
+/// `dialog` 传某条二级评论的 rpid，接口返回它所在的那条对话分支；
+/// 游标同样在 `cursor.pagination_reply.next_offset`。这里不填 total，
+/// 对话面板只需要知道还有没有下一页。
+pub fn dialog_page_from(value: &serde_json::Value) -> CommentPage {
+    let data = &value["data"];
+    let items = comments_from(data["replies"].as_array());
+    let next = data["cursor"]["pagination_reply"]["next_offset"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let ended = data["cursor"]["is_end"].as_bool().unwrap_or(false);
+    CommentPage {
+        total: 0,
         page: 0,
         has_more: !ended && next.is_some(),
         next,
@@ -680,6 +719,38 @@ mod tests {
             page.next.as_deref(),
             Some("offset-2")
         );
+        assert!(page.has_more);
+    }
+
+    #[test]
+    fn 对话游标能解析出分支与下一页() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "cursor": {
+                    "is_end": false,
+                    "pagination_reply": { "next_offset": "dialog-next" }
+                },
+                "replies": [
+                    {
+                        "rpid_str": "2",
+                        "root": "1",
+                        "parent": "1",
+                        "dialog": "2",
+                        "member": { "mid": "12", "uname": "乙" },
+                        "content": { "message": "同一分支" },
+                        "like": 1,
+                        "ctime": 100
+                    }
+                ]
+            }
+        });
+        let page = dialog_page_from(&value);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].root, 1);
+        assert_eq!(page.items[0].parent, 1);
+        assert_eq!(page.items[0].dialog, 2);
+        assert_eq!(page.next.as_deref(), Some("dialog-next"));
         assert!(page.has_more);
     }
 

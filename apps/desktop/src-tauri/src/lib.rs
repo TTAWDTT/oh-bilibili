@@ -219,6 +219,20 @@ async fn watch_comments(
         .await
 }
 
+/// 取一页「查看对话」。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_dialog(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    root: String,
+    dialog: String,
+    cursor: Option<String>,
+) -> Result<bilimusic_core::wire::CommentPage, WireError> {
+    engine
+        .comment_dialog(&TrackKey::from_provider(key), &root, &dialog, cursor.as_deref())
+        .await
+}
+
 /// 取一页楼中楼。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_replies(
@@ -1082,6 +1096,7 @@ pub fn run() {
             watch_open,
             watch_comments,
             watch_replies,
+            watch_dialog,
             search_suggest,
             hot_search,
             comment_add,
