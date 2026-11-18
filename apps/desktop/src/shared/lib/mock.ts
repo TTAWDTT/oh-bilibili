@@ -1,5 +1,6 @@
 import type { DownloadView, QrStatus } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
+import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
 import { emit, ensureClock, fail, playlistOf, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
@@ -645,6 +646,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           text: seed.text,
           emotes: [],
           mentions: [],
+          pictures: i === 0 ? [REAL_COVERS['七里香']] : [],
           level: seed.level,
           likes: 30 - i * 3,
           at: Math.floor(Date.now() / 1000) - i * 600,

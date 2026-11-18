@@ -25,6 +25,8 @@ pub struct Comment {
     pub emotes: Vec<(String, String)>,
     /// 评论里 @ 到的用户：名字到 uid。正文里的 @名字 会做成可点链接。
     pub mentions: Vec<(String, u64)>,
+    /// 评论带图。B 站的图片评论放在 `content.pictures`，最多九张。
+    pub pictures: Vec<String>,
     /// 评论者等级。B 站把 LV 牌挂在昵称后面。
     pub level: u8,
     pub likes: u32,
@@ -179,6 +181,8 @@ struct RawContent {
     /// 被 @ 的用户。B 站只在真的有提及时给这个数组。
     #[serde(default)]
     members: Option<Vec<RawMention>>,
+    #[serde(default)]
+    pictures: Option<Vec<RawPicture>>,
 }
 
 #[derive(Deserialize)]
@@ -193,6 +197,12 @@ struct RawMention {
     mid: u64,
     #[serde(default)]
     uname: String,
+}
+
+#[derive(Deserialize)]
+struct RawPicture {
+    #[serde(default)]
+    img_src: String,
 }
 
 #[derive(Deserialize)]
@@ -249,7 +259,7 @@ fn to_comment(raw: RawReply) -> Comment {
         .and_then(|control| control.location)
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
-    let (text, emotes, mentions) = raw
+    let (text, emotes, mentions, pictures) = raw
         .content
         .map(|c| {
             let emotes = c
@@ -272,7 +282,21 @@ fn to_comment(raw: RawReply) -> Comment {
                 .filter(|m| m.mid > 0 && !m.uname.is_empty())
                 .map(|m| (m.uname, m.mid))
                 .collect();
-            (c.message, emotes, mentions)
+            let pictures = c
+                .pictures
+                .unwrap_or_default()
+                .into_iter()
+                .map(|p| p.img_src.trim().to_string())
+                .filter(|src| !src.is_empty())
+                .map(|src| {
+                    if src.starts_with("//") {
+                        format!("https:{src}")
+                    } else {
+                        src
+                    }
+                })
+                .collect();
+            (c.message, emotes, mentions, pictures)
         })
         .unwrap_or_default();
     Comment {
@@ -292,6 +316,7 @@ fn to_comment(raw: RawReply) -> Comment {
         text,
         emotes,
         mentions,
+        pictures,
         level,
         likes: raw.like,
         at: raw.ctime,
@@ -473,6 +498,17 @@ mod tests {
             serde_json::json!({ "location": "IP属地：上海" });
         let page = cursor_page_from(&value, true);
         assert_eq!(page.items[0].location.as_deref(), Some("IP属地：上海"));
+    }
+
+    #[test]
+    fn 评论带出图片() {
+        let mut value = sample();
+        value["data"]["replies"][0]["content"]["pictures"] = serde_json::json!([
+            { "img_src": "//i0.hdslb.com/pic.jpg" },
+            { "img_src": "  " }
+        ]);
+        let page = cursor_page_from(&value, true);
+        assert_eq!(page.items[0].pictures, vec!["https://i0.hdslb.com/pic.jpg"]);
     }
 
     #[test]

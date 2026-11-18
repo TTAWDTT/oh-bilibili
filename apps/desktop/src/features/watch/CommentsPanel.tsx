@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
@@ -168,6 +169,7 @@ function CommentRow({
   replyComposer,
   replyComposerFor,
   onDialog,
+  onPhoto,
 }: {
   c: Comment
   depth?: number
@@ -179,6 +181,7 @@ function CommentRow({
   /** 楼中楼里某一条要展开回复框时用；根节点把同一个回调继续传下去。 */
   replyComposerFor?: ((c: Comment) => ReactNode) | undefined
   onDialog?: ((c: Comment) => void) | undefined
+  onPhoto?: ((src: string) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -378,6 +381,27 @@ function CommentRow({
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
             <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
           </p>
+          {c.pictures?.length ? (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {c.pictures.slice(0, 3).map((src, index) => (
+                <button
+                  key={`${src}-${index}`}
+                  type="button"
+                  onClick={() => onPhoto?.(src)}
+                  className="h-[72px] w-[72px] overflow-hidden rounded-[4px] bg-[var(--panel-alt)]"
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
       {replyComposer ? <div className="mt-2 pl-8">{replyComposer}</div> : null}
@@ -394,6 +418,7 @@ function CommentRow({
               replyComposerFor={replyComposerFor}
               replyComposer={replyComposerFor?.(r)}
               onDialog={onDialog}
+              onPhoto={onPhoto}
             />
           ))}
           {depth === 0 && (c.reply_count > c.replies.length || repliesOpen) ? (
@@ -470,7 +495,15 @@ function CommentRow({
  * 不白屏，也不影响看视频。
  */
 /** 对话里的一条。比列表里的评论少一排操作，只保留作者、等级、粉丝牌和正文。 */
-function DialogRow({ c, ownerMid }: { c: Comment; ownerMid: number | null }) {
+function DialogRow({
+  c,
+  ownerMid,
+  onPhoto,
+}: {
+  c: Comment
+  ownerMid: number | null
+  onPhoto?: ((src: string) => void) | undefined
+}) {
   const navigate = useAppStore((state) => state.navigate)
   return (
     <li className="flex items-start gap-2">
@@ -508,6 +541,27 @@ function DialogRow({ c, ownerMid }: { c: Comment; ownerMid: number | null }) {
         <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
           <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
         </p>
+        {c.pictures?.length ? (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {c.pictures.slice(0, 3).map((src, index) => (
+              <button
+                key={`${src}-${index}`}
+                type="button"
+                onClick={() => onPhoto?.(src)}
+                className="h-16 w-16 overflow-hidden rounded-[4px] bg-[var(--panel-alt)]"
+              >
+                <img
+                  src={src}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </li>
   )
@@ -521,6 +575,7 @@ function DialogModal({
   root,
   anchor,
   onClose,
+  onPhoto,
 }: {
   open: boolean
   trackKey: string
@@ -528,6 +583,7 @@ function DialogModal({
   root: string
   anchor: string
   onClose: () => void
+  onPhoto?: ((src: string) => void) | undefined
 }) {
   const [items, setItems] = useState<Comment[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
@@ -569,7 +625,7 @@ function DialogModal({
     <Modal open={open} title="对话" description={null} onClose={onClose} width="max-w-[560px]">
       <ul className="max-h-[58vh] space-y-3 overflow-y-auto pr-1">
         {items.map((c) => (
-          <DialogRow key={c.id} c={c} ownerMid={ownerMid} />
+          <DialogRow key={c.id} c={c} ownerMid={ownerMid} onPhoto={onPhoto} />
         ))}
       </ul>
       {loading ? (
@@ -635,6 +691,7 @@ export function CommentsPanel({
   /** 图挂了的代号。表情图来自远端，个别 404 时不该在面板里留一个碎图。 */
   const [brokenEmotes, setBrokenEmotes] = useState<ReadonlySet<string>>(new Set())
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [photo, setPhoto] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -785,6 +842,7 @@ export function CommentsPanel({
             text,
             emotes: [],
             mentions: [],
+            pictures: [],
             level: me?.level ?? 0,
             likes: 0,
             at: Math.floor(Date.now() / 1000),
@@ -1008,6 +1066,7 @@ export function CommentsPanel({
                 })
               }
               onDelete={mine.has(c.id) ? remove : undefined}
+              onPhoto={setPhoto}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
               replyComposerFor={(target) =>
                 replyTo?.id === target.id ? composer(replyTo) : undefined
@@ -1035,7 +1094,36 @@ export function CommentsPanel({
         root={dialog?.root ?? ''}
         anchor={dialog?.anchor ?? ''}
         onClose={() => setDialog(null)}
+        onPhoto={setPhoto}
       />
+      {photo
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setPhoto(null)}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-6"
+            >
+              <button
+                type="button"
+                aria-label="关闭图片"
+                title="关闭图片"
+                onClick={() => setPhoto(null)}
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 hover:bg-black/80"
+              >
+                <Icon name="close" size={18} />
+              </button>
+              <img
+                src={photo}
+                alt=""
+                referrerPolicy="no-referrer"
+                onClick={(event) => event.stopPropagation()}
+                className="max-h-full max-w-full rounded-[6px] object-contain"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
