@@ -829,3 +829,19 @@ async fn messages_live_cursor_pages_are_disjoint() {
     }
     assert!(paginated >= 2, "至少两类需实际推进到第二页，当前只验证了 {paginated} 类");
 }
+
+#[tokio::test]
+#[ignore = "真实网络，核对弹幕正文里的 XML 实体"]
+async fn 弹幕正文不带未解开的实体() {
+    let source = Source::open().await.expect("Source");
+    // BV1ej4J67ERn：实测这条视频里有一条 `˶>ᗜ<˶` 的颜文字弹幕。
+    let key = bilimusic_model::TrackKey::from_provider("BV1ej4J67ERn");
+    let list = source.danmaku_colored(&key).await.expect("弹幕");
+    let dirty: Vec<&str> = list
+        .iter()
+        .map(|line| line.text.as_str())
+        .filter(|t| t.contains("&lt;") || t.contains("&gt;") || t.contains("&amp;"))
+        .collect();
+    println!("共 {} 条，带未解开实体 {} 条", list.len(), dirty.len());
+    assert!(dirty.is_empty(), "这些弹幕的实体没解开：{dirty:?}");
+}
