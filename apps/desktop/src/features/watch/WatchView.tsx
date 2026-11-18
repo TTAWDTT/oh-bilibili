@@ -188,7 +188,8 @@ export function WatchView({ track }: { track: Track }) {
       return
     }
     if (needLike) like()
-    if (needCoin) coin(1, true)
+    // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
+    if (needCoin) coin(2 - (st.coins[track.key] ?? 0), true)
     if (needFav) fav()
     setBurst((n) => n + 1)
     toastDone('一键三连', '点赞、投币、收藏都点上了')
