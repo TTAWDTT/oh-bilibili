@@ -657,6 +657,18 @@ async fn video_online(
     engine.online_count(&TrackKey::from_provider(key), cid).await
 }
 
+/// 进度条悬停预览的缩略图。
+#[tauri::command(rename_all = "snake_case")]
+async fn video_shots(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    cid: u64,
+) -> Result<bilimusic_core::wire::VideoShots, WireError> {
+    engine
+        .video_shots(&TrackKey::from_provider(key), cid)
+        .await
+}
+
 #[tauri::command(rename_all = "snake_case")]
 async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<Track>, WireError> {
     engine.ranking(rid).await
@@ -1110,6 +1122,7 @@ pub fn run() {
             weekly_issues,
             weekly_issue,
             video_online,
+            video_shots,
             author_card,
             fav_tracks,
             unfav_from,

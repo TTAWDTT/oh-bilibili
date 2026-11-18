@@ -219,6 +219,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         explain: '预览模式',
         items: CATALOG.slice(0, 12).map((track) => ({ track, note: '预览模式的推荐语' })),
       }
+    case 'video_shots':
+      return {
+        images: ['https://bimp.hdslb.com/videoshotpvhdboss/43538251892_bgvhzb-0001.jpg'],
+        index: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45],
+        columns: 5,
+        rows: 2,
+        tile_w: 480,
+        tile_h: 270,
+      }
     case 'video_online':
       return 128
     case 'history_position':

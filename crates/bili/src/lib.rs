@@ -455,6 +455,11 @@ impl Source {
         self.client.online_count(bvid, cid).await
     }
 
+    /// 进度条悬停预览的缩略图。
+    pub async fn video_shots(&self, bvid: &str, cid: u64) -> Result<sync::VideoShots, BiliError> {
+        self.client.video_shots(bvid, cid).await
+    }
+
     /// 把一条视频从指定收藏夹移出。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), BiliError> {
         let detail = self.detail(key).await?;

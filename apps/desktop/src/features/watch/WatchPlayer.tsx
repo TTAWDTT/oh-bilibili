@@ -493,6 +493,49 @@ export function WatchPlayer({
   const duration = data.duration_ms || track.duration_ms || 0
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
 
+  /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
+  const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
+  const [shots, setShots] = useState<ipc.VideoShots | null>(null)
+  const shotsAsked = useRef(false)
+  const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number } | null>(null)
+
+  const askShots = (): void => {
+    if (shotsAsked.current || !cid) return
+    shotsAsked.current = true
+    void ipc
+      .videoShots(track.key, cid)
+      .then(setShots)
+      // 取失败就放开锁，下一次悬停还能再试；否则一次失败整个视频都没有预览。
+      .catch(() => {
+        shotsAsked.current = false
+      })
+  }
+
+  /** 第 second 秒对应雪碧图里的哪一张、哪一格。索引是升序的，二分找最后一个不大于它的。 */
+  const shotAt = (second: number): { image: string; col: number; row: number } | null => {
+    if (!shots || shots.images.length === 0 || shots.index.length === 0) return null
+    const per = Math.max(1, shots.columns * shots.rows)
+    const total = Math.min(shots.index.length, shots.images.length * per)
+    let lo = 0
+    let hi = total - 1
+    let best = 0
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if ((shots.index[mid] ?? 0) <= second) {
+        best = mid
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    const cell = best % per
+    return {
+      image: shots.images[Math.floor(best / per)] ?? '',
+      col: cell % Math.max(1, shots.columns),
+      row: Math.floor(cell / Math.max(1, shots.columns)),
+    }
+  }
+
   return (
     <div
       onMouseMove={poke}
@@ -693,7 +736,11 @@ export function WatchPlayer({
           tabIndex={0}
           onClick={(event) => {
             const box = event.currentTarget.getBoundingClientRect()
-            seekTo((event.clientX - box.left) / box.width)
+            const ratio = (event.clientX - box.left) / box.width
+            seekTo(ratio)
+            // 点完鼠标就停在这一点上，预览跟着亮起来，和 B 站一致。
+            if (duration) setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000) })
+            askShots()
           }}
           // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
           // 方向键按 5 秒走。缺这一段，读屏和纯键盘用户完全拖不动进度。
@@ -715,9 +762,57 @@ export function WatchPlayer({
             event.preventDefault()
             seekTo(target)
           }}
+          onMouseEnter={askShots}
+          onMouseMove={(event) => {
+            if (!duration) return
+            const box = event.currentTarget.getBoundingClientRect()
+            const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
+            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000) })
+          }}
+          onMouseLeave={() => setHoverAt(null)}
           className="group relative mb-1.5 h-3 cursor-pointer"
         >
           <DanmakuBeats items={danmaku} durationMs={duration} />
+          {hoverAt ? (
+            (() => {
+              const shot = shotAt(hoverAt.second)
+              if (!shot) {
+                // 缩略图还没到（或这条视频没有图）时，至少把落点时间给出来。
+                return (
+                  <span
+                    className="num pointer-events-none absolute bottom-full z-30 mb-1 -translate-x-1/2 whitespace-nowrap rounded-[3px] bg-black/75 px-1.5 py-0.5 text-[11px] leading-4 text-white"
+                    style={{ left: `${Math.min(96, Math.max(4, hoverAt.ratio * 100))}%` }}
+                  >
+                    {formatTime(hoverAt.second * 1000)}
+                  </span>
+                )
+              }
+              return (
+                <span
+                  className="pointer-events-none absolute bottom-full z-30 mb-2 block h-[90px] w-[160px] -translate-x-1/2 overflow-hidden rounded-[4px] border border-white/25 bg-black shadow-[0_6px_20px_rgba(0,0,0,0.55)]"
+                  style={{ left: `${Math.min(94, Math.max(6, hoverAt.ratio * 100))}%` }}
+                >
+                  {/* 雪碧图用 img 而不是 background-image：图片 CDN 对 tauri://localhost
+                      这个 Referer 回 403，只有 referrerPolicy 才能把它去掉。 */}
+                  <img
+                    src={shot.image}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="absolute max-w-none"
+                    style={{
+                      width: 160 * (shots?.columns ?? 1),
+                      height: 90 * (shots?.rows ?? 1),
+                      left: -shot.col * 160,
+                      top: -shot.row * 90,
+                    }}
+                  />
+                  <span className="num absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[11px] leading-4 text-white">
+                    {formatTime(hoverAt.second * 1000)}
+                  </span>
+                </span>
+              )
+            })()
+          ) : null}
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
           <span
             /* B 站播放器的进度条是品牌粉，不是链接蓝。 */

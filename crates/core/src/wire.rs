@@ -288,8 +288,9 @@ pub struct WatchStats {
 /// 评论。领域类型定义在 bili crate 的解析边界旁，这里只做重导出，
 /// 免得同一份结构写两遍、改一处漏一处。
 pub use bilimusic_bili::comments::{Comment, CommentPage};
+
 pub use bilimusic_bili::messages::{MessageItem, MessageKind, MessagePage, MessageUnread, MessageUser};
-pub use bilimusic_bili::sync::{DynamicItem, DynamicPage, Followed};
+pub use bilimusic_bili::sync::{DynamicItem, DynamicPage, Followed, VideoShots};
 pub use bilimusic_bili::HotSearchItem;
 
 /// 观看页一次调用拿到的全部东西。前端看不到任何远端地址。

@@ -32,6 +32,21 @@ pub struct UserHit {
     pub live: bool,
 }
 
+/// 进度条悬停预览用的视频缩略图。
+///
+/// B 站给的是雪碧图：`images` 里每张切成 `columns × rows` 格，`index` 是每格对应的
+/// 秒数（按顺序铺开）。前端拿它算「鼠标停在第 N 秒 → 第几张图的第几格」。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VideoShots {
+    pub images: Vec<String>,
+    /// 每一格对应的时间点（秒），长度等于所有图加起来的总格数。
+    pub index: Vec<u32>,
+    pub columns: u32,
+    pub rows: u32,
+    pub tile_w: u32,
+    pub tile_h: u32,
+}
+
 /// 正在直播的一个房间，来自推荐位（不是按分区拉的全量列表）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LiveRoom {
@@ -944,6 +959,50 @@ impl Client {
             data["explain"].as_str().unwrap_or_default().to_string(),
             items,
         ))
+    }
+
+    /// 进度条悬停预览的雪碧图。按 cid 取，一次给整条视频的全部缩略图。
+    /// 只有用户第一次把鼠标移到进度条上时前端才会调，平时不占请求。
+    pub async fn video_shots(&self, bvid: &str, cid: u64) -> Result<VideoShots, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/player/videoshot?bvid={bvid}&cid={cid}&index=1"),
+                std::time::Duration::from_millis(300),
+            )
+            .await?;
+        let data = &v["data"];
+        let images = data["image"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|x| x.as_str())
+                    .map(|s| {
+                        if let Some(rest) = s.strip_prefix("//") {
+                            format!("https://{rest}")
+                        } else {
+                            s.to_string()
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let index = data["index"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|x| x.as_u64())
+                    .map(|n| n as u32)
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(VideoShots {
+            images,
+            index,
+            columns: data["img_x_len"].as_u64().unwrap_or(10) as u32,
+            rows: data["img_y_len"].as_u64().unwrap_or(10) as u32,
+            tile_w: data["img_x_size"].as_u64().unwrap_or(480) as u32,
+            tile_h: data["img_y_size"].as_u64().unwrap_or(270) as u32,
+        })
     }
 
     /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
