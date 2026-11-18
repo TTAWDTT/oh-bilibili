@@ -6,6 +6,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
+import { chaptersFrom } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { DanmakuBeats } from '../player/DanmakuBeats'
@@ -520,8 +521,21 @@ export function WatchPlayer({
     saveQualityHeight(q.height)
   }
 
+  /** 某个时刻落在哪一章。章节按时间升序，取最后一个不超过它的。 */
+  const chapterAt = (ms: number): { at: number; title: string } | null => {
+    let hit: { at: number; title: string } | null = null
+    for (const chapter of chapters) {
+      if (chapter.at > ms) break
+      hit = chapter
+    }
+    return hit
+  }
+
   const duration = data.duration_ms || track.duration_ms || 0
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
+
+  /** 简介里的章节。没有就整条进度条一根刻度都不画。 */
+  const chapters = chaptersFrom(data.desc)
 
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
@@ -836,14 +850,25 @@ export function WatchPlayer({
                       top: -shot.row * 90,
                     }}
                   />
-                  <span className="num absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[11px] leading-4 text-white">
-                    {formatTime(hoverAt.second * 1000)}
+                  <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-0.5 text-[11px] leading-4 text-white">
+                    <span className="num text-white/70">{formatTime(hoverAt.second * 1000)} </span>
+                    <span className="line-clamp-1">{chapterAt(hoverAt.second * 1000)?.title}</span>
                   </span>
                 </span>
               )
             })()
           ) : null}
           <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
+          {chapters.map((chapter) => (
+            <span
+              key={chapter.at}
+              role="img"
+              aria-label={chapter.title || formatTime(chapter.at)}
+              title={chapter.title || formatTime(chapter.at)}
+              className="pointer-events-none absolute top-1/2 h-[9px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/85 shadow-[0_0_3px_rgba(0,0,0,0.6)]"
+              style={{ left: `${Math.min(100, (chapter.at / Math.max(1, duration)) * 100)}%` }}
+            />
+          ))}
           <span
             /* B 站播放器的进度条是品牌粉，不是链接蓝。 */
             className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
