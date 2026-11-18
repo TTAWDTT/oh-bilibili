@@ -449,6 +449,11 @@ fn 分P_列表与切换() {
         println!("切到 P{}，清单 {}", v2.current_page, v2.manifest_url);
         assert_eq!(v2.current_page, second);
         assert_ne!(v2.manifest_url, view.manifest_url, "换分P 应该是一条新清单");
+        assert_eq!(
+            v2.duration_ms,
+            view.pages[1].duration_ms,
+            "切 P 后进度条和 MPD 的时长必须跟着当前 P 走"
+        );
     });
 }
 
