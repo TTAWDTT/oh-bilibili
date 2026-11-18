@@ -738,34 +738,37 @@ impl Source {
         Ok(crate::comments::cursor_page_from(&value, cursor.is_none()))
     }
 
-    /// 取一页楼中楼。`root` 是一级评论的 rpid。
+    /// 取一页楼中楼。`root` 是一级评论的 rpid，`cursor` 是上一页的 `next`，
+    /// 第一页传 None。
     ///
-    /// 这里保留 `reply/reply` 的页码翻页：官方的 `dialog/cursor` 是按「某一条二级评论
-    /// 所在的对话分支」翻页的（`dialog` 必须是一条二级 rpid，传一级 rpid 会回空），
-    /// 拿它列整栋楼并不对。楼中楼只在用户点开时取一次，不像主列表那样连着翻十几页。
+    /// 走 `x/v2/reply/detail`：B 站桌面端的楼中楼列表就是它，翻页靠 `pagination_str`
+    /// 里的不透明游标。老的 `reply/reply?pn=` 是页码协议。官方的 `dialog/cursor`
+    /// 只返回某一条二级评论的对话分支（`dialog` 传一级 rpid 会回空），拿它列整栋楼
+    /// 并不对。
     pub async fn comment_replies(
         &self,
         key: &TrackKey,
         root: &str,
-        page: u32,
+        cursor: Option<&str>,
     ) -> Result<crate::comments::CommentPage, BiliError> {
         let detail = self.detail(key).await?;
-        let per_page = 20u32;
+        let offset = cursor.unwrap_or("");
+        let pagination =
+            crate::wbi::encode_uri_component(&format!("{{\"offset\":\"{offset}\"}}"));
         let value = self
             .client
             .get_json(
                 &format!(
-                    "{}/x/v2/reply/reply?type=1&oid={}&root={}&pn={}&ps={}",
+                    "{}/x/v2/reply/detail?type=1&oid={}&root={}&pagination_str={}&plat=1",
                     client::API,
                     detail.aid,
                     root,
-                    page,
-                    per_page
+                    pagination
                 ),
                 std::time::Duration::from_millis(400),
             )
             .await?;
-        Ok(crate::comments::replies_page_from(&value, page, per_page))
+        Ok(crate::comments::detail_page_from(&value))
     }
 
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, BiliError> {
