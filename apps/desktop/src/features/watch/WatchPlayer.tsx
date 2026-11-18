@@ -215,6 +215,8 @@ export function WatchPlayer({
   const [resumeNotice, setResumeNotice] = useState<number | null>(null)
   /** 自动连播的倒计时；关掉开关或没有下一个时为空。 */
   const [countdown, setCountdown] = useState<number | null>(null)
+  /** 只取消这一次自动连播，不改「自动连播」偏好。 */
+  const [countdownCancelled, setCountdownCancelled] = useState(false)
   const autoplay = useAutoplay((state) => state.enabled)
   const setAutoplay = useAutoplay((state) => state.setEnabled)
   /** 没登录就没有发弹幕资格：把「请先登录或注册」摆在输入框的位置上。 */
@@ -283,6 +285,11 @@ export function WatchPlayer({
   useEffect(() => {
     if (!finished || !next || !autoplay) {
       setCountdown(null)
+      setCountdownCancelled(false)
+      return
+    }
+    if (countdownCancelled) {
+      setCountdown(null)
       return
     }
     let left = 5
@@ -293,11 +300,11 @@ export function WatchPlayer({
       if (left <= 0) window.clearInterval(timer)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [finished, next, autoplay])
+  }, [finished, next, autoplay, countdownCancelled])
 
   useEffect(() => {
-    if (countdown === 0 && finished && next) onNextRef.current(next)
-  }, [countdown, finished, next])
+    if (countdown === 0 && finished && next && !countdownCancelled) onNextRef.current(next)
+  }, [countdown, finished, next, countdownCancelled])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
@@ -833,14 +840,23 @@ export function WatchPlayer({
           {next ? (
             <div className="flex flex-col items-center gap-1.5">
               {autoplay && countdown !== null ? (
-                <button
-                  type="button"
-                  onClick={() => onNext(next)}
-                  className="t max-w-full truncate text-[12px] text-white/65 hover:text-white"
-                  title={next.title}
-                >
-                  {countdown} 秒后自动播放：{next.title}
-                </button>
+                <div className="flex max-w-full items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onNext(next)}
+                    className="t max-w-full truncate text-[12px] text-white/65 hover:text-white"
+                    title={next.title}
+                  >
+                    {countdown} 秒后自动播放：{next.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountdownCancelled(true)}
+                    className="t shrink-0 text-[12px] text-white/55 hover:text-white"
+                  >
+                    取消
+                  </button>
+                </div>
               ) : null}
               <label className="flex items-center gap-1.5 text-[12px] text-white/55">
                 <input
