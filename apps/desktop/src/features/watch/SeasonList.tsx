@@ -13,10 +13,21 @@ import { Cover } from '../../shared/ui/Cover'
 export function SeasonList({ season }: { season: SeasonView }) {
   const replace = useAppStore((s) => s.replace)
   const currentRef = useRef<HTMLLIElement | null>(null)
+  const listRef = useRef<HTMLOListElement | null>(null)
 
   // 10 集以上的合集一屏放不下，不滚的话用户看不出自己正在第几集。
+  // 只滚列表自己：scrollIntoView 会连窄屏下的整页滚动容器一起滚，
+  // 进视频时页面会直接跳到合集卡，播放器被顶出屏幕。
   useEffect(() => {
-    currentRef.current?.scrollIntoView({ block: 'nearest' })
+    const list = listRef.current
+    const item = currentRef.current
+    if (!list || !item) return
+    const top = item.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop
+    const bottom = top + item.offsetHeight
+    if (top < list.scrollTop) list.scrollTop = top
+    else if (bottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = bottom - list.clientHeight
+    }
   }, [season.id])
 
   return (
@@ -28,7 +39,7 @@ export function SeasonList({ season }: { season: SeasonView }) {
           </h3>
           <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{season.episodes.length} 集</span>
         </div>
-        <ol className="flex max-h-[320px] flex-col gap-y-1.5 overflow-y-auto px-2 py-2">
+        <ol ref={listRef} className="flex max-h-[320px] flex-col gap-y-1.5 overflow-y-auto px-2 py-2">
           {season.episodes.map((ep, index) => (
             <li key={ep.key} ref={ep.current ? currentRef : undefined}>
               <button
