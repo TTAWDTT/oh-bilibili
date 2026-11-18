@@ -166,14 +166,14 @@ export function WatchView({ track }: { track: Track }) {
       })
   }
 
-  const coin = (count: number, alsoLike: boolean): void => {
+  const coin = (count: number, alsoLike: boolean, quiet = false): void => {
     void useReactionStore
       .getState()
       .addCoin(track, count, alsoLike)
       .then((ok) => {
         if (!ok) return
         setCoinDelta((n) => n + count)
-        toastDone('投币成功', alsoLike ? '同时点了个赞' : null)
+        if (!quiet) toastDone('投币成功', alsoLike ? '同时点了个赞' : null)
       })
   }
 
@@ -189,7 +189,7 @@ export function WatchView({ track }: { track: Track }) {
     }
     if (needLike) like()
     // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
-    if (needCoin) coin(2 - (st.coins[track.key] ?? 0), true)
+    if (needCoin) coin(2 - (st.coins[track.key] ?? 0), true, true)
     if (needFav) fav()
     setBurst((n) => n + 1)
     toastDone('一键三连', '点赞、投币、收藏都点上了')
