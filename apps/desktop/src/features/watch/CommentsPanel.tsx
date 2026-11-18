@@ -187,21 +187,49 @@ function CommentRow({
   const [repliesError, setRepliesError] = useState(false)
   const [liked, setLiked] = useState(c.liked)
   const [likes, setLikes] = useState(c.likes)
+  const [disliked, setDisliked] = useState(c.disliked)
   const likingRef = useRef(false)
+  const hatingRef = useRef(false)
 
   const toggleLike = async (): Promise<void> => {
     if (likingRef.current) return
     likingRef.current = true
     const next = !liked
+    const wasDisliked = disliked
     setLiked(next)
+    if (next) setDisliked(false)
     setLikes((count) => Math.max(0, count + (next ? 1 : -1)))
     try {
       await ipc.commentLike(trackKey, c.id, next)
     } catch {
       setLiked(!next)
+      if (next) setDisliked(wasDisliked)
       setLikes((count) => Math.max(0, count + (next ? -1 : 1)))
     } finally {
       likingRef.current = false
+    }
+  }
+
+  const toggleDislike = async (): Promise<void> => {
+    if (hatingRef.current) return
+    hatingRef.current = true
+    const next = !disliked
+    const wasLiked = liked
+    setDisliked(next)
+    if (next && wasLiked) {
+      setLiked(false)
+      setLikes((count) => Math.max(0, count - 1))
+    }
+    try {
+      await ipc.commentHate(trackKey, c.id, next)
+    } catch {
+      setDisliked(!next)
+      if (next && wasLiked) {
+        setLiked(true)
+        setLikes((count) => count + 1)
+      }
+    } finally {
+      hatingRef.current = false
     }
   }
 
@@ -297,7 +325,18 @@ function CommentRow({
                   </span>
                 ) : null}
               </span>
-              <Icon name="thumbDown" size={12} />
+              <button
+                type="button"
+                aria-pressed={disliked}
+                aria-label={disliked ? '取消点踩' : '点踩'}
+                title={disliked ? '取消点踩' : '点踩'}
+                onClick={() => void toggleDislike()}
+                className={`t press rounded-[3px] ${
+                  disliked ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]'
+                }`}
+              >
+                <Icon name="thumbDown" size={12} />
+              </button>
             </span>
             <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
             {c.location ? (
@@ -748,6 +787,7 @@ export function CommentsPanel({
             pinned: false,
             up_liked: false,
             liked: false,
+            disliked: false,
             medal: null,
             location: null,
           },
