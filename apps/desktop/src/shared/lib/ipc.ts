@@ -455,6 +455,11 @@ export function commentLike(key: string, rpid: string, like: boolean): Promise<n
   return call<null>('comment_like', { key, rpid, like })
 }
 
+/** 点踩 / 取消点踩一条评论。 */
+export function commentHate(key: string, rpid: string, hate: boolean): Promise<null> {
+  return call<null>('comment_hate', { key, rpid, hate })
+}
+
 /** 投币。count 1 或 2；also_like 为真时同时点赞（一键三连）。 */
 /** 批量读互动状态：[key, liked, faved, coin][]。 */
 export function relationStates(keys: string[]): Promise<[string, boolean, boolean, number][]> {

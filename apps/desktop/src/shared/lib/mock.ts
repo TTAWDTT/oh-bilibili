@@ -757,6 +757,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return null
     case 'comment_like':
       return null
+    case 'comment_hate':
+      return null
     case 'video_meta': {
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')

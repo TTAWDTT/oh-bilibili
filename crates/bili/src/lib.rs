@@ -937,6 +937,36 @@ impl Source {
         Ok(())
     }
 
+    /// 给一条评论点踩或取消点踩。
+    ///
+    /// 走官方桌面端同款 `x/v2/reply/hate`：`action=1` 点踩、`action=0` 取消。
+    /// 点赞与点踩在服务端是同一个互斥状态，点赞会把点踩顶掉。
+    pub async fn comment_hate(
+        &self,
+        key: &TrackKey,
+        rpid: &str,
+        hate: bool,
+    ) -> Result<(), BiliError> {
+        let detail = self.detail(key).await?;
+        let csrf = self
+            .client
+            .csrf()
+            .ok_or_else(|| BiliError::NeedsLogin("没有 bili_jct".into()))?;
+        self.client
+            .post_form(
+                &format!("{}/x/v2/reply/hate", client::API),
+                vec![
+                    ("type", "1".to_string()),
+                    ("oid", detail.aid.to_string()),
+                    ("rpid", rpid.to_string()),
+                    ("action", if hate { "1" } else { "0" }.to_string()),
+                    ("csrf", csrf),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     /// 取 DASH 的视频轨。只返回视频，音频永远走音频引擎。
     ///
     /// 用 fnval=4048 拿到全部特性与全部档位（含 1080P+），并且 fourk=1

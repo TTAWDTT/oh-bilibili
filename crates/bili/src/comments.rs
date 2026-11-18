@@ -40,6 +40,8 @@ pub struct Comment {
     pub up_liked: bool,
     /// 当前登录账号赞过这条评论。接口 `action` 为 1，游客恒为 0。
     pub liked: bool,
+    /// 当前登录账号点踩过这条评论。接口 `action` 为 2。
+    pub disliked: bool,
     /// 评论者戴的粉丝牌。没戴时为 None。
     pub medal: Option<CommentMedal>,
     /// B 站给的 IP 属地，形如「IP属地：上海」。旧评论可能没有。
@@ -202,6 +204,7 @@ struct RawUpAction {
 fn to_comment(raw: RawReply) -> Comment {
     let up_liked = raw.up_action.as_ref().map(|a| a.like).unwrap_or(false);
     let liked = raw.action == 1;
+    let disliked = raw.action == 2;
     let id = raw
         .rpid_str
         .filter(|s| !s.is_empty())
@@ -297,6 +300,7 @@ fn to_comment(raw: RawReply) -> Comment {
         pinned: false,
         up_liked,
         liked,
+        disliked,
         medal,
         location,
     }
@@ -518,6 +522,8 @@ mod tests {
         let page = cursor_page_from(&value, true);
         assert!(page.items[0].liked);
         assert!(!page.items[1].liked);
+        assert!(!page.items[0].disliked);
+        assert!(page.items[1].disliked);
     }
 
     #[test]
