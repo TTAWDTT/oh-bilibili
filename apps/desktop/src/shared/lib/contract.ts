@@ -73,6 +73,8 @@ export type Comment = {
   emotes: [string, string][]
   /** 评论里 @ 到的用户：名字到 uid。 */
   mentions: [string, number][]
+  /** 评论带图，最多九张。 */
+  pictures: string[]
   /** 评论者等级。 */
   level: number
   likes: number
