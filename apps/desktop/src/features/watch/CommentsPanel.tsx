@@ -166,15 +166,18 @@ function CommentRow({
   onReply,
   onDelete,
   replyComposer,
+  replyComposerFor,
   onDialog,
 }: {
   c: Comment
   depth?: number
   trackKey: string
   ownerMid?: number | null | undefined
-  onReply?: (c: Comment) => void
+  onReply?: ((c: Comment) => void) | undefined
   onDelete?: ((c: Comment) => void) | undefined
   replyComposer?: ReactNode
+  /** 楼中楼里某一条要展开回复框时用；根节点把同一个回调继续传下去。 */
+  replyComposerFor?: ((c: Comment) => ReactNode) | undefined
   onDialog?: ((c: Comment) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
@@ -353,7 +356,7 @@ function CommentRow({
                 查看对话
               </button>
             ) : null}
-            {depth === 0 && onReply ? (
+            {onReply ? (
               <button
                 type="button"
                 onClick={() => onReply(c)}
@@ -387,6 +390,9 @@ function CommentRow({
               depth={depth + 1}
               trackKey={trackKey}
               ownerMid={ownerMid}
+              onReply={onReply}
+              replyComposerFor={replyComposerFor}
+              replyComposer={replyComposerFor?.(r)}
               onDialog={onDialog}
             />
           ))}
@@ -619,7 +625,7 @@ export function CommentsPanel({
   const [, setTick] = useState(0)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
-  const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
+  const [replyTo, setReplyTo] = useState<{ id: string; root: string; author: string } | null>(null)
   /** 当前打开的对话分支：一级评论 + 分支里的二级评论。 */
   const [dialog, setDialog] = useState<{ root: string; anchor: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
@@ -761,8 +767,8 @@ export function CommentsPanel({
     setSending(true)
     setError(null)
     try {
-      // 回复一级评论：root 与 parent 都是那一条的 rpid。
-      const rpid = await ipc.commentAdd(trackKey, text, replyTo?.id, replyTo?.id)
+      // 回复一级评论时 root 就是它自己；回楼中楼时要挂在原来的根下面。
+      const rpid = await ipc.commentAdd(trackKey, text, replyTo?.root, replyTo?.id)
       setDraft('')
       setReplyTo(null)
       setEmojiOpen(false)
@@ -994,9 +1000,18 @@ export function CommentsPanel({
               c={c}
               trackKey={trackKey}
               ownerMid={ownerMid}
-              onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
+              onReply={(target) =>
+                setReplyTo({
+                  id: target.id,
+                  root: target.root ? String(target.root) : target.id,
+                  author: target.author,
+                })
+              }
               onDelete={mine.has(c.id) ? remove : undefined}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
+              replyComposerFor={(target) =>
+                replyTo?.id === target.id ? composer(replyTo) : undefined
+              }
               onDialog={(target) => {
                 if ((target.root ?? 0) > 0 && (target.dialog ?? 0) > 0) {
                   setDialog({ root: String(target.root), anchor: String(target.dialog) })
