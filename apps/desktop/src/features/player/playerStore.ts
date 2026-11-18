@@ -37,6 +37,17 @@ type PlayerStore = {
   applyStopped: () => void
 }
 
+/** 上次的倍速。引擎每次启动回到 1.0，所以启动时补一次。 */
+const SPEED_KEY = 'bilimusic.speed'
+
+function loadSpeed(): number {
+  try {
+    return Number(localStorage.getItem(SPEED_KEY) ?? 1) || 1
+  } catch {
+    return 1
+  }
+}
+
 export const usePlayerStore = create<PlayerStore>()((set, get) => {
   const apply = (next: PlayerSnapshot): void => {
     // 进度与快照一起换。换曲时只更新快照会让 progress 停在上一条的位置，
@@ -75,6 +86,11 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
           const [snapshot, queue] = await Promise.all([ipc.playerState(), ipc.queueState()])
           apply(snapshot)
           set({ queue })
+          // 引擎重启后倍速回到 1.0；把上次选的补回去（快照已在手，不用再等一次往返）。
+          const saved = loadSpeed()
+          if (saved !== 1 && Math.abs((snapshot.speed ?? 1) - saved) > 0.001) {
+            void ipc.playerSetSpeed(saved).then(apply).catch(() => {})
+          }
         } catch (cause) {
           initPromise = null
           toastFailure('读取播放状态', cause)
@@ -108,6 +124,12 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     setSpeed: async (speed) => {
       try {
         apply(await ipc.playerSetSpeed(speed))
+        // 倍速跟人走，不跟这条视频走：B 站也记住这个偏好。
+        try {
+          localStorage.setItem(SPEED_KEY, String(speed))
+        } catch {
+          // 隐私模式写不进去，只影响这次会话
+        }
       } catch {
         // 倍速失败不打断播放
       }
