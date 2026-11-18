@@ -292,6 +292,7 @@ pub use bilimusic_bili::comments::{Comment, CommentPage};
 pub use bilimusic_bili::messages::{MessageItem, MessageKind, MessagePage, MessageUnread, MessageUser};
 pub use bilimusic_bili::sync::{DynamicItem, DynamicPage, Followed, VideoShots};
 pub use bilimusic_bili::HotSearchItem;
+pub use bilimusic_bili::DanmakuLine;
 
 /// 观看页一次调用拿到的全部东西。前端看不到任何远端地址。
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -344,7 +344,7 @@ export function WatchPlayer({
     try {
       await ipc.danmakuSend(track.key, text, at, draftMode, draftColor)
       setDraft('')
-      onDanmakuSent({ at, text, color: cssColor(draftColor) })
+      onDanmakuSent({ at, text, color: cssColor(draftColor), mode: draftMode })
       poke()
     } catch (cause) {
       // 草稿留着，但失败原因要说出来：B 站限流时静默不动，看起来就是「点了没反应」。

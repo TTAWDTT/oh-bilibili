@@ -39,7 +39,7 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
     () =>
       sent.length === 0
         ? items
-        : [...items, ...sent.map((s) => ({ at: s.at, text: s.text, color: s.color }))].sort(
+        : [...items, ...sent.map((s) => ({ at: s.at, text: s.text, color: s.color, mode: 1 }))].sort(
             (a, b) => a.at - b.at,
           ),
     [items, sent],

@@ -1723,7 +1723,7 @@ impl Engine {
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
-    ) -> Result<Vec<(f64, String, u32)>, WireError> {
+    ) -> Result<Vec<crate::wire::DanmakuLine>, WireError> {
         Ok(self.source.danmaku_colored(key).await?)
     }
 

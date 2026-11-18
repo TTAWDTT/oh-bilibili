@@ -349,11 +349,15 @@ fn 弹幕能取到真实数据() {
         let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
         let list = engine.danmaku_colored(&key).await.expect("取弹幕");
         println!("共 {} 条弹幕", list.len());
-        for (at, text, color) in list.iter().take(3) {
-            println!("  {at:.1}s  {text}  #{color:06x}");
+        for line in list.iter().take(3) {
+            println!("  {:.1}s  {}  #{:06x}  mode {}", line.secs, line.text, line.color, line.mode);
         }
         assert!(list.len() > 50, "一条视频动辄上千条，实际只有 {}", list.len());
-        assert!(list.iter().any(|(_, t, _)| !t.is_empty()), "文本不该全空");
+        assert!(list.iter().any(|line| !line.text.is_empty()), "文本不该全空");
+        assert!(
+            list.iter().all(|line| matches!(line.mode, 1 | 4 | 5)),
+            "位置只该是 1 滚动 / 4 底部 / 5 顶部"
+        );
     });
 }
 
