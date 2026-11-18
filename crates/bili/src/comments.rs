@@ -42,6 +42,8 @@ pub struct Comment {
     pub liked: bool,
     /// 评论者戴的粉丝牌。没戴时为 None。
     pub medal: Option<CommentMedal>,
+    /// B 站给的 IP 属地，形如「IP属地：上海」。旧评论可能没有。
+    pub location: Option<String>,
 }
 
 /// 粉丝牌（接口里的 `member.fans_detail`）。颜色是 0xAARRGGBB，
@@ -103,6 +105,15 @@ struct RawReply {
     /// 当前用户操作状态：0 无、1 已点赞、2 已点踩。
     #[serde(default)]
     action: u32,
+    /// 评论控制信息。IP 属地在 `location` 里。
+    #[serde(default)]
+    reply_control: Option<RawReplyControl>,
+}
+
+#[derive(Deserialize)]
+struct RawReplyControl {
+    #[serde(default)]
+    location: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -230,6 +241,11 @@ fn to_comment(raw: RawReply) -> Comment {
         .take(3)
         .map(to_comment)
         .collect();
+    let location = raw
+        .reply_control
+        .and_then(|control| control.location)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
     let (text, emotes, mentions) = raw
         .content
         .map(|c| {
@@ -282,6 +298,7 @@ fn to_comment(raw: RawReply) -> Comment {
         up_liked,
         liked,
         medal,
+        location,
     }
 }
 
@@ -441,7 +458,17 @@ mod tests {
         assert_eq!(c.reply_count, 3);
         assert_eq!(c.replies.len(), 1);
         assert_eq!(c.replies[0].text, "回复一");
+        assert_eq!(c.location, None);
         assert!(page.has_more);
+    }
+
+    #[test]
+    fn 评论带出ip属地() {
+        let mut value = sample();
+        value["data"]["replies"][0]["reply_control"] =
+            serde_json::json!({ "location": "IP属地：上海" });
+        let page = cursor_page_from(&value, true);
+        assert_eq!(page.items[0].location.as_deref(), Some("IP属地：上海"));
     }
 
     #[test]

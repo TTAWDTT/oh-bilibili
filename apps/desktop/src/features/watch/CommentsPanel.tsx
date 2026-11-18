@@ -300,6 +300,11 @@ function CommentRow({
               <Icon name="thumbDown" size={12} />
             </span>
             <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
+            {c.location ? (
+              <span className="num hidden shrink-0 text-[11px] text-[var(--text-3)] md:inline">
+                {c.location}
+              </span>
+            ) : null}
             {depth > 0 && onDialog && (c.parent ?? 0) !== (c.root ?? 0) && (c.dialog ?? 0) > 0 ? (
               <button
                 type="button"
@@ -449,6 +454,11 @@ function DialogRow({ c, ownerMid }: { c: Comment; ownerMid: number | null }) {
             </span>
           ) : null}
           <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
+          {c.location ? (
+            <span className="num hidden shrink-0 text-[11px] text-[var(--text-3)] sm:inline">
+              {c.location}
+            </span>
+          ) : null}
         </div>
         <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
           <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
@@ -739,6 +749,7 @@ export function CommentsPanel({
             up_liked: false,
             liked: false,
             medal: null,
+            location: null,
           },
           ...prev,
         ])

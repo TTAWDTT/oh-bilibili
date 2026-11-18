@@ -87,6 +87,8 @@ export type Comment = {
   liked: boolean
   /** 评论者戴的粉丝牌。 */
   medal: CommentMedal | null
+  /** B 站给的 IP 属地，形如「IP属地：上海」。旧评论可能没有。 */
+  location: string | null
 }
 
 export type CommentPage = {
