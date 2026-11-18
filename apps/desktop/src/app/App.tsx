@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
 import { AuthorView } from '../features/library/AuthorView'
@@ -15,7 +15,7 @@ import { SearchView } from '../features/search/SearchView'
 import { SettingsView } from '../features/settings/SettingsView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
-import { useAppStore } from './appStore'
+import { glideCards, useAppStore } from './appStore'
 import { Sidebar } from './Sidebar'
 import { MobileTabBar } from './MobileTabBar'
 import { MobileRailSheet } from './MobileRailSheet'
@@ -137,6 +137,20 @@ function CurrentView({ view }: { view: View }) {
   }
 }
 
+/**
+ * 侧栏切换后把可见卡片从旧位置滑到新位置。
+ *
+ * 单独做成组件：App 本身不能订阅 sidebar，否则每次开合都会把整棵页面
+ * 子树重渲染一遍，比网格重排还贵。
+ */
+function SidebarGlide() {
+  const sidebar = useAppStore((state) => state.sidebar)
+  useLayoutEffect(() => {
+    glideCards()
+  }, [sidebar])
+  return null
+}
+
 export default function App() {
   useBootstrap()
   useShortcuts()
@@ -186,6 +200,7 @@ export default function App() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
       style={{ background: 'var(--color-ink)' }}>
+      <SidebarGlide />
       {/* 键盘用户跳过导航直达内容；不聚焦时不可见 */}
       <a
         href="#main-content"
