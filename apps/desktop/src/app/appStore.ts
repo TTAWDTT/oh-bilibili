@@ -1,6 +1,7 @@
 import type { Track } from '../shared/lib/contract'
 import type { MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
+import { flushSync } from 'react-dom'
 
 export type View =
   | { kind: 'home' }
@@ -29,6 +30,61 @@ export type ToastTone = 'error' | 'warn' | 'info' | 'success'
 export type Toast = { id: number; tone: ToastTone; title: string; detail: string | null }
 
 let toastSeq = 0
+
+let glideSeq = 0
+
+/**
+ * 侧边栏开合会换掉内容区的列数，整个网格一次性重排。
+ * 直接把结果怼到屏幕上就是一次硬跳；这里用 FLIP 把可见卡片从旧位置
+ * 平滑挪到新位置，重排仍然只发生一次，动的是 transform。
+ */
+function glideCards(apply: () => void): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    apply()
+    return
+  }
+  const seq = ++glideSeq
+  const scroller = document.getElementById('scroll-main')
+  const cards = scroller ? [...scroller.querySelectorAll<HTMLElement>('article[data-track-card]')] : []
+  const before = new Map<HTMLElement, DOMRect>()
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect()
+    if (rect.bottom > 0 && rect.top < window.innerHeight) before.set(card, rect)
+  }
+  flushSync(apply)
+  if (before.size === 0) return
+  const moved: HTMLElement[] = []
+  for (const [card, oldRect] of before) {
+    const rect = card.getBoundingClientRect()
+    const dx = oldRect.left - rect.left
+    const dy = oldRect.top - rect.top
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+    card.style.transition = 'none'
+    card.style.transform = `translate(${dx}px, ${dy}px)`
+    moved.push(card)
+  }
+  if (moved.length === 0) return
+  document.body.getBoundingClientRect()
+  let started = false
+  const start = (): void => {
+    if (started || seq !== glideSeq) return
+    started = true
+    for (const card of moved) {
+      card.style.transition = 'transform 220ms cubic-bezier(0.33, 1, 0.68, 1)'
+      card.style.transform = 'translate(0, 0)'
+    }
+  }
+  // 窗口被遮住时 rAF 会停摆，光靠 rAF 会把卡片永久停在反位移上。
+  requestAnimationFrame(start)
+  window.setTimeout(start, 50)
+  window.setTimeout(() => {
+    if (seq !== glideSeq) return
+    for (const card of moved) {
+      card.style.transition = ''
+      card.style.transform = ''
+    }
+  }, 320)
+}
 
 /** 左栏收起状态跟着窗口走：关掉再打开还是上次那种宽度。 */
 const SIDEBAR_KEY = 'oh-bilibili:sidebar'
@@ -111,7 +167,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   toggleSidebar: () => {
     const next: SidebarMode = get().sidebar === 'full' ? 'rail' : 'full'
     saveSidebar(next)
-    set({ sidebar: next })
+    glideCards(() => set({ sidebar: next }))
   },
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
