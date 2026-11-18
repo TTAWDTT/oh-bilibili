@@ -776,7 +776,12 @@ export function WatchPlayer({
           </div>
           <div className="flex items-center gap-2">
             {[
-              { on: liked, label: '点赞', run: onLike, icon: <BiliThumb size={16} /> },
+              {
+                on: liked,
+                label: liked ? '已点赞' : '点赞',
+                run: onLike,
+                icon: <BiliThumb size={16} />,
+              },
               {
                 on: coins > 0,
                 label: coins >= 2 ? '已投满' : '投币',
@@ -784,7 +789,12 @@ export function WatchPlayer({
                 icon: <BiliCoin size={16} />,
                 disabled: coins >= 2,
               },
-              { on: faved, label: '收藏', run: onFav, icon: <BiliStar size={16} /> },
+              {
+                on: faved,
+                label: faved ? '已收藏' : '收藏',
+                run: onFav,
+                icon: <BiliStar size={16} />,
+              },
             ].map((action) => (
               <button
                 key={action.label}
