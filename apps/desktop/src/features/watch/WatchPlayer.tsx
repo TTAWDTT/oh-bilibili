@@ -550,13 +550,20 @@ export function WatchPlayer({
   }, [data, retry])
 
   // 换档。shaka 按变体轨道的高度匹配，B 站的画质 id 不直接出现在变体上。
+  // 1080P 与 1080P+ 同高，只能再按码率找最近的一条；只按高度会永远选到高码率那档。
   const pickQuality = (q: QualityOption): void => {
     const player = playerRef.current
     if (!player) return
     const same = player.getVariantTracks().filter((t) => t.height === q.height)
     if (same.length === 0) return
-    // 同高度可能有多种码率，取最高的那条
-    const best = same.sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
+    const best =
+      q.bandwidth > 0
+        ? same.sort(
+            (a, b) =>
+              Math.abs((a.bandwidth ?? 0) - q.bandwidth) -
+              Math.abs((b.bandwidth ?? 0) - q.bandwidth),
+          )[0]
+        : same.sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
     if (!best) return
     player.selectVariantTrack(best, true)
     setActiveId(q.id)

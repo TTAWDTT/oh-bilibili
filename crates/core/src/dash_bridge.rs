@@ -13,6 +13,8 @@ pub struct QualityOption {
     pub label: String,
     pub width: u32,
     pub height: u32,
+    /// 源流码率。1080P 与 1080P+ 同高，切换时要靠它区分。
+    pub bandwidth: u64,
 }
 
 pub fn video_mpd(video: &[VideoStream], duration_ms: u64, handle_of: impl Fn(&str) -> String) -> String {
@@ -42,12 +44,14 @@ pub fn quality_list(video: &[VideoStream]) -> Vec<QualityOption> {
                     existing.width = v.width;
                     existing.height = v.height;
                 }
+                existing.bandwidth = existing.bandwidth.max(v.bandwidth);
             }
             None => out.push(QualityOption {
                 id: v.id,
                 label,
                 width: v.width,
                 height: v.height,
+                bandwidth: v.bandwidth,
             }),
         }
     }
@@ -84,5 +88,15 @@ mod tests {
         let list = quality_list(&fixture());
         assert_eq!(list[0].height, 1080);
         assert_eq!(list[0].label, "1080P+");
+    }
+
+    #[test]
+    fn 同高度档位保留各自码率() {
+        let list = quality_list(&fixture());
+        let p1080 = list.iter().find(|q| q.id == 80).expect("1080P");
+        let plus = list.iter().find(|q| q.id == 112).expect("1080P+");
+        assert_eq!(p1080.height, plus.height);
+        assert!(p1080.bandwidth > 0);
+        assert!(plus.bandwidth > p1080.bandwidth);
     }
 }
