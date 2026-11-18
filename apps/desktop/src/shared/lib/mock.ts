@@ -617,14 +617,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
     }
     case 'watch_replies': {
-      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      const cursor = typeof args.cursor === 'string' ? args.cursor : null
       return {
         total: 2,
-        page,
+        page: 0,
         next: null,
         has_more: false,
         items:
-          page === 1
+          cursor === null
             ? [
                 {
                   id: 'r1',

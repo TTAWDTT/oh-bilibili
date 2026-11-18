@@ -270,7 +270,7 @@ model  ← bili / store / audio
 | 观看页换片会压历史栈 | 相关推荐/自动连播用 `navigate`，返回要穿过一整条视频链 | 观看页内换片走 `replace`；发现页、搜索页、排行榜分区都把状态写进视图或会话缓存 |
 | 播放进度可能串轨 | 引擎还停在上一条时，界面读出别人的时钟，出现 `0:37 / 0:15` | 读进度前先比对 snapshot 的 track key，不是本条就归零 |
 | 端到端测试的等待窗口 | 网络慢时假红 | 等 3 秒、断言位置 > 800ms |
-| 评论接口的翻页方式 | 老 `x/v2/reply?pn=` 连翻十几页回 -352/412，随后全局冷却 60 秒，弹幕和取流一起停 | 主评论改走官方桌面端同款 `x/v2/reply/wbi/main`（`mode=3/2`、`pagination_str` 游标、`web_location=1315875`），楼中楼仍是 `reply/reply?pn=`；`signed_get_play` 不吃别的接口留下的冷却；评论预取降到一屏 |
+| 评论接口的翻页方式 | 老 `x/v2/reply?pn=` 连翻十几页回 -352/412，随后全局冷却 60 秒，弹幕和取流一起停 | 主评论改走官方桌面端同款 `x/v2/reply/wbi/main`（`mode=3/2`、`pagination_str` 游标、`web_location=1315875`），楼中楼改走 `x/v2/reply/detail`（`pagination_str` 游标、`plat=1`）；`signed_get_play` 不吃别的接口留下的冷却；评论预取降到一屏 |
 
 
 ## 接口可用性的实测结论
@@ -365,7 +365,7 @@ model  ← bili / store / audio
 | 评论 UP 主与时间 | 作者 mid 与视频作者相同标「UP主」；时间显示「N 天前 / MM-DD」；mid 是字符串，按 u64 解析曾把整页评论丢光，已修并加单测 |
 | 评论 UP 主置顶 | `data.upper.top.rpid` 是置顶那条的 rpid（`upper.rpid` 是空壳）；置顶可能在 `top_replies`、也可能就在普通分页里，两种都要处理。实测影视飓风那条：第一页 20 条、置顶 1 条排最前、25875 赞 |
 | 评论粉丝牌 | `member.fans_detail` 带勋章名、等级和 6 个颜色（0xAARRGGBB）；实测「飓风 18」按接口配色渲染在作者名前，粉白渐变 + 玫红边框，没戴牌不渲染。楼中楼共用同一个渲染函数 |
-| 楼中楼翻页 | `x/v2/reply/reply` 用 `oid + root + pn + ps` 取子回复，20 条一页；实测置顶评论 7580 条回复，展开第一页 20 条、再展开到 40 条，收起回到 3 条预览；展开的回复共用粉丝牌与表情渲染 |
+| 楼中楼翻页 | `x/v2/reply/detail` 用 `oid + root + pagination_str` 取子回复，游标在 `data.cursor.pagination_reply.next_offset`，条目在 `data.root.replies`，总数是 `data.root.rcount`；游标是不透明 base64，原样回填。实测 root 3596982434（3442 条）第一页 20 条 floor 1..29，第二页 20 条 floor 31..53，无重复。`dialog/cursor` 只给单条对话分支，不能拿来列楼（同一 root 传二级 dialog 只回 14 条）。收起再展开保留已翻到的页；展开的回复共用粉丝牌与表情渲染 |
 | 评论表情面板 | `x/emote/user/panel/web` 的全部面板包，再补 `x/emote/package?ids=6` 的经典 2233 娘包；点一个把代号插进草稿，实测 [呲牙] 写入成功 |
 | 退出停声 | 观看页点返回后，`sample` 显示音频线程停在信号量等待、不再解码；播放条也不出现 |
 | 拖到末尾 | 进度条提交 100% 按切歌处理；不会再出现参数类型错误，也不会原地重放同一首 |

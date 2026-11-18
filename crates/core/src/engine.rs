@@ -607,9 +607,9 @@ impl Engine {
         &self,
         key: &TrackKey,
         root: &str,
-        page: u32,
+        cursor: Option<&str>,
     ) -> Result<crate::wire::CommentPage, WireError> {
-        Ok(self.source.comment_replies(key, root, page.max(1)).await?)
+        Ok(self.source.comment_replies(key, root, cursor).await?)
     }
 
     pub async fn search_suggest(&self, term: &str) -> Result<Vec<String>, WireError> {

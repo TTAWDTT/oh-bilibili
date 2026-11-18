@@ -56,8 +56,9 @@ pub struct CommentMedal {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommentPage {
     pub total: u32,
+    /// 老的页码字段。翻页改游标后界面不再读它。
     pub page: u32,
-    /// 下一页的游标。只有主评论列表用它，楼中楼还是按页码翻。
+    /// 下一页的游标。主评论列表和楼中楼都用它翻页；没有下一页时为 None。
     pub next: Option<String>,
     pub items: Vec<Comment>,
     /// 还有下一页。
@@ -324,11 +325,20 @@ pub fn cursor_page_from(value: &serde_json::Value, first: bool) -> CommentPage {
     }
 }
 
-/// 从 `x/v2/reply/reply` 的响应里取一页楼中楼。
-pub fn replies_page_from(value: &serde_json::Value, page: u32, per_page: u32) -> CommentPage {
+/// 从 `x/v2/reply/detail` 的响应里取一页楼中楼。
+///
+/// 官方桌面端的楼中楼列表就走这个接口，翻页靠不透明的
+/// `cursor.pagination_reply.next_offset`；老的 `x/v2/reply/reply?pn=` 是页码协议。
+/// `dialog/cursor` 只返回某一条二级评论的对话分支，不是整栋楼，别拿它列楼层。
+pub fn detail_page_from(value: &serde_json::Value) -> CommentPage {
     let data = &value["data"];
-    let total = data["page"]["count"].as_u64().unwrap_or(0) as u32;
-    let items: Vec<Comment> = data["replies"]
+    let root = &data["root"];
+    // 真实响应里没有 data.page；总数在一级评论对象上。
+    let total = root["rcount"]
+        .as_u64()
+        .or_else(|| data["page"]["count"].as_u64())
+        .unwrap_or(0) as u32;
+    let items: Vec<Comment> = root["replies"]
         .as_array()
         .map(|list| {
             list.iter()
@@ -340,11 +350,16 @@ pub fn replies_page_from(value: &serde_json::Value, page: u32, per_page: u32) ->
                 .collect()
         })
         .unwrap_or_default();
+    let next = data["cursor"]["pagination_reply"]["next_offset"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let ended = data["cursor"]["is_end"].as_bool().unwrap_or(false);
     CommentPage {
         total,
-        page,
-        next: None,
-        has_more: page.saturating_mul(per_page) < total,
+        page: 0,
+        has_more: !ended && next.is_some(),
+        next,
         items,
     }
 }
@@ -612,34 +627,86 @@ mod tests {
     }
 
     #[test]
-    fn 楼中楼一页能解析出回复与还有更多() {
+    fn 楼中楼按游标解析出回复与下一页() {
+        // 照抄真实响应（BV1GJ411x7h7 / root 3596982434）的形状：
+        // 一级评论对象在 data.root，里层 replies 才是这一页的二级评论。
         let value = serde_json::json!({
             "code": 0,
             "data": {
-                "page": { "count": 25, "size": 20, "num": 1 },
-                "replies": [
-                    {
-                        "rpid_str": "777",
-                        "member": { "mid": "11", "uname": "甲" },
-                        "content": { "message": "第一条回复" },
-                        "like": 3,
-                        "ctime": 100
-                    },
-                    {
-                        "rpid_str": "888",
-                        "member": { "mid": "12", "uname": "乙" },
-                        "content": { "message": "第二条回复" },
-                        "like": 1,
-                        "ctime": 101
+                "root": {
+                    "rpid_str": "3596982434",
+                    "rcount": 3442,
+                    "replies": [
+                        {
+                            "rpid_str": "777",
+                            "root": "3596982434",
+                            "parent": "3596982434",
+                            "dialog": "777",
+                            "floor": 1,
+                            "member": { "mid": "11", "uname": "甲" },
+                            "content": { "message": "第一条回复" },
+                            "like": 3,
+                            "ctime": 100
+                        },
+                        {
+                            "rpid_str": "888",
+                            "root": "3596982434",
+                            "parent": "777",
+                            "dialog": "777",
+                            "floor": 2,
+                            "member": { "mid": "12", "uname": "乙" },
+                            "content": { "message": "第二条回复" },
+                            "like": 1,
+                            "ctime": 101
+                        }
+                    ]
+                },
+                "cursor": {
+                    "mode": 2,
+                    "is_begin": true,
+                    "is_end": false,
+                    "pagination_reply": {
+                        "next_offset": "offset-2"
                     }
-                ]
+                }
             }
         });
-        let page = replies_page_from(&value, 1, 20);
-        assert_eq!(page.total, 25);
+        let page = detail_page_from(&value);
+        assert_eq!(page.total, 3442);
         assert_eq!(page.items.len(), 2);
         assert_eq!(page.items[0].author, "甲");
         assert_eq!(page.items[1].text, "第二条回复");
+        assert_eq!(
+            page.next.as_deref(),
+            Some("offset-2")
+        );
         assert!(page.has_more);
+    }
+
+    #[test]
+    fn 楼中楼到底后不再要下一页() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "root": { "rpid_str": "1", "rcount": 21, "replies": [] },
+                "cursor": {
+                    "is_end": true,
+                    "pagination_reply": { "next_offset": "last" }
+                }
+            }
+        });
+        let page = detail_page_from(&value);
+        assert_eq!(page.total, 21);
+        assert!(page.items.is_empty());
+        assert!(!page.has_more);
+    }
+
+    #[test]
+    fn 楼中楼响应缺字段时给空页不报错() {
+        let page = detail_page_from(&serde_json::json!({ "code": -404 }));
+        assert_eq!(page.total, 0);
+        assert!(page.items.is_empty());
+        assert!(page.next.is_none());
+        assert!(!page.has_more);
     }
 }

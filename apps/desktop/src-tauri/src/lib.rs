@@ -225,10 +225,10 @@ async fn watch_replies(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     root: String,
-    page: u32,
+    cursor: Option<String>,
 ) -> Result<bilimusic_core::wire::CommentPage, WireError> {
     engine
-        .comment_replies(&TrackKey::from_provider(key), &root, page)
+        .comment_replies(&TrackKey::from_provider(key), &root, cursor.as_deref())
         .await
 }
 

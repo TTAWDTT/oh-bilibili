@@ -85,8 +85,9 @@ export type Comment = {
 
 export type CommentPage = {
   total: number
+  /** 老页码；翻页改游标后界面不再读它。 */
   page: number
-  /** 下一页的游标；主评论列表用它翻页，没有下一页时为 null。 */
+  /** 下一页的游标；主评论列表和楼中楼都用它翻页，没有下一页时为 null。 */
   next: string | null
   items: Comment[]
   has_more: boolean

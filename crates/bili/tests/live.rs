@@ -695,11 +695,12 @@ async fn 楼中楼能翻页() {
     );
 
     let first = source
-        .comment_replies(&key, &root.id, 1)
+        .comment_replies(&key, &root.id, None)
         .await
         .expect("第一页楼中楼");
+    let cursor = first.next.clone().expect("第一页之后应该还有下一页");
     let second = source
-        .comment_replies(&key, &root.id, 2)
+        .comment_replies(&key, &root.id, Some(&cursor))
         .await
         .expect("第二页楼中楼");
     println!(

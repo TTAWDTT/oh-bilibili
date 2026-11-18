@@ -177,7 +177,8 @@ function CommentRow({
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
   const [loadedReplies, setLoadedReplies] = useState<Comment[]>([])
-  const [repliesPage, setRepliesPage] = useState(0)
+  const [repliesCursor, setRepliesCursor] = useState<string | null>(null)
+  const [repliesLoaded, setRepliesLoaded] = useState(false)
   const [repliesHasMore, setRepliesHasMore] = useState(false)
   const [repliesLoading, setRepliesLoading] = useState(false)
   const [repliesError, setRepliesError] = useState(false)
@@ -201,20 +202,18 @@ function CommentRow({
     }
   }
 
-  const loadReplies = async (next: number): Promise<void> => {
+  const loadReplies = async (cursor: string | null): Promise<void> => {
     if (repliesLoading) return
     setRepliesLoading(true)
     setRepliesError(false)
     try {
-      const res = await ipc.watchReplies(trackKey, c.id, next)
-      if (next === 1) {
-        setLoadedReplies(res.items)
-        setRepliesOpen(true)
-      } else {
-        setLoadedReplies((prev) => [...prev, ...res.items])
-      }
-      setRepliesPage(res.page)
+      const res = await ipc.watchReplies(trackKey, c.id, cursor)
+      setLoadedReplies((prev) => (cursor === null ? res.items : [...prev, ...res.items]))
+      setRepliesCursor(res.next)
       setRepliesHasMore(res.has_more)
+      setRepliesLoaded(true)
+      // 只有首次展开才顺带开楼；收起期间返回的下一页不该把它掰回来。
+      if (cursor === null) setRepliesOpen(true)
     } catch {
       setRepliesError(true)
     } finally {
@@ -228,11 +227,12 @@ function CommentRow({
       setRepliesError(false)
       return
     }
-    if (repliesPage > 0) {
+    // 收起只隐藏；已经翻到的页和游标留着，再展开接着往下翻。
+    if (repliesLoaded) {
       setRepliesOpen(true)
       return
     }
-    void loadReplies(1)
+    void loadReplies(null)
   }
 
   const shownReplies = depth === 0 && repliesOpen ? loadedReplies : c.replies
@@ -343,7 +343,7 @@ function CommentRow({
                     ) : repliesError ? (
                       <button
                         type="button"
-                        onClick={() => void loadReplies(repliesPage + 1)}
+                        onClick={() => void loadReplies(repliesCursor)}
                         className="t press text-[var(--accent)] hover:opacity-80"
                       >
                         回复没取到，重试
@@ -351,7 +351,7 @@ function CommentRow({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => void loadReplies(repliesPage + 1)}
+                        onClick={() => void loadReplies(repliesCursor)}
                         className="t press inline-flex items-center gap-1 text-[var(--accent)] hover:opacity-80"
                       >
                         展开更多回复

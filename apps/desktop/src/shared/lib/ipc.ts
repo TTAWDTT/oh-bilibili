@@ -657,9 +657,9 @@ export function watchComments(key: string, cursor: string | null, hot = true): P
   return call<CommentPage>('watch_comments', { key, cursor, hot })
 }
 
-/** 取一页楼中楼。`root` 是一级评论的 rpid。 */
-export function watchReplies(key: string, root: string, page: number): Promise<CommentPage> {
-  return call<CommentPage>('watch_replies', { key, root, page })
+/** 取一页楼中楼。`root` 是一级评论的 rpid；`cursor` 是上一页的 next，第一页传 null。 */
+export function watchReplies(key: string, root: string, cursor: string | null): Promise<CommentPage> {
+  return call<CommentPage>('watch_replies', { key, root, cursor })
 }
 
 /** 热搜榜的一条。`keyword` 是真正要搜的词，`label` 是展示名。 */
