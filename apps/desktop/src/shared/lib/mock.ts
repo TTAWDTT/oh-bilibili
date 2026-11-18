@@ -755,8 +755,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return null
     case 'open_external':
       return null
-    case 'comment_del':
+    case 'comment_del': {
+      const list = sentComments.get(str(args, 'key'))
+      if (list) sentComments.set(str(args, 'key'), list.filter((c) => c.id !== str(args, 'rpid')))
       return null
+    }
     case 'comment_like':
       return null
     case 'comment_hate':

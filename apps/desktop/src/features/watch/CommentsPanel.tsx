@@ -166,6 +166,7 @@ function CommentRow({
   ownerMid,
   onReply,
   onDelete,
+  deleteFor,
   replyComposer,
   replyComposerFor,
   onDialog,
@@ -177,6 +178,8 @@ function CommentRow({
   ownerMid?: number | null | undefined
   onReply?: ((c: Comment) => void) | undefined
   onDelete?: ((c: Comment) => void) | undefined
+  /** 楼中楼里某一条能删时给按钮；根节点把同一个回调继续传下去。 */
+  deleteFor?: ((c: Comment) => ((c: Comment) => void) | undefined) | undefined
   replyComposer?: ReactNode
   /** 楼中楼里某一条要展开回复框时用；根节点把同一个回调继续传下去。 */
   replyComposerFor?: ((c: Comment) => ReactNode) | undefined
@@ -415,6 +418,8 @@ function CommentRow({
               trackKey={trackKey}
               ownerMid={ownerMid}
               onReply={onReply}
+              onDelete={deleteFor?.(r)}
+              deleteFor={deleteFor}
               replyComposerFor={replyComposerFor}
               replyComposer={replyComposerFor?.(r)}
               onDialog={onDialog}
@@ -1088,6 +1093,7 @@ export function CommentsPanel({
                 })
               }
               onDelete={mine.has(c.id) ? remove : undefined}
+              deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
               onPhoto={setPhoto}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
               replyComposerFor={(target) =>
