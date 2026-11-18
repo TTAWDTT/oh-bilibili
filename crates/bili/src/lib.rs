@@ -477,9 +477,80 @@ impl Source {
         self.client.precious().await
     }
 
-    /// 当前在看人数。
-    pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
-        self.client.online_count(bvid, cid).await
+    /// 观看页的元信息：在看人数 + 可用的字幕轨（同一个响应，只请求一次）。
+    pub async fn video_meta(&self, bvid: &str, cid: u64) -> Result<sync::VideoMeta, BiliError> {
+        self.client.video_meta(bvid, cid).await
+    }
+
+    /// 取一条字幕轨的全部台词。`lan` 传 `None` 时优先中文。
+    pub async fn subtitle_cues(
+        &self,
+        key: &TrackKey,
+        lan: Option<&str>,
+    ) -> Result<Vec<sync::SubtitleCue>, BiliError> {
+        let detail = self.detail(key).await?;
+        let value = self
+            .client
+            .signed_get_play(
+                &format!("{}/x/player/wbi/v2", client::API),
+                vec![
+                    ("bvid", key.as_opaque().to_string()),
+                    ("cid", detail.cid.to_string()),
+                ],
+                PLAY_INTERVAL,
+            )
+            .await?;
+        let list = value["data"]["subtitle"]["subtitles"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let usable: Vec<&serde_json::Value> = list
+            .iter()
+            .filter(|s| s["subtitle_url"].as_str().is_some_and(|u| !u.is_empty()))
+            .collect();
+        // 没指定语言就先中文（ai-zh / zh-CN 都算），再退第一条。
+        let picked = match lan {
+            Some(want) => usable.iter().find(|s| s["lan"].as_str() == Some(want)),
+            None => usable
+                .iter()
+                .find(|s| s["lan"].as_str().unwrap_or("").starts_with("zh"))
+                .or_else(|| usable.first()),
+        };
+        let Some(track) = picked else {
+            return Ok(Vec::new());
+        };
+        let url = track["subtitle_url"].as_str().unwrap_or("");
+        let absolute = if let Some(rest) = url.strip_prefix("//") {
+            format!("https:{rest}")
+        } else {
+            url.to_string()
+        };
+        // 正文在 CDN 上，是静态 JSON，不跟 B 站接口挤同一条串行闸门。
+        let body = self
+            .client
+            .get_json(&absolute, std::time::Duration::ZERO)
+            .await?;
+        Ok(body["body"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        let from = item["from"].as_f64()?.max(0.0);
+                        let to = item["to"].as_f64().unwrap_or(from).max(from);
+                        let text = item["content"].as_str()?.trim().to_string();
+                        if text.is_empty() {
+                            return None;
+                        }
+                        Some(sync::SubtitleCue {
+                            at_ms: (from * 1000.0).round() as u64,
+                            end_ms: (to * 1000.0).round() as u64,
+                            text,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     /// 进度条悬停预览的缩略图。

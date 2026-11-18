@@ -845,3 +845,33 @@ async fn 弹幕正文不带未解开的实体() {
     println!("共 {} 条，带未解开实体 {} 条", list.len(), dirty.len());
     assert!(dirty.is_empty(), "这些弹幕的实体没解开：{dirty:?}");
 }
+
+#[tokio::test]
+#[ignore = "真实网络，核对字幕轨与台词"]
+async fn 有字幕的视频能取到台词() {
+    let source = Source::open().await.expect("Source");
+    // 字幕（尤其 AI 字幕）只给登录用户，游客拿到的是空列表。
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
+        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+        source.import_cookies(&pairs);
+        let _ = source.refresh_session().await;
+    } else {
+        println!("没有 cookies.json，跳过");
+        return;
+    }
+    // BV1GJ411x7h7：这条挂了 12 条字幕轨（含 ai-zh）。
+    let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
+    let detail = source.detail(&key).await.expect("详情");
+    let meta = source.video_meta(&key.as_opaque(), detail.cid).await.expect("meta");
+    println!("在线 {}，字幕轨 {:?}", meta.online, meta.subtitles);
+    assert!(!meta.subtitles.is_empty(), "这条视频应该有字幕轨");
+
+    let cues = source.subtitle_cues(&key, None).await.expect("字幕");
+    println!("默认轨 {} 条，首条 {:?}", cues.len(), cues.first());
+    assert!(cues.len() > 20, "台词条数太少：{}", cues.len());
+    assert!(cues.iter().all(|c| c.end_ms >= c.at_ms), "结束时间不该早于开始");
+    assert!(cues.iter().all(|c| !c.text.is_empty()), "不该有空台词");
+}

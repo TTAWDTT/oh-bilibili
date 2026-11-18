@@ -653,13 +653,28 @@ async fn fav_covers(
     engine.fav_covers(folder_id, limit).await
 }
 
+/// 观看页元信息：在看人数 + 可用字幕轨（同一个响应，只请求一次）。
 #[tauri::command(rename_all = "snake_case")]
-async fn video_online(
+async fn watch_meta(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     cid: u64,
-) -> Result<u64, WireError> {
-    engine.online_count(&TrackKey::from_provider(key), cid).await
+) -> Result<bilimusic_core::wire::VideoMeta, WireError> {
+    engine
+        .watch_meta(&TrackKey::from_provider(key), cid)
+        .await
+}
+
+/// 一条字幕轨的全部台词。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_subtitles(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    lan: Option<String>,
+) -> Result<Vec<bilimusic_core::wire::SubtitleCue>, WireError> {
+    engine
+        .subtitle_cues(&TrackKey::from_provider(key), lan.as_deref())
+        .await
 }
 
 /// 进度条悬停预览的缩略图。
@@ -1127,7 +1142,8 @@ pub fn run() {
             precious,
             weekly_issues,
             weekly_issue,
-            video_online,
+            watch_meta,
+            watch_subtitles,
             video_shots,
             author_card,
             fav_tracks,

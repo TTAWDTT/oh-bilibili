@@ -1588,8 +1588,18 @@ impl Engine {
         })
     }
 
-    pub async fn online_count(&self, key: &TrackKey, cid: u64) -> Result<u64, WireError> {
-        Ok(self.source.online_count(&key.as_opaque(), cid).await?)
+    /// 观看页的元信息：在看人数与可用字幕轨。
+    pub async fn watch_meta(&self, key: &TrackKey, cid: u64) -> Result<crate::wire::VideoMeta, WireError> {
+        Ok(self.source.video_meta(&key.as_opaque(), cid).await?)
+    }
+
+    /// 一条字幕轨的全部台词。`lan` 为空时优先中文。
+    pub async fn subtitle_cues(
+        &self,
+        key: &TrackKey,
+        lan: Option<&str>,
+    ) -> Result<Vec<crate::wire::SubtitleCue>, WireError> {
+        Ok(self.source.subtitle_cues(key, lan).await?)
     }
 
     /// 进度条悬停预览用的缩略图雪碧图。

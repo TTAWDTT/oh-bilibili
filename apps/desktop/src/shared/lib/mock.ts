@@ -228,8 +228,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         tile_w: 480,
         tile_h: 270,
       }
-    case 'video_online':
-      return 128
+    case 'watch_meta':
+      return { online: 128, subtitles: [{ lan: 'zh-CN', label: '中文（中国）' }] }
+    case 'watch_subtitles':
+      return [
+        { at_ms: 0, end_ms: 2400, text: '预览字幕第一句' },
+        { at_ms: 2600, end_ms: 5200, text: '预览字幕第二句' },
+      ]
     case 'history_position':
       return null
     case 'fav_tracks': {
