@@ -7,6 +7,7 @@ import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
+import { Icon } from '../../shared/ui/Icon'
 import { CommentsPanel } from './CommentsPanel'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
@@ -28,6 +29,8 @@ export function WatchView({ track }: { track: Track }) {
   const goBack = useAppStore((s) => s.goBack)
   const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
+  const osFullscreen = useAppStore((s) => s.osFullscreen)
+  const setCinema = useAppStore((s) => s.setCinema)
   const [data, setData] = useState<WatchData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
@@ -299,6 +302,16 @@ export function WatchView({ track }: { track: Track }) {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {cinema && !osFullscreen ? (
+        <button
+          type="button"
+          onClick={() => setCinema(false)}
+          className="absolute right-4 top-4 z-50 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[12px] text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/75"
+        >
+          <Icon name="close" size={13} />
+          退出网页全屏
+        </button>
+      ) : null}
       <TripleBurst run={burst} />
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       {/* 返回在顶栏（TitleBar），不在画面上：浮在视频角上会挡住画面内容。 */}
