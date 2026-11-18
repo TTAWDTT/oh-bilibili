@@ -697,6 +697,16 @@ export function CommentsPanel({
   const [brokenEmotes, setBrokenEmotes] = useState<ReadonlySet<string>>(new Set())
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [photo, setPhoto] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!photo) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPhoto(null)
+    }
+    // 捕获阶段先接：播放器的全局快捷键也会处理 Esc，冒泡到 window 时可能已经被吞掉。
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [photo])
   const inputRef = useRef<HTMLInputElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
