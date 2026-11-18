@@ -45,6 +45,11 @@ export function WatchView({ track }: { track: Track }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const [page, setPage] = useState<number | undefined>(undefined)
+  // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
+  useEffect(() => {
+    if (page === undefined) return
+    document.getElementById('scroll-main')?.scrollTo({ top: 0 })
+  }, [page])
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
   const lastTrackRef = useRef<string | null>(null)
   const [nonce, setNonce] = useState(0)
