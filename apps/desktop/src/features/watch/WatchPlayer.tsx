@@ -18,6 +18,7 @@ import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
+import { BiliDanmakuSetting, BiliDanmakuSwitch } from '../../shared/ui/BiliDanmakuIcons'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
@@ -1006,13 +1007,14 @@ export function WatchPlayer({
           <button
             type="button"
             aria-pressed={danmakuOn}
+            aria-label={danmakuOn ? '关闭弹幕' : '打开弹幕'}
             title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
             onClick={() => setDanmakuEnabled(!danmakuOn)}
-            className={`t press flex h-7 shrink-0 items-center rounded-[4px] px-2 text-[12px] ${
-              danmakuOn ? 'bg-white/20' : 'text-white/60 hover:bg-white/10'
+            className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+              danmakuOn ? 'bg-white/20 text-white' : 'text-white/45 hover:bg-white/10 hover:text-white/70'
             }`}
           >
-            弹
+            <BiliDanmakuSwitch size={18} on={danmakuOn} />
           </button>
 
           {/* 字幕。没有字幕轨的条目不出现这颗按钮——B 站也是这样。 */}
@@ -1085,7 +1087,7 @@ export function WatchPlayer({
                 danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
-              <Icon name="gear" size={16} />
+              <BiliDanmakuSetting size={17} />
             </button>
             {danmakuPanel ? (
               <div className="absolute bottom-9 right-0 z-30 w-[236px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">

@@ -15,7 +15,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
   return (
     <div className="px-3 py-3">
       <div className="mb-1.5 flex items-center gap-2">
-        <h3 className="text-[14px] font-medium text-[var(--text-1)]">相关推荐</h3>
+        <h3 className="text-[14px] font-medium text-[var(--text-1)]">接下来播放</h3>
         <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
         {/* B 站把自动连播开关挂在相关推荐标题行右侧：不开播完不跳，不用等倒计时才关。 */}
         <button
@@ -40,7 +40,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
           </span>
         </button>
       </div>
-      <div className="flex flex-col gap-y-2.5">
+      <div className="flex flex-col gap-y-3">
         {items.map((item) => (
           <button
             key={item.key}
@@ -50,16 +50,21 @@ export function RelatedAside({ items }: { items: Track[] }) {
             className="group flex items-start gap-2 text-left"
           >
             <span
-              className="relative w-[136px] shrink-0 overflow-hidden rounded-[4px]"
-              style={{ aspectRatio: '16 / 10' }}
+              className="relative w-[160px] shrink-0 overflow-hidden rounded-[4px]"
+              style={{ aspectRatio: '16 / 9' }}
             >
-              <Cover cover={item.cover} title={item.title} width={136} className="h-full w-full" />
+              <Cover cover={item.cover} title={item.title} width={160} className="h-full w-full" />
               {/* B 站相关推荐的封面右下角挂着时长，扫一眼就知道要花多久。 */}
               {item.duration_ms ? (
                 <span className="num absolute bottom-0.5 right-1 rounded-[2px] bg-black/65 px-1 text-[10px] leading-[14px] text-white">
                   {formatDuration(item.duration_ms)}
                 </span>
               ) : null}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white">
+                  <Icon name="play" size={14} />
+                </span>
+              </span>
             </span>
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-[13.5px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">

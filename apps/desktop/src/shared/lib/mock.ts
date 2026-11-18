@@ -794,6 +794,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
       return { key, url: state.qr.url, expires_in_ms: state.qr.expiresIn }
     }
+    case 'qr_svg': {
+      const text = str(args, 'text')
+      const cells: string[] = []
+      for (let i = 0; i < 21 * 21; i += 1) {
+        if ((i * 7 + text.length) % 5 < 2) cells.push(`M${i % 21} ${Math.floor(i / 21)}h1v1h-1z`)
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 21 21" shape-rendering="crispEdges"><rect width="21" height="21" fill="#ffffff"/><path d="${cells.join('')}" fill="#000000"/></svg>`
+    }
     case 'auth_poll': {
       const key = str(args, 'key')
       if (!state.qr || state.qr.key !== key) return { state: 'expired', auth: null } satisfies QrStatus
