@@ -639,7 +639,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         next: null,
         has_more: false,
         items: [...mine, ...COMMENT_SEEDS.map((seed, i) => ({
-          id: `seed-${i}`,
+          id: i === 0 ? '1' : `seed-${i}`,
           mid: seed.mid,
           author: seed.author,
           avatar: null,

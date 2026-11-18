@@ -825,38 +825,60 @@ export function CommentsPanel({
     setError(null)
     try {
       // 回复一级评论时 root 就是它自己；回楼中楼时要挂在原来的根下面。
-      const rpid = await ipc.commentAdd(trackKey, text, replyTo?.root, replyTo?.id)
+      const target = replyTo
+      const rpid = await ipc.commentAdd(trackKey, text, target?.root, target?.id)
       setDraft('')
       setReplyTo(null)
       setEmojiOpen(false)
-      // 列表按热度排，刚发的没有热度，刷新也翻不到。把这条直接插到顶部，
-      // 用户才看得到自己刚发的东西，也才有地方删。
       if (rpid) {
         setMine((prev) => new Set(prev).add(rpid))
-        setItems((prev) => [
-          {
-            id: rpid,
-            mid: me?.mid ?? 0,
-            author: me?.uname ?? '我',
-            avatar: me?.avatar ?? null,
-            text,
-            emotes: [],
-            mentions: [],
-            pictures: [],
-            level: me?.level ?? 0,
-            likes: 0,
-            at: Math.floor(Date.now() / 1000),
-            replies: [],
-            reply_count: 0,
-            pinned: false,
-            up_liked: false,
-            liked: false,
-            disliked: false,
-            medal: null,
-            location: null,
-          },
-          ...prev,
-        ])
+        const numeric = (value: string): number => {
+          const parsed = Number(value)
+          return Number.isFinite(parsed) ? parsed : 0
+        }
+        const fresh: Comment = {
+          id: rpid,
+          root: numeric(target?.root ?? rpid),
+          parent: numeric(target?.id ?? rpid),
+          mid: me?.mid ?? 0,
+          author: me?.uname ?? '我',
+          avatar: me?.avatar ?? null,
+          text,
+          emotes: [],
+          mentions: [],
+          pictures: [],
+          level: me?.level ?? 0,
+          likes: 0,
+          at: Math.floor(Date.now() / 1000),
+          replies: [],
+          reply_count: 0,
+          pinned: false,
+          up_liked: false,
+          liked: false,
+          disliked: false,
+          medal: null,
+          location: null,
+        }
+        if (target) {
+          // 回复挂回原楼：一级评论补预览，楼中楼只加根评论的回复数。
+          const rootId = String(target.root)
+          setItems((prev) =>
+            prev.map((c) => {
+              if (c.id !== rootId) return c
+              const replies =
+                target.id === target.root
+                  ? [...c.replies, fresh].slice(0, 3)
+                  : c.replies.map((r) =>
+                      r.id === target.id ? { ...r, replies: [...r.replies, fresh].slice(0, 3) } : r,
+                    )
+              return { ...c, reply_count: c.reply_count + 1, replies }
+            }),
+          )
+        } else {
+          // 列表按热度排，刚发的没有热度，刷新也翻不到。直接插到顶部，
+          // 用户才看得到自己刚发的东西，也才有地方删。
+          setItems((prev) => [fresh, ...prev])
+        }
         setTotal((prev) => prev + 1)
       }
     } catch (e) {
