@@ -10,6 +10,7 @@ import { Avatar } from '../../shared/ui/Avatar'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
+import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
 
 /** 把一段纯文字里的 @名字 换成可点链接；名字必须出现在接口给的 members 里。 */
@@ -165,6 +166,7 @@ function CommentRow({
   onReply,
   onDelete,
   replyComposer,
+  onDialog,
 }: {
   c: Comment
   depth?: number
@@ -173,6 +175,7 @@ function CommentRow({
   onReply?: (c: Comment) => void
   onDelete?: ((c: Comment) => void) | undefined
   replyComposer?: ReactNode
+  onDialog?: ((c: Comment) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -297,6 +300,15 @@ function CommentRow({
               <Icon name="thumbDown" size={12} />
             </span>
             <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
+            {depth > 0 && onDialog && (c.parent ?? 0) !== (c.root ?? 0) && (c.dialog ?? 0) > 0 ? (
+              <button
+                type="button"
+                onClick={() => onDialog(c)}
+                className="t press shrink-0 text-[11px] text-[var(--accent)] hover:underline"
+              >
+                查看对话
+              </button>
+            ) : null}
             {depth === 0 && onReply ? (
               <button
                 type="button"
@@ -331,6 +343,7 @@ function CommentRow({
               depth={depth + 1}
               trackKey={trackKey}
               ownerMid={ownerMid}
+              onDialog={onDialog}
             />
           ))}
           {depth === 0 && (c.reply_count > c.replies.length || repliesOpen) ? (
@@ -406,6 +419,136 @@ function CommentRow({
  * 分页按需加载，滚动到底部自动取下一页。取不到内容时给明确文案，
  * 不白屏，也不影响看视频。
  */
+/** 对话里的一条。比列表里的评论少一排操作，只保留作者、等级、粉丝牌和正文。 */
+function DialogRow({ c, ownerMid }: { c: Comment; ownerMid: number | null }) {
+  const navigate = useAppStore((state) => state.navigate)
+  return (
+    <li className="flex items-start gap-2">
+      <span className="mt-0.5 shrink-0">
+        <Avatar src={c.avatar} alt={c.author} size={24} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          {c.medal ? <CommentMedalBadge medal={c.medal} /> : null}
+          {c.mid > 0 ? (
+            <button
+              type="button"
+              onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+              title={`看 ${c.author} 的空间`}
+              className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
+            >
+              {c.author}
+            </button>
+          ) : (
+            <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
+          )}
+          {c.level > 0 ? <LevelBadge level={c.level} /> : null}
+          {ownerMid !== null && c.mid === ownerMid ? (
+            <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+              UP主
+            </span>
+          ) : null}
+          <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">{formatRelative(c.at)}</span>
+        </div>
+        <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
+          <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
+        </p>
+      </div>
+    </li>
+  )
+}
+
+/** 查看对话：`dialog/cursor` 按一条对话分支翻页，和楼中楼列表是两支接口。 */
+function DialogModal({
+  open,
+  trackKey,
+  ownerMid,
+  root,
+  anchor,
+  onClose,
+}: {
+  open: boolean
+  trackKey: string
+  ownerMid: number | null
+  root: string
+  anchor: string
+  onClose: () => void
+}) {
+  const [items, setItems] = useState<Comment[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+  const loadingRef = useRef(false)
+
+  const load = async (next: string | null): Promise<void> => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    setLoading(true)
+    setError(false)
+    try {
+      const page = await ipc.watchDialog(trackKey, root, anchor, next)
+      setItems((prev) => (next === null ? page.items : [...prev, ...page.items]))
+      setCursor(page.next)
+      setHasMore(page.has_more)
+    } catch {
+      setError(true)
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return
+    setItems([])
+    setCursor(null)
+    setHasMore(false)
+    setError(false)
+    void load(null)
+    // load 依赖的参数都在这里，open 一变就重新取第一页。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, trackKey, root, anchor])
+
+  return (
+    <Modal open={open} title="对话" description={null} onClose={onClose} width="max-w-[560px]">
+      <ul className="max-h-[58vh] space-y-3 overflow-y-auto pr-1">
+        {items.map((c) => (
+          <DialogRow key={c.id} c={c} ownerMid={ownerMid} />
+        ))}
+      </ul>
+      {loading ? (
+        <div className="mt-3">
+          <BiliLoader compact label="正在取对话…" />
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mt-3 text-[12px] text-[var(--text-3)]">
+          <button
+            type="button"
+            onClick={() => void load(cursor)}
+            className="t press text-[var(--accent)] hover:underline"
+          >
+            对话没取到，重试
+          </button>
+        </div>
+      ) : null}
+      {hasMore && !loading && !error ? (
+        <button
+          type="button"
+          onClick={() => void load(cursor)}
+          className="t press mt-3 text-[12px] text-[var(--accent)] hover:underline"
+        >
+          展开更多
+        </button>
+      ) : null}
+      {!loading && items.length === 0 && !error ? (
+        <p className="py-4 text-center text-[12px] text-[var(--text-3)]">这条对话没有更多内容。</p>
+      ) : null}
+    </Modal>
+  )
+}
+
 export function CommentsPanel({
   trackKey,
   ownerMid = null,
@@ -428,6 +571,8 @@ export function CommentsPanel({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null)
+  /** 当前打开的对话分支：一级评论 + 分支里的二级评论。 */
+  const [dialog, setDialog] = useState<{ root: string; anchor: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
   const [mine, setMine] = useState<Set<string>>(new Set())
   /** 表情面板：代号 → 图片。第一次点开才取。 */
@@ -801,6 +946,11 @@ export function CommentsPanel({
               onReply={(target) => setReplyTo({ id: target.id, author: target.author })}
               onDelete={mine.has(c.id) ? remove : undefined}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
+              onDialog={(target) => {
+                if ((target.root ?? 0) > 0 && (target.dialog ?? 0) > 0) {
+                  setDialog({ root: String(target.root), anchor: String(target.dialog) })
+                }
+              }}
             />
           ))}
         </ul>
@@ -812,6 +962,14 @@ export function CommentsPanel({
         ) : null}
         {flow ? <div ref={sentinelRef} className="h-1" /> : null}
       </div>
+      <DialogModal
+        open={dialog !== null}
+        trackKey={trackKey}
+        ownerMid={ownerMid}
+        root={dialog?.root ?? ''}
+        anchor={dialog?.anchor ?? ''}
+        onClose={() => setDialog(null)}
+      />
     </div>
   )
 }

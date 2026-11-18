@@ -58,6 +58,12 @@ export type CommentMedal = {
 
 export type Comment = {
   id: string
+  /** 一级评论 rpid。楼中楼「查看对话」用它定位根。 */
+  root?: number
+  /** 直接回复的 rpid。等于 root 表示直接回一级评论。 */
+  parent?: number
+  /** 对话分支起点 rpid。`dialog/cursor` 用它。 */
+  dialog?: number
   /** 评论者 uid，用来标「UP主」。 */
   mid: number
   author: string
