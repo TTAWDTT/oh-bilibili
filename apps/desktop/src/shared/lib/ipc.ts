@@ -355,6 +355,20 @@ export function videoOnline(key: string, cid: number): Promise<number> {
   return call<number>('video_online', { key, cid })
 }
 
+/** 进度条悬停预览：一张切成 columns×rows 的雪碧图 + 每格对应的秒数。 */
+export type VideoShots = {
+  images: string[]
+  index: number[]
+  columns: number
+  rows: number
+  tile_w: number
+  tile_h: number
+}
+
+export function videoShots(key: string, cid: number): Promise<VideoShots> {
+  return call<VideoShots>('video_shots', { key, cid })
+}
+
 /** 某个收藏夹里的曲目。 */
 export function favTracks(folderId: number, page = 1): Promise<Track[]> {
   return call<Track[]>('fav_tracks', { folder_id: folderId, page })

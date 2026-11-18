@@ -1576,6 +1576,11 @@ impl Engine {
         Ok(self.source.online_count(&key.as_opaque(), cid).await?)
     }
 
+    /// 进度条悬停预览用的缩略图雪碧图。
+    pub async fn video_shots(&self, key: &TrackKey, cid: u64) -> Result<crate::wire::VideoShots, WireError> {
+        Ok(self.source.video_shots(&key.as_opaque(), cid).await?)
+    }
+
     pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
         for t in &tracks {
