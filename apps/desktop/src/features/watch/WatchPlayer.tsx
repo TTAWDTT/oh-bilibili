@@ -625,7 +625,7 @@ export function WatchPlayer({
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
   const [shots, setShots] = useState<ipc.VideoShots | null>(null)
   const shotsAsked = useRef(false)
-  const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number } | null>(null)
+  const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)
 
   const askShots = (): void => {
     if (shotsAsked.current || !cid) return
@@ -878,7 +878,9 @@ export function WatchPlayer({
             const ratio = (event.clientX - box.left) / box.width
             seekTo(ratio)
             // 点完鼠标就停在这一点上，预览跟着亮起来，和 B 站一致。
-            if (duration) setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000) })
+            if (duration) {
+              setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+            }
             askShots()
           }}
           // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
@@ -906,7 +908,7 @@ export function WatchPlayer({
             if (!duration) return
             const box = event.currentTarget.getBoundingClientRect()
             const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
-            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000) })
+            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
           }}
           onMouseLeave={() => setHoverAt(null)}
           className="group relative mb-1.5 h-3 cursor-pointer"
@@ -929,7 +931,12 @@ export function WatchPlayer({
               return (
                 <span
                   className="pointer-events-none absolute bottom-full z-30 mb-2 block h-[90px] w-[160px] -translate-x-1/2 overflow-hidden rounded-[4px] border border-white/25 bg-black shadow-[0_6px_20px_rgba(0,0,0,0.55)]"
-                  style={{ left: `${Math.min(94, Math.max(6, hoverAt.ratio * 100))}%` }}
+                  style={{
+                    left: Math.min(
+                      Math.max(hoverAt.ratio * hoverAt.width, 80),
+                      Math.max(80, hoverAt.width - 80),
+                    ),
+                  }}
                 >
                   {/* 雪碧图用 img 而不是 background-image：图片 CDN 对 tauri://localhost
                       这个 Referer 回 403，只有 referrerPolicy 才能把它去掉。 */}
