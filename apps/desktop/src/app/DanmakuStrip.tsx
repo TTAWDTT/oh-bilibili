@@ -45,10 +45,14 @@ export function DanmakuStrip() {
         if (cancelled) return
         setItems(
           list
-            .map(([secs, text, rgb]) => ({
-              at: Math.round(secs * 1000),
-              text,
-              color: rgb === 0xffffff ? 'var(--text-1)' : `#${rgb.toString(16).padStart(6, '0')}`,
+            .map((line) => ({
+              at: Math.round(line.secs * 1000),
+              text: line.text,
+              color:
+                line.color === 0xffffff
+                  ? 'var(--text-1)'
+                  : `#${line.color.toString(16).padStart(6, '0')}`,
+              mode: line.mode,
             }))
             .sort((a, b) => a.at - b.at),
         )

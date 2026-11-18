@@ -16,6 +16,7 @@ pub mod search;
 pub mod wbi;
 
 use bilimusic_model::{Millis, Quality, SearchQuery, Track, TrackKey};
+use serde::{Deserialize, Serialize};
 
 use crate::client::Client;
 use crate::error::BiliError;
@@ -86,8 +87,19 @@ pub struct SeasonEpisode {
     pub views: Option<u64>,
 }
 
+/// 一条弹幕。`mode` 是 B 站的位置：1 滚动、4 底部、5 顶部。
+///
+/// 以前只留了时间/文本/颜色，顶部和底部弹幕就都被当成滚动弹幕横向飞了。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DanmakuLine {
+    pub secs: f64,
+    pub text: String,
+    pub color: u32,
+    pub mode: u32,
+}
+
 /// 一个分P。
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PageRef {
     /// 从 1 开始的序号。
     pub no: u32,
@@ -884,7 +896,7 @@ impl Source {
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
-    ) -> Result<Vec<(f64, String, u32)>, BiliError> {
+    ) -> Result<Vec<DanmakuLine>, BiliError> {
         let detail = self.detail(key).await?;
         let items = self.danmaku_by_cid(detail.cid).await?;
         Ok(items)
@@ -896,7 +908,7 @@ impl Source {
             .danmaku_colored(key)
             .await?
             .into_iter()
-            .map(|(t, s, _)| (t, s))
+            .map(|line| (line.secs, line.text))
             .collect())
     }
 
@@ -904,7 +916,7 @@ impl Source {
         self.danmaku_texts(key).await
     }
 
-    async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<(f64, String, u32)>, BiliError> {
+    async fn danmaku_by_cid(&self, cid: u64) -> Result<Vec<DanmakuLine>, BiliError> {
         // x/v1/dm/list.so 现在返回一张 HTML 页，拿不到弹幕了（实测 3.4KB 的登录页）。
         // comment.bilibili.com 的 XML 还在，且一次给全量。
         let url = format!("https://comment.bilibili.com/{cid}.xml");
@@ -934,12 +946,22 @@ impl Source {
             let Some(p) = attrs.split('"').nth(1) else { continue };
             let fields: Vec<&str> = p.split(',').collect();
             let secs = fields.first().and_then(|t| t.parse::<f64>().ok()).unwrap_or(0.0);
-            // 第 4 个字段是十进制 RGB，B 站默认白色 16777215。
+            // 第 4 个字段是十进制 RGB，B 站默认白色 16777215；
+            // 第 2 个是位置：1 滚动、4 底部、5 顶部。
             let color = fields
                 .get(3)
                 .and_then(|t| t.parse::<u32>().ok())
                 .unwrap_or(0xFFFFFF);
-            out.push((secs, text.to_string(), color));
+            let mode = fields
+                .get(1)
+                .and_then(|t| t.parse::<u32>().ok())
+                .unwrap_or(1);
+            out.push(DanmakuLine {
+                secs,
+                text: text.to_string(),
+                color,
+                mode,
+            });
         }
         Ok(out)
     }

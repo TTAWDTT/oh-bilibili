@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { DanmakuLine } from '../../shared/lib/ipc'
 
-/** 一条弹幕：出现时刻（毫秒）、文本、颜色。 */
-export type DanmakuItem = { at: number; text: string; color: string }
+/** 一条弹幕：出现时刻（毫秒）、文本、颜色、位置（1 滚动 / 4 底部 / 5 顶部）。 */
+export type DanmakuItem = { at: number; text: string; color: string; mode: number }
 /** 屏幕上正在飘的一条，key 里带一个自增号，避免同文本去重。 */
 type Flight = DanmakuItem & { id: number; born: number; lane: number }
 
 const LIFE_MS = 9000
+/** 顶部/底部弹幕是钉住的，钉太久会糊住画面。 */
+const PINNED_MS = 4000
 const LANES = 10
 /** 多久检查一次「有哪些新弹幕该出现」。运动本身由 CSS 跑，不受这个频率影响。 */
 const SPAWN_TICK_MS = 220
@@ -17,6 +20,11 @@ const SPAWN_TICK_MS = 220
  * 只要前一条已经完全进入画面，这条车道就能再用。
  */
 const LANE_REUSE_RATIO = 0.16
+
+/** 一条弹幕该在屏幕上停留多久：滚动的按全场寿命，钉住的短一些。 */
+function pinnedLife(item: DanmakuItem, scrollLife: number): number {
+  return item.mode === 4 || item.mode === 5 ? PINNED_MS : scrollLife
+}
 
 /**
  * 弹幕层本体。
@@ -120,7 +128,7 @@ export function DanmakuField({
       lastPos.current = pos
 
       const prev = flightsRef.current
-      const alive = prev.filter((f) => pos - f.born < lifeMs)
+      const alive = prev.filter((f) => pos - f.born < pinnedLife(f, lifeMs))
       // 活着但已经过了独占期的车道要放回去，否则吞吐被寿命卡死。
       for (let c = 0; c < lanes; c += 1) {
         if (pos - laneBorn.current[c]! >= reuseMs) laneBorn.current[c] = -Infinity
@@ -140,6 +148,12 @@ export function DanmakuField({
       for (; i < all.length && all[i]!.at <= pos; i += 1) {
         const item = all[i]!
         if (alive.some((f) => f.at === item.at && f.text === item.text)) continue
+        // 顶部/底部弹幕不占车道，钉在画面上几秒就走。
+        if (item.mode === 4 || item.mode === 5) {
+          seq.current += 1
+          fresh.push({ ...item, id: seq.current, born: item.at, lane: -1 })
+          continue
+        }
         let lane = -1
         for (let c = 0; c < lanes; c += 1) {
           if (laneBorn.current[c] === -Infinity && !fresh.some((f) => f.lane === c)) {
@@ -180,8 +194,48 @@ export function DanmakuField({
       /* 把容器宽度交给 CSS：关键帧里用 -100% - 这个值，正好跑到左边缘外。 */
       style={{ ['--dm-travel' as string]: `${boxWidth}px` }}
     >
+      {enabled
+        ? flights
+            .filter((f) => f.mode === 5)
+            .map((f, index) => (
+              <span
+                key={f.id}
+                className="danmaku-pinned absolute left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap"
+                style={{
+                  top: `${6 + index * 1.6}%`,
+                  color: f.color,
+                  textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
+                  opacity: fade ? opacity * 0.85 : opacity,
+                  fontSize: `${size}px`,
+                }}
+              >
+                {f.text}
+              </span>
+            ))
+        : null}
+      {enabled
+        ? flights
+            .filter((f) => f.mode === 4)
+            .map((f, index) => (
+              <span
+                key={f.id}
+                className="danmaku-pinned absolute left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap"
+                style={{
+                  bottom: `${16 + index * 1.6}%`,
+                  color: f.color,
+                  textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
+                  opacity: fade ? opacity * 0.85 : opacity,
+                  fontSize: `${size}px`,
+                }}
+              >
+                {f.text}
+              </span>
+            ))
+        : null}
       {enabled && flights.length > 0
-        ? flights.map((f) => (
+        ? flights
+            .filter((f) => f.mode !== 4 && f.mode !== 5)
+            .map((f) => (
             <span
               key={f.id}
               className="danmaku absolute whitespace-nowrap"
@@ -205,13 +259,14 @@ export function DanmakuField({
   )
 }
 
-/** 把接口返回的 `[秒, 文本, 颜色]` 转成带毫秒时间轴的条目。 */
-export function toDanmakuItems(list: [number, string, number][]): DanmakuItem[] {
+/** 把接口返回的弹幕转成带毫秒时间轴的条目。 */
+export function toDanmakuItems(list: DanmakuLine[]): DanmakuItem[] {
   return list
-    .map(([secs, text, rgb]) => ({
-      at: Math.round(secs * 1000),
-      text,
-      color: rgb === 0xffffff ? 'var(--text-1)' : `#${rgb.toString(16).padStart(6, '0')}`,
+    .map((line) => ({
+      at: Math.round(line.secs * 1000),
+      text: line.text,
+      color: line.color === 0xffffff ? 'var(--text-1)' : `#${line.color.toString(16).padStart(6, '0')}`,
+      mode: line.mode,
     }))
     .sort((a, b) => a.at - b.at)
 }

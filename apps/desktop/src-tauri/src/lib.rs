@@ -96,7 +96,7 @@ async fn related(
 async fn danmaku_colored(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
-) -> Result<Vec<(f64, String, u32)>, WireError> {
+) -> Result<Vec<bilimusic_core::wire::DanmakuLine>, WireError> {
     engine.danmaku_colored(&TrackKey::from_provider(key)).await
 }
 

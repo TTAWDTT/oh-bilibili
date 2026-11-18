@@ -236,7 +236,7 @@ async fn 弹幕带真实颜色() {
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
     let items = source.danmaku_colored(&first.key).await.expect("弹幕");
-    let colored = items.iter().filter(|(_, _, c)| *c != 0xFFFFFF).count();
+    let colored = items.iter().filter(|line| line.color != 0xFFFFFF).count();
     println!("共 {} 条，其中 {} 条有彩色", items.len(), colored);
     assert!(!items.is_empty());
 }

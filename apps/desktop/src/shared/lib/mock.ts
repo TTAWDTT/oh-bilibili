@@ -712,7 +712,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         '前奏一响 青春就回来了', '谁 2026 年还在听', '音量调大', '泪目',
         '这个转场绝了', '单曲循环中', '干杯',
       ]
-      return texts.map((text, i) => [1 + i * 2, text, i % 4 === 0 ? 0xff6699 : 0xffffff])
+      // 第 3 条做成顶部弹幕、第 6 条做成底部，用来验证钉住的两种位置。
+      return texts.map((text, i) => ({
+        secs: 1 + i * 2,
+        text,
+        color: i % 4 === 0 ? 0xff6699 : 0xffffff,
+        mode: i === 2 ? 5 : i === 5 ? 4 : 1,
+      }))
     }
     case 'danmaku':
       return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']

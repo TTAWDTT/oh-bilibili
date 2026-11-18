@@ -26,12 +26,13 @@ export function CardDanmaku({ trackKey }: { trackKey: string }) {
       .then((list) => {
         if (!alive.current) return
         // 彩色弹幕优先：白字压在封面上不如彩色好看，全是白字的就退回白字
-        const colored = list.filter(([, , rgb]) => rgb !== 0xffffff)
+        const colored = list.filter((line) => line.color !== 0xffffff)
         const picked = (colored.length >= 3 ? colored : list).slice(0, 5)
         setLines(
-          picked.map(([, text, rgb]) => ({
-            text,
-            color: rgb === 0xffffff ? '#ffffff' : `#${rgb.toString(16).padStart(6, '0')}`,
+          picked.map((line) => ({
+            text: line.text,
+            color:
+              line.color === 0xffffff ? '#ffffff' : `#${line.color.toString(16).padStart(6, '0')}`,
           })),
         )
       })
