@@ -71,6 +71,28 @@ const DANMAKU_AREAS = [
 const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '0')}`
 
 /**
+ * 上次选的画质高度。B 站网页端会记住这个偏好，下次进视频直接用；
+ * 存高度而不是画质 id，因为 id 是每条视频自己的编号，跨视频没有意义。
+ */
+const QUALITY_KEY = 'bilimusic.quality'
+
+function loadQualityHeight(): number {
+  try {
+    return Number(localStorage.getItem(QUALITY_KEY) ?? 0) || 0
+  } catch {
+    return 0
+  }
+}
+
+function saveQualityHeight(height: number): void {
+  try {
+    localStorage.setItem(QUALITY_KEY, String(height))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
+/**
  * 把 shaka 的错误对象翻成一句人话。
  *
  * 直接 `String(e)` 会把整个对象、内部地址与压缩后的堆栈糊在画面上，
@@ -445,11 +467,18 @@ export function WatchPlayer({
         await player.load(data.manifest_url)
         // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
         // 否则按钮上只能显示兜底文案，用户不知道现在是多少。
-        if (wantHeight.current > 0) {
-          const match = player
-            .getVariantTracks()
-            .filter((t) => t.height === wantHeight.current)
+        // 降档重试优先；没有降档就按上次选的档位来。
+        const preferred = wantHeight.current || loadQualityHeight()
+        if (preferred > 0) {
+          const variants = player.getVariantTracks().filter((t) => (t.height ?? 0) > 0)
+          const exact = variants
+            .filter((t) => t.height === preferred)
             .sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
+          // 这条视频没有那一档（上次选了 1080P、这条最高 720P）就退到不超过它的最高档。
+          const lower = variants
+            .filter((t) => (t.height ?? 0) < preferred)
+            .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0]
+          const match = exact ?? lower
           if (match) player.selectVariantTrack(match, true)
           // 没有匹配到就没有「退档成功」可言，别再把它当成当前档。
           else wantHeight.current = 0
@@ -488,6 +517,7 @@ export function WatchPlayer({
     if (!best) return
     player.selectVariantTrack(best, true)
     setActiveId(q.id)
+    saveQualityHeight(q.height)
   }
 
   const duration = data.duration_ms || track.duration_ms || 0
