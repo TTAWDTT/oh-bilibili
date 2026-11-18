@@ -10,6 +10,7 @@ import { toastDone } from '../../app/notice'
 import { CommentsPanel } from './CommentsPanel'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
+import { PageList } from './PageList'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
@@ -354,7 +355,6 @@ export function WatchView({ track }: { track: Track }) {
             <WatchInfo
               track={track}
               data={data}
-              onPage={setPage}
               likeDelta={likeDelta}
               favDelta={favDelta}
               coinDelta={coinDelta}
@@ -389,6 +389,11 @@ export function WatchView({ track }: { track: Track }) {
               />
             </div>
           ) : null}
+          {!cinema && data && data.pages.length > 1 ? (
+            <div className="border-t border-hairline md:hidden">
+              <PageList pages={data.pages} current={data.current_page} onPage={setPage} />
+            </div>
+          ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           {!cinema && data?.season ? (
             <div className="border-t border-hairline md:hidden">
@@ -419,6 +424,7 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
+            {data ? <PageList pages={data.pages} current={data.current_page} onPage={setPage} /> : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>

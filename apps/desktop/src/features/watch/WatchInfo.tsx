@@ -145,7 +145,6 @@ export function WatchHead({
 export function WatchInfo({
   track,
   data,
-  onPage,
   likeDelta,
   favDelta,
   coinDelta,
@@ -158,7 +157,6 @@ export function WatchInfo({
 }: {
   track: Track
   data: WatchData
-  onPage: (no: number) => void
   /** 点赞与收藏的计数偏移由观看页统一持有，这里只负责显示。 */
   likeDelta: number
   favDelta: number
@@ -501,27 +499,6 @@ export function WatchInfo({
               className="t rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_10%,white)] px-2 text-[12px] leading-[22px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_18%,white)]"
             >
               {tag}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {data.pages.length > 1 ? (
-        <div className="no-scrollbar mt-3 flex gap-1 overflow-x-auto">
-          {data.pages.map((p) => (
-            <button
-              key={p.cid}
-              type="button"
-              aria-pressed={p.no === data.current_page}
-              onClick={() => onPage(p.no)}
-              title={p.title}
-              className={`t press shrink-0 rounded-[6px] px-2 py-1 text-[12px] ${
-                p.no === data.current_page
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)]'
-              }`}
-            >
-              P{p.no} {p.title.slice(0, 12) || '分P'}
             </button>
           ))}
         </div>
