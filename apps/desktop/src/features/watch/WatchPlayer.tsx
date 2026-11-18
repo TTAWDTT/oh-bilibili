@@ -73,16 +73,35 @@ const DANMAKU_AREAS = [
 const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '0')}`
 
 /**
- * 上次选的画质高度。B 站网页端会记住这个偏好，下次进视频直接用；
- * 存高度而不是画质 id，因为 id 是每条视频自己的编号，跨视频没有意义。
+ * 上次选的画质。B 站网页端会记住这个偏好，下次进视频直接用。
+ *
+ * 画质 id 是 B 站全局的档位编号（80=1080P、112=1080P+），跨视频通用；
+ * 只存高度会把同高的 1080P 和 1080P+ 混成一个，下次打开就落到高码率那档。
  */
 const QUALITY_KEY = 'bilimusic.quality'
+const QUALITY_ID_KEY = 'bilimusic.quality.id'
+
+function loadQualityId(): number {
+  try {
+    return Number(localStorage.getItem(QUALITY_ID_KEY) ?? 0) || 0
+  } catch {
+    return 0
+  }
+}
 
 function loadQualityHeight(): number {
   try {
     return Number(localStorage.getItem(QUALITY_KEY) ?? 0) || 0
   } catch {
     return 0
+  }
+}
+
+function saveQualityId(id: number): void {
+  try {
+    localStorage.setItem(QUALITY_ID_KEY, String(id))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
   }
 }
 
@@ -511,12 +530,20 @@ export function WatchPlayer({
         // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
         // 否则按钮上只能显示兜底文案，用户不知道现在是多少。
         // 降档重试优先；没有降档就按上次选的档位来。
-        const preferred = wantHeight.current || loadQualityHeight()
+        const preferredId = loadQualityId()
+        const preferredQuality = data.qualities.find((q) => q.id === preferredId)
+        const preferred = wantHeight.current || preferredQuality?.height || loadQualityHeight()
         if (preferred > 0) {
           const variants = player.getVariantTracks().filter((t) => (t.height ?? 0) > 0)
           const exact = variants
             .filter((t) => t.height === preferred)
-            .sort((a, b) => (b.bandwidth ?? 0) - (a.bandwidth ?? 0))[0]
+            .sort((a, b) => {
+              if (!preferredQuality) return (b.bandwidth ?? 0) - (a.bandwidth ?? 0)
+              return (
+                Math.abs((a.bandwidth ?? 0) - preferredQuality.bandwidth) -
+                Math.abs((b.bandwidth ?? 0) - preferredQuality.bandwidth)
+              )
+            })[0]
           // 这条视频没有那一档（上次选了 1080P、这条最高 720P）就退到不超过它的最高档。
           const lower = variants
             .filter((t) => (t.height ?? 0) < preferred)
@@ -529,7 +556,13 @@ export function WatchPlayer({
         const activeVariant = player.getVariantTracks().find((t) => t.active)
         if (activeVariant) {
           currentHeight.current = activeVariant.height
-          const match = data.qualities.find((q) => q.height === activeVariant.height)
+          const match = data.qualities
+            .filter((q) => q.height === activeVariant.height)
+            .sort(
+              (a, b) =>
+                Math.abs(a.bandwidth - (activeVariant.bandwidth ?? 0)) -
+                Math.abs(b.bandwidth - (activeVariant.bandwidth ?? 0)),
+            )[0]
           if (match) setActiveId(match.id)
         }
         if (cancelled) {
@@ -567,6 +600,7 @@ export function WatchPlayer({
     if (!best) return
     player.selectVariantTrack(best, true)
     setActiveId(q.id)
+    saveQualityId(q.id)
     saveQualityHeight(q.height)
   }
 
