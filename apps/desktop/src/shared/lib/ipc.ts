@@ -66,6 +66,11 @@ export function playerPlayContext(keys: string[], index: number): Promise<Player
   return call<PlayerSnapshot>('player_play_context', { keys, index })
 }
 
+/** 只暂停；已经在暂停时什么也不做。离开观看页用它收声音。 */
+export function playerPause(): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('player_pause', {})
+}
+
 export function playerToggle(): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_toggle', {})
 }

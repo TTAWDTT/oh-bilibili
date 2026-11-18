@@ -37,6 +37,9 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       playIndex(index)
       return snapshot()
     }
+    case 'player_pause':
+      if (state.phase === 'playing') state.phase = 'paused'
+      return snapshot()
     case 'player_toggle': {
       if (state.phase === 'playing') {
         state.phase = 'paused'
