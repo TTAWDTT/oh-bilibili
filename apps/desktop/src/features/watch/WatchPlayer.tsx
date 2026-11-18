@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '../../app/appStore'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -211,9 +211,37 @@ export function WatchPlayer({
   const danmakuSize = useDanmakuSettings((s) => s.size)
   const danmakuSpeed = useDanmakuSettings((s) => s.speed)
   const danmakuArea = useDanmakuSettings((s) => s.area)
+  const danmakuBlockWords = useDanmakuSettings((s) => s.blockWords)
+  const danmakuBlockTypes = useDanmakuSettings((s) => s.blockTypes)
   const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
   const patchDanmaku = useDanmakuSettings((s) => s.patch)
+  const setDanmakuBlockWords = useDanmakuSettings((s) => s.setBlockWords)
+  const toggleDanmakuBlockType = useDanmakuSettings((s) => s.toggleBlockType)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
+  const [blockDraft, setBlockDraft] = useState('')
+
+  /** 屏蔽词和屏蔽类型只作用于画面上的弹幕，右栏列表仍保留全部。 */
+  const visibleDanmaku = useMemo(() => {
+    const words = danmakuBlockWords.map((word) => word.trim().toLowerCase()).filter(Boolean)
+    const types = new Set(danmakuBlockTypes)
+    if (words.length === 0 && types.size === 0) return danmaku
+    return danmaku.filter((item) => {
+      const type = item.mode === 5 ? 'top' : item.mode === 4 ? 'bottom' : 'roll'
+      if (types.has(type)) return false
+      const text = item.text.toLowerCase()
+      return !words.some((word) => text.includes(word))
+    })
+  }, [danmaku, danmakuBlockWords, danmakuBlockTypes])
+
+  const addBlockWords = (): void => {
+    const words = blockDraft
+      .split(/[\s,，]+/)
+      .map((word) => word.trim().toLowerCase())
+      .filter(Boolean)
+    if (words.length === 0) return
+    setDanmakuBlockWords([...new Set([...danmakuBlockWords, ...words])])
+    setBlockDraft('')
+  }
 
   /** 引擎可能停在另一条视频上（比如这条没打开），别把别人的时间当成本条。 */
   const localPlayhead = (): number => {
@@ -665,7 +693,7 @@ export function WatchPlayer({
         aria-label="视频画面"
       />
       <DanmakuField
-        items={danmaku}
+        items={visibleDanmaku}
         position={() => Math.round(localPlayhead())}
         playing={playing}
         enabled={danmakuOn}
@@ -883,7 +911,7 @@ export function WatchPlayer({
           onMouseLeave={() => setHoverAt(null)}
           className="group relative mb-1.5 h-3 cursor-pointer"
         >
-          <DanmakuBeats items={danmaku} durationMs={duration} />
+          <DanmakuBeats items={visibleDanmaku} durationMs={duration} />
           {hoverAt ? (
             (() => {
               const shot = shotAt(hoverAt.second)
@@ -1090,7 +1118,7 @@ export function WatchPlayer({
               <BiliDanmakuSetting size={17} />
             </button>
             {danmakuPanel ? (
-              <div className="absolute bottom-9 right-0 z-30 w-[236px] rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+              <div className="absolute bottom-9 right-0 z-30 max-h-[70vh] w-[236px] overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
                 <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
                   <span>显示区域</span>
                   <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
@@ -1135,6 +1163,81 @@ export function WatchPlayer({
                     />
                   </label>
                 ))}
+
+                <div className="border-t border-white/10 pt-2">
+                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                    <span>屏蔽类型</span>
+                  </div>
+                  <div className="mt-1.5 flex gap-1">
+                    {(
+                      [
+                        { value: 'roll', name: '滚动' },
+                        { value: 'top', name: '顶部' },
+                        { value: 'bottom', name: '底部' },
+                      ] as const
+                    ).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={danmakuBlockTypes.includes(option.value)}
+                        onClick={() => toggleDanmakuBlockType(option.value)}
+                        className={`t press flex-1 rounded-[4px] py-1 text-[11px] leading-none ${
+                          danmakuBlockTypes.includes(option.value)
+                            ? 'bg-[var(--accent)] text-white'
+                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                        }`}
+                      >
+                        {option.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-2">
+                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
+                    <span>屏蔽词</span>
+                    {danmakuBlockWords.length > 0 ? (
+                      <span className="num">{danmakuBlockWords.length} 个</span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1.5 flex gap-1">
+                    <input
+                      value={blockDraft}
+                      onChange={(event) => setBlockDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addBlockWords()
+                        }
+                      }}
+                      placeholder="输入后回车"
+                      className="h-6 min-w-0 flex-1 rounded-[3px] border border-white/15 bg-white/[0.08] px-1.5 text-[11px] text-white placeholder-white/45 outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={addBlockWords}
+                      className="t press h-6 rounded-[3px] bg-white/10 px-2 text-[11px] text-white/80 hover:bg-white/20"
+                    >
+                      加
+                    </button>
+                  </div>
+                  {danmakuBlockWords.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {danmakuBlockWords.map((word) => (
+                        <button
+                          key={word}
+                          type="button"
+                          onClick={() =>
+                            setDanmakuBlockWords(danmakuBlockWords.filter((item) => item !== word))
+                          }
+                          className="t press rounded-[3px] bg-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:bg-white/20"
+                        >
+                          {word} ×
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="border-t border-white/10 pt-2">
                   <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
