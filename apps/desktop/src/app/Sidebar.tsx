@@ -70,7 +70,7 @@ export function Sidebar() {
         ].join(' ')}
       >
         <Icon name={entry.icon} size={16} className={active ? 'bili-icon-pop' : ''} />
-        {collapsed ? null : entry.label}
+        {collapsed ? null : <span className="bili-sidebar-label min-w-0 truncate">{entry.label}</span>}
       </button>
     )
   }
@@ -107,7 +107,7 @@ export function Sidebar() {
           }`}
         >
           <Icon name="chevronLeft" size={15} className={collapsed ? 'rotate-180' : ''} />
-          {collapsed ? null : '收起'}
+          {collapsed ? null : <span className="bili-sidebar-label">收起</span>}
         </button>
       </div>
     </nav>

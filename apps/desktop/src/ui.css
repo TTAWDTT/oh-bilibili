@@ -391,11 +391,32 @@
   box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
 }
 
-/* 侧边栏收起/展开：只动宽度，标签直接切掉不参与动画，
-   免得文字在 60px 里被挤成一行一行的。 */
+/* 侧边栏收起/展开不做宽度过渡。
+   宽度一变，发现页那几十张卡片每帧都要重新排版，160ms 的过渡就是十来次全量
+   reflow，点起来一顿一顿的。宽度瞬切只有一次重排，文字用透明度过一下眼。 */
 .bili-sidebar {
-  transition: width 160ms var(--ease);
+  contain: layout paint;
 }
+
+.bili-sidebar-label {
+  animation: bili-sidebar-label-in 120ms var(--ease);
+}
+
+@keyframes bili-sidebar-label-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bili-sidebar-label {
+    animation: none;
+  }
+}
+
 
 /* 卡片进场：错峰淡入上移。--i 是序号，由组件传入 */
 @keyframes bili-card-in {
