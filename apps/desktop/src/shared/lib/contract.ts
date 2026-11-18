@@ -189,6 +189,8 @@ export type QualityOption = {
   label: string
   width: number
   height: number
+  /** 源流码率。1080P 与 1080P+ 同高，切换时要靠它区分。 */
+  bandwidth: number
 }
 
 export type VideoMeta = {
