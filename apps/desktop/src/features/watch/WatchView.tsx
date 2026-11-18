@@ -53,6 +53,11 @@ export function WatchView({ track }: { track: Track }) {
     if (page === undefined) return
     document.getElementById('scroll-main')?.scrollTo({ top: 0 })
   }, [page])
+  /** 换 P 是另一条播放位置，不能沿用这条视频上次的续播点。 */
+  const changePage = (no: number): void => {
+    setResume(null)
+    setPage(no)
+  }
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
   const lastTrackRef = useRef<string | null>(null)
   const [nonce, setNonce] = useState(0)
@@ -404,7 +409,7 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
             <div className="border-t border-hairline md:hidden">
-              <PageList pages={data.pages} current={page ?? data.current_page} onPage={setPage} />
+              <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} />
             </div>
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
@@ -437,7 +442,7 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
-            {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={setPage} /> : null}
+            {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} /> : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>
