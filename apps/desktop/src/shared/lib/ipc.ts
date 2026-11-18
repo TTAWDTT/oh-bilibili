@@ -355,9 +355,21 @@ export function precious(): Promise<PreciousView> {
   return call<PreciousView>('precious', {})
 }
 
-/** 当前在看人数。 */
-export function videoOnline(key: string, cid: number): Promise<number> {
-  return call<number>('video_online', { key, cid })
+/** 一条字幕：出现在 `at_ms`，`end_ms` 之后不该再显示。 */
+export type SubtitleCue = { at_ms: number; end_ms: number; text: string }
+
+export type SubtitleTrack = { lan: string; label: string }
+
+/** 观看页元信息：在看人数 + 可用字幕轨（后端一次请求拿齐）。 */
+export type WatchMeta = { online: number; subtitles: SubtitleTrack[] }
+
+export function watchMeta(key: string, cid: number): Promise<WatchMeta> {
+  return call<WatchMeta>('watch_meta', { key, cid })
+}
+
+/** 取一条字幕轨的全部台词；`lan` 为空时后端优先中文。 */
+export function watchSubtitles(key: string, lan: string | null): Promise<SubtitleCue[]> {
+  return call<SubtitleCue[]>('watch_subtitles', { key, lan })
 }
 
 /** 进度条悬停预览：一张切成 columns×rows 的雪碧图 + 每格对应的秒数。 */

@@ -755,3 +755,48 @@ async fn fav_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::Track
         .expect("查状态");
     rows[0].2
 }
+
+#[test]
+#[ignore = "真实网络，核对引擎层的字幕元信息"]
+fn 观看页元信息带出字幕轨() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-meta-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    if let Some(src) = dirs_cookies() {
+        let _ = std::fs::copy(&src, dir.join("cookies.json"));
+    }
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    rt.block_on(async {
+        let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
+        let detail = engine.video_meta(&key).await.expect("详情");
+        let _ = detail;
+        let view = engine.open_watch_page(&key, "http://127.0.0.1:1", None).await;
+        // open_watch_page 会真的去拉流，这里只关心 cid 能取到
+        let cid = match view {
+            Ok(v) => v.pages.iter().find(|p| p.no == v.current_page).map(|p| p.cid).unwrap_or(0),
+            Err(_) => 0,
+        };
+        if cid == 0 {
+            println!("跳过：拿不到 cid");
+            return;
+        }
+        let meta = engine.watch_meta(&key, cid).await.expect("元信息");
+        println!("在线 {}，字幕轨 {}", meta.online, meta.subtitles.len());
+        // B 站对连续请求会临时隐藏字幕列表（实测同一视频先 12 条、几次请求后 0 条），
+        // 所以只断言「要么有轨、要么明确为空」，不把限流当成失败。
+        if meta.subtitles.is_empty() {
+            println!("跳过：这次没拿到字幕轨（B 站可能临时隐藏了字幕列表）");
+            return;
+        }
+        let cues = engine
+            .subtitle_cues(&key, Some(&meta.subtitles[0].lan))
+            .await
+            .expect("字幕");
+        println!("首轨 {} 条台词，首句 {:?}", cues.len(), cues.first());
+        assert!(!cues.is_empty(), "有字幕轨就该取得到台词");
+        assert!(cues.iter().all(|c| c.end_ms >= c.at_ms), "结束时间不该早于开始");
+    });
+}

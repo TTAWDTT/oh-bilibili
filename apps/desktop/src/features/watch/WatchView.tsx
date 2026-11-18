@@ -47,6 +47,8 @@ export function WatchView({ track }: { track: Track }) {
   const [nonce, setNonce] = useState(0)
   /** 当前在看人数。取不到就不显示，不猜。 */
   const [online, setOnline] = useState<number | null>(null)
+  /** 这条视频有哪些字幕轨；空表示没有字幕，播放器就不放「字幕」按钮。 */
+  const [subTracks, setSubTracks] = useState<ipc.SubtitleTrack[]>([])
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
   const [resume, setResume] = useState<{ key: string; at: number } | null>(null)
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
@@ -63,10 +65,13 @@ export function WatchView({ track }: { track: Track }) {
     if (!cid) return
     let cancelled = false
     setOnline(null)
+    setSubTracks([])
     void ipc
-      .videoOnline(track.key, cid)
-      .then((count) => {
-        if (!cancelled) setOnline(count)
+      .watchMeta(track.key, cid)
+      .then((meta) => {
+        if (cancelled) return
+        setOnline(meta.online)
+        setSubTracks(meta.subtitles)
       })
       .catch(() => {})
     return () => {
@@ -314,6 +319,7 @@ export function WatchView({ track }: { track: Track }) {
                 track={track}
                 data={data}
                 danmaku={danmaku}
+                subtitleTracks={subTracks}
                 onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
                 liked={liked}
                 faved={faved}

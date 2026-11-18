@@ -32,6 +32,30 @@ pub struct UserHit {
     pub live: bool,
 }
 
+/// 观看页的元信息：在看人数与字幕轨。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VideoMeta {
+    pub online: u64,
+    /// 可用的字幕轨。空表示这条视频没有字幕，播放器就不放「字幕」按钮。
+    pub subtitles: Vec<SubtitleTrack>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubtitleTrack {
+    /// B 站的语言码：`ai-zh`、`zh-CN`、`en-US` 等。
+    pub lan: String,
+    /// 展示名：中文、英文…
+    pub label: String,
+}
+
+/// 一条字幕：出现在 `at_ms`，`end_ms` 之后就不该再显示。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubtitleCue {
+    pub at_ms: u64,
+    pub end_ms: u64,
+    pub text: String,
+}
+
 /// 进度条悬停预览用的视频缩略图。
 ///
 /// B 站给的是雪碧图：`images` 里每张切成 `columns × rows` 格，`index` 是每格对应的
@@ -1005,11 +1029,11 @@ impl Client {
         })
     }
 
-    /// 当前在看人数。B 站视频页把它挂在播放量与弹幕后面。
+    /// 观看页要的两件小事：当前在看人数、这条视频有哪些字幕轨。
     ///
-    /// 走 wbi 版：官方桌面端播放器请求的就是 /x/player/wbi/v2，未签名的
-    /// /x/player/v2 在频繁进入视频页时更容易吃到 -352。
-    pub async fn online_count(&self, bvid: &str, cid: u64) -> Result<u64, BiliError> {
+    /// 两者都在 `/x/player/wbi/v2` 的同一个响应里，所以合成一次请求：
+    /// 为字幕再发一次同样的请求是白花一次往返。
+    pub async fn video_meta(&self, bvid: &str, cid: u64) -> Result<VideoMeta, BiliError> {
         let v = self
             .signed_get(
                 &format!("{API}/x/player/wbi/v2"),
@@ -1020,7 +1044,31 @@ impl Client {
                 std::time::Duration::from_millis(300),
             )
             .await?;
-        Ok(v["data"]["online_count"].as_u64().unwrap_or(0))
+        // 已经下架 / 地区受限的稿件这里会回非 0，但仍然给了 online_count=0，
+        // 不把它当成错误：标题行少一个数字比整页报错好。
+        let tracks = v["data"]["subtitle"]["subtitles"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|s| {
+                        let lan = s["lan"].as_str()?.to_string();
+                        // 没挂译文地址的轨点了也放不出来（未登录时 B 站会给空串）。
+                        let url = s["subtitle_url"].as_str().unwrap_or("");
+                        if url.is_empty() {
+                            return None;
+                        }
+                        Some(SubtitleTrack {
+                            lan,
+                            label: s["lan_doc"].as_str().unwrap_or("").to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(VideoMeta {
+            online: v["data"]["online_count"].as_u64().unwrap_or(0),
+            subtitles: tracks,
+        })
     }
 
     /// 正在直播的房间推荐：B 站首页右栏最上面那一块就是它。

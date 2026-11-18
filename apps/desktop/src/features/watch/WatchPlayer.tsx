@@ -121,6 +121,7 @@ export function WatchPlayer({
   track,
   data,
   danmaku,
+  subtitleTracks,
   onDanmakuSent,
   onLike,
   onFav,
@@ -136,6 +137,8 @@ export function WatchPlayer({
   track: Track
   data: WatchData
   danmaku: DanmakuItem[]
+  /** 这条视频的可用字幕轨。空表示没有字幕，控制条上就不出现「字幕」按钮。 */
+  subtitleTracks: ipc.SubtitleTrack[]
   onDanmakuSent: (item: DanmakuItem) => void
   /** 播完之后的收尾。B 站也是在这时候把三连与重播摆到画面上。 */
   onLike: () => void
@@ -169,6 +172,13 @@ export function WatchPlayer({
   const [qualityOpen, setQualityOpen] = useState(false)
   const [speedOpen, setSpeedOpen] = useState(false)
   const [now, setNow] = useState(0)
+  /**
+   * 字幕：开着哪一轨（null 表示关）。台词只在打开时取一次，
+   * 不在每次进视频都白拉一份 JSON——多数字幕轨是 AI 生成的长列表。
+   */
+  const [subTrack, setSubTrack] = useState<string | null>(null)
+  const [subCues, setSubCues] = useState<ipc.SubtitleCue[] | null>(null)
+  const [subMenu, setSubMenu] = useState(false)
   const [draft, setDraft] = useState('')
   /** 发弹幕时用的颜色与位置，和 B 站播放器那排按钮一致。 */
   const [draftColor, setDraftColor] = useState(0xffffff)
@@ -420,6 +430,9 @@ export function WatchPlayer({
     setRetry(0)
     audioAnchor.current = null
     audioLive.current = false
+    // 字幕属于上一条：换片就该关掉，别把上一部的台词挂在新画面上。
+    setSubTrack(null)
+    setSubMenu(false)
     // 时间与续播提示也属于上一条，跟着清单一起换掉。
     setNow(0)
     setResumeNotice(null)
@@ -534,6 +547,48 @@ export function WatchPlayer({
   const duration = data.duration_ms || track.duration_ms || 0
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
 
+  /** 当前该显示哪句字幕。台词按开始时间升序，取最后一条已经开始的。 */
+  const cue = (() => {
+    if (!subCues || subCues.length === 0) return null
+    const at = now
+    let lo = 0
+    let hi = subCues.length - 1
+    let hit: ipc.SubtitleCue | null = null
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      const line = subCues[mid]!
+      if (line.at_ms <= at) {
+        hit = line
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    // 已经过了这句的结束时间就是空档，不该把上一句一直挂着。
+    return hit && at <= hit.end_ms ? hit : null
+  })()
+
+  // 打开字幕时取台词；关掉就清空，避免下次换轨还显示旧的一轨。
+  useEffect(() => {
+    if (subTrack === null) {
+      setSubCues(null)
+      return
+    }
+    let cancelled = false
+    setSubCues(null)
+    void ipc
+      .watchSubtitles(track.key, subTrack)
+      .then((cues) => {
+        if (!cancelled) setSubCues(cues)
+      })
+      .catch(() => {
+        if (!cancelled) setSubCues([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [subTrack, track.key])
+
   /** 简介里的章节。没有就整条进度条一根刻度都不画。 */
   const chapters = chaptersFrom(data.desc)
 
@@ -619,6 +674,17 @@ export function WatchPlayer({
         area={danmakuArea}
         fade
       />
+      {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}
+      {cue ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[9%] z-[3] flex justify-center px-10">
+          <span
+            className="max-w-[86%] rounded-[3px] bg-black/55 px-2 py-0.5 text-center leading-[1.45] text-white"
+            style={{ fontSize: `${Math.max(13, danmakuSize + 3)}px`, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
+          >
+            {cue.text}
+          </span>
+        </div>
+      ) : null}
       {!ready && !error ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
           <BiliLoader label="正在取流…" />
@@ -948,6 +1014,60 @@ export function WatchPlayer({
           >
             弹
           </button>
+
+          {/* 字幕。没有字幕轨的条目不出现这颗按钮——B 站也是这样。 */}
+          {subtitleTracks.length > 0 ? (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setDanmakuPanel(false)
+                  setQualityOpen(false)
+                  setSpeedOpen(false)
+                  setSubMenu((open) => !open)
+                }}
+                aria-expanded={subMenu}
+                aria-label="字幕"
+                title="字幕"
+                className={`bili-icon-btn t press flex h-7 shrink-0 items-center justify-center rounded-[4px] px-1.5 text-[11px] font-medium tracking-wide ${
+                  subTrack ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
+                }`}
+              >
+                CC
+              </button>
+              {subMenu ? (
+                <div className="absolute bottom-9 right-0 z-30 flex max-h-[260px] w-[168px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubTrack(null)
+                      setSubMenu(false)
+                    }}
+                    className={`t press px-3 py-1 text-left text-[12px] ${
+                      subTrack === null ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                    }`}
+                  >
+                    关闭字幕
+                  </button>
+                  {subtitleTracks.map((t) => (
+                    <button
+                      key={t.lan}
+                      type="button"
+                      onClick={() => {
+                        setSubTrack(t.lan)
+                        setSubMenu(false)
+                      }}
+                      className={`t press px-3 py-1 text-left text-[12px] ${
+                        subTrack === t.lan ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                      }`}
+                    >
+                      {t.label || t.lan}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮：显示区域、样式、颜色、位置都在这里。 */}
           <div className="relative shrink-0">
