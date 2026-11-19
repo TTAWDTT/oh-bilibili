@@ -123,7 +123,17 @@ export function WatchHead({
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
         <span className="num">{formatCount(data.stats.views)} 播放</span>
         <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
-        <span className="num">{formatCount(data.stats.replies)} 评论</span>
+        <button
+          type="button"
+          onClick={() =>
+            document
+              .getElementById('watch-comments')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+          className="num t hover:text-[var(--accent)]"
+        >
+          {formatCount(data.stats.replies)} 评论
+        </button>
         {online !== null && online > 0 ? (
           <span className="num">{formatCount(online)} 人在看</span>
         ) : null}
