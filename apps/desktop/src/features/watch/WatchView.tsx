@@ -233,6 +233,21 @@ export function WatchView({ track }: { track: Track }) {
     }
   }
 
+  const currentPageNo = page ?? data?.current_page ?? 1
+  const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
+  const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
+  const nextTitle = nextPage
+    ? nextPage.title || `第 ${nextPage.no} P`
+    : related[0]?.title ?? null
+  const playNext = (): void => {
+    if (nextPage) {
+      changePage(nextPage.no)
+      return
+    }
+    const track = related[0]
+    if (track) replace({ kind: 'watch', track })
+  }
+
   // 取清单与档位
   useEffect(() => {
     let cancelled = false
@@ -361,8 +376,8 @@ export function WatchView({ track }: { track: Track }) {
                 onReplay={() => {
                   void ipc.playerReplay().catch(() => {})
                 }}
-                next={related[0] ?? null}
-                onNext={(nextTrack) => replace({ kind: 'watch', track: nextTrack })}
+                nextTitle={nextTitle}
+                onNext={playNext}
                 resumeAt={resume?.key === track.key ? resume.at : null}
               />
             </div>

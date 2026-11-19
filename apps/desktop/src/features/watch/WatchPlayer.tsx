@@ -149,7 +149,7 @@ export function WatchPlayer({
   onFav,
   onCoin,
   onReplay,
-  next,
+  nextTitle,
   onNext,
   resumeAt,
   liked,
@@ -168,9 +168,9 @@ export function WatchPlayer({
   /** 已投出去的币数，0/1/2。三连里投币要按真实状态置灰。 */
   onCoin: () => void
   onReplay: () => void
-  /** 相关推荐里的下一个，播完给个出口。 */
-  next: Track | null
-  onNext: (track: Track) => void
+  /** 播完后的下一集标题；多 P 先走下一 P，否则走相关推荐。 */
+  nextTitle: string | null
+  onNext: () => void
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
   liked: boolean
@@ -226,6 +226,7 @@ export function WatchPlayer({
   /** 鼠标停在倒计时行上时冻结倒计时，给「取消」留出点击时间。 */
   const countdownHovered = useRef(false)
   const [countdownHover, setCountdownHover] = useState(false)
+  const nextFired = useRef(false)
   const autoplay = useAutoplay((state) => state.enabled)
   const setAutoplay = useAutoplay((state) => state.setEnabled)
   const loopOne = useLoopOne((state) => state.enabled)
@@ -235,6 +236,11 @@ export function WatchPlayer({
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
+  const advance = (): void => {
+    if (nextFired.current) return
+    nextFired.current = true
+    onNextRef.current()
+  }
   const onReplayRef = useRef(onReplay)
   onReplayRef.current = onReplay
 
@@ -296,7 +302,11 @@ export function WatchPlayer({
 
   // 播完自动进下一个：倒计时期间随时可以手动跳或关掉自动连播。
   useEffect(() => {
-    if (!ended || !next || !autoplay || loopOne) {
+    if (!ended) nextFired.current = false
+  }, [ended])
+
+  useEffect(() => {
+    if (!ended || !nextTitle || !autoplay || loopOne || nextFired.current) {
       setCountdown(null)
       setCountdownCancelled(false)
       return
@@ -314,7 +324,7 @@ export function WatchPlayer({
       if (left <= 0) window.clearInterval(timer)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [ended, next, autoplay, loopOne, countdownCancelled])
+  }, [ended, nextTitle, autoplay, loopOne, countdownCancelled])
 
   /**
    * 单集循环：播完直接把时间拉回 0 继续放。
@@ -329,10 +339,10 @@ export function WatchPlayer({
   }, [ended, loopOne])
 
   useEffect(() => {
-    if (countdown === 0 && ended && next && !countdownCancelled && !countdownHovered.current) {
-      onNextRef.current(next)
+    if (countdown === 0 && ended && nextTitle && !countdownCancelled && !countdownHovered.current) {
+      advance()
     }
-  }, [countdown, countdownHover, ended, next, countdownCancelled])
+  }, [countdown, countdownHover, ended, nextTitle, countdownCancelled])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
@@ -914,10 +924,10 @@ export function WatchPlayer({
               <Icon name="refresh" size={15} />
               重播
             </button>
-            {next ? (
+            {nextTitle ? (
               <button
                 type="button"
-                onClick={() => onNext(next)}
+                onClick={advance}
                 className="t press flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-4 text-[13px] text-white hover:border-white/70"
               >
                 <Icon name="play" size={14} />
@@ -925,7 +935,7 @@ export function WatchPlayer({
               </button>
             ) : null}
           </div>
-          {next ? (
+          {nextTitle ? (
             <div className="flex flex-col items-center gap-1.5">
               {autoplay && countdown !== null ? (
                 <div
@@ -941,11 +951,11 @@ export function WatchPlayer({
                 >
                   <button
                     type="button"
-                    onClick={() => onNext(next)}
+                    onClick={advance}
                     className="t max-w-full truncate text-[12px] text-white/65 hover:text-white"
-                    title={next.title}
+                    title={nextTitle}
                   >
-                    {countdown} 秒后自动播放：{next.title}
+                    {countdown} 秒后自动播放：{nextTitle}
                   </button>
                   <button
                     type="button"
