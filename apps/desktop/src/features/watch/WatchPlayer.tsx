@@ -211,6 +211,10 @@ export function WatchPlayer({
   const [playing, setPlaying] = useState(false)
   /** 播到结尾就掀开三连面板。 */
   const [finished, setFinished] = useState(false)
+  /** 仅开发页：`?forceEnded=1` 直接把结束卡拉起来，用来验自动连播与取消。 */
+  const forceEnded =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).has('forceEnded')
+  const ended = finished || forceEnded
   /** 「已为你定位」提示里显示的位置；null 表示这条不该续播或用户已经撤销。 */
   const [resumeNotice, setResumeNotice] = useState<number | null>(null)
   /** 自动连播的倒计时；关掉开关或没有下一个时为空。 */
@@ -286,7 +290,7 @@ export function WatchPlayer({
 
   // 播完自动进下一个：倒计时期间随时可以手动跳或关掉自动连播。
   useEffect(() => {
-    if (!finished || !next || !autoplay) {
+    if (!ended || !next || !autoplay) {
       setCountdown(null)
       setCountdownCancelled(false)
       return
@@ -304,13 +308,13 @@ export function WatchPlayer({
       if (left <= 0) window.clearInterval(timer)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [finished, next, autoplay, countdownCancelled])
+  }, [ended, next, autoplay, countdownCancelled])
 
   useEffect(() => {
-    if (countdown === 0 && finished && next && !countdownCancelled && !countdownHovered.current) {
+    if (countdown === 0 && ended && next && !countdownCancelled && !countdownHovered.current) {
       onNextRef.current(next)
     }
-  }, [countdown, countdownHover, finished, next, countdownCancelled])
+  }, [countdown, countdownHover, ended, next, countdownCancelled])
 
   // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
@@ -773,14 +777,14 @@ export function WatchPlayer({
           <BiliLoader label="正在取流…" />
         </div>
       ) : null}
-      {error ? (
+      {error && !forceEnded ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">
           <span>{error}</span>
         </div>
       ) : null}
 
       {/* 播完掀开的三连。B 站视频放完也是这一张：UP 头像、一句邀请、三个按钮。 */}
-      {finished && !error ? (
+      {ended && (!error || forceEnded) ? (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/75 px-6 text-center text-white backdrop-blur-[2px]">
           <Avatar src={data.owner_avatar ?? null} alt={data.owner} size={56} />
           <div>
