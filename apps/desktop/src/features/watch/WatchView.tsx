@@ -407,6 +407,11 @@ export function WatchView({ track }: { track: Track }) {
               }
             />
           ) : null}
+          {!cinema && danmaku.length > 0 ? (
+            <div className="border-t border-hairline md:hidden">
+              <DanmakuList items={danmaku} />
+            </div>
+          ) : null}
           {!cinema && data && data.pages.length > 1 ? (
             <div className="border-t border-hairline md:hidden">
               <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} />
