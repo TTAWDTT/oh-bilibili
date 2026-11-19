@@ -195,7 +195,7 @@ export function WatchInfo({
   onTriple: () => void
   /** 简介里的时间戳跳转。 */
   onSeek: (ms: number) => void
-  /** 宽屏主栏的 UP 主行，插在标签之后、分P 之前。 */
+  /** 窄屏主栏的 UP 主行；宽屏只在右栏放名片。 */
   ownerRow?: React.ReactNode
 }) {
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
@@ -655,7 +655,7 @@ export function WatchInfo({
         </div>
       </Modal>
 
-      {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}
+      {/* B 站宽屏只在右栏放 UP 名片；窄屏没有右栏，这里补一行。 */}
       {ownerRow ? <div className="mt-1">{ownerRow}</div> : null}
 
       {data.desc ? (
