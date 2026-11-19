@@ -162,21 +162,24 @@ export function OwnerCard({
           ) : null}
         </div>
       </div>
-      {/* 关注靠右一颗窄胶囊：占满整行的话，右栏一窄就像一条横贯的色带。 */}
-      <div className="flex items-center justify-end">
+      {/* 粉丝数跟关注按钮分开：关注后按钮换成「已关注」，粉丝数不该跟着消失。 */}
+      <div className="flex items-center gap-2">
+        {card ? (
+          <span className="num text-[12px] text-[var(--text-3)]">
+            {formatCount(Math.max(0, card.fans + (fansDelta ?? 0)))} 粉丝
+          </span>
+        ) : null}
         <button
           type="button"
           aria-pressed={followed === true}
           onClick={onFollow}
-          className={`t press flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
+          className={`t press ml-auto flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
             followed === true
               ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
               : 'bg-[var(--accent)] text-white hover:opacity-90'
           }`}
         >
-          {followed === true
-            ? '已关注'
-            : `+ 关注 ${card ? formatCount(Math.max(0, card.fans + (fansDelta ?? 0))) : ''}`.trim()}
+          {followed === true ? '已关注' : '+ 关注'}
         </button>
       </div>
       {hoverCard}
