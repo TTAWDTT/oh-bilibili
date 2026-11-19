@@ -197,10 +197,8 @@ export function WatchView({ track }: { track: Track }) {
         return
       }
       const at = usePlayerStore.getState().progress.position_ms
-      if (at < 5000) {
-        clearPagePos(track.key, no)
-        return
-      }
+      // 刚切 P 时声音还没起来，进度会短暂为 0；这时不能清掉这一 P 的记录。
+      if (at < 5000) return
       if (data.duration_ms > 0 && at > data.duration_ms - 10_000) return
       savePagePos(track.key, no, at)
     }
