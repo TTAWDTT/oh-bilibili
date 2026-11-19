@@ -201,6 +201,8 @@ export function WatchPlayer({
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  /** 播放器自己报的缓冲态：卡住时画面上要有转圈，不然只能看到画面定格。 */
+  const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
   const [controls, setControls] = useState(true)
   const [qualityOpen, setQualityOpen] = useState(false)
@@ -580,6 +582,10 @@ export function WatchPlayer({
         shaka.polyfill?.installAll?.()
         const player = new shaka.Player(video)
         playerRef.current = player
+        player.addEventListener('buffering', (event: { detail?: unknown }) => {
+          const detail = event.detail as { buffering?: boolean } | undefined
+          if (!cancelled) setBuffering(Boolean(detail?.buffering))
+        })
         player.addEventListener('error', (event: { detail?: unknown }) => {
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
           const detail = event.detail as { handled?: boolean } | undefined
@@ -648,6 +654,7 @@ export function WatchPlayer({
           await player.destroy()
           return
         }
+        setBuffering(false)
         setReady(true)
       } catch (e) {
         if (!cancelled) setError(describePlaybackError(e))
@@ -963,6 +970,25 @@ export function WatchPlayer({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
           <BiliLoader label="正在取流…" />
         </div>
+      ) : null}
+      {ready && buffering && !ended && !error ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-white/85">
+          <span className="bili-buffer-spin h-9 w-9 rounded-full border-2 border-white/25 border-t-white" />
+          <span className="text-[12px]">正在缓冲…</span>
+        </div>
+      ) : null}
+      {ready && !playing && !buffering && !ended && !error ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            togglePlay()
+          }}
+          aria-label="播放"
+          className="t press absolute left-1/2 top-1/2 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/25 backdrop-blur-[2px] hover:bg-black/60"
+        >
+          <Icon name="play" size={24} />
+        </button>
       ) : null}
       {error && !forceEnded ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">

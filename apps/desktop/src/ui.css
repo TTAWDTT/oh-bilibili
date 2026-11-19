@@ -315,6 +315,22 @@
   }
 }
 
+@keyframes bili-buffer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bili-buffer-spin {
+  animation: bili-buffer-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bili-buffer-spin {
+    animation-duration: 2.4s;
+  }
+}
+
 .bili-live-dot {
   width: 5px;
   height: 5px;
