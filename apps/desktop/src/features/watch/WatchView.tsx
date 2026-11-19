@@ -19,6 +19,23 @@ import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
 import { FavPicker } from '../library/FavPicker'
 
+function loadWatchPage(key: string): number | null {
+  try {
+    const page = Number(localStorage.getItem(`oh-bilibili:watch-page:${key}`))
+    return Number.isInteger(page) && page > 0 ? page : null
+  } catch {
+    return null
+  }
+}
+
+function saveWatchPage(key: string, page: number): void {
+  try {
+    localStorage.setItem(`oh-bilibili:watch-page:${key}`, String(page))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
 /**
  * 观看页。只负责取数与拼装：播放器、信息区、评论区、右栏各是一块。
  *
@@ -47,7 +64,10 @@ export function WatchView({ track }: { track: Track }) {
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
-  const [page, setPage] = useState<number | undefined>(undefined)
+  const [page, setPage] = useState<number | undefined>(
+    () => loadWatchPage(track.key) ?? undefined,
+  )
+  const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
     if (page === undefined) return
@@ -57,6 +77,7 @@ export function WatchView({ track }: { track: Track }) {
   const changePage = (no: number): void => {
     setResume(null)
     setPage(no)
+    saveWatchPage(track.key, no)
   }
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
   const lastTrackRef = useRef<string | null>(null)
@@ -112,6 +133,8 @@ export function WatchView({ track }: { track: Track }) {
   useEffect(() => {
     let cancelled = false
     setResume(null)
+    // 从记住的 P 打开时不沿用 bvid 级历史：它可能属于上一 P。
+    if (initialStoredPage.current) return
     void ipc
       .historyPosition(track.key)
       .then((at) => {
@@ -260,7 +283,14 @@ export function WatchView({ track }: { track: Track }) {
     void (async () => {
       try {
         const next = await ipc.watchOpen(track.key, page)
-        if (!cancelled) setData(next)
+        if (!cancelled) {
+          initialStoredPage.current = false
+          if (page !== undefined && !next.pages.some((entry) => entry.no === page)) {
+            setPage(next.current_page)
+            saveWatchPage(track.key, next.current_page)
+          }
+          setData(next)
+        }
       } catch (e) {
         if (!cancelled) setError(toWireError(e).message)
       }
