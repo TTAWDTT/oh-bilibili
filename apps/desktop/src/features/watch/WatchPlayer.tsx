@@ -1206,6 +1206,16 @@ export function WatchPlayer({
 
           <button
             type="button"
+            onClick={captureShot}
+            aria-label="截图"
+            title="截图"
+            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15"
+          >
+            <Icon name="camera" size={16} />
+          </button>
+
+          <button
+            type="button"
             aria-pressed={danmakuOn}
             aria-label={danmakuOn ? '关闭弹幕' : '打开弹幕'}
             title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
