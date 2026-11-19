@@ -366,7 +366,12 @@ export type SubtitleCue = { at_ms: number; end_ms: number; text: string }
 export type SubtitleTrack = { lan: string; label: string }
 
 /** 观看页元信息：在看人数 + 可用字幕轨（后端一次请求拿齐）。 */
-export type WatchMeta = { online: number; subtitles: SubtitleTrack[] }
+export type WatchMeta = {
+  online: number
+  subtitles: SubtitleTrack[]
+  /** UP 主设的播放器章节；`at_ms` 已从接口的秒换算成毫秒。 */
+  chapters: { at_ms: number; title: string }[]
+}
 
 export function watchMeta(key: string, cid: number): Promise<WatchMeta> {
   return call<WatchMeta>('watch_meta', { key, cid })

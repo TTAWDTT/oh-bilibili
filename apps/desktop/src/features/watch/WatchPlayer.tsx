@@ -7,7 +7,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
-import { chaptersFrom } from '../../shared/lib/chapters'
+import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { DanmakuBeats } from '../player/DanmakuBeats'
@@ -152,6 +152,7 @@ export function WatchPlayer({
   nextTitle,
   onNext,
   resumeAt,
+  chapters: chapterMeta,
   liked,
   faved,
   coins,
@@ -173,6 +174,8 @@ export function WatchPlayer({
   onNext: () => void
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
+  /** UP 主设的章节；空表时退回简介里的时间戳。 */
+  chapters: Chapter[]
   liked: boolean
   faved: boolean
   coins: number
@@ -718,8 +721,8 @@ export function WatchPlayer({
     }
   }, [subTrack, track.key])
 
-  /** 简介里的章节。没有就整条进度条一根刻度都不画。 */
-  const chapters = chaptersFrom(data.desc)
+  /** 章节优先用 UP 主设的，没设过再看简介里有没有时间戳。 */
+  const chapters = chapterMeta.length > 0 ? chapterMeta : chaptersFrom(data.desc)
 
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0

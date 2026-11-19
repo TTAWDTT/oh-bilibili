@@ -9,6 +9,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone } from '../../app/notice'
 import { Icon } from '../../shared/ui/Icon'
 import { CommentsPanel } from './CommentsPanel'
+import { ChapterList } from './ChapterList'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
 import { PageList } from './PageList'
@@ -123,6 +124,8 @@ export function WatchView({ track }: { track: Track }) {
   const [online, setOnline] = useState<number | null>(null)
   /** 这条视频有哪些字幕轨；空表示没有字幕，播放器就不放「字幕」按钮。 */
   const [subTracks, setSubTracks] = useState<ipc.SubtitleTrack[]>([])
+  /** UP 主设的章节。 */
+  const [metaChapters, setMetaChapters] = useState<{ at_ms: number; title: string }[]>([])
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
   const [resume, setResume] = useState<{ key: string; at: number } | null>(
     storedPagePos ? { key: track.key, at: storedPagePos } : null,
@@ -142,12 +145,14 @@ export function WatchView({ track }: { track: Track }) {
     let cancelled = false
     setOnline(null)
     setSubTracks([])
+    setMetaChapters([])
     void ipc
       .watchMeta(track.key, cid)
       .then((meta) => {
         if (cancelled) return
         setOnline(meta.online)
         setSubTracks(meta.subtitles)
+        setMetaChapters(meta.chapters)
       })
       .catch(() => {})
     return () => {
@@ -320,6 +325,7 @@ export function WatchView({ track }: { track: Track }) {
   }
 
   const currentPageNo = page ?? data?.current_page ?? 1
+  const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
   const nextTitle = nextPage
@@ -476,6 +482,7 @@ export function WatchView({ track }: { track: Track }) {
                 nextTitle={nextTitle}
                 onNext={playNext}
                 resumeAt={resume?.key === track.key ? resume.at : null}
+                chapters={chapters}
               />
             </div>
           ) : (
@@ -559,6 +566,7 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
+            {data ? <ChapterList desc={data.desc} chapters={chapters} /> : null}
             {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} /> : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
