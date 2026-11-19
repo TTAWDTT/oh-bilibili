@@ -652,7 +652,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           text: seed.text,
           emotes: [],
           mentions: [],
-          pictures: i === 0 ? [REAL_COVERS['七里香']] : [],
+          pictures:
+            i === 0
+              ? ['七里香', '晴天', '起风了', '江南']
+                  .map((name) => REAL_COVERS[name])
+                  .filter((src): src is string => Boolean(src))
+              : [],
           level: seed.level,
           likes: 30 - i * 3,
           at: Math.floor(Date.now() / 1000) - i * 600,

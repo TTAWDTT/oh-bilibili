@@ -501,7 +501,7 @@ function CommentRow({
           ) : null}
           {c.pictures?.length ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {c.pictures.slice(0, 3).map((src, index) => (
+              {c.pictures.slice(0, 9).map((src, index) => (
                 <button
                   key={`${src}-${index}`}
                   type="button"
@@ -679,7 +679,7 @@ function DialogRow({
         </p>
         {c.pictures?.length ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {c.pictures.slice(0, 3).map((src, index) => (
+            {c.pictures.slice(0, 9).map((src, index) => (
               <button
                 key={`${src}-${index}`}
                 type="button"
