@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { PageRef } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
 import { Icon } from '../../shared/ui/Icon'
+import { scrollIntoList } from './listScroll'
 
 /**
  * 多 P 视频的「视频选集」。B 站把它做成右栏一张带集数的卡片：
@@ -19,9 +20,10 @@ export function PageList({
   onPage: (no: number) => void
 }) {
   const currentRef = useRef<HTMLButtonElement | null>(null)
+  const listRef = useRef<HTMLOListElement | null>(null)
 
   useEffect(() => {
-    currentRef.current?.scrollIntoView({ block: 'nearest' })
+    scrollIntoList(currentRef.current, listRef.current)
   }, [current])
 
   if (pages.length <= 1) return null
@@ -33,7 +35,7 @@ export function PageList({
           <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">视频选集</h3>
           <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{pages.length} 集</span>
         </div>
-        <ol className="flex max-h-[320px] flex-col gap-y-0.5 overflow-y-auto px-1.5 py-1.5">
+        <ol ref={listRef} className="flex max-h-[320px] flex-col gap-y-0.5 overflow-y-auto px-1.5 py-1.5">
           {pages.map((page) => {
             const active = page.no === current
             return (

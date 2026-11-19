@@ -3,6 +3,8 @@ import { useAppStore } from '../../app/appStore'
 import type { SeasonView } from '../../shared/lib/contract'
 import { formatCount, formatTime } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
+import { Icon } from '../../shared/ui/Icon'
+import { scrollIntoList } from './listScroll'
 
 /**
  * 右栏的合集。
@@ -14,21 +16,11 @@ export function SeasonList({ season }: { season: SeasonView }) {
   const replace = useAppStore((s) => s.replace)
   const currentRef = useRef<HTMLLIElement | null>(null)
   const listRef = useRef<HTMLOListElement | null>(null)
+  const currentKey = season.episodes.find((ep) => ep.current)?.key ?? null
 
-  // 10 集以上的合集一屏放不下，不滚的话用户看不出自己正在第几集。
-  // 只滚列表自己：scrollIntoView 会连窄屏下的整页滚动容器一起滚，
-  // 进视频时页面会直接跳到合集卡，播放器被顶出屏幕。
   useEffect(() => {
-    const list = listRef.current
-    const item = currentRef.current
-    if (!list || !item) return
-    const top = item.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop
-    const bottom = top + item.offsetHeight
-    if (top < list.scrollTop) list.scrollTop = top
-    else if (bottom > list.scrollTop + list.clientHeight) {
-      list.scrollTop = bottom - list.clientHeight
-    }
-  }, [season.id])
+    scrollIntoList(currentRef.current, listRef.current)
+  }, [currentKey])
 
   return (
     <div className="px-2 pb-2">
@@ -82,6 +74,9 @@ export function SeasonList({ season }: { season: SeasonView }) {
                     {ep.views ? ` · ${formatCount(ep.views)}` : ''}
                   </span>
                 </span>
+                {ep.current ? (
+                  <Icon name="play" size={12} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                ) : null}
               </button>
             </li>
           ))}
