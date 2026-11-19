@@ -7,6 +7,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::sync::Mutex;
 use std::time::Duration;
 
+/// 一次 Range 最多拉这么多。长连接一旦被 CDN 挂住，整条流会永久停住；
+/// 分成小块后，单块超时就能丢掉连接、从当前偏移重连。
+const CHUNK_SIZE: u64 = 256 * 1024;
+
 pub struct RemoteMedia {
     client: reqwest::blocking::Client,
     url: String,
@@ -20,7 +24,7 @@ impl RemoteMedia {
     pub fn open(url: impl Into<String>, headers: Vec<(String, String)>) -> Result<RemoteMedia, String> {
         let url: String = url.into();
         let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(8))
             .build()
             .map_err(|e| e.to_string())?;
 
@@ -69,8 +73,12 @@ impl RemoteMedia {
         for (k, v) in &self.headers {
             req = req.header(k.as_str(), v.as_str());
         }
+        let end = match self.total {
+            Some(total) if self.pos < total => (self.pos + CHUNK_SIZE - 1).min(total - 1),
+            _ => self.pos + CHUNK_SIZE - 1,
+        };
         let resp = req
-            .header("Range", format!("bytes={}-", self.pos))
+            .header("Range", format!("bytes={}-{}", self.pos, end))
             .send()
             .map_err(std::io::Error::other)?;
         let status = resp.status();
@@ -84,6 +92,9 @@ impl RemoteMedia {
 
 impl Read for RemoteMedia {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.total.is_some_and(|total| self.pos >= total) {
+            return Ok(0);
+        }
         // B 站 CDN 的长连接会中途断掉。早先这里直接往上抛错，而解码线程遇到
         // 任何 IO 错误就 set_playing(false)——表现就是「播到随机位置突然停住」，
         // 进度冻结、按钮回到播放态。
@@ -191,7 +202,7 @@ mod reconnect_tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
 
     /// 前两次连接都在发了一小段后强行断开，第三次才把剩余字节发完。
@@ -204,6 +215,8 @@ mod reconnect_tests {
         let listener = TcpListener::bind("127.0.0.1:0").expect("端口");
         let port = listener.local_addr().expect("地址").port();
         let counter = hits.clone();
+        let bounded = Arc::new(AtomicBool::new(false));
+        let bounded_server = bounded.clone();
 
         std::thread::spawn(move || {
             const BODY: usize = 4096;
@@ -221,6 +234,16 @@ mod reconnect_tests {
                     .and_then(|r| r.split('-').next())
                     .and_then(|v| v.trim().parse::<usize>().ok())
                     .unwrap_or(0);
+                let end = text
+                    .split("bytes=")
+                    .nth(1)
+                    .and_then(|r| r.split('-').nth(1))
+                    .map(|v| v.chars().take_while(|c| c.is_ascii_digit()).collect::<String>())
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .unwrap_or(0);
+                if end > start {
+                    bounded_server.store(true, Ordering::SeqCst);
+                }
                 let _ = s.write_all(
                     format!(
                         "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n",
@@ -257,6 +280,7 @@ mod reconnect_tests {
         println!("读到 {} 字节，建立了 {} 次连接", got.len(), hits.load(Ordering::SeqCst));
         assert!(got.len() >= 4096, "应该读完整段，实际 {}", got.len());
         assert!(hits.load(Ordering::SeqCst) >= 3, "应该重连过");
+        assert!(bounded.load(Ordering::SeqCst), "Range 必须带有限终点");
     }
 
     /// 一直断流且没读到文件末尾时，必须把错误交给解码器，
