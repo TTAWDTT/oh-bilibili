@@ -242,7 +242,7 @@ function CommentRow({
   /** 楼中楼里某一条要展开回复框时用；根节点把同一个回调继续传下去。 */
   replyComposerFor?: ((c: Comment) => ReactNode) | undefined
   onDialog?: ((c: Comment) => void) | undefined
-  onPhoto?: ((src: string) => void) | undefined
+  onPhoto?: ((pictures: string[], index: number) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
@@ -505,7 +505,7 @@ function CommentRow({
                 <button
                   key={`${src}-${index}`}
                   type="button"
-                  onClick={() => onPhoto?.(src)}
+                  onClick={() => onPhoto?.(c.pictures, index)}
                   className="h-[72px] w-[72px] overflow-hidden rounded-[4px] bg-[var(--panel-alt)]"
                 >
                   <img
@@ -628,7 +628,7 @@ function DialogRow({
 }: {
   c: Comment
   ownerMid: number | null
-  onPhoto?: ((src: string) => void) | undefined
+  onPhoto?: ((pictures: string[], index: number) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
@@ -683,7 +683,7 @@ function DialogRow({
               <button
                 key={`${src}-${index}`}
                 type="button"
-                onClick={() => onPhoto?.(src)}
+                onClick={() => onPhoto?.(c.pictures, index)}
                 className="h-16 w-16 overflow-hidden rounded-[4px] bg-[var(--panel-alt)]"
               >
                 <img
@@ -722,7 +722,7 @@ function DialogModal({
   root: string
   anchor: string
   onClose: () => void
-  onPhoto?: ((src: string) => void) | undefined
+  onPhoto?: ((pictures: string[], index: number) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
@@ -841,14 +841,31 @@ export function CommentsPanel({
   /** 图挂了的代号。表情图来自远端，个别 404 时不该在面板里留一个碎图。 */
   const [brokenEmotes, setBrokenEmotes] = useState<ReadonlySet<string>>(new Set())
   const [emojiOpen, setEmojiOpen] = useState(false)
-  const [photo, setPhoto] = useState<string | null>(null)
+  const [photo, setPhoto] = useState<{ pictures: string[]; index: number } | null>(null)
 
   useEffect(() => {
     if (!photo) return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setPhoto(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        setPhoto(null)
+        return
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault()
+        event.stopPropagation()
+        setPhoto((current) => {
+          if (!current) return current
+          const delta = event.key === 'ArrowLeft' ? -1 : 1
+          return {
+            ...current,
+            index: (current.index + delta + current.pictures.length) % current.pictures.length,
+          }
+        })
+      }
     }
-    // 捕获阶段先接：播放器的全局快捷键也会处理 Esc，冒泡到 window 时可能已经被吞掉。
+    // 捕获阶段先接：播放器的全局快捷键也会处理 Esc 与方向键。
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [photo])
@@ -1263,7 +1280,7 @@ export function CommentsPanel({
               }
               onDelete={mine.has(c.id) ? remove : undefined}
               deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
-              onPhoto={setPhoto}
+              onPhoto={(pictures, index) => setPhoto({ pictures, index })}
               onSeek={seekToTime}
               onAuthorHover={showAuthorCard}
               onAuthorHide={authorHover.hide}
@@ -1294,7 +1311,7 @@ export function CommentsPanel({
         root={dialog?.root ?? ''}
         anchor={dialog?.anchor ?? ''}
         onClose={() => setDialog(null)}
-        onPhoto={setPhoto}
+        onPhoto={(pictures, index) => setPhoto({ pictures, index })}
         onSeek={seekToTime}
         onAuthorHover={showAuthorCard}
         onAuthorHide={authorHover.hide}
@@ -1320,13 +1337,63 @@ export function CommentsPanel({
                 type="button"
                 aria-label="关闭图片"
                 title="关闭图片"
-                onClick={() => setPhoto(null)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setPhoto(null)
+                }}
                 className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 hover:bg-black/80"
               >
                 <Icon name="close" size={18} />
               </button>
+              {photo.pictures.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    aria-label="上一张"
+                    title="上一张"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setPhoto((current) =>
+                        current
+                          ? {
+                              ...current,
+                              index:
+                                (current.index - 1 + current.pictures.length) %
+                                current.pictures.length,
+                            }
+                          : current,
+                      )
+                    }}
+                    className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/30 hover:bg-black/75"
+                  >
+                    <Icon name="chevronLeft" size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="下一张"
+                    title="下一张"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setPhoto((current) =>
+                        current
+                          ? {
+                              ...current,
+                              index: (current.index + 1) % current.pictures.length,
+                            }
+                          : current,
+                      )
+                    }}
+                    className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/30 hover:bg-black/75"
+                  >
+                    <Icon name="chevronRight" size={20} />
+                  </button>
+                  <span className="num absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-[12px] text-white/85 ui-audit-ok">
+                    {photo.index + 1} / {photo.pictures.length}
+                  </span>
+                </>
+              ) : null}
               <img
-                src={photo}
+                src={photo.pictures[photo.index] ?? photo.pictures[0] ?? ''}
                 alt=""
                 referrerPolicy="no-referrer"
                 onClick={(event) => event.stopPropagation()}
