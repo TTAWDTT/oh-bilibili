@@ -115,7 +115,12 @@ impl Read for RemoteMedia {
                     }
                     self.drop_response();
                     if attempt == 2 {
-                        return Ok(0);
+                        // 到这里还没读到文件末尾，不能把 0 交给解码器：
+                        // Symphonia 会把它当成自然 EOF，引擎就弹出结束卡并切下一集。
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::ConnectionAborted,
+                            "音频流在到达末尾前断开",
+                        ));
                     }
                     std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
                 }
@@ -252,5 +257,31 @@ mod reconnect_tests {
         println!("读到 {} 字节，建立了 {} 次连接", got.len(), hits.load(Ordering::SeqCst));
         assert!(got.len() >= 4096, "应该读完整段，实际 {}", got.len());
         assert!(hits.load(Ordering::SeqCst) >= 3, "应该重连过");
+    }
+
+    /// 一直断流且没读到文件末尾时，必须把错误交给解码器，
+    /// 不能返回 0 让它误判成自然播完。
+    #[test]
+    fn 中途断流不能被当成自然播完() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("端口");
+        let port = listener.local_addr().expect("地址").port();
+
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut s) = stream else { break };
+                let mut head = [0u8; 2048];
+                let _ = s.read(&mut head);
+                let _ = s.write_all(
+                    b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/4096\r\nContent-Length: 0\r\n\r\n",
+                );
+            }
+        });
+
+        std::thread::sleep(Duration::from_millis(120));
+        let mut media =
+            RemoteMedia::open(format!("http://127.0.0.1:{port}/x"), Vec::new()).expect("打开");
+        let mut buf = [0u8; 128];
+        let err = media.read(&mut buf).expect_err("断流不能被当成 EOF");
+        assert_eq!(err.kind(), std::io::ErrorKind::ConnectionAborted);
     }
 }

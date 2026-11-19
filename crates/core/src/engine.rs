@@ -1128,6 +1128,9 @@ impl Engine {
                     stalled = 0;
                     let key = lock(&engine.queue).current().map(|e| e.track.key.clone());
                     if let Some(k) = key {
+                        // 重载会重新签一次流地址；从断点续上，别让一次 CDN 断流把进度送回 0:00。
+                        let at = lock(&engine.player).clock().position_ms();
+                        *lock(&engine.resume_at_ms) = at;
                         let _ = rt.block_on(engine.play_key(&k));
                     }
                 }
