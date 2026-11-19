@@ -160,6 +160,11 @@ export function historyPosition(key: string): Promise<number | null> {
   return call<number | null>('history_position', { key })
 }
 
+/** 批量查历史进度：[key, position_ms]。右栏推荐用它画看过的进度条。 */
+export function historyPositions(keys: string[]): Promise<[string, number][]> {
+  return call<[string, number][]>('history_positions', { keys })
+}
+
 /** 删掉某首歌的历史。 */
 export function historyDelete(key: string): Promise<null> {
   return call<null>('history_delete', { key })

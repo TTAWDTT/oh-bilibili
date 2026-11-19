@@ -1366,6 +1366,11 @@ impl Engine {
         Ok(self.library.history_position(key)?)
     }
 
+    /// 批量查历史进度，给右栏推荐画看过的进度。
+    pub fn history_positions(&self, keys: &[String]) -> Result<Vec<(String, u64)>, WireError> {
+        Ok(self.library.history_positions(keys)?)
+    }
+
     pub fn playlists(&self) -> Result<Vec<bilimusic_store::Playlist>, WireError> {
         Ok(self.library.playlists()?)
     }
