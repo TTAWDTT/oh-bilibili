@@ -640,14 +640,19 @@ impl Source {
     pub async fn send_danmaku(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
         text: &str,
         progress_ms: u64,
         mode: u64,
         color: u32,
     ) -> Result<(), BiliError> {
-        let detail = self.detail(key).await?;
+        // 多 P 视频的弹幕按 P 分池，`detail.cid` 是第一 P。不给 cid 时才退回它。
+        let cid = match cid {
+            Some(cid) => cid,
+            None => self.detail(key).await?.cid,
+        };
         self.client
-            .send_danmaku(detail.cid, &key.as_opaque(), text, progress_ms, mode, color)
+            .send_danmaku(cid, &key.as_opaque(), text, progress_ms, mode, color)
             .await
     }
 

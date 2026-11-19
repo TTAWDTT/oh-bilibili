@@ -1893,6 +1893,7 @@ impl Engine {
     pub async fn danmaku_send(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
         text: &str,
         progress_ms: u64,
         mode: u64,
@@ -1910,7 +1911,7 @@ impl Engine {
             return Err(WireError::input("mode", "弹幕位置只有滚动、顶部、底部"));
         }
         self.source
-            .send_danmaku(key, trimmed, progress_ms, mode, color)
+            .send_danmaku(key, cid, trimmed, progress_ms, mode, color)
             .await?;
         Ok(())
     }
