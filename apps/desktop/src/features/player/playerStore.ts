@@ -39,12 +39,26 @@ type PlayerStore = {
 
 /** 上次的倍速。引擎每次启动回到 1.0，所以启动时补一次。 */
 const SPEED_KEY = 'bilimusic.speed'
+/** 上次的音量。引擎重新启动时也把用户的选择补回去。 */
+const VOLUME_KEY = 'bilimusic.volume'
 
 function loadSpeed(): number {
   try {
     return Number(localStorage.getItem(SPEED_KEY) ?? 1) || 1
   } catch {
     return 1
+  }
+}
+
+function loadVolume(): number | null {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY)
+    if (raw === null) return null
+    const value = Number(raw)
+    if (!Number.isFinite(value)) return null
+    return Math.min(1, Math.max(0, value))
+  } catch {
+    return null
   }
 }
 
@@ -56,14 +70,18 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
     syncPlayhead(next.position_ms, next.phase === 'playing', next.duration_ms)
   }
 
-  const run = async (op: string, task: () => Promise<PlayerSnapshot>): Promise<void> => {
+  const run = async (op: string, task: () => Promise<PlayerSnapshot>): Promise<boolean> => {
     const current = ++ticket
     try {
       const next = await task()
-      if (current === ticket) apply(next)
+      if (current === ticket) {
+        apply(next)
+        return true
+      }
     } catch (cause) {
       if (current === ticket) toastFailure(op, cause)
     }
+    return false
   }
 
   const refreshQueue = async (): Promise<void> => {
@@ -90,6 +108,10 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
           const saved = loadSpeed()
           if (saved !== 1 && Math.abs((snapshot.speed ?? 1) - saved) > 0.001) {
             void ipc.playerSetSpeed(saved).then(apply).catch(() => {})
+          }
+          const savedVolume = loadVolume()
+          if (savedVolume !== null && Math.abs((snapshot.volume ?? 0.7) - savedVolume) > 0.001) {
+            void ipc.playerVolume(savedVolume).then(apply).catch(() => {})
           }
         } catch (cause) {
           initPromise = null
@@ -135,9 +157,16 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       }
     },
     setVolume: async (volume) => {
+      const value = Math.min(1, Math.max(0, volume))
       const current = get().snapshot
-      if (current) apply({ ...current, volume })
-      await run('调整音量', () => ipc.playerVolume(volume))
+      if (current) apply({ ...current, volume: value })
+      if (await run('调整音量', () => ipc.playerVolume(value))) {
+        try {
+          localStorage.setItem(VOLUME_KEY, String(value))
+        } catch {
+          // 隐私模式写不进去，只影响这次会话
+        }
+      }
     },
     cycleRepeat: async () => {
       const order: readonly RepeatMode[] = ['off', 'all', 'one']
