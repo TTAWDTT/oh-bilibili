@@ -79,14 +79,17 @@ function descriptionNodes(text: string, onSeek: (ms: number) => void): React.Rea
 export function WatchHead({
   track,
   data,
+  currentPage,
   online,
   onListen,
 }: {
   track: Track
   data: WatchData
+  currentPage: number
   online: number | null
   onListen: (atMs: number) => void
 }) {
+  const page = data.pages.find((entry) => entry.no === currentPage)
   return (
     <div className="pb-2">
       {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
@@ -105,6 +108,17 @@ export function WatchHead({
           听视频
         </button>
       </div>
+
+      {data.pages.length > 1 && page ? (
+        <div className="mt-1 flex min-w-0 items-baseline gap-2 text-[13px] text-[var(--text-2)]">
+          <span className="num shrink-0 rounded-[3px] bg-[var(--accent-soft)] px-1.5 leading-[20px] text-[var(--accent)]">
+            P{currentPage}
+          </span>
+          <span className="truncate" title={page.title}>
+            {page.title || `第 ${currentPage} P`}
+          </span>
+        </div>
+      ) : null}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
         <span className="num">{formatCount(data.stats.views)} 播放</span>

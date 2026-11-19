@@ -740,6 +740,7 @@ export function WatchPlayer({
 
   /** 章节优先用 UP 主设的，没设过再看简介里有没有时间戳。 */
   const chapters = chapterMeta.length > 0 ? chapterMeta : chaptersFrom(data.desc)
+  const pageTitle = data.pages.find((page) => page.no === currentPage)?.title ?? ''
 
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
@@ -941,6 +942,21 @@ export function WatchPlayer({
           >
             {cue.text}
           </span>
+        </div>
+      ) : null}
+      {cinema ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/55 to-transparent px-4 pb-12 pt-3">
+          <div className="min-w-0 max-w-[72%]">
+            <div className="truncate text-[14px] text-white/90" title={track.title}>
+              {track.title}
+            </div>
+            {data.pages.length > 1 ? (
+              <div className="mt-0.5 flex items-baseline gap-2 text-[12px] text-white/55">
+                <span className="num shrink-0 text-white/80">P{currentPage}</span>
+                <span className="truncate">{pageTitle || `第 ${currentPage} P`}</span>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {!ready && !error ? (

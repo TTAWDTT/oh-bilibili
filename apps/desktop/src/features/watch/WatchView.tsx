@@ -460,6 +460,7 @@ export function WatchView({ track }: { track: Track }) {
             <WatchHead
               track={track}
               data={data}
+              currentPage={currentPageNo}
               online={online}
               onListen={(at) => {
                 void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
