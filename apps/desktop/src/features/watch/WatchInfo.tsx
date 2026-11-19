@@ -80,13 +80,11 @@ export function WatchHead({
   track,
   data,
   currentPage,
-  online,
   onListen,
 }: {
   track: Track
   data: WatchData
   currentPage: number
-  online: number | null
   onListen: (atMs: number) => void
 }) {
   const page = data.pages.find((entry) => entry.no === currentPage)
@@ -134,9 +132,6 @@ export function WatchHead({
         >
           {formatCount(data.stats.replies)} 评论
         </button>
-        {online !== null && online > 0 ? (
-          <span className="num">{formatCount(online)} 人在看</span>
-        ) : null}
         {/* B 站这一行的尾巴是投稿日期，分区名跟在后面。 */}
         {data.pubdate > 0 ? <span className="num">{formatDate(data.pubdate)}</span> : null}
         {data.tname ? (

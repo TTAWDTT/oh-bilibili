@@ -5,7 +5,7 @@ import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
 import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
-import { formatTime } from '../../shared/lib/format'
+import { formatCount, formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
@@ -140,9 +140,75 @@ function describePlaybackError(e: unknown): string {
  * 并且跟着引擎的时钟走：暂停、拖动、换速都以引擎为准。
  * 清单与分片都走本机代理，前端拿不到任何远端地址。
  */
+function DanmakuComposer({
+  tone,
+  signedIn,
+  onLogin,
+  value,
+  onChange,
+  onSend,
+  sending,
+  inputClass = '',
+}: {
+  tone: 'dark' | 'light'
+  signedIn: boolean
+  onLogin: () => void
+  value: string
+  onChange: (value: string) => void
+  onSend: () => void
+  sending: boolean
+  inputClass?: string
+}) {
+  if (!signedIn) {
+    return (
+      <button
+        type="button"
+        onClick={onLogin}
+        className={`flex h-8 min-w-0 flex-1 items-center gap-1 rounded-[4px] px-2 text-[12px] ${
+          tone === 'dark' ? 'text-white/60 hover:text-white' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
+        }`}
+      >
+        请先
+        <span className="text-[var(--accent)]">登录</span>
+        或
+        <span className="text-[var(--accent)]">注册</span>
+      </button>
+    )
+  }
+
+  return (
+    <>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onSend()
+        }}
+        placeholder="发个友善的弹幕见证当下"
+        aria-label="发弹幕"
+        className={`h-8 min-w-0 rounded-[4px] border px-2 text-[12px] outline-none transition-colors ${
+          tone === 'dark'
+            ? 'border-white/15 bg-white/[0.08] text-white placeholder-white/55 hover:border-white/25 hover:bg-white/[0.12] focus:border-[var(--accent)] focus:bg-white/[0.12]'
+            : 'border-[var(--line)] bg-[var(--panel)] text-[var(--text-1)] placeholder-[var(--text-3)] hover:border-[var(--accent)] focus:border-[var(--accent)]'
+        } ${inputClass}`}
+      />
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={!value.trim() || sending}
+        aria-label="发送"
+        className="t press flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
+      >
+        <Icon name="send" size={14} />
+      </button>
+    </>
+  )
+}
+
 export function WatchPlayer({
   track,
   data,
+  online,
   danmaku,
   subtitleTracks,
   onDanmakuSent,
@@ -163,6 +229,7 @@ export function WatchPlayer({
 }: {
   track: Track
   data: WatchData
+  online: number | null
   danmaku: DanmakuItem[]
   /** 这条视频的可用字幕轨。空表示没有字幕，控制条上就不出现「字幕」按钮。 */
   subtitleTracks: ipc.SubtitleTrack[]
@@ -890,6 +957,7 @@ export function WatchPlayer({
   }
 
   return (
+    <>
     <div
       onMouseMove={poke}
       onMouseLeave={() => setControls(false)}
@@ -1293,43 +1361,21 @@ export function WatchPlayer({
           controls || !playing ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* 窄屏把发弹幕单独放一行：控制条一行塞不下输入框，挤压后会与画面字幕糊在一起。 */}
-        <div className="mb-1.5 flex items-center gap-2 lg:hidden">
-          {!signedIn ? (
-            <button
-              type="button"
-              onClick={() => setAuthOpen(true)}
-              className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-[4px] px-1 text-[12px] text-white/60 hover:text-white"
-            >
-              请先
-              <span className="text-[var(--accent)]">登录</span>
-              或
-              <span className="text-[var(--accent)]">注册</span>
-            </button>
-          ) : (
-            <>
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void sendDanmaku()
-                }}
-                placeholder="发个友善的弹幕见证当下"
-                aria-label="发弹幕"
-                className="h-7 min-w-0 flex-1 rounded-[4px] border border-white/15 bg-white/[0.08] px-2 text-[12px] text-white placeholder-white/55 outline-none transition-colors hover:border-white/25 hover:bg-white/[0.12] focus:border-[var(--accent)] focus:bg-white/[0.12]"
-              />
-              <button
-                type="button"
-                onClick={() => void sendDanmaku()}
-                disabled={!draft.trim() || sending}
-                aria-label="发送"
-                className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
-              >
-                <Icon name="send" size={14} />
-              </button>
-            </>
-          )}
-        </div>
+        {/* 全屏时没有画面下方那条栏，发弹幕留在控制条里。 */}
+        {cinema ? (
+          <div className="mb-1.5 flex items-center gap-2 lg:hidden">
+            <DanmakuComposer
+              tone="dark"
+              signedIn={signedIn}
+              onLogin={() => setAuthOpen(true)}
+              value={draft}
+              onChange={setDraft}
+              onSend={() => void sendDanmaku()}
+              sending={sending}
+              inputClass="flex-1"
+            />
+          </div>
+        ) : null}
 
         <div
           role="slider"
@@ -1470,46 +1516,20 @@ export function WatchPlayer({
 
           <div className="min-w-0 flex-1" />
 
-          <div className="hidden items-center gap-2 lg:flex">
-            {/*
-             * 未登录时 B 站不给输入框，而是把「请先登录或注册」摊在同一行：
-             * 让人能打字再说「发送失败」是最差的一种。登录态取不到也按未登录处理。
-             */}
-            {!signedIn ? (
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
-                className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] px-1 text-[12px] text-white/60 hover:text-white"
-              >
-                请先
-                <span className="text-[var(--accent)] hover:underline">登录</span>
-                或
-                <span className="text-[var(--accent)] hover:underline">注册</span>
-              </button>
-            ) : (
-              <>
-                <input
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void sendDanmaku()
-                  }}
-                  placeholder="发个友善的弹幕见证当下"
-                  aria-label="发弹幕"
-                  className="h-7 w-[150px] shrink-0 rounded-[4px] border border-white/15 bg-white/[0.08] px-2 text-[12px] text-white placeholder-white/55 outline-none transition-colors hover:border-white/25 hover:bg-white/[0.12] focus:border-[var(--accent)] focus:bg-white/[0.12]"
-                />
-                <button
-                  type="button"
-                  onClick={() => void sendDanmaku()}
-                  disabled={!draft.trim() || sending}
-                  aria-label="发送"
-                  className="t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
-                >
-                  <Icon name="send" size={14} />
-                </button>
-              </>
-            )}
-          </div>
+          {cinema ? (
+            <div className="hidden items-center gap-2 lg:flex">
+              <DanmakuComposer
+                tone="dark"
+                signedIn={signedIn}
+                onLogin={() => setAuthOpen(true)}
+                value={draft}
+                onChange={setDraft}
+                onSend={() => void sendDanmaku()}
+                sending={sending}
+                inputClass="w-[150px] shrink-0"
+              />
+            </div>
+          ) : null}
 
           <button
             type="button"
@@ -1956,5 +1976,28 @@ export function WatchPlayer({
         </div>
       </div>
     </div>
+    {!cinema ? (
+      <div className="flex items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] px-3 py-2">
+        {online !== null && online > 0 ? (
+          <span className="num flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)]">
+            <Icon name="user" size={13} />
+            {formatCount(online)} 人在看
+          </span>
+        ) : null}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <DanmakuComposer
+            tone="light"
+            signedIn={signedIn}
+            onLogin={() => setAuthOpen(true)}
+            value={draft}
+            onChange={setDraft}
+            onSend={() => void sendDanmaku()}
+            sending={sending}
+            inputClass="flex-1"
+          />
+        </div>
+      </div>
+    ) : null}
+    </>
   )
 }

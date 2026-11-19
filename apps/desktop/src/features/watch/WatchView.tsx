@@ -461,7 +461,6 @@ export function WatchView({ track }: { track: Track }) {
               track={track}
               data={data}
               currentPage={currentPageNo}
-              online={online}
               onListen={(at) => {
                 void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
               }}
@@ -472,6 +471,7 @@ export function WatchView({ track }: { track: Track }) {
               <WatchPlayer
                 track={track}
                 data={data}
+                online={online}
                 danmaku={danmaku}
                 subtitleTracks={subTracks}
                 onDanmakuSent={(item) => setDanmaku((prev) => [...prev, item])}
