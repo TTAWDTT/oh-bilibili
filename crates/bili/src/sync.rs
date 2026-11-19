@@ -32,12 +32,21 @@ pub struct UserHit {
     pub live: bool,
 }
 
-/// 观看页的元信息：在看人数与字幕轨。
+/// 观看页的元信息：在看人数、字幕轨与 UP 主设的章节。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VideoMeta {
     pub online: u64,
     /// 可用的字幕轨。空表示这条视频没有字幕，播放器就不放「字幕」按钮。
     pub subtitles: Vec<SubtitleTrack>,
+    /// UP 主在播放器里手工设的章节；没设过就是空表。
+    pub chapters: Vec<VideoChapter>,
+}
+
+/// 播放器章节。`view_points` 的 `from` 是秒，这里统一成毫秒。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VideoChapter {
+    pub at_ms: u64,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1068,6 +1077,7 @@ impl Client {
         Ok(VideoMeta {
             online: v["data"]["online_count"].as_u64().unwrap_or(0),
             subtitles: tracks,
+            chapters: chapters_of(&v),
         })
     }
 
@@ -1486,6 +1496,22 @@ fn weekly_notes(list: &serde_json::Value) -> HashMap<String, String> {
             let bvid = m["bvid"].as_str()?;
             let note = m["rcmd_reason"].as_str().filter(|s| !s.is_empty())?;
             Some((bvid.to_string(), note.to_string()))
+        })
+        .collect()
+}
+
+/// 播放器章节。`view_points[].from` 是秒，`content` 是标题；没设过章节就是空表。
+fn chapters_of(value: &serde_json::Value) -> Vec<VideoChapter> {
+    let Some(list) = value["data"]["view_points"].as_array() else {
+        return Vec::new();
+    };
+    list.iter()
+        .filter_map(|p| {
+            let from = p["from"].as_u64()?;
+            Some(VideoChapter {
+                at_ms: from.saturating_mul(1000),
+                title: p["content"].as_str().unwrap_or("").to_string(),
+            })
         })
         .collect()
 }
@@ -2174,6 +2200,23 @@ mod relation_shape_tests {
         assert_eq!(notes.get("BV1TgWp6MEHJ").map(String::as_str), Some("就在今天"));
         assert!(!notes.contains_key("BV1UB4v67Exr"), "空推荐语不该入表");
         assert!(!notes.contains_key("BV1vmWJ6LEmW"), "没给推荐语就不该有这一项");
+    }
+
+    /// 真实响应里 `view_points[].from` 是秒（实测第一条 `from: 0, to: 55`）。
+    /// 当成毫秒读的话，每章都会挤在开头几秒。
+    #[test]
+    fn 章节取_view_points_的秒() {
+        let v = json!({
+            "data": { "view_points": [
+                { "from": 0, "to": 55, "content": "开场" },
+                { "from": 55, "to": 130, "content": "第二节" }
+            ]}
+        });
+        let chapters = super::chapters_of(&v);
+        assert_eq!(chapters.len(), 2);
+        assert_eq!(chapters[1].at_ms, 55_000);
+        assert_eq!(chapters[1].title, "第二节");
+        assert!(super::chapters_of(&json!({ "data": {} })).is_empty());
     }
 
     /// 同一个字段名在热门里是对象（`{"content": "百万播放"}`），在每周必看里是裸字符串。
