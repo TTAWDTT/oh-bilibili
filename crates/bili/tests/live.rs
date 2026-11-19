@@ -905,7 +905,7 @@ async fn 有字幕的视频能取到台词() {
     println!("在线 {}，字幕轨 {:?}", meta.online, meta.subtitles);
     assert!(!meta.subtitles.is_empty(), "这条视频应该有字幕轨");
 
-    let cues = source.subtitle_cues(&key, None).await.expect("字幕");
+    let cues = source.subtitle_cues(&key, None, None).await.expect("字幕");
     println!("默认轨 {} 条，首条 {:?}", cues.len(), cues.first());
     assert!(cues.len() > 20, "台词条数太少：{}", cues.len());
     assert!(cues.iter().all(|c| c.end_ms >= c.at_ms), "结束时间不该早于开始");

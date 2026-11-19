@@ -797,7 +797,7 @@ fn 观看页元信息带出字幕轨() {
             return;
         }
         let cues = engine
-            .subtitle_cues(&key, Some(&meta.subtitles[0].lan))
+            .subtitle_cues(&key, None, Some(&meta.subtitles[0].lan))
             .await
             .expect("字幕");
         println!("首轨 {} 条台词，首句 {:?}", cues.len(), cues.first());

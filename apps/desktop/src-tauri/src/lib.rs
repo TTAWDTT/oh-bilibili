@@ -720,9 +720,10 @@ async fn watch_subtitles(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     lan: Option<String>,
+    cid: Option<u64>,
 ) -> Result<Vec<bilimusic_core::wire::SubtitleCue>, WireError> {
     engine
-        .subtitle_cues(&TrackKey::from_provider(key), lan.as_deref())
+        .subtitle_cues(&TrackKey::from_provider(key), cid, lan.as_deref())
         .await
 }
 

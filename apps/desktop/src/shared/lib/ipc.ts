@@ -391,8 +391,8 @@ export function watchSummary(
 }
 
 /** 取一条字幕轨的全部台词；`lan` 为空时后端优先中文。 */
-export function watchSubtitles(key: string, lan: string | null): Promise<SubtitleCue[]> {
-  return call<SubtitleCue[]>('watch_subtitles', { key, lan })
+export function watchSubtitles(key: string, lan: string | null, cid?: number): Promise<SubtitleCue[]> {
+  return call<SubtitleCue[]>('watch_subtitles', { key, lan, cid })
 }
 
 /** 进度条悬停预览：一张切成 columns×rows 的雪碧图 + 每格对应的秒数。 */

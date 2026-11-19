@@ -530,6 +530,9 @@ export function WatchPlayer({
     }
   }, [])
 
+  /** 当前这一 P 的 cid：弹幕、字幕、预览图都按它取。 */
+  const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
+
   const sendDanmaku = async (): Promise<void> => {
     const text = draft.trim()
     if (!text || sending) return
@@ -801,7 +804,7 @@ export function WatchPlayer({
     let cancelled = false
     setSubCues(null)
     void ipc
-      .watchSubtitles(track.key, subTrack)
+      .watchSubtitles(track.key, subTrack, cid)
       .then((cues) => {
         if (!cancelled) setSubCues(cues)
       })
@@ -818,7 +821,6 @@ export function WatchPlayer({
   const pageTitle = data.pages.find((page) => page.no === currentPage)?.title ?? ''
 
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
-  const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
   const [shots, setShots] = useState<ipc.VideoShots | null>(null)
   const shotsAsked = useRef(false)
   const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)

@@ -496,16 +496,21 @@ impl Source {
     pub async fn subtitle_cues(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
         lan: Option<&str>,
     ) -> Result<Vec<sync::SubtitleCue>, BiliError> {
-        let detail = self.detail(key).await?;
+        // 字幕挂在每一 P 上，`detail.cid` 是第一 P。不给 cid 时才退回它。
+        let cid = match cid {
+            Some(cid) => cid,
+            None => self.detail(key).await?.cid,
+        };
         let value = self
             .client
             .signed_get_play(
                 &format!("{}/x/player/wbi/v2", client::API),
                 vec![
                     ("bvid", key.as_opaque().to_string()),
-                    ("cid", detail.cid.to_string()),
+                    ("cid", cid.to_string()),
                 ],
                 PLAY_INTERVAL,
             )
