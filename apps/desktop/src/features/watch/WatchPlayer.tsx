@@ -1121,7 +1121,14 @@ export function WatchPlayer({
           onMouseLeave={() => setHoverAt(null)}
           className="group relative mb-1.5 h-3 cursor-pointer"
         >
-          <DanmakuBeats items={visibleDanmaku} durationMs={duration} />
+          <DanmakuBeats
+            items={visibleDanmaku}
+            durationMs={duration}
+            onSeek={(ms) => {
+              if (!duration) return
+              seekTo(ms / duration)
+            }}
+          />
           {hoverAt ? (
             (() => {
               const shot = shotAt(hoverAt.second)
