@@ -20,8 +20,9 @@ function mentionNodes(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
+  onSeek?: ((ms: number) => void) | undefined,
 ): ReactNode[] {
-  if (mentions.length === 0) return [text]
+  if (mentions.length === 0) return timestampLinks(text, onSeek, keyBase)
   // URL 整段保留，@ 只在非 URL 段落里找，避免把链接路径里的 @ 拆开。
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
   const nodes: ReactNode[] = []
@@ -30,7 +31,7 @@ function mentionNodes(
       nodes.push(part)
       return
     }
-    nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index))
+    nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index, onSeek))
   })
   return nodes
 }
@@ -41,6 +42,7 @@ function mentionLinks(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
+  onSeek?: ((ms: number) => void) | undefined,
 ): ReactNode[] {
   const names = [...mentions]
     .sort((a, b) => b[0].length - a[0].length)
@@ -54,7 +56,7 @@ function mentionLinks(
   for (const match of text.matchAll(pattern)) {
     const prefix = match[1] ?? ''
     const at = (match.index ?? 0) + prefix.length
-    if (at > last) nodes.push(text.slice(last, at))
+    if (at > last) nodes.push(...timestampLinks(text.slice(last, at), onSeek, keyBase * 100 + at))
     const name = match[2] ?? ''
     const mid = mentions.find(([value]) => value === name)?.[1] ?? 0
     nodes.push(
@@ -69,6 +71,53 @@ function mentionLinks(
     )
     last = (match.index ?? 0) + match[0].length
   }
+  if (last < text.length) {
+    nodes.push(...timestampLinks(text.slice(last), onSeek, keyBase * 100 + last))
+  }
+  return nodes
+}
+
+/** `01:23` / `1:02:03` 转毫秒。评论里的时间戳和简介一样可以点着跳。 */
+function timestampMs(token: string): number | null {
+  const parts = token.replace(/：/g, ':').split(':').map(Number)
+  if (parts.some((n) => Number.isNaN(n))) return null
+  if (parts.length === 2) return ((parts[0] ?? 0) * 60 + (parts[1] ?? 0)) * 1000
+  if (parts.length === 3) {
+    return ((parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)) * 1000
+  }
+  return null
+}
+
+function timestampLinks(
+  text: string,
+  onSeek: ((ms: number) => void) | undefined,
+  keyBase: number,
+): ReactNode[] {
+  if (!onSeek) return [text]
+  const nodes: ReactNode[] = []
+  const pattern = /\b((?:\d{1,2}[:：])?[0-5]?\d[:：][0-5]\d)\b/g
+  let last = 0
+  for (const match of text.matchAll(pattern)) {
+    const token = match[1] ?? ''
+    const at = match.index ?? 0
+    if (at > last) nodes.push(text.slice(last, at))
+    const ms = timestampMs(token)
+    if (ms === null) {
+      nodes.push(token)
+    } else {
+      nodes.push(
+        <button
+          key={`${keyBase}-${at}`}
+          type="button"
+          onClick={() => onSeek(ms)}
+          className="t text-[var(--accent)] hover:underline"
+        >
+          {token}
+        </button>,
+      )
+    }
+    last = at + token.length
+  }
   if (last < text.length) nodes.push(text.slice(last))
   return nodes
 }
@@ -78,13 +127,17 @@ function CommentText({
   text,
   emotes,
   mentions,
+  onSeek,
 }: {
   text: string
   emotes: [string, string][]
   mentions: [string, number][]
+  onSeek?: ((ms: number) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
-  if (emotes.length === 0 && mentions.length === 0) return <>{text}</>
+  if (emotes.length === 0 && mentions.length === 0) {
+    return <>{timestampLinks(text, onSeek, 0)}</>
+  }
   const map = new Map(emotes)
   const nodes: ReactNode[] = []
   let buffer = ''
@@ -97,6 +150,7 @@ function CommentText({
         mentions,
         (name, mid) => navigate({ kind: 'author', name, mid }),
         chunk,
+        onSeek,
       ),
     )
     buffer = ''
@@ -171,6 +225,7 @@ function CommentRow({
   replyComposerFor,
   onDialog,
   onPhoto,
+  onSeek,
 }: {
   c: Comment
   depth?: number
@@ -185,6 +240,7 @@ function CommentRow({
   replyComposerFor?: ((c: Comment) => ReactNode) | undefined
   onDialog?: ((c: Comment) => void) | undefined
   onPhoto?: ((src: string) => void) | undefined
+  onSeek?: ((ms: number) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -382,7 +438,12 @@ function CommentRow({
             ) : null}
           </div>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
-            <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
+            <CommentText
+              text={c.text}
+              emotes={c.emotes}
+              mentions={c.mentions}
+              onSeek={onSeek}
+            />
           </p>
           {c.pictures?.length ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -424,6 +485,7 @@ function CommentRow({
               replyComposer={replyComposerFor?.(r)}
               onDialog={onDialog}
               onPhoto={onPhoto}
+              onSeek={onSeek}
             />
           ))}
           {depth === 0 && (c.reply_count > c.replies.length || repliesOpen) ? (
@@ -504,10 +566,12 @@ function DialogRow({
   c,
   ownerMid,
   onPhoto,
+  onSeek,
 }: {
   c: Comment
   ownerMid: number | null
   onPhoto?: ((src: string) => void) | undefined
+  onSeek?: ((ms: number) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   return (
@@ -544,7 +608,12 @@ function DialogRow({
           ) : null}
         </div>
         <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
-          <CommentText text={c.text} emotes={c.emotes} mentions={c.mentions} />
+          <CommentText
+            text={c.text}
+            emotes={c.emotes}
+            mentions={c.mentions}
+            onSeek={onSeek}
+          />
         </p>
         {c.pictures?.length ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -581,6 +650,7 @@ function DialogModal({
   anchor,
   onClose,
   onPhoto,
+  onSeek,
 }: {
   open: boolean
   trackKey: string
@@ -589,6 +659,7 @@ function DialogModal({
   anchor: string
   onClose: () => void
   onPhoto?: ((src: string) => void) | undefined
+  onSeek?: ((ms: number) => void) | undefined
 }) {
   const [items, setItems] = useState<Comment[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
@@ -630,7 +701,13 @@ function DialogModal({
     <Modal open={open} title="对话" description={null} onClose={onClose} width="max-w-[560px]">
       <ul className="max-h-[58vh] space-y-3 overflow-y-auto pr-1">
         {items.map((c) => (
-          <DialogRow key={c.id} c={c} ownerMid={ownerMid} onPhoto={onPhoto} />
+          <DialogRow
+            key={c.id}
+            c={c}
+            ownerMid={ownerMid}
+            onPhoto={onPhoto}
+            onSeek={onSeek}
+          />
         ))}
       </ul>
       {loading ? (
@@ -919,6 +996,10 @@ export function CommentsPanel({
     }
   }
 
+  const seekToTime = (ms: number): void => {
+    void ipc.playerSeek(ms).catch(() => {})
+  }
+
   const composer = (reply: { id: string; author: string } | null): ReactNode => (
     <div>
       {reply ? (
@@ -1105,6 +1186,7 @@ export function CommentsPanel({
               onDelete={mine.has(c.id) ? remove : undefined}
               deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
               onPhoto={setPhoto}
+              onSeek={seekToTime}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
               replyComposerFor={(target) =>
                 replyTo?.id === target.id ? composer(replyTo) : undefined
@@ -1133,6 +1215,7 @@ export function CommentsPanel({
         anchor={dialog?.anchor ?? ''}
         onClose={() => setDialog(null)}
         onPhoto={setPhoto}
+        onSeek={seekToTime}
       />
       {photo
         ? createPortal(
