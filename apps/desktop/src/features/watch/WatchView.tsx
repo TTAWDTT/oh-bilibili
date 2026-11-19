@@ -391,9 +391,9 @@ export function WatchView({ track }: { track: Track }) {
   // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。
   // 多 P 视频的弹幕按 P 分开，cid 没到之前先不拉，免得先闪一屏 P1 的弹幕。
   useEffect(() => {
+    setDanmaku([])
     if (!danmakuCid) return
     let cancelled = false
-    setDanmaku([])
     void ipc
       .danmakuColored(track.key, danmakuCid)
       .then((list) => {
