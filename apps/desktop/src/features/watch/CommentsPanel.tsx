@@ -947,7 +947,9 @@ export function CommentsPanel({
     try {
       // 回复一级评论时 root 就是它自己；回楼中楼时要挂在原来的根下面。
       const target = replyTo
-      const rpid = await ipc.commentAdd(trackKey, text, target?.root, target?.id)
+      // B 站会把「回复 @某人 :」写进正文，服务端不会替客户端补这一段。
+      const body = target ? `回复 @${target.author} :${text}` : text
+      const rpid = await ipc.commentAdd(trackKey, body, target?.root, target?.id)
       setDraft('')
       setReplyTo(null)
       setEmojiOpen(false)
@@ -964,7 +966,7 @@ export function CommentsPanel({
           mid: me?.mid ?? 0,
           author: me?.uname ?? '我',
           avatar: me?.avatar ?? null,
-          text,
+          text: body,
           emotes: [],
           mentions: [],
           pictures: [],
