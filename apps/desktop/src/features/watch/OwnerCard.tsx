@@ -1,5 +1,6 @@
 import type { MouseEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
+import { toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatCount } from '../../shared/lib/format'
@@ -101,6 +102,21 @@ export function OwnerCard({
             </p>
           ) : null}
         </div>
+        {data.owner_mid ? (
+          <button
+            type="button"
+            title="去 B 站给 UP 主充电"
+            onClick={() =>
+              void ipc
+                .openExternal(`https://space.bilibili.com/${data.owner_mid}`)
+                .catch((cause) => toastFailure('打开充电页', cause))
+            }
+            className="t press flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[var(--line)] px-2.5 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            <Icon name="battery" size={12} />
+            充电
+          </button>
+        ) : null}
         <button
           type="button"
           aria-pressed={followed === true}
@@ -169,18 +185,35 @@ export function OwnerCard({
             {formatCount(Math.max(0, card.fans + (fansDelta ?? 0)))} 粉丝
           </span>
         ) : null}
-        <button
-          type="button"
-          aria-pressed={followed === true}
-          onClick={onFollow}
-          className={`t press ml-auto flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
-            followed === true
-              ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-              : 'bg-[var(--accent)] text-white hover:opacity-90'
-          }`}
-        >
-          {followed === true ? '已关注' : '+ 关注'}
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {data.owner_mid ? (
+            <button
+              type="button"
+              title="去 B 站给 UP 主充电"
+              onClick={() =>
+                void ipc
+                  .openExternal(`https://space.bilibili.com/${data.owner_mid}`)
+                  .catch((cause) => toastFailure('打开充电页', cause))
+              }
+              className="t press flex h-8 items-center gap-1 rounded-[4px] border border-[var(--line)] px-2.5 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              <Icon name="battery" size={13} />
+              充电
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-pressed={followed === true}
+            onClick={onFollow}
+            className={`t press flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
+              followed === true
+                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                : 'bg-[var(--accent)] text-white hover:opacity-90'
+            }`}
+          >
+            {followed === true ? '已关注' : '+ 关注'}
+          </button>
+        </div>
       </div>
       {hoverCard}
     </div>
