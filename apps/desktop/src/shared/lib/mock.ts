@@ -2,7 +2,7 @@ import type { DownloadView, QrStatus } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
-import { emit, ensureClock, fail, playlistOf, snapshot, state, trackOf } from './mockEngine'
+import { emit, ensureClock, fail, playlistOf, setDuration, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
 
 export { mockSubscribe } from './mockEngine'
@@ -578,6 +578,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'watch_open': {
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
+      // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
+      setDuration(track.duration_ms ?? 30_000)
       return {
         key: track.key,
         desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD 下面的文字用来验证简介超过两行时的展开与收起，以及窄屏下的排版是否会把按钮挤掉。展开之后应该能看到这一段完整的介绍，收起时恢复到两行，按钮本身不遮挡下面的标签。',

@@ -232,3 +232,9 @@ export function setPosition(position: number): void {
   state.position = clamp(position, 0, state.duration)
   emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
 }
+
+/** 预览里没有真实音频：观看页打开时把这条视频的时长交给播放器状态。 */
+export function setDuration(duration: number): void {
+  state.duration = Math.max(1, duration)
+  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
+}
