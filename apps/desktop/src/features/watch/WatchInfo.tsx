@@ -306,6 +306,10 @@ export function WatchInfo({
   }
 
   const noteKey = `oh-bilibili:watch-note:${track.key}`
+  const noteTimes = [...new Set(note.match(/\[((?:\d{1,2}:)?[0-5]?\d:[0-5]\d)\]/g) ?? [])]
+    .map((token) => token.slice(1, -1))
+    .map((label) => ({ label, at: timestampMs(label) }))
+    .filter((item): item is { label: string; at: number } => item.at !== null)
   const openNote = (): void => {
     try {
       setNote(localStorage.getItem(noteKey) ?? '')
@@ -555,6 +559,23 @@ export function WatchInfo({
           placeholder="点「插入当前时间」，把想法和播放位置一起记下来"
           className="w-full resize-y rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13px] leading-[1.6] text-[var(--text-1)] outline-none focus:border-[var(--accent)]"
         />
+        {noteTimes.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {noteTimes.map(({ label, at }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  setNoteOpen(false)
+                  onSeek(at)
+                }}
+                className="t press rounded-[4px] bg-[var(--accent-soft)] px-2 py-0.5 text-[12px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_18%,white)]"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="mt-3 flex items-center justify-between gap-3">
           <button
             type="button"
