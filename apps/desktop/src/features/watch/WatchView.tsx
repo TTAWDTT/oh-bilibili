@@ -329,6 +329,7 @@ export function WatchView({ track }: { track: Track }) {
   }
 
   const currentPageNo = page ?? data?.current_page ?? 1
+  const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
@@ -388,11 +389,13 @@ export function WatchView({ track }: { track: Track }) {
   }, [])
 
   // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。
+  // 多 P 视频的弹幕按 P 分开，cid 没到之前先不拉，免得先闪一屏 P1 的弹幕。
   useEffect(() => {
+    if (!danmakuCid) return
     let cancelled = false
     setDanmaku([])
     void ipc
-      .danmakuColored(track.key)
+      .danmakuColored(track.key, danmakuCid)
       .then((list) => {
         if (!cancelled) setDanmaku(toDanmakuItems(list))
       })
@@ -400,7 +403,7 @@ export function WatchView({ track }: { track: Track }) {
     return () => {
       cancelled = true
     }
-  }, [track.key])
+  }, [track.key, danmakuCid])
 
   // 打开就把这条视频的真实点赞/收藏/投币状态拉回来，
   // 否则按钮看起来永远是未点过的。

@@ -235,7 +235,7 @@ async fn 弹幕带真实颜色() {
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
-    let items = source.danmaku_colored(&first.key).await.expect("弹幕");
+    let items = source.danmaku_colored(&first.key, None).await.expect("弹幕");
     let colored = items.iter().filter(|line| line.color != 0xFFFFFF).count();
     println!("共 {} 条，其中 {} 条有彩色", items.len(), colored);
     assert!(!items.is_empty());
@@ -872,7 +872,7 @@ async fn 弹幕正文不带未解开的实体() {
     let source = Source::open().await.expect("Source");
     // BV1ej4J67ERn：实测这条视频里有一条 `˶>ᗜ<˶` 的颜文字弹幕。
     let key = bilimusic_model::TrackKey::from_provider("BV1ej4J67ERn");
-    let list = source.danmaku_colored(&key).await.expect("弹幕");
+    let list = source.danmaku_colored(&key, None).await.expect("弹幕");
     let dirty: Vec<&str> = list
         .iter()
         .map(|line| line.text.as_str())

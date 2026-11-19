@@ -529,8 +529,8 @@ export function danmakuSend(
 /** 一条弹幕。`mode` 是位置：1 滚动、4 底部、5 顶部。 */
 export type DanmakuLine = { secs: number; text: string; color: number; mode: number }
 
-export function danmakuColored(key: string): Promise<DanmakuLine[]> {
-  return call<DanmakuLine[]>('danmaku_colored', { key })
+export function danmakuColored(key: string, cid?: number): Promise<DanmakuLine[]> {
+  return call<DanmakuLine[]>('danmaku_colored', { key, cid })
 }
 
 /** 弹幕密度曲线，用来画高能进度条。 */

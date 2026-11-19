@@ -1798,8 +1798,9 @@ impl Engine {
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
     ) -> Result<Vec<crate::wire::DanmakuLine>, WireError> {
-        Ok(self.source.danmaku_colored(key).await?)
+        Ok(self.source.danmaku_colored(key, cid).await?)
     }
 
     pub async fn danmaku_heat(&self, key: &TrackKey, buckets: usize) -> Result<Vec<u32>, WireError> {
