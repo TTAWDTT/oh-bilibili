@@ -258,8 +258,41 @@ function CommentRow({
   const [liked, setLiked] = useState(c.liked)
   const [likes, setLikes] = useState(c.likes)
   const [disliked, setDisliked] = useState(c.disliked)
+  const [expanded, setExpanded] = useState(false)
+  const [canExpand, setCanExpand] = useState(false)
+  const textRef = useRef<HTMLParagraphElement | null>(null)
   const likingRef = useRef(false)
   const hatingRef = useRef(false)
+
+  useEffect(() => {
+    if (expanded) return
+    const el = textRef.current
+    if (!el) return
+    const measure = (): void => {
+      if (c.text.length < 120) {
+        setCanExpand(false)
+        return
+      }
+      // line-clamp 会把 scrollHeight 也裁到可见高度，只能拿同宽克隆量完整高度。
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.classList.remove('line-clamp-6')
+      clone.style.position = 'absolute'
+      clone.style.visibility = 'hidden'
+      clone.style.left = '-9999px'
+      clone.style.top = '0'
+      clone.style.width = `${el.clientWidth}px`
+      clone.style.display = 'block'
+      clone.style.webkitLineClamp = 'unset'
+      document.body.appendChild(clone)
+      const full = clone.scrollHeight
+      clone.remove()
+      setCanExpand(full > el.clientHeight + 1)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [c.text, expanded])
 
   const toggleLike = async (): Promise<void> => {
     if (likingRef.current) return
@@ -444,7 +477,12 @@ function CommentRow({
               </button>
             ) : null}
           </div>
-          <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)]">
+          <p
+            ref={textRef}
+            className={`mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-[1.5] text-[var(--text-1)] ${
+              expanded ? '' : 'line-clamp-6'
+            }`}
+          >
             <CommentText
               text={c.text}
               emotes={c.emotes}
@@ -452,6 +490,15 @@ function CommentRow({
               onSeek={onSeek}
             />
           </p>
+          {canExpand ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="t mt-1 text-[11px] text-[var(--accent)] hover:underline"
+            >
+              {expanded ? '收起' : '展开'}
+            </button>
+          ) : null}
           {c.pictures?.length ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {c.pictures.slice(0, 3).map((src, index) => (
