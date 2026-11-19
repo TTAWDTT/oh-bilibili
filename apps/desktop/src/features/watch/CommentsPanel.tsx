@@ -15,6 +15,25 @@ import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
 
+/** 评论排序是用户偏好，切视频、重启后都应该沿用。 */
+const COMMENT_SORT_KEY = 'oh-bilibili:comments:hot'
+
+function loadCommentHot(): boolean {
+  try {
+    return localStorage.getItem(COMMENT_SORT_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveCommentHot(hot: boolean): void {
+  try {
+    localStorage.setItem(COMMENT_SORT_KEY, hot ? '1' : '0')
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
 /** 把一段纯文字里的 @名字 换成可点链接；名字必须出现在接口给的 members 里。 */
 function mentionNodes(
   text: string,
@@ -820,7 +839,7 @@ export function CommentsPanel({
   flow?: boolean
 }) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
-  const [hot, setHot] = useState(true)
+  const [hot, setHot] = useState(loadCommentHot)
   const [items, setItems] = useState<Comment[]>([])
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -1207,7 +1226,10 @@ export function CommentsPanel({
               key={option.label}
               type="button"
               aria-pressed={hot === option.on}
-              onClick={() => setHot(option.on)}
+              onClick={() => {
+                setHot(option.on)
+                saveCommentHot(option.on)
+              }}
               className={`t press rounded-[4px] px-2 py-0.5 ${
                 hot === option.on
                   ? 'text-[var(--accent)]'
