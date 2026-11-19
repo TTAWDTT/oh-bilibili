@@ -42,13 +42,28 @@ function mentionNodes(
   keyBase: number,
   onSeek?: ((ms: number) => void) | undefined,
 ): ReactNode[] {
-  if (mentions.length === 0) return timestampLinks(text, onSeek, keyBase)
   // URL 整段保留，@ 只在非 URL 段落里找，避免把链接路径里的 @ 拆开。
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
   const nodes: ReactNode[] = []
   parts.forEach((part, index) => {
     if (/^https?:\/\//.test(part)) {
-      nodes.push(part)
+      const url = part.replace(/[.,;:!?，。；、）…]+$/, '')
+      const trailing = part.slice(url.length)
+      nodes.push(
+        <button
+          key={`${keyBase}-url-${index}`}
+          type="button"
+          onClick={() => void ipc.openExternal(url).catch(() => {})}
+          className="t break-all text-left text-[var(--accent)] hover:underline"
+        >
+          {url}
+        </button>,
+      )
+      if (trailing) nodes.push(trailing)
+      return
+    }
+    if (mentions.length === 0) {
+      nodes.push(...timestampLinks(part, onSeek, keyBase * 100 + index))
       return
     }
     nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index, onSeek))
@@ -156,7 +171,17 @@ function CommentText({
 }) {
   const navigate = useAppStore((state) => state.navigate)
   if (emotes.length === 0 && mentions.length === 0) {
-    return <>{timestampLinks(text, onSeek, 0)}</>
+    return (
+      <>
+        {mentionNodes(
+          text,
+          mentions,
+          (name, mid) => navigate({ kind: 'author', name, mid }),
+          0,
+          onSeek,
+        )}
+      </>
+    )
   }
   const map = new Map(emotes)
   const nodes: ReactNode[] = []
