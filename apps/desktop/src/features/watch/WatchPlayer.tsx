@@ -153,6 +153,8 @@ export function WatchPlayer({
   nextTitle,
   onNext,
   seekSignal,
+  currentPage,
+  onPage,
   resumeAt,
   chapters: chapterMeta,
   liked,
@@ -176,6 +178,9 @@ export function WatchPlayer({
   onNext: () => void
   /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
   seekSignal: { at: number; nonce: number } | null
+  /** 多 P 时控制条上的选集。 */
+  currentPage: number
+  onPage: (no: number) => void
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
   /** UP 主设的章节；空表时退回简介里的时间戳。 */
@@ -200,6 +205,7 @@ export function WatchPlayer({
   const [controls, setControls] = useState(true)
   const [qualityOpen, setQualityOpen] = useState(false)
   const [speedOpen, setSpeedOpen] = useState(false)
+  const [pagesOpen, setPagesOpen] = useState(false)
   const [now, setNow] = useState(0)
   /**
    * 字幕：开着哪一轨（null 表示关）。台词只在打开时取一次，
@@ -1534,6 +1540,7 @@ export function WatchPlayer({
               onClick={() => {
                 setQualityOpen(false)
                 setSpeedOpen(false)
+                setPagesOpen(false)
                 setDanmakuPanel((open) => !open)
               }}
               aria-expanded={danmakuPanel}
@@ -1716,6 +1723,60 @@ export function WatchPlayer({
             ) : null}
           </div>
 
+          {data.pages.length > 1 ? (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setDanmakuPanel(false)
+                  setSpeedOpen(false)
+                  setQualityOpen(false)
+                  setPagesOpen((open) => !open)
+                }}
+                aria-expanded={pagesOpen}
+                aria-label="选集"
+                title="选集"
+                className="t press flex h-7 items-center gap-1 rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+              >
+                选集
+                <span className="num text-[11px] text-white/55">P{currentPage}</span>
+              </button>
+              {pagesOpen ? (
+                <div className="absolute bottom-8 right-0 z-30 flex max-h-[320px] w-[280px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                  {data.pages.map((page) => {
+                    const on = page.no === currentPage
+                    return (
+                      <button
+                        key={page.cid}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          onPage(page.no)
+                          setPagesOpen(false)
+                        }}
+                        className={`t flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-[12px] ${
+                          on
+                            ? 'bg-white/10 text-[var(--accent)]'
+                            : 'text-white/85 hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="num shrink-0">P{page.no}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {page.title || `第 ${page.no} P`}
+                        </span>
+                        {page.duration_ms ? (
+                          <span className="num shrink-0 text-[11px] text-white/45">
+                            {formatTime(page.duration_ms)}
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {data.qualities.length > 0 ? (
             <div className="relative shrink-0">
               <button
@@ -1723,6 +1784,7 @@ export function WatchPlayer({
                 onClick={() => {
                   setDanmakuPanel(false)
                   setSpeedOpen(false)
+                  setPagesOpen(false)
                   setQualityOpen((open) => !open)
                 }}
                 aria-expanded={qualityOpen}
@@ -1771,6 +1833,7 @@ export function WatchPlayer({
               onClick={() => {
                 setDanmakuPanel(false)
                 setQualityOpen(false)
+                setPagesOpen(false)
                 setSpeedOpen((open) => !open)
               }}
               aria-expanded={speedOpen}

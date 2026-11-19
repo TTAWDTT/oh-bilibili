@@ -486,6 +486,8 @@ export function WatchView({ track }: { track: Track }) {
                 nextTitle={nextTitle}
                 onNext={playNext}
                 seekSignal={seekSignal}
+                currentPage={currentPageNo}
+                onPage={changePage}
                 resumeAt={resume?.key === track.key ? resume.at : null}
                 chapters={chapters}
               />
