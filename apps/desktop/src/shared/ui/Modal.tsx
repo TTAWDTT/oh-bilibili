@@ -14,6 +14,11 @@ type ModalProps = {
 
 export function Modal({ open, title, description, onClose, children, width = 'max-w-md' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const closeRef = useRef(onClose)
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
@@ -29,7 +34,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
 
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
-        onClose()
+        closeRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -65,7 +70,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
       window.clearTimeout(timer)
       previous?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
