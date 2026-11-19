@@ -13,7 +13,7 @@ import type { DanmakuItem } from '../player/DanmakuField'
 import { DanmakuBeats } from '../player/DanmakuBeats'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 import { useAuthStore } from '../auth/authStore'
-import { useAutoplay } from './autoplay'
+import { useAutoplay, useLoopOne } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -228,11 +228,15 @@ export function WatchPlayer({
   const [countdownHover, setCountdownHover] = useState(false)
   const autoplay = useAutoplay((state) => state.enabled)
   const setAutoplay = useAutoplay((state) => state.setEnabled)
+  const loopOne = useLoopOne((state) => state.enabled)
+  const setLoopOne = useLoopOne((state) => state.setEnabled)
   /** 没登录就没有发弹幕资格：把「请先登录或注册」摆在输入框的位置上。 */
   const signedIn = useAuthStore((state) => state.auth !== null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
+  const onReplayRef = useRef(onReplay)
+  onReplayRef.current = onReplay
 
   const speed = usePlayerStore((state) => state.snapshot?.speed ?? 1)
   const setSpeed = usePlayerStore((state) => state.setSpeed)
@@ -292,7 +296,7 @@ export function WatchPlayer({
 
   // 播完自动进下一个：倒计时期间随时可以手动跳或关掉自动连播。
   useEffect(() => {
-    if (!ended || !next || !autoplay) {
+    if (!ended || !next || !autoplay || loopOne) {
       setCountdown(null)
       setCountdownCancelled(false)
       return
@@ -310,7 +314,19 @@ export function WatchPlayer({
       if (left <= 0) window.clearInterval(timer)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [ended, next, autoplay, countdownCancelled])
+  }, [ended, next, autoplay, loopOne, countdownCancelled])
+
+  /**
+   * 单集循环：播完直接把时间拉回 0 继续放。
+   * 必须排在自动连播之后判断，否则循环开着还会先闪一下倒计时。
+   */
+  useEffect(() => {
+    if (!ended || !loopOne) return
+    const timer = window.setTimeout(() => {
+      onReplayRef.current()
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [ended, loopOne])
 
   useEffect(() => {
     if (countdown === 0 && ended && next && !countdownCancelled && !countdownHovered.current) {
@@ -1555,6 +1571,19 @@ export function WatchPlayer({
               ) : null}
             </div>
           ) : null}
+
+          <button
+            type="button"
+            aria-pressed={loopOne}
+            aria-label={loopOne ? '关闭单集循环' : '单集循环'}
+            title={loopOne ? '关闭单集循环' : '单集循环'}
+            onClick={() => setLoopOne(!loopOne)}
+            className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+              loopOne ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
+            }`}
+          >
+            <Icon name="repeatOne" size={16} />
+          </button>
 
           <div className="relative hidden shrink-0 lg:block">
             <button
