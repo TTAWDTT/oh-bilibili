@@ -536,7 +536,8 @@ export function WatchPlayer({
     setSending(true)
     const at = Math.round(localPlayhead())
     try {
-      await ipc.danmakuSend(track.key, text, at, draftMode, draftColor)
+      const cid = data.pages.find((page) => page.no === currentPage)?.cid
+      await ipc.danmakuSend(track.key, text, at, draftMode, draftColor, cid)
       setDraft('')
       onDanmakuSent({ at, text, color: cssColor(draftColor), mode: draftMode })
       poke()

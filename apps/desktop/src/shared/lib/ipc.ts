@@ -522,8 +522,9 @@ export function danmakuSend(
   progressMs: number,
   mode = 1,
   color = 0xffffff,
+  cid?: number,
 ): Promise<null> {
-  return call<null>('danmaku_send', { key, text, progress_ms: progressMs, mode, color })
+  return call<null>('danmaku_send', { key, text, progress_ms: progressMs, mode, color, cid })
 }
 
 /** 一条弹幕。`mode` 是位置：1 滚动、4 底部、5 顶部。 */
