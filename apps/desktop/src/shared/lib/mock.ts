@@ -632,6 +632,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'watch_comments': {
       const cursor = args.cursor == null ? null : str(args, 'cursor')
+      const ownerMid = findTrack(str(args, 'key'))?.up_mid ?? null
       // 预览只造一页评论：带游标再来就回空，界面上不会原样重复一遍。
       if (cursor) return { total: COMMENT_SEEDS.length, page: 1, next: null, items: [], has_more: false }
       const mine = (sentComments.get(str(args, 'key')) ?? []).map((c) => ({
@@ -660,7 +661,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         has_more: false,
         items: [...mine, ...COMMENT_SEEDS.map((seed, i) => ({
           id: i === 0 ? '1' : `seed-${i}`,
-          mid: seed.mid,
+          // 第一条是「UP主本人」，mid 要和当前视频作者一致，只看 UP 主才筛得出来。
+          mid: i === 0 && ownerMid !== null ? ownerMid : seed.mid,
           author: seed.author,
           avatar: null,
           text: seed.text,
