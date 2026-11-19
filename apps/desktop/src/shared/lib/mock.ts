@@ -242,7 +242,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         tile_h: 270,
       }
     case 'watch_meta':
-      return { online: 128, subtitles: [{ lan: 'zh-CN', label: '中文（中国）' }] }
+      return {
+        online: 128,
+        subtitles: [{ lan: 'zh-CN', label: '中文（中国）' }],
+        chapters: [
+          { at_ms: 5_000, title: '开场' },
+          { at_ms: 15_000, title: '副歌' },
+          { at_ms: 25_000, title: '尾声' },
+        ],
+      }
     case 'watch_subtitles':
       return [
         { at_ms: 0, end_ms: 2400, text: '预览字幕第一句' },
