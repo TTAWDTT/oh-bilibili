@@ -47,6 +47,9 @@ pub struct Engine {
     speed: Mutex<f32>,
     /// 恢复队列时要跳回的位置（毫秒）。0 表示从头开始。
     resume_at_ms: Mutex<u64>,
+    /// 看模式下当前 P 的 cid。`detail.cid` 永远是第一 P，多 P 视频取音轨
+    /// 必须换成用户正在看的那一 P，否则每一集放的都是 P1 的声音。
+    watch_cid: Mutex<Option<(String, u64)>>,
     repeat: Mutex<String>,
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
@@ -91,6 +94,7 @@ impl Engine {
             volume: Mutex::new(0.7),
             speed: Mutex::new(1.0),
             resume_at_ms: Mutex::new(0),
+            watch_cid: Mutex::new(None),
             repeat: Mutex::new("off".into()),
             events,
             http: reqwest::Client::new(),
@@ -362,6 +366,12 @@ impl Engine {
                 queue.jump_by_key(key);
             }
         }
+        let current = page
+            .and_then(|no| detail.pages.iter().find(|p| p.no == no))
+            .or_else(|| detail.pages.first());
+        let page_cid = current.map(|p| p.cid);
+        let page_no = current.map(|p| p.no).unwrap_or(1);
+        *lock(&self.watch_cid) = current.map(|p| (key.as_opaque().to_string(), p.cid));
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
         // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
         // 不会出现「进度条先跳过去、音频还在 0」的竞态。
@@ -389,11 +399,6 @@ impl Engine {
         // 模式切到「看」这一步也要让界面知道：底部播放条、右栏歌词
         // 都按模式决定是否出现，不给它们新快照就会停在「听」的旧状态。
         self.emit_state();
-        let current = page
-            .and_then(|no| detail.pages.iter().find(|p| p.no == no))
-            .or_else(|| detail.pages.first());
-        let page_cid = current.map(|p| p.cid);
-        let page_no = current.map(|p| p.no).unwrap_or(1);
         let video = self.source.dash_video_at(key, page_cid).await?;
         // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
         // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
@@ -709,7 +714,15 @@ impl Engine {
         key: &TrackKey,
         token: LoadToken,
     ) -> Result<Prepared, WireError> {
-        let detail = self.source.detail(key).await?;
+        let mut detail = self.source.detail(key).await?;
+        // 多 P 视频的 `detail.cid` 是第一 P。观看页切到第 N P 时音轨也得跟着换，
+        // 否则听到的仍是 P1 的声音，播到 P1 结尾就当成整集播完。
+        if let Some((_, cid)) = lock(&self.watch_cid)
+            .as_ref()
+            .filter(|(bvid, _)| bvid == key.as_opaque())
+        {
+            detail.cid = *cid;
+        }
         // 详情是字段最全的一份（UP 主头像、分区名都在里面），把它写回 known。
         // 入库与卡片都从 known 取，不写回的话历史里的头像会一直是空的——
         // 队列里那份来自列表接口，字段没这么全。
