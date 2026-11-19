@@ -7,6 +7,7 @@ import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
+import { useDownloadsStore } from '../downloads/downloadsStore'
 import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
@@ -221,6 +222,14 @@ export function WatchInfo({
   const [noteOpen, setNoteOpen] = useState(false)
   const [note, setNote] = useState('')
   const noteRef = useRef<HTMLTextAreaElement | null>(null)
+  const [downloadPending, setDownloadPending] = useState(false)
+  const downloadPendingRef = useRef(false)
+  const download = useDownloadsStore((state) =>
+    (state.items ?? []).find((entry) => entry.key === track.key),
+  )
+  const enqueueDownload = useDownloadsStore((state) => state.enqueue)
+  const downloading = downloadPending || download?.state === 'queued' || download?.state === 'running'
+  const downloaded = download?.state === 'done'
   const [coinPick, setCoinPick] = useState(1)
   const [alsoLike, setAlsoLike] = useState(true)
   /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
@@ -455,6 +464,23 @@ export function WatchInfo({
         <button type="button" aria-label="视频笔记" onClick={openNote} className={action(false)}>
           <Icon name="note" size={20} />
           笔记
+        </button>
+        <button
+          type="button"
+          aria-pressed={downloaded}
+          onClick={() => {
+            if (downloadPendingRef.current || downloading || downloaded) return
+            downloadPendingRef.current = true
+            setDownloadPending(true)
+            void enqueueDownload(track.key).finally(() => {
+              downloadPendingRef.current = false
+              setDownloadPending(false)
+            })
+          }}
+          className={action(downloaded)}
+        >
+          <Icon name={downloaded ? 'check' : downloading ? 'clock' : 'download'} size={20} />
+          {downloaded ? '已下载' : downloading ? '下载中' : '下载'}
         </button>
         <span className="mx-1.5 h-5 w-px shrink-0 bg-[var(--line)]" />
         <button
