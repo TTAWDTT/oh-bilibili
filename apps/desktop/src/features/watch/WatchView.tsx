@@ -521,14 +521,16 @@ export function WatchView({ track }: { track: Track }) {
               onTriple={triple}
               onSeek={seekTo}
               ownerRow={
-                <OwnerCard
-                  data={data}
-                  card={card}
-                  followed={followed}
-                  fansDelta={fansDelta}
-                  onFollow={toggleFollow}
-                  inline
-                />
+                <div className="md:hidden">
+                  <OwnerCard
+                    data={data}
+                    card={card}
+                    followed={followed}
+                    fansDelta={fansDelta}
+                    onFollow={toggleFollow}
+                    inline
+                  />
+                </div>
               }
             />
           ) : null}
