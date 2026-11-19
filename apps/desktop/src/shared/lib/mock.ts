@@ -251,6 +251,26 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           { at_ms: 25_000, title: '尾声' },
         ],
       }
+    case 'watch_summary':
+      return {
+        summary:
+          '预览模式的 AI 总结：这条视频用三段时间讲了同一个主题，先给结论，再补两个例子，最后收回到现场。',
+        outline: [
+          {
+            title: '开场',
+            at_ms: 5_000,
+            points: [
+              { at_ms: 5_000, content: '先把问题摆出来' },
+              { at_ms: 15_000, content: '给出第一个例子' },
+            ],
+          },
+          {
+            title: '尾声',
+            at_ms: 25_000,
+            points: [{ at_ms: 25_000, content: '收回到主题' }],
+          },
+        ],
+      }
     case 'watch_subtitles':
       return [
         { at_ms: 0, end_ms: 2400, text: '预览字幕第一句' },

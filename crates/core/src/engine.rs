@@ -1629,6 +1629,19 @@ impl Engine {
         Ok(self.source.video_meta(&key.as_opaque(), cid).await?)
     }
 
+    /// 这条视频的 AI 总结；没有总结的稿件返回 None。
+    pub async fn watch_summary(
+        &self,
+        key: &TrackKey,
+        cid: u64,
+        up_mid: u64,
+    ) -> Result<Option<crate::wire::VideoSummary>, WireError> {
+        Ok(self
+            .source
+            .video_summary(&key.as_opaque(), cid, up_mid)
+            .await?)
+    }
+
     /// 一条字幕轨的全部台词。`lan` 为空时优先中文。
     pub async fn subtitle_cues(
         &self,

@@ -700,6 +700,19 @@ async fn watch_meta(
         .await
 }
 
+/// 这条视频的 AI 总结；没有总结的稿件返回 null。
+#[tauri::command(rename_all = "snake_case")]
+async fn watch_summary(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+    cid: u64,
+    up_mid: u64,
+) -> Result<Option<bilimusic_core::wire::VideoSummary>, WireError> {
+    engine
+        .watch_summary(&TrackKey::from_provider(key), cid, up_mid)
+        .await
+}
+
 /// 一条字幕轨的全部台词。
 #[tauri::command(rename_all = "snake_case")]
 async fn watch_subtitles(
@@ -1218,6 +1231,7 @@ pub fn run() {
             weekly_issues,
             weekly_issue,
             watch_meta,
+            watch_summary,
             watch_subtitles,
             video_shots,
             author_card,

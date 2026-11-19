@@ -377,6 +377,19 @@ export function watchMeta(key: string, cid: number): Promise<WatchMeta> {
   return call<WatchMeta>('watch_meta', { key, cid })
 }
 
+/** B 站给这条视频生成的 AI 总结；没有总结的稿件返回 null。 */
+export type SummaryPoint = { at_ms: number; content: string }
+export type SummarySection = { title: string; at_ms: number; points: SummaryPoint[] }
+export type VideoSummary = { summary: string; outline: SummarySection[] }
+
+export function watchSummary(
+  key: string,
+  cid: number,
+  upMid: number,
+): Promise<VideoSummary | null> {
+  return call<VideoSummary | null>('watch_summary', { key, cid, up_mid: upMid })
+}
+
 /** 取一条字幕轨的全部台词；`lan` 为空时后端优先中文。 */
 export function watchSubtitles(key: string, lan: string | null): Promise<SubtitleCue[]> {
   return call<SubtitleCue[]>('watch_subtitles', { key, lan })
