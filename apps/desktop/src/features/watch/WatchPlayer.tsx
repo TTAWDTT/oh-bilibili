@@ -814,7 +814,8 @@ export function WatchPlayer({
     return () => {
       cancelled = true
     }
-  }, [subTrack, track.key])
+    // 字幕按 P 分，切 P 必须重取：语言代码通常一样，少了 cid 就会一直挂着上一集。
+  }, [subTrack, track.key, cid])
 
   /** 章节优先用 UP 主设的，没设过再看简介里有没有时间戳。 */
   const chapters = chapterMeta.length > 0 ? chapterMeta : chaptersFrom(data.desc)
@@ -823,6 +824,11 @@ export function WatchPlayer({
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
   const [shots, setShots] = useState<ipc.VideoShots | null>(null)
   const shotsAsked = useRef(false)
+  // 预览图按 P 分，换 P 要重新要；否则悬停显示的是上一集的时间轴。
+  useEffect(() => {
+    shotsAsked.current = false
+    setShots(null)
+  }, [cid])
   const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)
   /** 右键菜单的位置；null 表示没开。 */
   const [shotMenu, setShotMenu] = useState<{ x: number; y: number } | null>(null)
