@@ -7,6 +7,7 @@ import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
+import { copyText } from '../../shared/lib/clipboard'
 import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
@@ -732,6 +733,16 @@ export function WatchPlayer({
   /** 右键菜单的位置；null 表示没开。 */
   const [shotMenu, setShotMenu] = useState<{ x: number; y: number } | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  /** 镜像画面只翻转视频元素，弹幕和字幕保持正向。 */
+  const [mirror, setMirror] = useState(false)
+  const [statsOn, setStatsOn] = useState(false)
+  const [stats, setStats] = useState<{
+    width: number
+    height: number
+    dropped: number
+    buffer: number
+    rate: number
+  } | null>(null)
 
   useEffect(() => {
     if (!shotMenu) return
@@ -743,6 +754,44 @@ export function WatchPlayer({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [shotMenu])
+
+  useEffect(() => {
+    if (!statsOn) {
+      setStats(null)
+      return
+    }
+    const refresh = (): void => {
+      const video = videoRef.current
+      if (!video) return
+      const end = video.buffered.length ? video.buffered.end(video.buffered.length - 1) : 0
+      setStats({
+        width: video.videoWidth,
+        height: video.videoHeight,
+        dropped:
+          (video as HTMLVideoElement & { webkitDroppedFrameCount?: number })
+            .webkitDroppedFrameCount ?? 0,
+        buffer: Math.max(0, end - video.currentTime),
+        rate: video.playbackRate,
+      })
+    }
+    refresh()
+    const timer = window.setInterval(refresh, 1000)
+    return () => window.clearInterval(timer)
+  }, [statsOn])
+
+  const copyWatchLink = (): void => {
+    setShotMenu(null)
+    void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+      toastDone(ok ? '已复制视频链接' : '复制失败'),
+    )
+  }
+
+  const copyCurrentTime = (): void => {
+    setShotMenu(null)
+    void copyText(formatTime(Math.round(localPlayhead()))).then((ok) =>
+      toastDone(ok ? '已复制当前时间' : '复制失败'),
+    )
+  }
 
   const captureShot = (): void => {
     setShotMenu(null)
@@ -826,8 +875,8 @@ export function WatchPlayer({
         event.preventDefault()
         const box = event.currentTarget.getBoundingClientRect()
         setShotMenu({
-          x: Math.min(event.clientX - box.left, Math.max(8, box.width - 132)),
-          y: Math.min(event.clientY - box.top, Math.max(8, box.height - 44)),
+          x: Math.min(event.clientX - box.left, Math.max(8, box.width - 180)),
+          y: Math.min(event.clientY - box.top, Math.max(8, box.height - 300)),
         })
         poke()
       }}
@@ -853,6 +902,7 @@ export function WatchPlayer({
           setStageMode(!cinema, false)
         }}
         className="h-full w-full cursor-pointer object-contain"
+        style={mirror ? { transform: 'scaleX(-1)' } : undefined}
         aria-label="视频画面"
       />
       <DanmakuField
@@ -1017,16 +1067,99 @@ export function WatchPlayer({
       {shotMenu ? (
         <div
           data-shot-menu
-          className="absolute z-40 min-w-[124px] overflow-hidden rounded-[6px] border border-white/15 bg-black/90 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+          className="absolute z-40 min-w-[164px] overflow-hidden rounded-[6px] border border-white/15 bg-black/90 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
           style={{ left: shotMenu.x, top: shotMenu.y }}
         >
           <button
             type="button"
-            onClick={captureShot}
-            className="t flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+            onClick={() => {
+              setShotMenu(null)
+              togglePlay()
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
           >
-            <Icon name="camera" size={13} />
-            截图
+            播放 / 暂停
+            <span className="text-[11px] text-white/35">空格</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              setLoopOne(!loopOne)
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            循环播放
+            <span className="text-[11px] text-white/35">{loopOne ? '✓' : ''}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              setMirror(!mirror)
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            镜像画面
+            <span className="text-[11px] text-white/35">{mirror ? '✓' : ''}</span>
+          </button>
+          <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              setStageMode(!cinema, false)
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            网页全屏
+            <span className="text-[11px] text-white/35">W</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              const full = cinema && osFullscreen
+              setStageMode(!full, !full)
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            全屏
+            <span className="text-[11px] text-white/35">F</span>
+          </button>
+          <button
+            type="button"
+            onClick={captureShot}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            视频截图
+            <span className="text-[11px] text-white/35" />
+          </button>
+          <button
+            type="button"
+            onClick={copyWatchLink}
+            className="t flex w-full items-center px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            复制视频网址
+          </button>
+          <button
+            type="button"
+            onClick={copyCurrentTime}
+            className="t flex w-full items-center px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            复制当前时间
+          </button>
+          <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              setStatsOn(!statsOn)
+            }}
+            className="t flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            视频统计信息
+            <span className="text-[11px] text-white/35">{statsOn ? '✓' : ''}</span>
           </button>
           <button
             type="button"
@@ -1034,11 +1167,20 @@ export function WatchPlayer({
               setShotMenu(null)
               setHelpOpen(true)
             }}
-            className="t flex w-full items-center gap-2 border-t border-white/10 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+            className="t flex w-full items-center justify-between gap-6 border-t border-white/10 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
           >
-            <Icon name="info" size={13} />
             快捷键
+            <span className="text-[11px] text-white/35">右键</span>
           </button>
+        </div>
+      ) : null}
+      {statsOn && stats ? (
+        <div className="pointer-events-none absolute left-3 top-3 z-30 rounded-[4px] bg-black/70 px-3 py-2 font-mono text-[11px] leading-[18px] text-white/90">
+          <div>分辨率　{stats.width}×{stats.height}</div>
+          <div>画质　　{data.qualities.find((q) => q.id === activeId)?.label ?? '—'}</div>
+          <div>丢帧　　{stats.dropped}</div>
+          <div>缓冲　　{stats.buffer.toFixed(1)} s</div>
+          <div>倍速　　{stats.rate}×</div>
         </div>
       ) : null}
       <Modal
