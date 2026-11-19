@@ -416,7 +416,12 @@ function CommentRow({
   const shownReplies = depth === 0 && repliesOpen ? loadedReplies : c.replies
 
   return (
-    <li className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}>
+    <li
+      data-comment-id={c.id}
+      data-comment-mid={c.mid}
+      data-comment-depth={depth}
+      className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}
+    >
       <div className="flex items-start gap-2">
         <span className="mt-0.5 shrink-0">
           <Avatar src={c.avatar} alt={c.author} size={24} />
@@ -875,6 +880,10 @@ export function CommentsPanel({
 }) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
   const [hot, setHot] = useState(loadCommentHot)
+  /** 只看 UP 主本人发的评论；开发页用 `?onlyUp=1` 直接打开来验筛选。 */
+  const [onlyUp, setOnlyUp] = useState(
+    import.meta.env.DEV && new URLSearchParams(window.location.search).has('onlyUp'),
+  )
   const [items, setItems] = useState<Comment[]>([])
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -932,6 +941,7 @@ export function CommentsPanel({
   const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
   const authorHover = useAuthorHover()
+  const visible = onlyUp && ownerMid !== null ? items.filter((c) => c.mid === ownerMid) : items
   const showAuthorCard = (c: Comment, el: HTMLElement): void => {
     if (c.mid <= 0) return
     authorHover.show(
@@ -970,7 +980,7 @@ export function CommentsPanel({
   // 评论区跟着整页一起滚时不能再自己滚一屏，否则是「滚动里套滚动」。
   // 到底没有交给 IntersectionObserver：哨兵进入整页滚动容器的可视区就取下一页。
   useEffect(() => {
-    if (!flow) return
+    if (!flow || onlyUp) return
     const sentinel = sentinelRef.current
     if (!sentinel) return
     const root = sentinel.closest('[data-scroll-root]')
@@ -984,7 +994,7 @@ export function CommentsPanel({
     observer.observe(sentinel)
     return () => observer.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flow, hasMore, loading, trackKey])
+  }, [flow, hasMore, loading, trackKey, onlyUp])
 
   const load = async (byHot = hot): Promise<void> => {
     if (loadingRef.current) return
@@ -1043,7 +1053,7 @@ export function CommentsPanel({
   // 取回一页后缓冲还不够深就继续取；评论每页 20 条，一屏就能划完。
   // 跟着整页滚时量哨兵到窗口的距离，否则量面板自己的滚动位置。
   useEffect(() => {
-    if (loading || !hasMore) return
+    if (loading || !hasMore || onlyUp) return
     if (flow) {
       const mark = sentinelRef.current
       if (mark && mark.getBoundingClientRect().top < window.innerHeight + COMMENT_PREFETCH_PX) {
@@ -1056,7 +1066,7 @@ export function CommentsPanel({
       void load()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, hasMore, loading, flow])
+  }, [items, hasMore, loading, flow, onlyUp])
 
   const onScroll = (): void => {
     const box = boxRef.current
@@ -1266,6 +1276,20 @@ export function CommentsPanel({
           {total > 0 ? formatCount(total) : '—'}
         </span>
         <div className="ml-auto flex items-center gap-1 text-[12px]">
+          {ownerMid !== null ? (
+            <button
+              type="button"
+              aria-pressed={onlyUp}
+              onClick={() => setOnlyUp((value) => !value)}
+              className={`t press mr-1 rounded-[4px] px-2 py-0.5 ${
+                onlyUp
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
+              }`}
+            >
+              UP主
+            </button>
+          ) : null}
           {[
             { on: true, label: '最热' },
             { on: false, label: '最新' },
@@ -1334,8 +1358,8 @@ export function CommentsPanel({
             </button>
           </div>
         ) : null}
-        <ul className="max-w-[880px] space-y-4">
-          {items.map((c) => (
+        <ul className="max-w-[880px] space-y-4" data-comment-list="root">
+          {visible.map((c) => (
             <CommentRow
               key={c.id}
               c={c}
@@ -1365,11 +1389,25 @@ export function CommentsPanel({
               }}
             />
           ))}
+          {onlyUp && !loading && !error && items.length > 0 && visible.length === 0 ? (
+            <li className="py-6 text-center text-[12px] text-[var(--text-3)]">
+              这一页还没有 UP 主本人的评论。
+            </li>
+          ) : null}
         </ul>
         {loading ? (
           <BiliLoader compact label="正在取评论…" />
         ) : null}
-        {!loading && !hasMore && items.length > 0 ? (
+        {onlyUp && hasMore && !loading && !error && !retry ? (
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="t press block mx-auto my-4 rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)]"
+          >
+            加载更多评论
+          </button>
+        ) : null}
+        {!loading && !hasMore && visible.length > 0 ? (
           <p className="py-3 text-center text-[11px] text-[var(--text-3)]">到底了</p>
         ) : null}
         {flow ? <div ref={sentinelRef} className="h-1" /> : null}
