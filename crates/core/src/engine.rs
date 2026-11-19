@@ -1890,6 +1890,14 @@ impl Engine {
         self: &Arc<Self>,
         key: &TrackKey,
     ) -> Result<DownloadView, WireError> {
+        // 双击不能起第二个 yt-dlp；同一个 key 已在跑就直接回现有进度。
+        if let Some(existing) = lock(&self.downloads)
+            .iter()
+            .find(|d| d.key == key.as_opaque() && (d.state == "queued" || d.state == "running"))
+            .cloned()
+        {
+            return Ok(existing);
+        }
         let track = self.track_of(key)?;
         let bin = find_ytdlp().ok_or_else(|| {
             WireError::internal("找不到 yt-dlp，先运行 scripts/fetch-yt-dlp.sh")
