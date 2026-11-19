@@ -923,7 +923,7 @@ export function CommentsPanel({
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [photo])
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
@@ -943,6 +943,13 @@ export function CommentsPanel({
   useEffect(() => {
     if (replyTo) inputRef.current?.focus()
   }, [replyTo])
+
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 32), 112)}px`
+  }, [draft])
 
   useEffect(() => {
     if (!emojiOpen || emotes !== null) return
@@ -1166,8 +1173,8 @@ export function CommentsPanel({
           </button>
         </div>
       ) : null}
-      <div className="flex gap-2">
-        <input
+      <div className="flex items-end gap-2">
+        <textarea
           ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -1176,11 +1183,16 @@ export function CommentsPanel({
               setReplyTo(null)
               return
             }
-            if (event.key === 'Enter') void submit()
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault()
+              void submit()
+            }
           }}
+          rows={1}
+          maxLength={1000}
           placeholder={reply ? `回复 @${reply.author}` : '发一条评论'}
           aria-label={reply ? `回复 @${reply.author}` : '发评论'}
-          className="h-8 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+          className="max-h-28 min-h-8 min-w-0 flex-1 resize-none rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 py-1.5 text-[12px] leading-5 outline-none focus:border-[var(--accent)]"
         />
         <div className="relative shrink-0">
           <button
