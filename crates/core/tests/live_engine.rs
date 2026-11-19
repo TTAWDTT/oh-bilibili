@@ -347,7 +347,7 @@ fn 弹幕能取到真实数据() {
     rt.block_on(async {
         let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
         let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
-        let list = engine.danmaku_colored(&key).await.expect("取弹幕");
+        let list = engine.danmaku_colored(&key, None).await.expect("取弹幕");
         println!("共 {} 条弹幕", list.len());
         for line in list.iter().take(3) {
             println!("  {:.1}s  {}  #{:06x}  mode {}", line.secs, line.text, line.color, line.mode);

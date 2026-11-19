@@ -96,8 +96,9 @@ async fn related(
 async fn danmaku_colored(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
+    cid: Option<u64>,
 ) -> Result<Vec<bilimusic_core::wire::DanmakuLine>, WireError> {
-    engine.danmaku_colored(&TrackKey::from_provider(key)).await
+    engine.danmaku_colored(&TrackKey::from_provider(key), cid).await
 }
 
 /// 弹幕密度曲线，用来画高能进度条。

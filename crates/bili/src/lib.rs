@@ -1060,16 +1060,20 @@ impl Source {
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
     ) -> Result<Vec<DanmakuLine>, BiliError> {
-        let detail = self.detail(key).await?;
-        let items = self.danmaku_by_cid(detail.cid).await?;
+        let cid = match cid {
+            Some(cid) => cid,
+            None => self.detail(key).await?.cid,
+        };
+        let items = self.danmaku_by_cid(cid).await?;
         Ok(items)
     }
 
     /// 兼容旧调用：只要文本。
     async fn danmaku_texts(&self, key: &TrackKey) -> Result<Vec<(f64, String)>, BiliError> {
         Ok(self
-            .danmaku_colored(key)
+            .danmaku_colored(key, None)
             .await?
             .into_iter()
             .map(|line| (line.secs, line.text))
