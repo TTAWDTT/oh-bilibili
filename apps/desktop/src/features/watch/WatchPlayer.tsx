@@ -19,6 +19,7 @@ import { VolumeControl } from '../player/VolumeControl'
 import { Avatar } from '../../shared/ui/Avatar'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
+import { Modal } from '../../shared/ui/Modal'
 import { BiliDanmakuSetting, BiliDanmakuSwitch } from '../../shared/ui/BiliDanmakuIcons'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
@@ -687,6 +688,7 @@ export function WatchPlayer({
   const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)
   /** 右键菜单的位置；null 表示没开。 */
   const [shotMenu, setShotMenu] = useState<{ x: number; y: number } | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
     if (!shotMenu) return
@@ -983,8 +985,49 @@ export function WatchPlayer({
             <Icon name="camera" size={13} />
             截图
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShotMenu(null)
+              setHelpOpen(true)
+            }}
+            className="t flex w-full items-center gap-2 border-t border-white/10 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            <Icon name="info" size={13} />
+            快捷键
+          </button>
         </div>
       ) : null}
+      <Modal
+        open={helpOpen}
+        title="播放器快捷键"
+        description={null}
+        onClose={() => setHelpOpen(false)}
+        width="max-w-[420px]"
+      >
+        <dl className="text-[13px]">
+          {[
+            ['空格', '播放 / 暂停'],
+            ['← / →', '后退 / 前进 5 秒'],
+            ['↑ / ↓', '音量 ±5%'],
+            ['M', '静音'],
+            ['F', '全屏 / 退出'],
+            ['W', '网页全屏 / 退出'],
+            ['Esc', '退出全屏或收起右栏'],
+            ['右键', '截图 / 快捷键'],
+          ].map(([key, action]) => (
+            <div
+              key={key}
+              className="flex items-center justify-between gap-4 border-t border-hairline py-2 first:border-t-0"
+            >
+              <dt className="num shrink-0 rounded-[3px] border border-hairline bg-[var(--panel-raised)] px-1.5 py-0.5 text-[11px] text-[var(--text-2)]">
+                {key}
+              </dt>
+              <dd className="text-right text-[var(--text-1)]">{action}</dd>
+            </div>
+          ))}
+        </dl>
+      </Modal>
 
       {/* 控制条浮在画面上：鼠标移上来才出现，静止就淡出。
           常驻一条控制条会把画面挤小，视频网站都不这么做。 */}
