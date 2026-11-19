@@ -1662,9 +1662,10 @@ impl Engine {
     pub async fn subtitle_cues(
         &self,
         key: &TrackKey,
+        cid: Option<u64>,
         lan: Option<&str>,
     ) -> Result<Vec<crate::wire::SubtitleCue>, WireError> {
-        Ok(self.source.subtitle_cues(key, lan).await?)
+        Ok(self.source.subtitle_cues(key, cid, lan).await?)
     }
 
     /// 进度条悬停预览用的缩略图雪碧图。
