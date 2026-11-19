@@ -8,6 +8,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { COMMENT_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { Avatar } from '../../shared/ui/Avatar'
+import { AuthorHoverCard, useAuthorHover } from '../../shared/ui/AuthorHoverCard'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
@@ -226,6 +227,8 @@ function CommentRow({
   onDialog,
   onPhoto,
   onSeek,
+  onAuthorHover,
+  onAuthorHide,
 }: {
   c: Comment
   depth?: number
@@ -241,6 +244,8 @@ function CommentRow({
   onDialog?: ((c: Comment) => void) | undefined
   onPhoto?: ((src: string) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
+  onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
+  onAuthorHide?: (() => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -346,6 +351,8 @@ function CommentRow({
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+                onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
+                onMouseLeave={onAuthorHide}
                 title={`看 ${c.author} 的空间`}
                 className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
               >
@@ -486,6 +493,8 @@ function CommentRow({
               onDialog={onDialog}
               onPhoto={onPhoto}
               onSeek={onSeek}
+              onAuthorHover={onAuthorHover}
+              onAuthorHide={onAuthorHide}
             />
           ))}
           {depth === 0 && (c.reply_count > c.replies.length || repliesOpen) ? (
@@ -567,11 +576,15 @@ function DialogRow({
   ownerMid,
   onPhoto,
   onSeek,
+  onAuthorHover,
+  onAuthorHide,
 }: {
   c: Comment
   ownerMid: number | null
   onPhoto?: ((src: string) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
+  onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
+  onAuthorHide?: (() => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   return (
@@ -586,6 +599,8 @@ function DialogRow({
             <button
               type="button"
               onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+              onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
+              onMouseLeave={onAuthorHide}
               title={`看 ${c.author} 的空间`}
               className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
             >
@@ -651,6 +666,8 @@ function DialogModal({
   onClose,
   onPhoto,
   onSeek,
+  onAuthorHover,
+  onAuthorHide,
 }: {
   open: boolean
   trackKey: string
@@ -660,6 +677,8 @@ function DialogModal({
   onClose: () => void
   onPhoto?: ((src: string) => void) | undefined
   onSeek?: ((ms: number) => void) | undefined
+  onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
+  onAuthorHide?: (() => void) | undefined
 }) {
   const [items, setItems] = useState<Comment[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
@@ -707,6 +726,8 @@ function DialogModal({
             ownerMid={ownerMid}
             onPhoto={onPhoto}
             onSeek={onSeek}
+            onAuthorHover={onAuthorHover}
+            onAuthorHide={onAuthorHide}
           />
         ))}
       </ul>
@@ -792,6 +813,14 @@ export function CommentsPanel({
   const cursorRef = useRef<string | null>(null)
   const seqRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
+  const authorHover = useAuthorHover()
+  const showAuthorCard = (c: Comment, el: HTMLElement): void => {
+    if (c.mid <= 0) return
+    authorHover.show(
+      { mid: c.mid, name: c.author, face: c.avatar, sign: '', official: null, vip: false },
+      el,
+    )
+  }
 
   useEffect(() => {
     if (replyTo) inputRef.current?.focus()
@@ -1187,6 +1216,8 @@ export function CommentsPanel({
               deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
               onPhoto={setPhoto}
               onSeek={seekToTime}
+              onAuthorHover={showAuthorCard}
+              onAuthorHide={authorHover.hide}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
               replyComposerFor={(target) =>
                 replyTo?.id === target.id ? composer(replyTo) : undefined
@@ -1216,6 +1247,17 @@ export function CommentsPanel({
         onClose={() => setDialog(null)}
         onPhoto={setPhoto}
         onSeek={seekToTime}
+        onAuthorHover={showAuthorCard}
+        onAuthorHide={authorHover.hide}
+      />
+      <AuthorHoverCard
+        hover={authorHover.hover}
+        card={authorHover.card}
+        onHide={authorHover.hide}
+        onKeep={authorHover.keep}
+        onOpen={(user) =>
+          useAppStore.getState().navigate({ kind: 'author', name: user.name, mid: user.mid })
+        }
       />
       {photo
         ? createPortal(
