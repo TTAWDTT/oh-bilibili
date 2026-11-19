@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '../../app/appStore'
+import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
 import * as ipc from '../../shared/lib/ipc'
 import type { QualityOption, Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -684,6 +685,54 @@ export function WatchPlayer({
   const [shots, setShots] = useState<ipc.VideoShots | null>(null)
   const shotsAsked = useRef(false)
   const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)
+  /** 右键菜单的位置；null 表示没开。 */
+  const [shotMenu, setShotMenu] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (!shotMenu) return
+    const close = (event: MouseEvent): void => {
+      const target = event.target
+      if (target instanceof Element && target.closest('[data-shot-menu]')) return
+      setShotMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [shotMenu])
+
+  const captureShot = (): void => {
+    setShotMenu(null)
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      toastFailure('截图', new Error('画面还没准备好'))
+      return
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const context = canvas.getContext('2d')
+    if (!context) {
+      toastFailure('截图', new Error('浏览器不支持画布'))
+      return
+    }
+    try {
+      context.drawImage(video, 0, 0)
+    } catch (e) {
+      toastFailure('截图', e)
+      return
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        toastFailure('截图', new Error('生成图片失败'))
+        return
+      }
+      void (async () => {
+        const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()))
+        const at = Math.round(localPlayhead())
+        const path = await ipc.saveScreenshot(bytes, `${track.title}-${formatTime(at)}`)
+        toastDone('截图已保存', path)
+      })().catch((e) => toastFailure('截图', e))
+    }, 'image/png')
+  }
 
   const askShots = (): void => {
     if (shotsAsked.current || !cid) return
@@ -726,6 +775,17 @@ export function WatchPlayer({
     <div
       onMouseMove={poke}
       onMouseLeave={() => setControls(false)}
+      onContextMenu={(event) => {
+        const target = event.target
+        if (target instanceof Element && target.closest('input, textarea')) return
+        event.preventDefault()
+        const box = event.currentTarget.getBoundingClientRect()
+        setShotMenu({
+          x: Math.min(event.clientX - box.left, Math.max(8, box.width - 132)),
+          y: Math.min(event.clientY - box.top, Math.max(8, box.height - 44)),
+        })
+        poke()
+      }}
       className={
         cinema
           ? 'relative flex h-full w-full flex-col justify-center bg-black'
@@ -905,6 +965,23 @@ export function WatchPlayer({
             className="t press shrink-0 text-[var(--accent)] hover:underline"
           >
             撤销
+          </button>
+        </div>
+      ) : null}
+
+      {shotMenu ? (
+        <div
+          data-shot-menu
+          className="absolute z-40 min-w-[124px] overflow-hidden rounded-[6px] border border-white/15 bg-black/90 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+          style={{ left: shotMenu.x, top: shotMenu.y }}
+        >
+          <button
+            type="button"
+            onClick={captureShot}
+            className="t flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-white/90 hover:bg-white/15"
+          >
+            <Icon name="camera" size={13} />
+            截图
           </button>
         </div>
       ) : null}

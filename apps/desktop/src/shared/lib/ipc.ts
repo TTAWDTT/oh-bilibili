@@ -410,6 +410,11 @@ export function openExternal(url: string): Promise<null> {
   return call<null>('open_external', { url })
 }
 
+/** 把播放器截图写到 ~/Pictures/oh-bilibili，返回落盘路径。 */
+export function saveScreenshot(png: number[], name: string): Promise<string> {
+  return call<string>('save_screenshot', { bytes: png, name })
+}
+
 /** 加入或移出稍后再看。 */
 export function watchLaterSet(key: string, on: boolean): Promise<null> {
   return call<null>('watch_later_set', { key, on })

@@ -1023,6 +1023,38 @@ fn open_external(url: String) -> Result<(), WireError> {
     Ok(())
 }
 
+/// 把播放器截图写到 `~/Pictures/oh-bilibili`。文件名只接受安全字符，
+/// 前端传来的标题不能决定落盘路径的目录部分。
+fn screenshot_stem(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+            other => other,
+        })
+        .collect();
+    let cleaned = cleaned.trim().trim_matches('.').chars().take(80).collect::<String>();
+    if cleaned.is_empty() {
+        "截图".to_string()
+    } else {
+        cleaned
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn save_screenshot(bytes: Vec<u8>, name: String) -> Result<String, WireError> {
+    if bytes.is_empty() {
+        return Err(WireError::input("bytes", "截图是空的"));
+    }
+    let home = std::env::var_os("HOME").ok_or_else(|| WireError::internal("找不到用户目录"))?;
+    let dir = std::path::PathBuf::from(home).join("Pictures").join("oh-bilibili");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| WireError::internal(format!("建不了截图目录：{e}")))?;
+    let path = dir.join(format!("{}.png", screenshot_stem(&name)));
+    std::fs::write(&path, bytes).map_err(|e| WireError::internal(format!("写不了截图：{e}")))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
     engine
@@ -1194,9 +1226,21 @@ pub fn run() {
             download_reveal,
             download_open_dir,
             open_external,
+            save_screenshot,
             download_enqueue,
             sync_now,
         ])
         .run(tauri::generate_context!())
         .expect("oh-bilibili 启动失败");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::screenshot_stem;
+
+    #[test]
+    fn 截图文件名去掉路径分隔符() {
+        assert_eq!(screenshot_stem("a/b:c*?\"<>|"), "a-b-c------");
+        assert_eq!(screenshot_stem("  ..  "), "截图");
+    }
 }
