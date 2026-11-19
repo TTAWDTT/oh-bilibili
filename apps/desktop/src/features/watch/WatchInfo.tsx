@@ -183,6 +183,37 @@ export function WatchInfo({
   const [tags, setTags] = useState<string[]>([])
   /** 简介默认收两行，长简介给一个展开。 */
   const [descOpen, setDescOpen] = useState(false)
+  const [descCanExpand, setDescCanExpand] = useState(false)
+  const descRef = useRef<HTMLParagraphElement | null>(null)
+
+  useEffect(() => {
+    setDescOpen(false)
+  }, [track.key])
+
+  useEffect(() => {
+    if (descOpen) return
+    const el = descRef.current
+    if (!el) return
+    const measure = (): void => {
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.classList.remove('line-clamp-2')
+      clone.style.position = 'absolute'
+      clone.style.visibility = 'hidden'
+      clone.style.left = '-9999px'
+      clone.style.top = '0'
+      clone.style.width = `${el.clientWidth}px`
+      clone.style.display = 'block'
+      clone.style.webkitLineClamp = 'unset'
+      document.body.appendChild(clone)
+      const full = clone.scrollHeight
+      clone.remove()
+      setDescCanExpand(full > el.clientHeight + 1)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [data.desc, descOpen])
   /** 投币浮层的位置，null 表示没开。操作排是 overflow-x-auto，absolute 会被裁掉。 */
   const [coinAt, setCoinAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
   const [shareAt, setShareAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
@@ -470,6 +501,7 @@ export function WatchInfo({
       {data.desc ? (
         <div className="mt-3 max-w-[820px]">
           <p
+            ref={descRef}
             className={`whitespace-pre-wrap text-[13px] leading-[1.6] text-[var(--text-2)] ${
               descOpen ? '' : 'line-clamp-2'
             }`}
@@ -477,7 +509,7 @@ export function WatchInfo({
             {descriptionNodes(data.desc, onSeek)}
           </p>
           {/* 长简介按 B 站收两行；短简介不需要那个按钮。 */}
-          {data.desc.length > 90 ? (
+          {descCanExpand ? (
             <button
               type="button"
               onClick={() => setDescOpen((open) => !open)}
