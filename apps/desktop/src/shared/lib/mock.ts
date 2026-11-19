@@ -575,7 +575,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (!track) throw fail('input', '预览模式没有这条视频')
       return {
         key: track.key,
-        desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD',
+        desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD 下面的文字用来验证简介超过两行时的展开与收起，以及窄屏下的排版是否会把按钮挤掉。展开之后应该能看到这一段完整的介绍，收起时恢复到两行，按钮本身不遮挡下面的标签。',
         owner: track.artist,
         owner_mid: track.up_mid ?? null,
         owner_avatar: track.up_avatar ?? null,
