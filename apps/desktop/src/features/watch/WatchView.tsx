@@ -194,6 +194,21 @@ export function WatchView({ track }: { track: Track }) {
     }
   }, [track.key])
 
+  /** 选集每一行下面那条「看到哪了」。读的是本地存的分 P 进度。 */
+  const [pagePos, setPagePos] = useState<Record<number, number>>({})
+  useEffect(() => {
+    const prefix = `oh-bilibili:watch-pos:${track.key}:`
+    const next: Record<number, number> = {}
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(prefix)) continue
+      const no = Number(key.slice(prefix.length))
+      const at = Number(localStorage.getItem(key) ?? 0)
+      if (no > 0 && Number.isFinite(at) && at > 0) next[no] = at
+    }
+    setPagePos(next)
+  }, [track.key, page, data])
+
   // 每条 P 各记一份进度；切 P 与离开页面时由 effect 清理补写一次。
   useEffect(() => {
     const save = (): void => {
@@ -544,7 +559,12 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
             <div className="border-t border-hairline md:hidden">
-              <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} />
+              <PageList
+                pages={data.pages}
+                current={page ?? data.current_page}
+                onPage={changePage}
+                progress={pagePos}
+              />
             </div>
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
@@ -578,7 +598,14 @@ export function WatchView({ track }: { track: Track }) {
             ) : null}
             <DanmakuList items={danmaku} />
             {data ? <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} /> : null}
-            {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} /> : null}
+            {data ? (
+              <PageList
+                pages={data.pages}
+                current={page ?? data.current_page}
+                onPage={changePage}
+                progress={pagePos}
+              />
+            ) : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>

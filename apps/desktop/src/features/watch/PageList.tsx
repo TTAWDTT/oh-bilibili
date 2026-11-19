@@ -13,10 +13,13 @@ export function PageList({
   pages,
   current,
   onPage,
+  progress,
 }: {
   pages: PageRef[]
   current: number
   onPage: (no: number) => void
+  /** P 序号 → 已看到的毫秒数。没有记录的不画。 */
+  progress?: Record<number, number>
 }) {
   const currentRef = useRef<HTMLButtonElement | null>(null)
   const listRef = useRef<HTMLOListElement | null>(null)
@@ -39,6 +42,8 @@ export function PageList({
         <ol ref={listRef} className="flex max-h-[320px] flex-col overflow-y-auto px-1.5 py-1.5">
           {pages.map((page) => {
             const active = page.no === current
+            const seen = progress?.[page.no] ?? 0
+            const ratio = page.duration_ms > 0 ? Math.min(1, seen / page.duration_ms) : 0
             return (
               <li key={page.cid}>
                 <button
@@ -71,6 +76,17 @@ export function PageList({
                   {page.duration_ms ? (
                     <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
                       {formatTime(page.duration_ms)}
+                    </span>
+                  ) : null}
+                  {ratio > 0 ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute bottom-0.5 left-8 right-2 h-[2px] overflow-hidden rounded-full bg-[var(--line)]"
+                    >
+                      <span
+                        className="block h-full rounded-full bg-[var(--accent)]"
+                        style={{ width: `${ratio * 100}%` }}
+                      />
                     </span>
                   ) : null}
                 </button>
