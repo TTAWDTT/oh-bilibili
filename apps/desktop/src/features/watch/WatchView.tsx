@@ -126,6 +126,10 @@ export function WatchView({ track }: { track: Track }) {
   const [subTracks, setSubTracks] = useState<ipc.SubtitleTrack[]>([])
   /** UP 主设的章节。 */
   const [metaChapters, setMetaChapters] = useState<{ at_ms: number; title: string }[]>([])
+  /** 外部（章节/总结/简介）点时间戳时发一次定位请求，由播放器统一改声音与画面。 */
+  const [seekSignal, setSeekSignal] = useState<{ at: number; nonce: number } | null>(null)
+  const seekTo = (ms: number): void =>
+    setSeekSignal((previous) => ({ at: ms, nonce: (previous?.nonce ?? 0) + 1 }))
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
   const [resume, setResume] = useState<{ key: string; at: number } | null>(
     storedPagePos ? { key: track.key, at: storedPagePos } : null,
@@ -481,6 +485,7 @@ export function WatchView({ track }: { track: Track }) {
                 }}
                 nextTitle={nextTitle}
                 onNext={playNext}
+                seekSignal={seekSignal}
                 resumeAt={resume?.key === track.key ? resume.at : null}
                 chapters={chapters}
               />
@@ -511,9 +516,7 @@ export function WatchView({ track }: { track: Track }) {
               onLike={like}
               onFav={openFav}
               onTriple={triple}
-              onSeek={(ms) => {
-                void ipc.playerSeek(ms).catch(() => {})
-              }}
+              onSeek={seekTo}
               ownerRow={
                 <OwnerCard
                   data={data}
@@ -566,7 +569,7 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
-            {data ? <ChapterList desc={data.desc} chapters={chapters} /> : null}
+            {data ? <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} /> : null}
             {data ? <PageList pages={data.pages} current={page ?? data.current_page} onPage={changePage} /> : null}
             {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
