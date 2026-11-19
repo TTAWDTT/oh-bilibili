@@ -152,6 +152,7 @@ export function WatchPlayer({
   onReplay,
   nextTitle,
   onNext,
+  seekSignal,
   resumeAt,
   chapters: chapterMeta,
   liked,
@@ -173,6 +174,8 @@ export function WatchPlayer({
   /** 播完后的下一集标题；多 P 先走下一 P，否则走相关推荐。 */
   nextTitle: string | null
   onNext: () => void
+  /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
+  seekSignal: { at: number; nonce: number } | null
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
   /** UP 主设的章节；空表时退回简介里的时间戳。 */
@@ -298,6 +301,13 @@ export function WatchPlayer({
     if (hideTimer.current) window.clearTimeout(hideTimer.current)
     hideTimer.current = window.setTimeout(() => setControls(false), 2500)
   }
+  useEffect(() => {
+    if (!seekSignal) return
+    const video = videoRef.current
+    if (video) video.currentTime = seekSignal.at / 1000
+    setNow(seekSignal.at)
+    void ipc.playerSeek(seekSignal.at).catch(() => {})
+  }, [seekSignal])
   useEffect(() => {
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current)

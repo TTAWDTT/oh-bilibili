@@ -291,7 +291,8 @@ pub use bilimusic_bili::comments::{Comment, CommentPage};
 
 pub use bilimusic_bili::messages::{MessageItem, MessageKind, MessagePage, MessageUnread, MessageUser};
 pub use bilimusic_bili::sync::{
-    DynamicItem, DynamicPage, Followed, SubtitleCue, SubtitleTrack, VideoMeta, VideoShots,
+    DynamicItem, DynamicPage, Followed, SubtitleCue, SubtitleTrack, SummaryPoint, SummarySection,
+    VideoMeta, VideoShots, VideoSummary,
 };
 pub use bilimusic_bili::HotSearchItem;
 pub use bilimusic_bili::DanmakuLine;

@@ -13,6 +13,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { SharePanel } from './SharePanel'
+import { SummaryCard } from './SummaryCard'
 
 /** 状态翻过一次才换 key，让扩散环重播；初次挂载返回 0，进页面时不会三颗一起闪。 */
 function useFlipKey(value: boolean | number): number {
@@ -179,6 +180,7 @@ export function WatchInfo({
   const likeRing = useFlipKey(liked)
   const coinRing = useFlipKey(coins)
   const favRing = useFlipKey(faved)
+  const cid = data.pages.find((page) => page.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
 
   const [saved, setSaved] = useState(false)
   /** 视频标签。公开接口，取不到就不显示这一行。 */
@@ -653,6 +655,10 @@ export function WatchInfo({
             </button>
           ) : null}
         </div>
+      ) : null}
+
+      {data.owner_mid ? (
+        <SummaryCard trackKey={track.key} cid={cid} upMid={data.owner_mid} onSeek={onSeek} />
       ) : null}
 
       {tags.length > 0 ? (

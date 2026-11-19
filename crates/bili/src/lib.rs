@@ -482,6 +482,16 @@ impl Source {
         self.client.video_meta(bvid, cid).await
     }
 
+    /// 这条视频的 AI 总结；没有总结的稿件返回 None。
+    pub async fn video_summary(
+        &self,
+        bvid: &str,
+        cid: u64,
+        up_mid: u64,
+    ) -> Result<Option<sync::VideoSummary>, BiliError> {
+        self.client.video_summary(bvid, cid, up_mid).await
+    }
+
     /// 取一条字幕轨的全部台词。`lan` 传 `None` 时优先中文。
     pub async fn subtitle_cues(
         &self,

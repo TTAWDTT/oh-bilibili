@@ -49,6 +49,26 @@ pub struct VideoChapter {
     pub title: String,
 }
 
+/// B 站给这条视频生成的 AI 总结。没有总结的稿件整块不返回。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VideoSummary {
+    pub summary: String,
+    pub outline: Vec<SummarySection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SummarySection {
+    pub title: String,
+    pub at_ms: u64,
+    pub points: Vec<SummaryPoint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SummaryPoint {
+    pub at_ms: u64,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubtitleTrack {
     /// B 站的语言码：`ai-zh`、`zh-CN`、`en-US` 等。
@@ -1081,6 +1101,28 @@ impl Client {
         })
     }
 
+    /// 这条视频的 AI 总结。不是每条投稿都有，取不到就返回 None。
+    pub async fn video_summary(
+        &self,
+        bvid: &str,
+        cid: u64,
+        up_mid: u64,
+    ) -> Result<Option<VideoSummary>, BiliError> {
+        let v = self
+            .signed_get(
+                &format!("{API}/x/web-interface/view/conclusion/get"),
+                vec![
+                    ("bvid", bvid.to_string()),
+                    ("cid", cid.to_string()),
+                    ("up_mid", up_mid.to_string()),
+                    ("web_location", "1315873".to_string()),
+                ],
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(summary_of(&v))
+    }
+
     /// 正在直播的房间推荐：B 站首页右栏最上面那一块就是它。
     ///
     /// 走 `room/v1/room/get_user_recommend`：`xlive` 那套 second/getList
@@ -1514,6 +1556,44 @@ fn chapters_of(value: &serde_json::Value) -> Vec<VideoChapter> {
             })
         })
         .collect()
+}
+
+/// AI 总结。外层 code 是请求结果，`data.code` 才是「这条稿件有没有总结」。
+fn summary_of(value: &serde_json::Value) -> Option<VideoSummary> {
+    if value["code"].as_i64()? != 0 || value["data"]["code"].as_i64().unwrap_or(-1) != 0 {
+        return None;
+    }
+    let model = &value["data"]["model_result"];
+    let summary = model["summary"].as_str()?.trim().to_string();
+    if summary.is_empty() {
+        return None;
+    }
+    let outline = model["outline"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .map(|section| SummarySection {
+                    title: section["title"].as_str().unwrap_or("").to_string(),
+                    at_ms: section["timestamp"].as_u64().unwrap_or(0) * 1000,
+                    points: section["part_outline"]
+                        .as_array()
+                        .map(|points| {
+                            points
+                                .iter()
+                                .filter_map(|point| {
+                                    Some(SummaryPoint {
+                                        at_ms: point["timestamp"].as_u64().unwrap_or(0) * 1000,
+                                        content: point["content"].as_str()?.to_string(),
+                                    })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(VideoSummary { summary, outline })
 }
 
 /// mid 在动态接口里可能是数字，也可能是数字字符串。
@@ -2217,6 +2297,35 @@ mod relation_shape_tests {
         assert_eq!(chapters[1].at_ms, 55_000);
         assert_eq!(chapters[1].title, "第二节");
         assert!(super::chapters_of(&json!({ "data": {} })).is_empty());
+    }
+
+    #[test]
+    fn 总结取摘要与分段时间戳() {
+        let v = json!({
+            "code": 0,
+            "data": {
+                "code": 0,
+                "model_result": {
+                    "summary": "一句话总结。",
+                    "outline": [{
+                        "title": "第一节",
+                        "timestamp": 1,
+                        "part_outline": [
+                            { "timestamp": 26, "content": "第一个点" },
+                            { "timestamp": 104, "content": "第二个点" }
+                        ]
+                    }]
+                }
+            }
+        });
+        let summary = super::summary_of(&v).expect("有总结");
+        assert_eq!(summary.summary, "一句话总结。");
+        assert_eq!(summary.outline[0].at_ms, 1_000);
+        assert_eq!(summary.outline[0].points[1].at_ms, 104_000);
+        assert_eq!(summary.outline[0].points[1].content, "第二个点");
+
+        let none = json!({ "code": 0, "data": { "code": -1 } });
+        assert!(super::summary_of(&none).is_none());
     }
 
     /// 同一个字段名在热门里是对象（`{"content": "百万播放"}`），在每周必看里是裸字符串。
