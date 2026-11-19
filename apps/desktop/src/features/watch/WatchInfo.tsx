@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
-import { formatCount, formatDate } from '../../shared/lib/format'
+import { formatCount, formatDate, formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
 import { toastDone, toastFailure } from '../../app/notice'
 import { useReactionStore } from '../reactions/reactionStore'
 import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
+import { Modal } from '../../shared/ui/Modal'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { SharePanel } from './SharePanel'
 
@@ -217,6 +218,9 @@ export function WatchInfo({
   /** 投币浮层的位置，null 表示没开。操作排是 overflow-x-auto，absolute 会被裁掉。 */
   const [coinAt, setCoinAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
   const [shareAt, setShareAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const noteRef = useRef<HTMLTextAreaElement | null>(null)
   const [coinPick, setCoinPick] = useState(1)
   const [alsoLike, setAlsoLike] = useState(true)
   /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
@@ -263,6 +267,12 @@ export function WatchInfo({
     }
   }, [])
 
+  useEffect(() => {
+    if (!noteOpen) return
+    const timer = window.setTimeout(() => noteRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
+  }, [noteOpen])
+
   const openCoin = (event: React.MouseEvent<HTMLButtonElement>): void => {
     if (coins >= 2) {
       toastDone('已经投过两枚', 'B 站上限 2 枚')
@@ -293,6 +303,38 @@ export function WatchInfo({
     if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
     holdTimer.current = null
     setHolding(false)
+  }
+
+  const noteKey = `oh-bilibili:watch-note:${track.key}`
+  const openNote = (): void => {
+    try {
+      setNote(localStorage.getItem(noteKey) ?? '')
+    } catch {
+      setNote('')
+    }
+    setNoteOpen(true)
+  }
+  const insertNoteTime = (): void => {
+    const stamp = `[${formatTime(readPlayhead())}] `
+    const el = noteRef.current
+    const start = el?.selectionStart ?? note.length
+    const end = el?.selectionEnd ?? start
+    const next = note.slice(0, start) + stamp + note.slice(end)
+    setNote(next)
+    window.requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(start + stamp.length, start + stamp.length)
+    })
+  }
+  const saveNote = (): void => {
+    try {
+      if (note.trim()) localStorage.setItem(noteKey, note)
+      else localStorage.removeItem(noteKey)
+      setNoteOpen(false)
+      toastDone(note.trim() ? '笔记已保存' : '笔记已清空')
+    } catch {
+      toastFailure('保存笔记', new Error('本地存储不可用'))
+    }
   }
 
   /**
@@ -406,6 +448,10 @@ export function WatchInfo({
           <Icon name="share" size={22} />
           {formatCount(data.stats.shares)}
         </button>
+        <button type="button" aria-label="视频笔记" onClick={openNote} className={action(false)}>
+          <Icon name="note" size={20} />
+          笔记
+        </button>
         <span className="mx-1.5 h-5 w-px shrink-0 bg-[var(--line)]" />
         <button
           type="button"
@@ -494,6 +540,47 @@ export function WatchInfo({
       <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={520}>
         <SharePanel track={track} onClose={() => setShareAt(null)} />
       </AnchoredPanel>
+      <Modal
+        open={noteOpen}
+        title="视频笔记"
+        description={null}
+        onClose={() => setNoteOpen(false)}
+        width="max-w-[620px]"
+      >
+        <textarea
+          ref={noteRef}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          rows={10}
+          placeholder="点「插入当前时间」，把想法和播放位置一起记下来"
+          className="w-full resize-y rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13px] leading-[1.6] text-[var(--text-1)] outline-none focus:border-[var(--accent)]"
+        />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={insertNoteTime}
+            className="t press text-[12px] text-[var(--accent)] hover:underline"
+          >
+            插入当前时间
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setNoteOpen(false)}
+              className="t press rounded-[6px] px-3 py-1.5 text-[13px] text-[var(--text-3)] hover:bg-[var(--panel-alt)]"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={saveNote}
+              className="t press rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white hover:opacity-90"
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* B 站顺序：三连 → UP 行 → 简介 → 标签。UP 行紧跟操作排，不沉到标签后面。 */}
       {ownerRow ? <div className="mt-1">{ownerRow}</div> : null}
