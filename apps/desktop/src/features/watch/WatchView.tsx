@@ -18,6 +18,7 @@ import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
+import { setWatchFavHandler } from './watchActions'
 import { FavPicker } from '../library/FavPicker'
 import { usePlayerStore } from '../player/playerStore'
 
@@ -328,6 +329,13 @@ export function WatchView({ track }: { track: Track }) {
     }
     setPickingFav(true)
   }
+  // 按 E 等于点收藏：走同一条路，需要选收藏夹时照样弹窗。
+  const openFavRef = useRef(openFav)
+  openFavRef.current = openFav
+  useEffect(() => {
+    setWatchFavHandler(() => openFavRef.current())
+    return () => setWatchFavHandler(null)
+  }, [])
 
   const favTo = async (folderId: number | null): Promise<void> => {
     setFavBusy(true)

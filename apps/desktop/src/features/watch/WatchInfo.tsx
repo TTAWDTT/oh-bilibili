@@ -427,7 +427,7 @@ export function WatchInfo({
           aria-label="投币"
           onClick={openCoin}
           className={`${action(coins > 0)} bili-tri-btn relative overflow-hidden`}
-          title="投币（W）"
+          title="投币"
         >
           {coinRing > 0 ? (
             <span

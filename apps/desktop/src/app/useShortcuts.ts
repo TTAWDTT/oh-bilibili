@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { usePlayerStore } from '../features/player/playerStore'
 import { useDanmakuSettings } from '../features/player/danmakuSettings'
 import { readPlayhead } from '../shared/lib/playhead'
+import { watchFav } from '../features/watch/watchActions'
 import { useAppStore } from './appStore'
 
 const TEXT_ENTRY = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
@@ -103,6 +104,10 @@ export function useShortcuts(): void {
         event.preventDefault()
         const danmaku = useDanmakuSettings.getState()
         danmaku.setEnabled(!danmaku.enabled)
+      } else if (key === 'e' && useAppStore.getState().view.kind === 'watch') {
+        // E 收藏，和收藏按钮同一个入口。
+        event.preventDefault()
+        watchFav()
       } else if (key === 'm' && player.snapshot?.track) {
         // M 静音；再按一次回到静音前的音量。
         event.preventDefault()
