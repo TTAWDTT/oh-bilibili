@@ -77,6 +77,8 @@ export type Comment = {
   pictures: string[]
   /** 评论者等级。 */
   level: number
+  /** 大会员。 */
+  vip: boolean
   likes: number
   at: number
   replies: Comment[]

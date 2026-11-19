@@ -414,6 +414,11 @@ function CommentRow({
               <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
             )}
             {c.level > 0 ? <LevelBadge level={c.level} /> : null}
+            {c.vip ? (
+              <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+                大会员
+              </span>
+            ) : null}
             {c.pinned ? (
               <span className="flex shrink-0 items-center gap-0.5 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 <Icon name="thumb" size={9} />
@@ -676,6 +681,11 @@ function DialogRow({
             <span className="truncate text-[12px] text-[var(--text-2)]">{c.author}</span>
           )}
           {c.level > 0 ? <LevelBadge level={c.level} /> : null}
+          {c.vip ? (
+            <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
+              大会员
+            </span>
+          ) : null}
           {ownerMid !== null && c.mid === ownerMid ? (
             <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
               UP主
@@ -1054,6 +1064,7 @@ export function CommentsPanel({
           mentions: [],
           pictures: [],
           level: me?.level ?? 0,
+          vip: false,
           likes: 0,
           at: Math.floor(Date.now() / 1000),
           replies: [],

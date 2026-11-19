@@ -29,6 +29,8 @@ pub struct Comment {
     pub pictures: Vec<String>,
     /// 评论者等级。B 站把 LV 牌挂在昵称后面。
     pub level: u8,
+    /// 大会员。接口里是 `member.vip.vipStatus == 1`。
+    pub vip: bool,
     pub likes: u32,
     /// Unix 秒。
     pub at: i64,
@@ -133,6 +135,14 @@ struct RawMember {
     level_info: Option<RawLevel>,
     #[serde(default)]
     fans_detail: Option<RawFansDetail>,
+    #[serde(default)]
+    vip: Option<RawVip>,
+}
+
+#[derive(Deserialize)]
+struct RawVip {
+    #[serde(default, rename = "vipStatus")]
+    vip_status: u32,
 }
 
 fn u64_from_any<'de, D>(deserializer: D) -> Result<u64, D::Error>
@@ -232,6 +242,12 @@ fn to_comment(raw: RawReply) -> Comment {
         .and_then(|m| m.level_info.as_ref())
         .map(|l| l.current_level as u8)
         .unwrap_or(0);
+    let vip = raw
+        .member
+        .as_ref()
+        .and_then(|m| m.vip.as_ref())
+        .map(|v| v.vip_status == 1)
+        .unwrap_or(false);
     let medal = raw
         .member
         .as_ref()
@@ -318,6 +334,7 @@ fn to_comment(raw: RawReply) -> Comment {
         mentions,
         pictures,
         level,
+        vip,
         likes: raw.like,
         at: raw.ctime,
         replies,
@@ -488,7 +505,17 @@ mod tests {
         assert_eq!(c.replies.len(), 1);
         assert_eq!(c.replies[0].text, "回复一");
         assert_eq!(c.location, None);
+        assert!(!c.vip);
         assert!(page.has_more);
+    }
+
+    #[test]
+    fn 大会员评论带出vip() {
+        let mut value = sample();
+        value["data"]["replies"][0]["member"]["vip"] = serde_json::json!({ "vipStatus": 1 });
+        let page = cursor_page_from(&value, true);
+        assert!(page.items[0].vip);
+        assert!(!page.items[0].replies[0].vip);
     }
 
     #[test]
