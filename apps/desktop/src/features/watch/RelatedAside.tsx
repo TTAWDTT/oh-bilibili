@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
+import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
@@ -10,6 +12,24 @@ export function RelatedAside({ items }: { items: Track[] }) {
   const replace = useAppStore((s) => s.replace)
   const autoplay = useAutoplay((s) => s.enabled)
   const setAutoplay = useAutoplay((s) => s.setEnabled)
+  const [progress, setProgress] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    const keys = items.map((item) => item.key)
+    if (keys.length === 0) return
+    let alive = true
+    void ipc
+      .historyPositions(keys)
+      .then((rows) => {
+        if (alive) setProgress(Object.fromEntries(rows))
+      })
+      .catch(() => {
+        // 历史读不到就不画进度，推荐本身照常显示
+      })
+    return () => {
+      alive = false
+    }
+  }, [items])
   if (items.length === 0) return null
 
   return (
@@ -58,6 +78,16 @@ export function RelatedAside({ items }: { items: Track[] }) {
               {item.duration_ms ? (
                 <span className="num absolute bottom-0.5 right-1 rounded-[2px] bg-black/65 px-1 text-[10px] leading-[14px] text-white">
                   {formatDuration(item.duration_ms)}
+                </span>
+              ) : null}
+              {item.duration_ms && (progress[item.key] ?? 0) > 0 ? (
+                <span className="absolute inset-x-0 bottom-0 h-[3px] bg-black/45">
+                  <span
+                    className="block h-full bg-[var(--accent)]"
+                    style={{
+                      width: `${Math.min(100, ((progress[item.key] ?? 0) / item.duration_ms) * 100)}%`,
+                    }}
+                  />
                 </span>
               ) : null}
               <span className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">

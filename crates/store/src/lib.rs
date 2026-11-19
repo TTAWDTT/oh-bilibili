@@ -452,6 +452,32 @@ impl Library {
         })
     }
 
+    /// 批量查历史进度：右栏一条请求就能给所有推荐画上「看过没有」。
+    pub fn history_positions(&self, provider_keys: &[String]) -> Result<Vec<(String, u64)>> {
+        if provider_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.with(|conn| {
+            let mut statement = conn.prepare(
+                "SELECT t.provider_key, h.position_ms FROM history h
+                 JOIN tracks t ON t.id = h.track_id",
+            )?;
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?.max(0) as u64))
+            })?;
+            let wanted: std::collections::HashSet<&str> =
+                provider_keys.iter().map(String::as_str).collect();
+            let mut out = Vec::new();
+            for row in rows {
+                let (key, position) = row?;
+                if wanted.contains(key.as_str()) {
+                    out.push((key, position));
+                }
+            }
+            Ok(out)
+        })
+    }
+
     /// 写入一条同步意图。取消不是删行，是把 want 置 0。
     pub fn set_reaction(
         &self,
@@ -916,6 +942,21 @@ mod tests {
         // 重新打开视频时先写一条 0 历史，不能把续播点清掉。
         l.push_history(a, 0).unwrap();
         assert_eq!(l.history_position("BVBVresume").unwrap(), Some(42_500));
+    }
+
+    #[test]
+    fn 批量历史进度只返回问到的键() {
+        let l = lib();
+        for (n, position) in [("batch1", 11_000), ("batch2", 22_000)] {
+            let id = l.upsert_track(&track(n)).unwrap();
+            l.push_history(id, 0).unwrap();
+            l.set_history_position(&format!("BV{n}"), position).unwrap();
+        }
+        let rows = l
+            .history_positions(&["BVbatch1".into(), "BVmissing".into()])
+            .unwrap();
+        assert_eq!(rows, vec![("BVbatch1".to_string(), 11_000)]);
+        assert!(l.history_positions(&[]).unwrap().is_empty());
     }
 
     #[test]

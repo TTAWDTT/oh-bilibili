@@ -250,6 +250,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       ]
     case 'history_position':
       return null
+    case 'history_positions': {
+      // 预览：把前两条推荐当成看过一半，用来验右栏进度条。
+      const keys = Array.isArray(args.keys) ? (args.keys as unknown[]).map(String) : []
+      return keys.slice(0, 2).map((key) => [key, 12_000] as [string, number])
+    }
     case 'fav_tracks': {
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40
