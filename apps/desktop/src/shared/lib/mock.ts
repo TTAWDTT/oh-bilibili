@@ -9,7 +9,7 @@ export { mockSubscribe } from './mockEngine'
 
 const COMMENT_SEEDS: { author: string; mid: number; text: string; level: number; medal: string | null }[] = [
   { author: 'UP主本人', mid: 90000, text: '置顶：这条在预览模式里用来验置顶标记。', level: 6, medal: null },
-  { author: '耳机党', mid: 90002, text: '前奏一响，DNA 动了。', level: 5, medal: '周杰伦' },
+  { author: '耳机党', mid: 90002, text: '00:27 前奏一响，DNA 动了。', level: 5, medal: '周杰伦' },
   { author: '夜航船', mid: 90003, text: '第五遍循环，还是这首。', level: 3, medal: null },
 ]
 
