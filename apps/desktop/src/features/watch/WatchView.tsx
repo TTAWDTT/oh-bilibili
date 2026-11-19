@@ -18,6 +18,7 @@ import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer } from './WatchPlayer'
 import { FavPicker } from '../library/FavPicker'
+import { usePlayerStore } from '../player/playerStore'
 
 function loadWatchPage(key: string): number | null {
   try {
@@ -31,6 +32,31 @@ function loadWatchPage(key: string): number | null {
 function saveWatchPage(key: string, page: number): void {
   try {
     localStorage.setItem(`oh-bilibili:watch-page:${key}`, String(page))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
+function loadPagePos(key: string, page: number): number | null {
+  try {
+    const at = Number(localStorage.getItem(`oh-bilibili:watch-pos:${key}:${page}`))
+    return Number.isFinite(at) && at > 0 ? at : null
+  } catch {
+    return null
+  }
+}
+
+function savePagePos(key: string, page: number, at: number): void {
+  try {
+    localStorage.setItem(`oh-bilibili:watch-pos:${key}:${page}`, String(Math.round(at)))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
+function clearPagePos(key: string, page: number): void {
+  try {
+    localStorage.removeItem(`oh-bilibili:watch-pos:${key}:${page}`)
   } catch {
     // 隐私模式写不进去，只影响这次会话
   }
@@ -64,18 +90,29 @@ export function WatchView({ track }: { track: Track }) {
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
-  const [page, setPage] = useState<number | undefined>(
-    () => loadWatchPage(track.key) ?? undefined,
-  )
+  const storedPage = useRef(loadWatchPage(track.key)).current
+  const storedPagePos = useRef(storedPage ? loadPagePos(track.key, storedPage) : null).current
+  const [page, setPage] = useState<number | undefined>(storedPage ?? undefined)
+  /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
+  const [pendingResume, setPendingResume] = useState<number | null>(storedPagePos)
   const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
     if (page === undefined) return
     document.getElementById('scroll-main')?.scrollTo({ top: 0 })
   }, [page])
-  /** 换 P 是另一条播放位置，不能沿用这条视频上次的续播点。 */
+  /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
   const changePage = (no: number): void => {
-    setResume(null)
+    const from = page ?? data?.current_page
+    const snap = usePlayerStore.getState().snapshot
+    // 快照只在命令时更新，真实播放位置在 progress 切片里（10Hz）。
+    const now = usePlayerStore.getState().progress.position_ms
+    if (from !== undefined && snap?.track?.key === track.key && now >= 5000) {
+      savePagePos(track.key, from, now)
+    }
+    const at = loadPagePos(track.key, no)
+    setResume(at ? { key: track.key, at } : null)
+    setPendingResume(at)
     setPage(no)
     saveWatchPage(track.key, no)
   }
@@ -87,7 +124,9 @@ export function WatchView({ track }: { track: Track }) {
   /** 这条视频有哪些字幕轨；空表示没有字幕，播放器就不放「字幕」按钮。 */
   const [subTracks, setSubTracks] = useState<ipc.SubtitleTrack[]>([])
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
-  const [resume, setResume] = useState<{ key: string; at: number } | null>(null)
+  const [resume, setResume] = useState<{ key: string; at: number } | null>(
+    storedPagePos ? { key: track.key, at: storedPagePos } : null,
+  )
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   const [followed, setFollowed] = useState<boolean | null>(null)
@@ -132,9 +171,9 @@ export function WatchView({ track }: { track: Track }) {
 
   useEffect(() => {
     let cancelled = false
-    setResume(null)
     // 从记住的 P 打开时不沿用 bvid 级历史：它可能属于上一 P。
     if (initialStoredPage.current) return
+    setResume(null)
     void ipc
       .historyPosition(track.key)
       .then((at) => {
@@ -145,6 +184,32 @@ export function WatchView({ track }: { track: Track }) {
       cancelled = true
     }
   }, [track.key])
+
+  // 每条 P 各记一份进度；切 P 与离开页面时由 effect 清理补写一次。
+  useEffect(() => {
+    const save = (): void => {
+      const snap = usePlayerStore.getState().snapshot
+      if (!snap || snap.track?.key !== track.key) return
+      const no = page ?? data?.current_page
+      if (no === undefined || !data || data.current_page !== no) return
+      if (snap.phase === 'ended') {
+        clearPagePos(track.key, no)
+        return
+      }
+      const at = usePlayerStore.getState().progress.position_ms
+      if (at < 5000) {
+        clearPagePos(track.key, no)
+        return
+      }
+      if (data.duration_ms > 0 && at > data.duration_ms - 10_000) return
+      savePagePos(track.key, no, at)
+    }
+    const timer = window.setInterval(save, 5000)
+    return () => {
+      window.clearInterval(timer)
+      save()
+    }
+  }, [track.key, page, data])
 
   const mid = data?.owner_mid ?? null
 
@@ -282,12 +347,16 @@ export function WatchView({ track }: { track: Track }) {
     setError(null)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key, page)
+        const next = await ipc.watchOpen(track.key, page, pendingResume ?? undefined)
         if (!cancelled) {
           initialStoredPage.current = false
           if (page !== undefined && !next.pages.some((entry) => entry.no === page)) {
-            setPage(next.current_page)
-            saveWatchPage(track.key, next.current_page)
+            const fallback = next.current_page
+            const at = loadPagePos(track.key, fallback)
+            setPage(fallback)
+            setPendingResume(at)
+            setResume(at ? { key: track.key, at } : null)
+            saveWatchPage(track.key, fallback)
           }
           setData(next)
         }
@@ -298,7 +367,7 @@ export function WatchView({ track }: { track: Track }) {
     return () => {
       cancelled = true
     }
-  }, [track.key, page, nonce])
+  }, [track.key, page, pendingResume, nonce])
 
   // 离开这一页就停掉声音。切到「听」时引擎已经把模式改成 listen，
   // 那边的 close_watch 不会误停用户主动选的后台播放。

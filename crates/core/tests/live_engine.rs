@@ -443,7 +443,7 @@ fn 分P_列表与切换() {
         let second = view.pages[1].no;
         let key = bilimusic_model::TrackKey::from_provider(view.key.clone());
         let v2 = engine
-            .open_watch_page(&key, "http://127.0.0.1:9", Some(second))
+            .open_watch_page(&key, "http://127.0.0.1:9", Some(second), None)
             .await
             .expect("切到第二个分P");
         println!("切到 P{}，清单 {}", v2.current_page, v2.manifest_url);
@@ -778,7 +778,7 @@ fn 观看页元信息带出字幕轨() {
         let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
         let detail = engine.video_meta(&key).await.expect("详情");
         let _ = detail;
-        let view = engine.open_watch_page(&key, "http://127.0.0.1:1", None).await;
+        let view = engine.open_watch_page(&key, "http://127.0.0.1:1", None, None).await;
         // open_watch_page 会真的去拉流，这里只关心 cid 能取到
         let cid = match view {
             Ok(v) => v.pages.iter().find(|p| p.no == v.current_page).map(|p| p.cid).unwrap_or(0),

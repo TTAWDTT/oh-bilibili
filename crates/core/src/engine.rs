@@ -335,15 +335,17 @@ impl Engine {
         key: &TrackKey,
         proxy_origin: &str,
     ) -> Result<WatchView, WireError> {
-        self.open_watch_page(key, proxy_origin, None).await
+        self.open_watch_page(key, proxy_origin, None, None).await
     }
 
     /// 打开某个分P。`page` 是从 1 开始的序号，None 表示当前/第一个。
+    /// `resume_at_ms` 是这一 P 自己的续播点；显式给出时优先于按整条视频存的历史。
     pub async fn open_watch_page(
         self: &Arc<Self>,
         key: &TrackKey,
         proxy_origin: &str,
         page: Option<u32>,
+        resume_at_ms: Option<u64>,
     ) -> Result<WatchView, WireError> {
         // 打开观看页就是「看」模式：底部音频条按模式隐藏，
         // 不会出现「没在听却挂着一条音频」。
@@ -363,15 +365,17 @@ impl Engine {
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
         // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
         // 不会出现「进度条先跳过去、音频还在 0」的竞态。
-        *lock(&self.resume_at_ms) = if page.is_none() {
-            self.library
-                .history_position(key.as_opaque())
-                .ok()
-                .flatten()
-                .unwrap_or(0)
-        } else {
-            0
-        };
+        *lock(&self.resume_at_ms) = resume_at_ms.unwrap_or_else(|| {
+            if page.is_none() {
+                self.library
+                    .history_position(key.as_opaque())
+                    .ok()
+                    .flatten()
+                    .unwrap_or(0)
+            } else {
+                0
+            }
+        });
         // 打开观看页就要有声音。引擎是唯一的发声者，这里顺手把它挂上：
         // 前端不需要再补一次「开始播放」，也就不会因为调用失败而静音。
         // 起播要等拉流，放后台跑，页面先出来。

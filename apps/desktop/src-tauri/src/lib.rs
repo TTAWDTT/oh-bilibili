@@ -320,10 +320,11 @@ async fn watch_open(
     port: tauri::State<'_, MvPort>,
     key: String,
     page: Option<u32>,
+    resume_at: Option<u64>,
 ) -> Result<bilimusic_core::wire::WatchView, WireError> {
     let origin = format!("http://127.0.0.1:{}", port.0);
     engine
-        .open_watch_page(&TrackKey::from_provider(key), &origin, page)
+        .open_watch_page(&TrackKey::from_provider(key), &origin, page, resume_at)
         .await
 }
 
