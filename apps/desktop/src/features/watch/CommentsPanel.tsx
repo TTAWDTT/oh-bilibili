@@ -1269,7 +1269,7 @@ export function CommentsPanel({
   )
 
   return (
-    <div className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
+    <div id="watch-comments" className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
       <div className={`flex items-baseline gap-2 py-3 ${flow ? '' : 'px-3'}`}>
         <h3 className="text-[14px] font-medium">评论</h3>
         <span className="num text-[12px] text-[var(--text-3)]">

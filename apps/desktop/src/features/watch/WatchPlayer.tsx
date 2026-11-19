@@ -967,6 +967,19 @@ export function WatchPlayer({
       {error && !forceEnded ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">
           <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              wantHeight.current = 0
+              currentHeight.current = 0
+              setError(null)
+              setReady(false)
+              setRetry((n) => n + 1)
+            }}
+            className="t press mt-1 rounded-full border border-white/30 px-3 py-1 text-[12px] text-white hover:border-white/70"
+          >
+            重试
+          </button>
         </div>
       ) : null}
 
