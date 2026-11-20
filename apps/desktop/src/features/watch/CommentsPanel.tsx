@@ -21,6 +21,29 @@ const DIALOG_PAGE_SIZE = 20
 /** 评论排序是用户偏好，切视频、重启后都应该沿用。 */
 const COMMENT_SORT_KEY = 'oh-bilibili:comments:hot'
 
+/**
+ * 长评论是否需要「展开」要量一次真实行高。量法会克隆正文并强制布局，
+ * 一千条评论同时量会把主线程打出几千次布局。共享一个观察器，只在
+ * 评论进入视口附近时量，离屏的评论保持未测量。
+ */
+const expandMeasure = new WeakMap<Element, () => void>()
+const expandObserver =
+  typeof IntersectionObserver === 'undefined'
+    ? null
+    : new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue
+            const run = expandMeasure.get(entry.target)
+            if (!run) continue
+            expandMeasure.delete(entry.target)
+            expandObserver?.unobserve(entry.target)
+            run()
+          }
+        },
+        { rootMargin: '300px' },
+      )
+
 function loadCommentHot(): boolean {
   try {
     return localStorage.getItem(COMMENT_SORT_KEY) !== '0'
@@ -315,11 +338,12 @@ function CommentRow({
     if (expanded) return
     const el = textRef.current
     if (!el) return
+    if (c.text.length < 120) {
+      setCanExpand(false)
+      return
+    }
+    let cancelled = false
     const measure = (): void => {
-      if (c.text.length < 120) {
-        setCanExpand(false)
-        return
-      }
       // line-clamp 会把 scrollHeight 也裁到可见高度，只能拿同宽克隆量完整高度。
       const clone = el.cloneNode(true) as HTMLElement
       clone.classList.remove('line-clamp-6')
@@ -333,12 +357,15 @@ function CommentRow({
       document.body.appendChild(clone)
       const full = clone.scrollHeight
       clone.remove()
-      setCanExpand(full > el.clientHeight + 1)
+      if (!cancelled) setCanExpand(full > el.clientHeight + 1)
     }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
+    expandMeasure.set(el, measure)
+    expandObserver?.observe(el)
+    return () => {
+      cancelled = true
+      expandMeasure.delete(el)
+      expandObserver?.unobserve(el)
+    }
   }, [c.text, expanded])
 
   const toggleLike = async (): Promise<void> => {

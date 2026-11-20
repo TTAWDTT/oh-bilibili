@@ -661,6 +661,44 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'watch_comments': {
       const cursor = args.cursor == null ? null : str(args, 'cursor')
       const ownerMid = findTrack(str(args, 'key'))?.up_mid ?? null
+      // 浏览器预览的长列表压测夹具：1000 条长评论，每页 20 条。
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('manyComments')) {
+        const page = Number(cursor ?? '1') || 1
+        const pageSize = 20
+        const total = 1000
+        const longText =
+          '前奏一响，DNA 动了。副歌一进来，整个人被拽回第一次听它的下午。耳机里循环的只有这一首，旋律没变，听歌的人已经被生活推着走了很远。'.repeat(3)
+        const items = Array.from({ length: pageSize }, (_, index) => {
+          const n = (page - 1) * pageSize + index
+          return {
+            id: `many-${n}`,
+            mid: 9000 + n,
+            author: `预览用户${n}`,
+            avatar: null,
+            text: `这是第 ${n + 1} 条压测评论。${longText}`,
+            emotes: [],
+            mentions: [],
+            pictures: [],
+            level: (n % 6) + 1,
+            vip: false,
+            likes: n % 97,
+            at: Math.floor(Date.now() / 1000) - n * 60,
+            replies: [],
+            reply_count: 0,
+            pinned: false,
+            up_liked: false,
+            liked: false,
+            medal: null,
+          }
+        })
+        return {
+          total,
+          page,
+          next: page * pageSize < total ? String(page + 1) : null,
+          items,
+          has_more: page * pageSize < total,
+        }
+      }
       // 预览只造一页评论：带游标再来就回空，界面上不会原样重复一遍。
       if (cursor) return { total: COMMENT_SEEDS.length, page: 1, next: null, items: [], has_more: false }
       const mine = (sentComments.get(str(args, 'key')) ?? []).map((c) => ({
