@@ -310,8 +310,7 @@ export function WatchPlayer({
   const [subCues, setSubCues] = useState<ipc.SubtitleCue[] | null>(null)
   const [subMenu, setSubMenu] = useState(false)
   const [draft, setDraft] = useState('')
-  /** 发弹幕时用的颜色与位置，和 B 站播放器那排按钮一致。 */
-  const [draftColor, setDraftColor] = useState(0xffffff)
+  /** 发弹幕的位置；颜色跨视频沿用设置里的偏好。 */
   const [draftMode, setDraftMode] = useState(1)
   const [sending, setSending] = useState(false)
   const cinema = useAppStore((state) => state.cinema)
@@ -361,10 +360,12 @@ export function WatchPlayer({
   const danmakuArea = useDanmakuSettings((s) => s.area)
   const danmakuBlockWords = useDanmakuSettings((s) => s.blockWords)
   const danmakuBlockTypes = useDanmakuSettings((s) => s.blockTypes)
+  const sendColor = useDanmakuSettings((s) => s.sendColor)
   const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
   const patchDanmaku = useDanmakuSettings((s) => s.patch)
   const setDanmakuBlockWords = useDanmakuSettings((s) => s.setBlockWords)
   const toggleDanmakuBlockType = useDanmakuSettings((s) => s.toggleBlockType)
+  const setSendColor = useDanmakuSettings((s) => s.setSendColor)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
   const [blockDraft, setBlockDraft] = useState('')
 
@@ -567,9 +568,9 @@ export function WatchPlayer({
     const at = Math.round(localPlayhead())
     try {
       const cid = data.pages.find((page) => page.no === currentPage)?.cid
-      await ipc.danmakuSend(track.key, text, at, draftMode, draftColor, cid)
+      await ipc.danmakuSend(track.key, text, at, draftMode, sendColor, cid)
       setDraft('')
-      onDanmakuSent({ at, text, color: cssColor(draftColor), mode: draftMode })
+      onDanmakuSent({ at, text, color: cssColor(sendColor), mode: draftMode })
       poke()
     } catch (cause) {
       // 草稿留着，但失败原因要说出来：B 站限流时静默不动，看起来就是「点了没反应」。
@@ -1897,7 +1898,7 @@ export function WatchPlayer({
                 <div className="border-t border-white/10 pt-2">
                   <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
                     <span>弹幕颜色</span>
-                    <span>{DANMAKU_COLORS.find((color) => color.value === draftColor)?.name}</span>
+                    <span>{DANMAKU_COLORS.find((color) => color.value === sendColor)?.name}</span>
                   </div>
                   <div className="mt-1.5 grid grid-cols-8 gap-1.5">
                     {DANMAKU_COLORS.map((color) => (
@@ -1905,10 +1906,10 @@ export function WatchPlayer({
                         key={color.value}
                         type="button"
                         aria-label={`弹幕颜色 ${color.name}`}
-                        aria-pressed={draftColor === color.value}
-                        onClick={() => setDraftColor(color.value)}
+                        aria-pressed={sendColor === color.value}
+                        onClick={() => setSendColor(color.value)}
                         className={`h-4 w-4 rounded-full border ${
-                          draftColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
+                          sendColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
                         }`}
                         style={{ background: cssColor(color.value) }}
                       />
@@ -2047,7 +2048,7 @@ export function WatchPlayer({
             <Icon name="repeatOne" size={16} />
           </button>
 
-          <div className="relative hidden shrink-0 lg:block">
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -2088,7 +2089,7 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          {/* 音量与倍速在窄屏交给系统：手机上调的是系统音量，不是应用音量。 */}
+          {/* 音量在窄屏交给系统；倍速是播放器状态，任何宽度都得留着。 */}
           <span
             className="hidden shrink-0 items-center xl:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
