@@ -559,6 +559,7 @@ function CommentRow({
                 <button
                   key={`${src}-${index}`}
                   type="button"
+                  aria-label={`查看第 ${index + 1} 张评论图片`}
                   onClick={() => onPhoto?.(c.pictures, index)}
                   className="h-[72px] w-[72px] overflow-hidden rounded-[4px] bg-[var(--panel-alt)]"
                 >
