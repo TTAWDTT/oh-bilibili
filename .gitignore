@@ -7,3 +7,4 @@ dist/
 apps/desktop/src-tauri/gen/
 testdata/
 resources/yt-dlp
+resources/yt-dlp.exe
