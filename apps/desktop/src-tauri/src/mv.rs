@@ -87,7 +87,6 @@ fn query(url: &str, key: &str) -> Option<String> {
 
 fn handle(
     mut stream: TcpStream,
-    cookie: &str,
     engine: &Engine,
     client: &reqwest::blocking::Client,
 ) -> std::io::Result<()> {
@@ -149,6 +148,7 @@ fn handle(
         .header("User-Agent", UA)
         .header("Referer", "https://www.bilibili.com/")
         .header("Origin", "https://www.bilibili.com");
+    let cookie = engine.cookie_header();
     if !cookie.is_empty() {
         req = req.header("Cookie", cookie);
     }
@@ -183,7 +183,7 @@ fn handle(
 }
 
 /// 在 127.0.0.1 的随机端口上起代理，返回端口号。
-pub fn spawn(cookie: String, engine: Arc<Engine>) -> std::io::Result<u16> {
+pub fn spawn(engine: Arc<Engine>) -> std::io::Result<u16> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
     // 连接池开着，同一台 CDN 的分片请求复用同一条连接。
@@ -196,11 +196,10 @@ pub fn spawn(cookie: String, engine: Arc<Engine>) -> std::io::Result<u16> {
         .name("bilimusic-mv-proxy".into())
         .spawn(move || {
             for stream in listener.incoming().flatten() {
-                let cookie = cookie.clone();
                 let engine = engine.clone();
                 let client = client.clone();
                 std::thread::spawn(move || {
-                    let _ = handle(stream, &cookie, &engine, &client);
+                    let _ = handle(stream, &engine, &client);
                 });
             }
         })?;

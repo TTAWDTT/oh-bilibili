@@ -152,6 +152,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -188,6 +189,7 @@ dependencies = [
  "bilimusic-bili",
  "bilimusic-model",
  "bilimusic-store",
+ "dirs",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -2021,6 +2023,7 @@ version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]
