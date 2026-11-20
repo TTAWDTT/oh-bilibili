@@ -947,3 +947,29 @@ async fn 字幕按传入的cid取而不是总拿第一P() {
     assert!(!named.is_empty(), "P3 应该有字幕");
     assert_eq!(fallback.len(), by_first.len(), "不给 cid 时必须退回第一 P");
 }
+
+/// 弹幕也是按 P 分池的。给 cid 就按它取，不给才退回第一 P——观影页切 P
+/// 后弹幕条数会跟着变，靠的就是这条。
+#[tokio::test]
+#[ignore = "真实网络，核对按 P 取弹幕"]
+async fn 弹幕按传入的cid取而不是总拿第一P() {
+    let source = Source::open().await.expect("Source");
+    let key = bilimusic_model::TrackKey::from_provider("BV1vs411n7TH");
+    let detail = source.detail(&key).await.expect("详情");
+    assert!(detail.pages.len() > 3, "这条投稿应当是多 P");
+    let first = detail.pages[0].cid;
+    let third = detail.pages[2].cid;
+
+    let named = source.danmaku_colored(&key, Some(third)).await.expect("P3 弹幕");
+    let fallback = source.danmaku_colored(&key, None).await.expect("默认弹幕");
+    let by_first = source.danmaku_colored(&key, Some(first)).await.expect("P1 弹幕");
+    println!(
+        "P3 {} 条 / 不给 cid {} 条 / P1 {} 条",
+        named.len(),
+        fallback.len(),
+        by_first.len()
+    );
+    assert!(!named.is_empty(), "P3 应该有弹幕");
+    assert_eq!(fallback.len(), by_first.len(), "不给 cid 时必须退回第一 P");
+    assert_ne!(named.len(), by_first.len(), "不同 P 的弹幕池不该一样多");
+}
