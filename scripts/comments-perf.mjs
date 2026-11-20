@@ -127,6 +127,9 @@ async function main() {
       if (count >= 1000) break
     }
 
+    const expandButtons = await evaluate(
+      `[...document.querySelectorAll('[data-comment-id] button')].filter((b) => (b.textContent || '').trim() === '展开').length`,
+    )
     const longTasks = await evaluate(`window.__longTasks ?? []`)
     const metrics = (await send('Performance.getMetrics', {}, sid)).result.metrics
     const metric = (name) => metrics.find((m) => m.name === name)?.value ?? 0
@@ -136,6 +139,7 @@ async function main() {
       recalcStyles: metric('RecalcStyleCount'),
       nodes: metric('Nodes'),
       heapMB: Math.round((metric('JSHeapUsedSize') / 1024 / 1024) * 10) / 10,
+      expandButtons,
       longTasks: longTasks.length,
       longMax: longTasks.length ? Math.round(Math.max(...longTasks)) : 0,
     }
@@ -149,6 +153,9 @@ async function main() {
       process.exitCode = 1
     } else if (metric('JSHeapUsedSize') >= HEAP_LIMIT) {
       console.log(`✗ JS 堆 ${report.heapMB}MB 超过上限 ${Math.round(HEAP_LIMIT / 1024 / 1024)}MB`)
+      process.exitCode = 1
+    } else if (report.expandButtons === 0) {
+      console.log('✗ 长评论的「展开」按钮没有出现')
       process.exitCode = 1
     } else {
       console.log('✓ 评论长列表布局与堆占用在预算内')

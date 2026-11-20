@@ -667,7 +667,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         const pageSize = 20
         const total = 1000
         const longText =
-          '前奏一响，DNA 动了。副歌一进来，整个人被拽回第一次听它的下午。耳机里循环的只有这一首，旋律没变，听歌的人已经被生活推着走了很远。'.repeat(3)
+          '前奏一响，DNA 动了。副歌一进来，整个人被拽回第一次听它的下午。耳机里循环的只有这一首，旋律没变，听歌的人已经被生活推着走了很远。'.repeat(7)
         const items = Array.from({ length: pageSize }, (_, index) => {
           const n = (page - 1) * pageSize + index
           return {
