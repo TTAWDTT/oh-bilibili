@@ -44,8 +44,10 @@ export function DanmakuBeats({
   const seekable = typeof onSeek === 'function'
   const bucketMs = durationMs / BUCKETS
   return (
+    // 一百来根柱子只是密度示意。给每根挂 role=button 会在无障碍树里塞一堆
+    // 没有名字的按钮；键盘用户本来就有进度条滑杆，这里只保留鼠标点击。
     <div
-      aria-hidden={!seekable}
+      aria-hidden
       className={`absolute inset-x-0 -top-[13px] flex h-2 items-end gap-px ${
         seekable ? '' : 'pointer-events-none'
       }`}
@@ -53,7 +55,6 @@ export function DanmakuBeats({
       {bars.map((bar, i) => (
         <span
           key={i}
-          role={seekable && bar.height > 0 ? 'button' : undefined}
           title={
             seekable && bar.height > 0
               ? `${formatTime(i * bucketMs)} · 高能`
