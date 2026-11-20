@@ -127,6 +127,12 @@ impl Player {
         self.clock.clone()
     }
 
+    /// 立即把共享时钟归零。切歌开始到新流加载完成之间，旧时钟还会被
+    /// 上层快照读到，先归零才不会把上一条的位置显示到新视频上。
+    pub fn reset_clock(&self) {
+        self.clock.reset(self.device_rate);
+    }
+
     /// 取走「自然播放到结尾」标记。
     pub fn take_ended(&self) -> bool {
         self.ended.swap(false, Ordering::Relaxed)

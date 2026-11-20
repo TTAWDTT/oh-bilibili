@@ -251,6 +251,13 @@ impl Engine {
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         *lock(&self.last_transport_at) = std::time::Instant::now();
+        {
+            let player = lock(&self.player);
+            // 换曲先停掉旧音轨并清零时钟。新流要等网络，期间 snapshot()
+            // 仍会读这个时钟；不清零就会短暂把上一条的位置挂到新视频上。
+            player.stop();
+            player.reset_clock();
+        }
         let token = self.next_token();
         {
             let mut st = lock(&self.state);
