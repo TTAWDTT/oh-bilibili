@@ -273,6 +273,13 @@ async function main() {
         '进度条键盘 End 能落位',
         keySent && keyBefore !== null && keyAfter !== null && keyAfter !== keyBefore && keyAfter > 0,
       )
+
+      const pipAt1320 = await page.evaluate(`(() => {
+        const enabled = !!document.pictureInPictureEnabled
+        const btn = document.querySelector('button[aria-label="画中画"]')
+        return { enabled, visible: btn ? getComputedStyle(btn).display !== 'none' : false }
+      })()`)
+      check('支持画中画时桌面控制条有入口', !pipAt1320.enabled || pipAt1320.visible)
     }
 
     await page.viewport(700, 860)
@@ -296,6 +303,12 @@ async function main() {
       )
       await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
     }
+    const pipAt700 = await page.evaluate(`(() => {
+      const enabled = !!document.pictureInPictureEnabled
+      const btn = document.querySelector('button[aria-label="画中画"]')
+      return { enabled, visible: btn ? getComputedStyle(btn).display !== 'none' : false }
+    })()`)
+    check('700 宽隐藏画中画入口', !pipAt700.enabled || !pipAt700.visible)
     await page.viewport(1320, 900)
     await sleep(400)
 
