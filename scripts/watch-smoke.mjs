@@ -309,6 +309,12 @@ async function main() {
       return { enabled, visible: btn ? getComputedStyle(btn).display !== 'none' : false }
     })()`)
     check('700 宽隐藏画中画入口', !pipAt700.enabled || !pipAt700.visible)
+    check(
+      '700 宽仍能看到章节',
+      await page.evaluate(
+        `[...document.querySelectorAll('h3')].some((el) => el.textContent.trim() === '章节' && el.getClientRects().length > 0)`,
+      ),
+    )
     await page.viewport(1320, 900)
     await sleep(400)
 
