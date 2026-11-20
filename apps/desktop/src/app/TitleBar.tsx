@@ -72,7 +72,7 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
       <div
         data-search-suggest-panel
         onKeyDown={moveInPanel}
-        className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
+        className="bili-suggest absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
       >
         <button
           type="button"
@@ -110,7 +110,7 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
     <div
       data-search-suggest-panel
       onKeyDown={moveInPanel}
-      className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
+      className="bili-suggest absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(360px,calc(100vh-80px))] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.25)]"
     >
       {history.length > 0 ? (
         <div className="px-3 pb-1.5">
@@ -219,9 +219,11 @@ export function TitleBar() {
   }, [auth?.logged_in, auth?.user?.mid, messaging, setUnread])
 
   const submit = (): void => {
+    const word = text.trim()
+    if (!word) return
     setFocused(false)
     inputRef.current?.blur()
-    setQuery(text.trim())
+    setQuery(word)
   }
 
   const openAccount = (button: HTMLButtonElement): void => {

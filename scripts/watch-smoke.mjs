@@ -331,6 +331,45 @@ async function main() {
     check('结束卡给出即将播放的下一集', !!endCard && endCard.cover && endCard.text.length > 0)
     check('结束卡保留自动连播开关', !!endCard?.autoplay)
 
+    // 搜索入口只在顶栏：点开有联想 panel，提交后进结果页；侧栏不再有独立搜索页。
+    await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    await sleep(5000)
+    check(
+      '侧边栏不再有独立搜索入口',
+      !(await page.evaluate(
+        `[...document.querySelectorAll('nav[aria-label="主导航"] button')].some((b) => (b.textContent || '').trim() === '搜索')`,
+      )),
+    )
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return false
+      input.focus()
+      return true
+    })()`)
+    await sleep(400)
+    check('点顶栏搜索框出现联想面板', await page.evaluate(`!!document.querySelector('[data-search-suggest-panel]')`))
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, '周杰伦')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    await sleep(300)
+    const submitted = await page.evaluate(`(() => {
+      const form = document.querySelector('input[aria-label="顶栏搜索"]')?.closest('form')
+      if (!form) return false
+      form.requestSubmit()
+      return true
+    })()`)
+    let searched = false
+    for (let i = 0; i < 20 && !searched; i += 1) {
+      await sleep(400)
+      searched = await page.evaluate(`document.body.innerText.includes('综合') && document.querySelectorAll('[data-track-card]').length > 0`)
+    }
+    check('顶栏搜索提交后出结果', submitted && searched)
+
   } finally {
     page.close()
   }
