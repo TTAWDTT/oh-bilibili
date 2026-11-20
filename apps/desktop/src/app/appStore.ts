@@ -12,7 +12,6 @@ export type View =
   | { kind: 'weekly' }
   | { kind: 'live' }
   | { kind: 'bangumi' }
-  | { kind: 'search' }
   | { kind: 'library' }
   | { kind: 'playlist'; id: number; name: string }
   | { kind: 'liked' }
@@ -99,11 +98,13 @@ type AppStore = {
   rail: RailTab | null
   /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
   searchFocus: number
-  /** 顶栏搜索框提交的关键词，搜索页消费一次后清空。 */
+  /** 顶栏搜索框提交的关键词，搜索面板消费一次后清空。 */
   heroQuery: string | null
-  /** 搜索页当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
+  /** 搜索面板是否展开。搜索是顶栏的一个面板，不是独立页面。 */
+  searchOpen: boolean
+  /** 搜索面板当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
   currentQuery: string
-  /** 搜索页上次用的分区与排序，切走再回来要恢复。 */
+  /** 搜索面板上次用的分区与排序，收起再打开要恢复。 */
   currentPartition: string
   currentOrder: string
   /** 时长筛选：0 不限，1~4 对应 B 站的 duration 参数。 */
@@ -120,8 +121,6 @@ type AppStore = {
   cinema: boolean
   /** 窗口是否进系统全屏。只有「全屏」把它打开，「网页全屏」不动窗口。 */
   osFullscreen: boolean
-  /** 搜索页要预填的作者名。点 UP 主时写入，搜索页消费后清空。 */
-  authorQuery: string | null
   toasts: Toast[]
   /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
   history: View[]
@@ -138,13 +137,13 @@ type AppStore = {
   closeRail: () => void
   focusSearch: () => void
   setHeroQuery: (q: string | null) => void
+  closeSearch: () => void
   setCurrentQuery: (q: string) => void
   setSearchFilters: (partition: string, order: string, duration?: number) => void
   setAuthOpen: (open: boolean) => void
   setStage: (open: boolean) => void
   setCinema: (on: boolean) => void
   setOsFullscreen: (on: boolean) => void
-  setAuthorQuery: (q: string | null) => void
   pushToast: (tone: ToastTone, title: string, detail: string | null) => void
   dismissToast: (id: number) => void
 }
@@ -163,6 +162,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   rail: null,
   searchFocus: 0,
   heroQuery: null,
+  searchOpen: false,
   currentQuery: '',
   currentPartition: '全部',
   currentOrder: 'totalrank',
@@ -174,30 +174,31 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   stage: false,
   cinema: false,
   osFullscreen: false,
-  authorQuery: null,
   toasts: [],
   navigate: (view) =>
     set((state) => {
       // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
       if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
-        return {}
+        return { searchOpen: false }
       }
       return {
         view,
+        searchOpen: false,
         cinema: false,
         osFullscreen: false,
         history: [...state.history, state.view].slice(-32),
       }
     }),
-  replace: (view) => set({ view, cinema: false, osFullscreen: false }),
+  replace: (view) => set({ view, searchOpen: false, cinema: false, osFullscreen: false }),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)
       if (!prev) {
-        return { view: { kind: 'home' } as View, cinema: false, osFullscreen: false }
+        return { view: { kind: 'home' } as View, searchOpen: false, cinema: false, osFullscreen: false }
       }
       return {
         view: prev,
+        searchOpen: false,
         cinema: false,
         osFullscreen: false,
         history: state.history.slice(0, -1),
@@ -207,7 +208,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ searchFocus: state.searchFocus + 1 })),
-  setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
+  // null 只表示「这一条请求已被面板消费」，不该把面板重新打开。
+  setHeroQuery: (q) =>
+    q === null ? set({ heroQuery: null }) : set({ heroQuery: q, currentQuery: q, searchOpen: true }),
+  closeSearch: () => set({ searchOpen: false }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
   setSearchFilters: (partition, order, duration = 0) =>
     set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),
@@ -215,7 +219,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setStage: (open) => set({ stage: open }),
   setCinema: (on) => set({ cinema: on }),
   setOsFullscreen: (on) => set({ osFullscreen: on }),
-  setAuthorQuery: (q) => set({ authorQuery: q }),
   pushToast: (tone, title, detail) => {
     toastSeq += 1
     const toast: Toast = { id: toastSeq, tone, title, detail }

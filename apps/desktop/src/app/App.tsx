@@ -11,7 +11,7 @@ import { NowPlayingRail } from '../features/player/NowPlayingRail'
 import { StageView } from '../features/player/StageView'
 import { PlayerBar } from '../features/player/PlayerBar'
 import { useHasSession, useIsListening, usePlayerStore } from '../features/player/playerStore'
-import { SearchView } from '../features/search/SearchView'
+import { SearchPanel } from '../features/search/SearchPanel'
 import { SettingsView } from '../features/settings/SettingsView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
@@ -63,8 +63,6 @@ function viewTitle(view: View): string {
       return '直播'
     case 'bangumi':
       return '番剧'
-    case 'search':
-      return '搜索'
     case 'library':
       return '曲库'
     case 'playlist':
@@ -110,8 +108,6 @@ function CurrentView({ view }: { view: View }) {
       return <LiveView />
     case 'bangumi':
       return <BangumiView />
-    case 'search':
-      return <SearchView />
     case 'library':
       return <LibraryView />
     case 'playlist':
@@ -160,6 +156,7 @@ export default function App() {
   // 只有进系统全屏才藏标题栏。网页全屏要留着它：自定义标题栏里带着
   // 关闭与最小化按钮，藏掉窗口就没法关了。
   const osFullscreen = useAppStore((state) => state.osFullscreen)
+  const searchOpen = useAppStore((state) => state.searchOpen)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
 
@@ -235,7 +232,9 @@ export default function App() {
         {musicView && listening ? <DanmakuStrip /> : null}
       </div>
 
-      <BackToTop targetId="scroll-main" />
+      {/* 搜索是顶栏下拉出来的面板：盖住整页，但顶栏的输入框始终可编辑。 */}
+      {searchOpen ? <SearchPanel /> : null}
+      {searchOpen ? null : <BackToTop targetId="scroll-main" />}
       <PlayerBar />
       <MobileTabBar />
       {railOpen ? <MobileRailSheet tab={rail ?? 'lyrics'} /> : null}

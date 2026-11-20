@@ -66,7 +66,7 @@ function TrackHeader({ track, quality, loading }: { track: Track; quality: numbe
 export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hideHeader?: boolean }) {
   const snapshot = usePlayerStore((state) => state.snapshot)
   const queue = usePlayerStore((state) => state.queue)
-  const navigate = useAppStore((state) => state.navigate)
+  const focusSearch = useAppStore((state) => state.focusSearch)
   const toggleRail = useAppStore((state) => state.toggleRail)
   const closeRail = useAppStore((state) => state.closeRail)
   const track = snapshot?.track ?? null
@@ -113,7 +113,7 @@ export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hide
             icon="biliTv"
             title="还没有在播放"
             detail="挑一首歌，歌词会跟着进度滚动。"
-            action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+            action={{ label: '去搜索', onClick: () => focusSearch() }}
             compact
           />
         )}

@@ -22,7 +22,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
   const revision = useLibraryStore((state) => state.revision)
-  const navigate = useAppStore((state) => state.navigate)
+  const focusSearch = useAppStore((state) => state.focusSearch)
   const playContext = usePlayerStore((state) => state.playContext)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
@@ -68,7 +68,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate({ kind: 'search' })}
+                  onClick={() => focusSearch()}
                   className="t press h-8 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 >
                   去添加
@@ -100,7 +100,7 @@ export function PlaylistView({ id, name }: PlaylistViewProps) {
                 icon="music"
                 title="这张歌单还是空的"
                 detail="去搜索里找到喜欢的歌，点加号就能收进来。"
-                action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+                action={{ label: '去搜索', onClick: () => focusSearch() }}
               />
             </div>
           ) : null}

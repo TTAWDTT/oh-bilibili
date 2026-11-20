@@ -28,7 +28,7 @@ async function copyPath(path: string): Promise<void> {
 
 export function DownloadsView() {
   const items = useDownloadsStore((state) => state.items)
-  const navigate = useAppStore((state) => state.navigate)
+  const focusSearch = useAppStore((state) => state.focusSearch)
 
   const reveal = async (key: string): Promise<void> => {
     try {
@@ -84,7 +84,7 @@ export function DownloadsView() {
               mascot="coin"
               icon="download"
               title="还没有下载，离线听要趁早"
-              action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+              action={{ label: '去搜索', onClick: () => focusSearch() }}
             />
           </div>
         ) : (
