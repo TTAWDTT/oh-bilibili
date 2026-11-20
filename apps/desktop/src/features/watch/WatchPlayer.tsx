@@ -478,7 +478,7 @@ export function WatchPlayer({
   }
 
   const seekTo = (ratio: number): void => {
-    const duration = data.duration_ms
+    const duration = data.duration_ms || track.duration_ms || 0
     if (!duration) return
     const at = Math.round(Math.min(Math.max(ratio, 0), 1) * duration)
     lastSeek.current = at
@@ -1540,17 +1540,17 @@ export function WatchPlayer({
           // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
           // 方向键按 5 秒走。缺这一段，读屏和纯键盘用户完全拖不动进度。
           onKeyDown={(event) => {
-            if (!data.duration_ms) return
+            if (!duration) return
             const step = event.shiftKey ? 30_000 : 5_000
             const at = localPlayhead()
             const keys: Record<string, number | undefined> = {
               Home: 0,
               // 正好落在 duration 上会被解码器当成越界忽略，留 1.5 秒。
-              End: Math.max(0, 1 - 1500 / data.duration_ms),
-              ArrowLeft: (at - step) / data.duration_ms,
-              ArrowDown: (at - step) / data.duration_ms,
-              ArrowRight: (at + step) / data.duration_ms,
-              ArrowUp: (at + step) / data.duration_ms,
+              End: Math.max(0, 1 - 1500 / duration),
+              ArrowLeft: (at - step) / duration,
+              ArrowDown: (at - step) / duration,
+              ArrowRight: (at + step) / duration,
+              ArrowUp: (at + step) / duration,
             }
             const target = keys[event.key]
             if (target === undefined) return

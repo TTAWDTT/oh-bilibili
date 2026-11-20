@@ -258,6 +258,21 @@ async function main() {
       await sleep(150)
       const seekAfter = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
       check('没有坐标的 press 不会把进度打回开头', seekBefore !== null && seekAfter === seekBefore)
+
+      const keyBefore = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
+      const keySent = await page.evaluate(`(() => {
+        const el = document.querySelector('[role="slider"][aria-label="播放进度"]')
+        if (!el) return false
+        el.focus()
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }))
+        return true
+      })()`)
+      await sleep(150)
+      const keyAfter = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
+      check(
+        '进度条键盘 End 能落位',
+        keySent && keyBefore !== null && keyAfter !== null && keyAfter !== keyBefore && keyAfter > 0,
+      )
     }
 
     await page.viewport(700, 860)
