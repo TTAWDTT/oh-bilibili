@@ -17,7 +17,7 @@ import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
-import { WatchPlayer } from './WatchPlayer'
+import { WatchPlayer, type NextUp } from './WatchPlayer'
 import { setWatchFavHandler } from './watchActions'
 import { FavPicker } from '../library/FavPicker'
 import { usePlayerStore } from '../player/playerStore'
@@ -356,9 +356,25 @@ export function WatchView({ track }: { track: Track }) {
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
-  const nextTitle = nextPage
-    ? nextPage.title || `第 ${nextPage.no} P`
-    : related[0]?.title ?? null
+  const nextUp: NextUp | null = nextPage
+    ? {
+        title: nextPage.title || `第 ${nextPage.no} P`,
+        owner: track.artist,
+        cover: track.cover,
+        views: null,
+        durationMs: nextPage.duration_ms,
+        page: nextPage.no,
+      }
+    : related[0]
+      ? {
+          title: related[0].title,
+          owner: related[0].artist,
+          cover: related[0].cover,
+          views: related[0].views ?? null,
+          durationMs: related[0].duration_ms,
+          page: null,
+        }
+      : null
   const playNext = (): void => {
     if (nextPage) {
       changePage(nextPage.no)
@@ -510,7 +526,7 @@ export function WatchView({ track }: { track: Track }) {
                 onReplay={() => {
                   void ipc.playerReplay().catch(() => {})
                 }}
-                nextTitle={nextTitle}
+                nextUp={nextUp}
                 onNext={playNext}
                 seekSignal={seekSignal}
                 currentPage={currentPageNo}

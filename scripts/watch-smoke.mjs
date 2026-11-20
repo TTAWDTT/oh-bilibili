@@ -306,6 +306,31 @@ async function main() {
     })`)
     check('筛选已生效且不会变多', filtered.pressed === 'true' && filtered.count <= before)
 
+    // 结束卡：?forceEnded=1 让播放器直接落到播完状态。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?forceEnded=1`)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let endCard = null
+    for (let i = 0; i < 20 && !endCard; i += 1) {
+      await sleep(400)
+      endCard = await page.evaluate(`(() => {
+        const label = [...document.querySelectorAll('span')].find((el) => el.textContent === '即将播放')
+        if (!label) return null
+        const card = label.parentElement?.parentElement?.querySelector('button')
+        return {
+          text: (card?.innerText || '').trim(),
+          cover: !!card?.querySelector('img'),
+          autoplay: !!document.querySelector('[role="switch"][aria-label="自动连播"]'),
+        }
+      })()`)
+    }
+    check('结束卡给出即将播放的下一集', !!endCard && endCard.cover && endCard.text.length > 0)
+    check('结束卡保留自动连播开关', !!endCard?.autoplay)
+
   } finally {
     page.close()
   }

@@ -17,7 +17,6 @@ import { useAuthStore } from '../auth/authStore'
 import { useAutoplay, useLoopOne } from './autoplay'
 import { usePlayerStore } from '../player/playerStore'
 import { VolumeControl } from '../player/VolumeControl'
-import { Avatar } from '../../shared/ui/Avatar'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
@@ -218,6 +217,17 @@ type WatchProbe = {
   }
 }
 
+/** 播完后那张「即将播放」卡要用的字段。 */
+export type NextUp = {
+  title: string
+  owner: string
+  cover: string | null
+  views: number | null
+  durationMs: number | null
+  /** 多 P 时是下一 P 的序号；相关推荐为 null。 */
+  page: number | null
+}
+
 export function WatchPlayer({
   track,
   data,
@@ -229,7 +239,7 @@ export function WatchPlayer({
   onFav,
   onCoin,
   onReplay,
-  nextTitle,
+  nextUp,
   onNext,
   seekSignal,
   currentPage,
@@ -254,7 +264,7 @@ export function WatchPlayer({
   onCoin: () => void
   onReplay: () => void
   /** 播完后的下一集标题；多 P 先走下一 P，否则走相关推荐。 */
-  nextTitle: string | null
+  nextUp: NextUp | null
   onNext: () => void
   /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
   seekSignal: { at: number; nonce: number } | null
@@ -269,6 +279,7 @@ export function WatchPlayer({
   faved: boolean
   coins: number
 }) {
+  const nextTitle = nextUp?.title ?? null
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
@@ -1119,15 +1130,129 @@ export function WatchPlayer({
         </div>
       ) : null}
 
-      {/* 播完掀开的三连。B 站视频放完也是这一张：UP 头像、一句邀请、三个按钮。 */}
+      {/* 播完的结束卡：B 站先给「即将播放」，三连与重播退到下一层。 */}
       {ended && (!error || forceEnded) ? (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/75 px-6 text-center text-white backdrop-blur-[2px]">
-          <Avatar src={data.owner_avatar ?? null} alt={data.owner} size={56} />
-          <div>
-            <div className="text-[15px]">{data.owner}</div>
-            <div className="mt-1 text-[13px] text-white/70">喜欢这个视频的话，给个三连吧</div>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/80 px-6 py-5 text-white backdrop-blur-[2px]">
+          {nextUp ? (
+            <div
+              className="w-full max-w-[520px] text-left"
+              onPointerEnter={() => {
+                countdownHovered.current = true
+                setCountdownHover(true)
+              }}
+              onPointerLeave={() => {
+                countdownHovered.current = false
+                setCountdownHover(false)
+              }}
+            >
+              <div className="mb-2 flex items-center justify-between text-[12px] text-white/55">
+                <span>即将播放</span>
+                {autoplay && countdown !== null ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="relative flex h-6 w-6 items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="absolute inset-0 -rotate-90" aria-hidden>
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.16)"
+                          strokeWidth="2"
+                        />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          fill="none"
+                          stroke="var(--accent)"
+                          strokeWidth="2"
+                          pathLength={100}
+                          strokeDasharray={100}
+                          strokeDashoffset={100 - (countdown / 5) * 100}
+                        />
+                      </svg>
+                      <span className="num text-[10px] text-white/80">{countdown}</span>
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={advance}
+                className="t group flex w-full gap-3 rounded-[6px] border border-white/10 bg-white/[0.04] p-2 text-left hover:border-white/25 hover:bg-white/[0.08]"
+              >
+                <span className="relative aspect-video w-[168px] shrink-0 overflow-hidden rounded-[4px] bg-black">
+                  {nextUp.cover ? (
+                    <img
+                      src={nextUp.cover}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white">
+                      <Icon name="play" size={18} />
+                    </span>
+                  </span>
+                  {nextUp.durationMs ? (
+                    <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white/85">
+                      {formatTime(nextUp.durationMs)}
+                    </span>
+                  ) : null}
+                  {nextUp.page ? (
+                    <span className="num absolute left-1 top-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white/85">
+                      P{nextUp.page}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="min-w-0 flex-1 py-0.5">
+                  <span className="line-clamp-2 text-[14px] leading-5 text-white/90 group-hover:text-white">
+                    {nextUp.title}
+                  </span>
+                  <span className="mt-1 block truncate text-[12px] text-white/50">
+                    {nextUp.owner}
+                    {nextUp.views !== null ? ` · ${formatCount(nextUp.views)} 播放` : ''}
+                  </span>
+                </span>
+              </button>
+              <div className="mt-2 flex items-center justify-between text-[12px]">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoplay}
+                  aria-label="自动连播"
+                  onClick={() => setAutoplay(!autoplay)}
+                  className="t press flex items-center gap-1.5 text-white/55 hover:text-white"
+                >
+                  自动连播
+                  <span
+                    className={`relative flex h-4 w-7 items-center rounded-full p-0.5 transition-colors ${
+                      autoplay ? 'bg-[var(--accent)]' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                        autoplay ? 'translate-x-3' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
+                </button>
+                {autoplay && countdown !== null ? (
+                  <button
+                    type="button"
+                    onClick={() => setCountdownCancelled(true)}
+                    className="t press rounded-[4px] px-1.5 py-0.5 text-white/55 hover:bg-white/10 hover:text-white"
+                  >
+                    取消
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="text-[13px] text-white/65">播完了</div>
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {[
               {
                 on: liked,
@@ -1183,49 +1308,6 @@ export function WatchPlayer({
               </button>
             ) : null}
           </div>
-          {nextTitle ? (
-            <div className="flex flex-col items-center gap-1.5">
-              {autoplay && countdown !== null ? (
-                <div
-                  className="flex max-w-full items-center gap-3"
-                  onPointerEnter={() => {
-                    countdownHovered.current = true
-                    setCountdownHover(true)
-                  }}
-                  onPointerLeave={() => {
-                    countdownHovered.current = false
-                    setCountdownHover(false)
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={advance}
-                    className="t max-w-full truncate text-[12px] text-white/65 hover:text-white"
-                    title={nextTitle}
-                  >
-                    {countdown} 秒后自动播放：{nextTitle}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="取消本次自动连播"
-                    onClick={() => setCountdownCancelled(true)}
-                    className="t press shrink-0 rounded-[4px] px-2 py-1 text-[12px] text-white/65 hover:bg-white/10 hover:text-white"
-                  >
-                    取消
-                  </button>
-                </div>
-              ) : null}
-              <label className="flex items-center gap-1.5 text-[12px] text-white/55">
-                <input
-                  type="checkbox"
-                  checked={autoplay}
-                  onChange={(event) => setAutoplay(event.target.checked)}
-                  className="accent-[var(--accent)]"
-                />
-                自动连播
-              </label>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
