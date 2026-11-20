@@ -1,7 +1,7 @@
 {
   "name": "bilimusic",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "workspaces": [
     "apps/*"
@@ -13,6 +13,7 @@
     "bundle": "npm run tauri:build -w @bilimusic/desktop",
     "typecheck": "npm run typecheck -w @bilimusic/desktop",
     "ui:audit": "node scripts/ui-audit.mjs",
-    "verify": "bash scripts/verify.sh"
+    "fetch:yt-dlp:windows": "node scripts/fetch-yt-dlp-windows.mjs",
+    "verify": "cargo test --workspace --locked --quiet && npm run typecheck && npm run ui:audit && node scripts/ipc-audit.mjs"
   }
 }

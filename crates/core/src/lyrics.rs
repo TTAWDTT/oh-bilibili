@@ -171,8 +171,7 @@ pub fn lyric_queries(raw: &str) -> Vec<String> {
 /// 从 lrclib 找歌词。这个接口免鉴权，实测返回逐字时间轴。
 /// 本地 lrc：和下载目录同名放一份 `.lrc` 就能用。
 pub fn from_local(track: &Track) -> Option<LyricDoc> {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from)?;
-    let dir = home.join("Music").join("BiliMusic");
+    let dir = crate::engine::downloads_dir();
     let base = clean_title(&track.title);
     if base.is_empty() {
         return None;

@@ -1,0 +1,17 @@
+yt-dlp 2026.10.26
+
+This installer includes the unmodified upstream Windows x64 executable.
+The PyInstaller executable is distributed under the GNU General Public
+License, version 3 or later. The upstream release provides source code,
+build instructions and third-party license information.
+
+Release and source archive:
+https://github.com/yt-dlp/yt-dlp/releases/tag/2026.10.26
+https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.tar.gz
+
+Build instructions and third-party notices:
+https://github.com/yt-dlp/yt-dlp/blob/2026.10.26/README.md#licensing
+https://github.com/yt-dlp/yt-dlp/blob/2026.10.26/THIRD_PARTY_LICENSES.txt
+
+GNU General Public License:
+https://www.gnu.org/licenses/gpl-3.0.txt

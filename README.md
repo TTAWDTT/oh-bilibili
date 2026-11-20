@@ -9,8 +9,8 @@
 <p align="center">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" />
-  <img alt="Rust 1.77+" src="https://img.shields.io/badge/Rust-1.77+-DEA584?logo=rust&logoColor=white" />
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-first-000000?logo=apple&logoColor=white" />
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-DEA584?logo=rust&logoColor=white" />
+  <img alt="Windows 与 macOS" src="https://img.shields.io/badge/desktop-Windows%20%7C%20macOS-0078D4" />
 </p>
 
 ![oh-bilibili 首页](docs/assets/readme-home.jpg)
@@ -50,23 +50,27 @@ DASH 播放（4K / 1080P+ / 1080P 等），断点续播、倍速、网页全屏�
 
 ## 跑起来
 
-前置：Node 22.12+、Rust 1.77+、macOS。
+Windows x64 用户从 [Windows Release](https://github.com/TTAWDTT/oh-bilibili/releases/tag/v0.1.1) 下载 `oh-bilibili-0.1.1-windows-x64-setup.exe`，双击后安装到当前用户。安装包未签名。首次运行需要 Microsoft Edge WebView2 Runtime，缺少时安装程序会联网安装。Apple Silicon 用户可下载 [macOS 版本](https://github.com/TTAWDTT/oh-bilibili/releases/tag/v0.1.0)。
+
+从源码运行需要 Node 22.12+ 和 Rust stable，终端需能运行 `cargo`。Windows 还需 Visual Studio Build Tools 的「使用 C++ 的桌面开发」工作负载、Windows SDK 和 WebView2 Runtime。
 
 ```sh
-npm install
+npm ci
+npm run fetch:yt-dlp:windows   # Windows x64
+# macOS 改为运行 sh scripts/fetch-yt-dlp.sh
 npm run dev      # Tauri 桌面窗口
 npm run web      # 只调界面：浏览器里跑，内存 mock，不碰真实接口
 ```
 
-下载功能需要 `yt-dlp`。先运行 `scripts/fetch-yt-dlp.sh` 把它放进 `resources/`；`npm run bundle` 会一并打进 `.app/Contents/Resources/`。开发时也会从工作目录或 PATH 里找。
+下载功能使用随包提供的 yt-dlp。Windows 准备命令会校验固定版本的 SHA-256。
 
 ## 打包
 
 ```sh
-npm run bundle   # target/release/bundle/macos/oh-bilibili.app，约 46MB
+npm run bundle
 ```
 
-`.app` 未签名，首次打开要右键 -> 打开。DMG 在无图形会话的机器上会卡在 Finder AppleScript，这是环境限制，不影响 `.app`。
+Windows x64 安装程序在 `target/release/bundle/nsis/`。macOS 应用在 `target/release/bundle/macos/`。`.app` 未签名，首次打开要右键选择「打开」。生成 DMG 需要有 Finder 的图形会话。
 
 ## 架构
 

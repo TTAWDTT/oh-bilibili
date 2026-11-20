@@ -26,18 +26,33 @@ async fn 引擎能搜到歌并真的开始播放() {
     assert_eq!(snapshot.phase, "playing", "应该进入播放态");
     assert!(snapshot.quality_kbps.unwrap_or(0) >= 64, "应该拿到音轨档位");
 
-    // 网络取首字节要 1–2 秒，1.2 秒的窗口在快网下才够，会假红。
-    // 等 3 秒再测，断言的是「有没有在推进」而不是「推进得多快」。
-    tokio::time::sleep(Duration::from_millis(3000)).await;
-    let after = engine.snapshot();
-    println!("3 秒后位置：{}ms", after.position_ms);
-    assert!(after.position_ms > 800, "声卡应该真的在推进位置");
+    let wait_for_position = |minimum| {
+        let engine = &engine;
+        async move {
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(12);
+            loop {
+                let position = engine.snapshot().position_ms;
+                if position >= minimum {
+                    return position;
+                }
+                assert!(
+                    tokio::time::Instant::now() < deadline,
+                    "播放位置没到 {minimum}ms，实际 {position}ms"
+                );
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    };
+
+    let after = wait_for_position(801).await;
+    println!("声卡开始推进后位置：{after}ms");
 
     engine.seek(90_000);
-    tokio::time::sleep(Duration::from_millis(400)).await;
-    let seeked = engine.snapshot().position_ms;
+    let seeked = wait_for_position(89_000).await;
     println!("seek 到 90s 后：{seeked}ms");
-    assert!(seeked >= 89_000, "seek 应该落在目标附近");
+    assert!((89_000..=92_000).contains(&seeked), "seek 应该落在目标附近");
+    let advanced = wait_for_position(seeked + 300).await;
+    println!("seek 之后继续推进：{advanced}ms");
 
     let lyrics = engine.lyrics_get(&tracks[0].key).await.expect("歌词请求成功");
     println!("歌词：{} 行，来源 {}", lyrics.lines.len(), lyrics.source);

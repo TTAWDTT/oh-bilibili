@@ -1223,22 +1223,12 @@ impl Source {
         Ok(out)
     }
 
-    /// 当前 cookie 串，代理转发视频时要带上。
-    pub fn cookie_header(&self) -> String {
-        self.client.cookie_header()
-    }
-
-    /// 给音频层用的请求头。`audio` 不认识 B 站，只认识这些键值。
+    /// 播放地址已签名，CDN 请求只需 UA 和来源页。
     pub fn stream_headers(&self) -> Vec<(String, String)> {
-        let cookie = self.client.cookie_header();
-        let mut headers = vec![
+        vec![
             ("User-Agent".to_string(), client::UA.to_string()),
             ("Referer".to_string(), client::REFERER.to_string()),
-        ];
-        if !cookie.is_empty() {
-            headers.push(("Cookie".to_string(), cookie));
-        }
-        headers
+        ]
     }
 }
 

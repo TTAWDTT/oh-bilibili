@@ -1,10 +1,12 @@
+import { isMacOS } from '../../shared/lib/runtime'
+
 const SHORTCUTS: ReadonlyArray<{ keys: readonly string[]; label: string; detail: string }> = [
   { keys: ['空格'], label: '播放 / 暂停', detail: '输入框里不触发，不会打断打字' },
   { keys: ['←', '→'], label: '快退 / 快进 5 秒', detail: '焦点在进度条上时交给滑块处理' },
   { keys: ['↑', '↓'], label: '音量 ±5%', detail: '和 B 站播放器同一档步长' },
   { keys: ['D'], label: '开关弹幕', detail: '设置会记住，重开还是这个状态' },
   { keys: ['M'], label: '静音 / 恢复', detail: '再按一次回到静音前的音量' },
-  { keys: ['⌘', 'K'], label: '聚焦搜索框', detail: '任何页面都直接回到搜索' },
+  { keys: [isMacOS ? '⌘' : 'Ctrl', 'K'], label: '聚焦搜索框', detail: '任何页面都直接回到搜索' },
   { keys: ['F'], label: '全屏播放', detail: '窗口进系统全屏' },
   { keys: ['W'], label: '网页全屏', detail: '只铺满窗口，不切系统全屏' },
   { keys: ['Esc'], label: '退出全屏 / 关闭弹窗', detail: '都没有时收起右栏' },

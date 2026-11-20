@@ -1,0 +1,19 @@
+{
+  "bundle": {
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"],
+    "resources": {
+      "../../../resources/yt-dlp.exe": "yt-dlp.exe",
+      "../../../resources/yt-dlp-Windows.txt": "yt-dlp-Windows.txt",
+      "../../../resources/GPL-3.0.txt": "licenses/GPL-3.0.txt",
+      "../../../resources/yt-dlp-third-party.txt": "licenses/yt-dlp-third-party.txt"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": true
+      }
+    }
+  }
+}

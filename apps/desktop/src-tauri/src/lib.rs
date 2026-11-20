@@ -4,6 +4,7 @@
 //! 业务逻辑全在 `bilimusic-core` 里。
 
 mod mv;
+mod system;
 
 use std::sync::Arc;
 
@@ -1019,53 +1020,47 @@ fn download_reveal(
         .find(|d| d.key == key)
         .and_then(|d| d.path)
         .ok_or_else(|| WireError::input("key", "这条记录还没有落盘路径"))?;
-    std::process::Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| WireError::internal(format!("打不开访达：{e}")))?;
-    Ok(())
+    system::reveal(std::path::Path::new(&path))
+        .map_err(|e| WireError::internal(format!("无法定位下载文件：{e}")))
 }
 
-/// 在访达里打开下载目录（没有就建一个再打开）。
+/// 在文件管理器里打开下载目录（没有就建一个再打开）。
 #[tauri::command(rename_all = "snake_case")]
 fn download_open_dir() -> Result<(), WireError> {
     let dir = bilimusic_core::engine::downloads_dir();
     std::fs::create_dir_all(&dir)
         .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
-    std::process::Command::new("open")
-        .arg(&dir)
-        .spawn()
-        .map_err(|e| WireError::internal(format!("打不开访达：{e}")))?;
-    Ok(())
+    system::open(dir.as_os_str())
+        .map_err(|e| WireError::internal(format!("打不开下载目录：{e}")))
 }
 
 /// 用系统默认浏览器打开外部链接。只收 http/https：
 /// 简介里的文字来自 B 站，不能让它拉起 file:// 之类任意 scheme。
 #[tauri::command(rename_all = "snake_case")]
 fn open_external(url: String) -> Result<(), WireError> {
-    let lower = url.to_ascii_lowercase();
-    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
-        return Err(WireError::input("url", "只允许 http/https 链接"));
-    }
-    std::process::Command::new("open")
-        .arg(&url)
-        .spawn()
-        .map_err(|e| WireError::internal(format!("打不开浏览器：{e}")))?;
-    Ok(())
+    let url = reqwest::Url::parse(&url)
+        .ok()
+        .filter(|url| matches!(url.scheme(), "http" | "https"))
+        .ok_or_else(|| WireError::input("url", "只允许 http/https 链接"))?;
+    system::open(url.as_str().as_ref())
+        .map_err(|e| WireError::internal(format!("打不开浏览器：{e}")))
 }
 
-/// 把播放器截图写到 `~/Pictures/oh-bilibili`。文件名只接受安全字符，
+/// 把截图写到系统图片目录的 `oh-bilibili` 文件夹。文件名只接受安全字符，
 /// 前端传来的标题不能决定落盘路径的目录部分。
 fn screenshot_stem(name: &str) -> String {
     let cleaned: String = name
         .chars()
         .map(|c| match c {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0'..='\x1f' => '-',
             other => other,
         })
         .collect();
-    let cleaned = cleaned.trim().trim_matches('.').chars().take(80).collect::<String>();
+    let cleaned = cleaned.trim_matches(|c: char| c == '.' || c.is_whitespace());
+    let mut cleaned: String = cleaned.chars().take(80).collect();
+    if cfg!(windows) && windows_device_name(&cleaned) {
+        cleaned.insert(0, '_');
+    }
     if cleaned.is_empty() {
         "截图".to_string()
     } else {
@@ -1073,13 +1068,21 @@ fn screenshot_stem(name: &str) -> String {
     }
 }
 
+fn windows_device_name(name: &str) -> bool {
+    let name = name.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    matches!(name.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || name.strip_prefix("COM").or_else(|| name.strip_prefix("LPT"))
+            .is_some_and(|n| matches!(n, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"))
+}
+
 #[tauri::command(rename_all = "snake_case")]
-fn save_screenshot(bytes: Vec<u8>, name: String) -> Result<String, WireError> {
+fn save_screenshot(app: tauri::AppHandle, bytes: Vec<u8>, name: String) -> Result<String, WireError> {
     if bytes.is_empty() {
         return Err(WireError::input("bytes", "截图是空的"));
     }
-    let home = std::env::var_os("HOME").ok_or_else(|| WireError::internal("找不到用户目录"))?;
-    let dir = std::path::PathBuf::from(home).join("Pictures").join("oh-bilibili");
+    let dir = app.path().picture_dir()
+        .map_err(|e| WireError::internal(format!("找不到图片目录：{e}")))?
+        .join("oh-bilibili");
     std::fs::create_dir_all(&dir)
         .map_err(|e| WireError::internal(format!("建不了截图目录：{e}")))?;
     let path = dir.join(format!("{}.png", screenshot_stem(&name)));
@@ -1128,16 +1131,13 @@ async fn sync_now(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let dir = app
-                .path()
-                .app_data_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
-            std::fs::create_dir_all(&dir).ok();
+            let dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&dir)?;
             let db_path = dir.join("library.sqlite");
 
             let engine = Engine::new(&db_path)?;
             mv::apply_env_failures();
-            let mv_port = mv::spawn(engine.cookie_header(), engine.clone())
+            let mv_port = mv::spawn(engine.clone())
                 .map_err(|e| format!("MV 代理起不来：{e}"))?;
             app.manage(MvPort(mv_port));
             app.manage(engine.clone());
@@ -1275,6 +1275,15 @@ mod tests {
     #[test]
     fn 截图文件名去掉路径分隔符() {
         assert_eq!(screenshot_stem("a/b:c*?\"<>|"), "a-b-c------");
+        assert_eq!(screenshot_stem("a\0\nb"), "a--b");
         assert_eq!(screenshot_stem("  ..  "), "截图");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 截图文件名避开设备名() {
+        assert_eq!(screenshot_stem("NUL"), "_NUL");
+        assert_eq!(screenshot_stem("lpt².截图"), "_lpt².截图");
+        assert_eq!(screenshot_stem("COM10"), "COM10");
     }
 }

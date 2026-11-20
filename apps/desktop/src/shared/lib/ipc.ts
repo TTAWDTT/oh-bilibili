@@ -424,7 +424,7 @@ export function downloadRemove(key: string): Promise<DownloadView[]> {
   return call<DownloadView[]>('download_remove', { key })
 }
 
-/** 在访达里定位这个文件。 */
+/** 在文件管理器里定位这个文件。 */
 export function downloadReveal(key: string): Promise<null> {
   return call<null>('download_reveal', { key })
 }
@@ -448,7 +448,7 @@ export function followSet(mid: number, on: boolean): Promise<null> {
   return call<null>('follow_set', { mid, on })
 }
 
-/** 在访达里打开下载目录。 */
+/** 在文件管理器里打开下载目录。 */
 export function downloadOpenDir(): Promise<null> {
   return call<null>('download_open_dir', {})
 }

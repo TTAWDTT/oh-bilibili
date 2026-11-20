@@ -4,6 +4,7 @@
 //! 它不直接拼 B 站 URL，也不直接写 SQL 字符串。
 
 pub mod dash_bridge;
+mod download;
 pub mod tickets;
 pub mod engine;
 pub mod lyrics;

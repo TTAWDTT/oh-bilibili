@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
+const root = path.resolve(import.meta.dirname, '..')
 const ipcSrc = fs.readFileSync(path.join(root, 'apps/desktop/src/shared/lib/ipc.ts'), 'utf8')
 const libSrc = fs.readFileSync(path.join(root, 'apps/desktop/src-tauri/src/lib.rs'), 'utf8')
 

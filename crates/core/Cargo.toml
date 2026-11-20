@@ -6,6 +6,7 @@ license.workspace = true
 description = "core"
 
 [dependencies]
+dirs = "7"
 serde.workspace = true
 thiserror.workspace = true
 bilimusic-model = { path = "../model" }

@@ -10,9 +10,9 @@
  * 它们出现在 DARK_CONTEXT_FILES 里的文件时会被跳过。
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
 
-const ROOT = new URL('../apps/desktop/src', import.meta.url).pathname
+const ROOT = join(import.meta.dirname, '../apps/desktop/src')
 
 // 这些文件整体是深色语境（全屏视频浮层、banner 深色遮罩），浅色字合法
 const DARK_CONTEXT_FILES = [
@@ -89,7 +89,7 @@ function walk(dir) {
 
 const findings = []
 for (const file of walk(ROOT)) {
-  const rel = file.replace(ROOT + '/', '')
+  const rel = relative(ROOT, file).split(sep).join('/')
   const darkContext = DARK_CONTEXT_FILES.includes(rel)
   const lines = readFileSync(file, 'utf8').split('\n')
   for (const rule of RULES) {

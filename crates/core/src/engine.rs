@@ -1797,10 +1797,6 @@ impl Engine {
         }
     }
 
-    pub fn cookie_header(&self) -> String {
-        self.source.cookie_header()
-    }
-
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
@@ -1931,18 +1927,12 @@ impl Engine {
         self: &Arc<Self>,
         key: &TrackKey,
     ) -> Result<DownloadView, WireError> {
-        // 双击不能起第二个 yt-dlp；同一个 key 已在跑就直接回现有进度。
-        if let Some(existing) = lock(&self.downloads)
-            .iter()
-            .find(|d| d.key == key.as_opaque() && (d.state == "queued" || d.state == "running"))
-            .cloned()
-        {
-            return Ok(existing);
-        }
         let track = self.track_of(key)?;
-        let bin = find_ytdlp().ok_or_else(|| {
-            WireError::internal("找不到 yt-dlp，先运行 scripts/fetch-yt-dlp.sh")
-        })?;
+        let helper = crate::download::find_helper()
+            .ok_or_else(|| WireError::internal("找不到 yt-dlp，请检查应用安装或 PATH"))?;
+        let dir = downloads_dir();
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
         let view = DownloadView {
             key: key.as_opaque().to_string(),
@@ -1953,6 +1943,11 @@ impl Engine {
         };
         {
             let mut list = lock(&self.downloads);
+            if let Some(existing) = list.iter().find(|d| {
+                d.key == view.key && (d.state == "queued" || d.state == "running")
+            }) {
+                return Ok(existing.clone());
+            }
             list.retain(|d| d.key != view.key);
             list.push(view.clone());
         }
@@ -1960,34 +1955,15 @@ impl Engine {
             view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
         });
 
-        let dir = download_dir();
-        std::fs::create_dir_all(&dir).ok();
         let url = format!("https://www.bilibili.com/video/{}", key.as_opaque());
-        let template = dir.join("%(title)s.%(ext)s");
         let engine = self.clone();
         let view_key = view.key.clone();
 
         tokio::task::spawn_blocking(move || {
-            let output = std::process::Command::new(&bin)
-                .arg("--no-playlist")
-                .arg("-f")
-                .arg("ba")
-                .arg("-o")
-                .arg(&template)
-                .arg(&url)
-                .output();
-
-            let (state, path) = match output {
-                Ok(out) if out.status.success() => ("done", newest_file(&dir)),
-                Ok(out) => {
-                    eprintln!(
-                        "yt-dlp 失败: {}",
-                        String::from_utf8_lossy(&out.stderr).chars().take(400).collect::<String>()
-                    );
-                    ("failed", None)
-                }
+            let (state, path) = match crate::download::audio(&helper, &dir, &url) {
+                Ok(path) => ("done", Some(path)),
                 Err(e) => {
-                    eprintln!("起不动 yt-dlp: {e}");
+                    eprintln!("下载失败：{e}");
                     ("failed", None)
                 }
             };
@@ -2085,51 +2061,10 @@ mod tauri_runtime {
     }
 }
 
-
-/// yt-dlp 的查找顺序：随包资源、当前目录、PATH。
-fn find_ytdlp() -> Option<std::path::PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            candidates.push(dir.join("resources").join("yt-dlp"));
-            // macOS 打包后资源在 Contents/Resources/
-            candidates.push(dir.join("..").join("Resources").join("yt-dlp"));
-            candidates.push(dir.parent().map(|p| p.join("resources").join("yt-dlp")).unwrap_or_default());
-        }
-    }
-    // 测试与开发时工作目录在 crate 里，所以往上找两层。
-    for rel in ["resources/yt-dlp", "../../resources/yt-dlp", "../../../resources/yt-dlp"] {
-        candidates.push(std::path::PathBuf::from(rel));
-    }
-    for c in candidates {
-        if c.is_file() {
-            return Some(c);
-        }
-    }
-    if std::process::Command::new("yt-dlp").arg("--version").output().is_ok() {
-        return Some(std::path::PathBuf::from("yt-dlp"));
-    }
-    None
-}
-
 /// 下载目录。界面上的「打开目录」用它，免得前端自己拼 HOME。
 pub fn downloads_dir() -> std::path::PathBuf {
-    download_dir()
-}
-
-fn download_dir() -> std::path::PathBuf {
-    std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
+    dirs::audio_dir()
+        .or_else(|| dirs::home_dir().map(|home| home.join("Music")))
         .unwrap_or_else(std::env::temp_dir)
-        .join("Music")
         .join("BiliMusic")
-}
-
-fn newest_file(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    std::fs::read_dir(dir)
-        .ok()?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file())
-        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
-        .map(|e| e.path())
 }

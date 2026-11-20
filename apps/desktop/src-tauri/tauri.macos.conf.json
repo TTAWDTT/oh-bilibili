@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "../../../resources/yt-dlp": "yt-dlp"
+    }
+  }
+}
