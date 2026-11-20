@@ -78,6 +78,12 @@ async function connect() {
   await send('Runtime.enable', {}, sid)
   await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: 1, mobile: false }, sid)
 
+  const viewport = (width, height) =>
+    send(
+      'Emulation.setDeviceMetricsOverride',
+      { width, height, deviceScaleFactor: 1, mobile: false },
+      sid,
+    )
   const evaluate = async (expression) => {
     const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sid)
     return res.result?.result?.value
@@ -101,6 +107,7 @@ async function connect() {
 
   return {
     evaluate,
+    viewport,
     clickText,
     clickExactText,
     close: () => {
@@ -149,6 +156,24 @@ async function main() {
     check('点「弹幕列表」', await page.clickText('弹幕列表'))
     await sleep(800)
     check('弹幕列表展开到多行', (await page.evaluate(`document.querySelectorAll('[class*="max-h-"] li').length`)) > 3)
+
+    const layout = await page.evaluate(`(() => {
+      const doc = document.scrollingElement
+      const video = document.querySelector('video')
+      const box = video ? video.getBoundingClientRect() : null
+      return {
+        overflow: doc ? doc.scrollWidth - doc.clientWidth : -1,
+        ratio: box && box.height > 0 ? box.width / box.height : 0,
+      }
+    })()`)
+    check('1320 宽没有横向溢出', layout.overflow === 0)
+    check('画面保持 16:9', Math.abs(layout.ratio - 16 / 9) < 0.05)
+
+    await page.viewport(700, 860)
+    await sleep(600)
+    check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
+    await page.viewport(1320, 900)
+    await sleep(400)
 
     check('点「弹幕设置」', await page.clickText('弹幕设置'))
     await sleep(600)
