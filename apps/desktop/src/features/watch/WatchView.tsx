@@ -356,6 +356,11 @@ export function WatchView({ track }: { track: Track }) {
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
+  // 分 P 播完接下一 P；合集里的单集播完接下一集。B 站两者都是自动连播，
+  // 不走相关推荐——只有既没有下一 P 也没有下一集时才退到推荐第一条。
+  const seasonEpisodes = data?.season?.episodes ?? []
+  const seasonIndex = seasonEpisodes.findIndex((ep) => ep.key === track.key)
+  const nextSeasonEp = seasonIndex >= 0 ? seasonEpisodes[seasonIndex + 1] ?? null : null
   const nextUp: NextUp | null = nextPage
     ? {
         title: nextPage.title || `第 ${nextPage.no} P`,
@@ -365,7 +370,16 @@ export function WatchView({ track }: { track: Track }) {
         durationMs: nextPage.duration_ms,
         page: nextPage.no,
       }
-    : related[0]
+    : nextSeasonEp
+      ? {
+          title: nextSeasonEp.title,
+          owner: '',
+          cover: nextSeasonEp.cover,
+          views: nextSeasonEp.views ?? null,
+          durationMs: nextSeasonEp.duration_ms || null,
+          page: null,
+        }
+      : related[0]
       ? {
           title: related[0].title,
           owner: related[0].artist,
@@ -378,6 +392,20 @@ export function WatchView({ track }: { track: Track }) {
   const playNext = (): void => {
     if (nextPage) {
       changePage(nextPage.no)
+      return
+    }
+    if (nextSeasonEp) {
+      replace({
+        kind: 'watch',
+        track: {
+          key: nextSeasonEp.key,
+          title: nextSeasonEp.title,
+          artist: '',
+          duration_ms: nextSeasonEp.duration_ms || null,
+          cover: nextSeasonEp.cover,
+          views: nextSeasonEp.views,
+        },
+      })
       return
     }
     const track = related[0]
