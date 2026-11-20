@@ -23,6 +23,14 @@ pub const REFERER: &str = "https://www.bilibili.com/";
 /// 密钥缓存的寿命。nav 的 key 每天换一次，取 30 分钟足够稳也不浪费请求。
 const KEY_TTL: Duration = Duration::from_secs(30 * 60);
 
+fn session_origin(url: &reqwest::Url) -> bool {
+    url.scheme() == "https"
+        && url.port_or_known_default() == Some(443)
+        && url
+            .domain()
+            .is_some_and(|host| host == "bilibili.com" || host.ends_with(".bilibili.com"))
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct NavState {
     pub is_login: bool,
@@ -57,9 +65,18 @@ pub struct Client {
 
 impl Client {
     pub fn new() -> Result<Client, BiliError> {
+        let redirects = reqwest::redirect::Policy::default();
         let http = reqwest::Client::builder()
             .user_agent(UA)
             .timeout(Duration::from_secs(20))
+            .redirect(reqwest::redirect::Policy::custom(move |attempt| {
+                if attempt.previous().last().is_some_and(session_origin)
+                    && attempt.url().scheme() != "https"
+                {
+                    return attempt.stop();
+                }
+                redirects.redirect(attempt)
+            }))
             .build()
             .map_err(|e| BiliError::Network(e.to_string()))?;
         Ok(Client {
@@ -83,11 +100,22 @@ impl Client {
         self.nav.read().map(|n| n.clone()).unwrap_or_default()
     }
 
-    pub fn cookie_header(&self) -> String {
+    fn cookie_header(&self) -> String {
         let jar = self.jar.read().expect("cookie 罐被毒化");
         let mut pairs: Vec<String> = jar.iter().map(|(k, v)| format!("{k}={v}")).collect();
         pairs.sort();
         pairs.join("; ")
+    }
+
+    fn session_request(&self, method: reqwest::Method, url: &str) -> reqwest::RequestBuilder {
+        let request = self.http.request(method, url);
+        if reqwest::Url::parse(url).is_ok_and(|url| session_origin(&url)) {
+            let cookie = self.cookie_header();
+            if !cookie.is_empty() {
+                return request.header(reqwest::header::COOKIE, cookie);
+            }
+        }
+        request
     }
 
     pub fn set_cookie(&self, name: &str, value: &str) {
@@ -278,21 +306,17 @@ impl Client {
             self.gate(min_interval).await;
         }
 
-        let cookie = self.cookie_header();
-        let mut req = self
-            .http
-            .get(url)
+        let req = self
+            .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .header("Accept-Language", "zh-CN,zh;q=0.9");
-        if !cookie.is_empty() {
-            req = req.header("Cookie", cookie);
-        }
-
         let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
         let status = resp.status();
-        self.absorb_cookies(resp.headers());
+        if session_origin(resp.url()) {
+            self.absorb_cookies(resp.headers());
+        }
         let body = resp
             .text()
             .await
@@ -343,15 +367,10 @@ impl Client {
     pub async fn get_bytes(&self, url: &str, min_interval: Duration) -> Result<Vec<u8>, BiliError> {
         self.wait_cooldown().await?;
         self.gate(min_interval).await;
-        let cookie = self.cookie_header();
-        let mut req = self
-            .http
-            .get(url)
+        let req = self
+            .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        if !cookie.is_empty() {
-            req = req.header("Cookie", cookie);
-        }
         let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
         Ok(resp.bytes().await.map_err(|e| BiliError::Network(e.to_string()))?.to_vec())
     }
@@ -360,15 +379,10 @@ impl Client {
     pub async fn get_text(&self, url: &str, min_interval: Duration) -> Result<String, BiliError> {
         self.wait_cooldown().await?;
         self.gate(min_interval).await;
-        let cookie = self.cookie_header();
-        let mut req = self
-            .http
-            .get(url)
+        let req = self
+            .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        if !cookie.is_empty() {
-            req = req.header("Cookie", cookie);
-        }
         let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
         resp.text().await.map_err(|e| BiliError::Network(e.to_string()))
     }
@@ -430,20 +444,17 @@ impl Client {
         self.wait_cooldown().await?;
         self.gate(Duration::from_millis(400)).await;
 
-        let cookie = self.cookie_header();
-        let mut req = self
-            .http
-            .post(url)
+        let req = self
+            .session_request(reqwest::Method::POST, url)
             .header("Referer", REFERER)
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .form(&form);
-        if !cookie.is_empty() {
-            req = req.header("Cookie", cookie);
-        }
         let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
         let status = resp.status();
-        self.absorb_cookies(resp.headers());
+        if session_origin(resp.url()) {
+            self.absorb_cookies(resp.headers());
+        }
         let body = resp
             .text()
             .await
@@ -540,5 +551,36 @@ mod cookie_dirty_tests {
         client.remember("SESSDATA", "new");
         assert!(client.take_cookies_dirty(), "值变了要标脏");
         assert!(!client.take_cookies_dirty(), "取走之后要复位");
+    }
+}
+
+#[cfg(test)]
+mod cookie_scope_tests {
+    use super::Client;
+
+    #[test]
+    fn 只给安全的站内接口附带登录凭据() {
+        let client = Client::new().unwrap();
+        client.import_cookies(&[("SESSDATA".into(), "synthetic".into())]);
+        for (url, expected) in [
+            ("https://api.bilibili.com/", true),
+            ("https://api.live.bilibili.com/", true),
+            ("https://www.bilibili.com/", true),
+            ("http://api.bilibili.com/", false),
+            ("https://api.bilibili.com:8443/", false),
+            ("https://aisubtitle.hdslb.com/", false),
+            ("https://api.bilibili.com.example.invalid/", false),
+            ("https://api.bilibili.com@example.invalid/", false),
+        ] {
+            let request = client
+                .session_request(reqwest::Method::GET, url)
+                .build()
+                .unwrap();
+            assert_eq!(
+                request.headers().contains_key(reqwest::header::COOKIE),
+                expected,
+                "{url}"
+            );
+        }
     }
 }

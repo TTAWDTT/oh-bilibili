@@ -1020,15 +1020,11 @@ fn download_reveal(
         .find(|d| d.key == key)
         .and_then(|d| d.path)
         .ok_or_else(|| WireError::input("key", "这条记录还没有落盘路径"))?;
-    std::process::Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| WireError::internal(format!("打不开访达：{e}")))?;
-    Ok(())
+    system::reveal(std::path::Path::new(&path))
+        .map_err(|e| WireError::internal(format!("无法定位下载文件：{e}")))
 }
 
-/// 在访达里打开下载目录（没有就建一个再打开）。
+/// 在文件管理器里打开下载目录（没有就建一个再打开）。
 #[tauri::command(rename_all = "snake_case")]
 fn download_open_dir() -> Result<(), WireError> {
     let dir = bilimusic_core::engine::downloads_dir();

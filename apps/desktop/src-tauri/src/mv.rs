@@ -1,7 +1,7 @@
 //! 本地 MV 代理。
 //!
 //! B 站视频 CDN 对非 bilibili 的 Referer 返回 403，而页面里的 `<video>` 无法自定义
-//! Referer。所以视频字节必须由本机代理转发：它补上 Referer 与 Cookie，把 Range 原样
+//! Referer。所以视频字节必须由本机代理转发：它补上 Referer，把 Range 原样
 //! 传下去，再把 206 响应流回 webview。
 //!
 //! 只转发引擎铸过票的地址。前端拿到的是不透明句柄，既造不出远端地址，
@@ -148,10 +148,6 @@ fn handle(
         .header("User-Agent", UA)
         .header("Referer", "https://www.bilibili.com/")
         .header("Origin", "https://www.bilibili.com");
-    let cookie = engine.cookie_header();
-    if !cookie.is_empty() {
-        req = req.header("Cookie", cookie);
-    }
     if let Some(r) = range {
         req = req.header("Range", r);
     }

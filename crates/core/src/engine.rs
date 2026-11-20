@@ -1797,10 +1797,6 @@ impl Engine {
         }
     }
 
-    pub fn cookie_header(&self) -> String {
-        self.source.cookie_header()
-    }
-
     pub async fn danmaku_colored(
         &self,
         key: &TrackKey,
