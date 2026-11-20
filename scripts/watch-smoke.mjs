@@ -362,6 +362,12 @@ async function main() {
       before = await page.evaluate(`document.querySelectorAll('[data-comment-id]').length`)
     }
     check('评论列表渲染出多条', before > 0)
+    check(
+      '评论图片缩略图放大到 88px',
+      (await page.evaluate(
+        `document.querySelector('button[aria-label^="查看第"] img')?.getBoundingClientRect().width ?? 0`,
+      )) >= 88,
+    )
     check('点「UP主」筛选', await page.clickExactText('UP主'))
     await sleep(1200)
     const filtered = await page.evaluate(`({
