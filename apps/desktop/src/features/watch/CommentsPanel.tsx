@@ -939,6 +939,8 @@ export function CommentsPanel({
   /** 下一批的游标；null 表示还没开始或已经到底。 */
   const cursorRef = useRef<string | null>(null)
   const seqRef = useRef(0)
+  /** 「只看 UP 主」已经自动补翻了几页；到上限就交回手动按钮。 */
+  const scannedRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
   const authorHover = useAuthorHover()
   const visible = onlyUp && ownerMid !== null ? items.filter((c) => c.mid === ownerMid) : items
@@ -996,6 +998,16 @@ export function CommentsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow, hasMore, loading, trackKey, onlyUp])
 
+  // 只看 UP 主时热门区前几页可能一条 UP 的都没有。自动补两页就够常见情况，
+  // 再多就变成替用户刷接口了，剩下的交给「加载更多评论」。
+  useEffect(() => {
+    if (!onlyUp || loading || !hasMore || error || retry) return
+    if (visible.length > 0 || scannedRef.current >= 2) return
+    scannedRef.current += 1
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlyUp, loading, hasMore, visible.length, error, retry])
+
   const load = async (byHot = hot): Promise<void> => {
     if (loadingRef.current) return
     const seq = seqRef.current
@@ -1041,6 +1053,7 @@ export function CommentsPanel({
   useEffect(() => {
     seqRef.current += 1
     loadingRef.current = false
+    scannedRef.current = 0
     setItems([])
     setReplyTo(null)
     setTotal(0)
