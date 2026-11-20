@@ -1,7 +1,26 @@
 import { useEffect, useRef } from 'react'
 import type { PageRef } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
+import { usePlayerStore } from '../player/playerStore'
 import { scrollIntoList } from './listScroll'
+
+/** 正在播的那一集进度会一直往前走：只让这一行订阅播放进度，别把整张表带上。 */
+function LivePageBar({ durationMs }: { durationMs: number }) {
+  const at = usePlayerStore((state) => state.progress.position_ms)
+  const ratio = durationMs > 0 ? Math.min(1, at / durationMs) : 0
+  if (ratio <= 0) return null
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute bottom-0.5 left-8 right-2 h-[2px] overflow-hidden rounded-full bg-[var(--line)]"
+    >
+      <span
+        className="block h-full rounded-full bg-[var(--accent)]"
+        style={{ width: `${ratio * 100}%` }}
+      />
+    </span>
+  )
+}
 
 /**
  * 多 P 视频的「视频选集」。B 站把它做成右栏一张带集数的卡片：
@@ -78,7 +97,9 @@ export function PageList({
                       {formatTime(page.duration_ms)}
                     </span>
                   ) : null}
-                  {ratio > 0 ? (
+                  {active ? (
+                    <LivePageBar durationMs={page.duration_ms} />
+                  ) : ratio > 0 ? (
                     <span
                       aria-hidden
                       className="pointer-events-none absolute bottom-0.5 left-8 right-2 h-[2px] overflow-hidden rounded-full bg-[var(--line)]"
