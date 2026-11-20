@@ -105,9 +105,26 @@ async function connect() {
       return true
     })()`)
 
+  /** 真实双击：两下 press/release，第二下 clickCount=2，才会触发 dblclick。 */
+  const doubleClick = async (x, y) => {
+    for (const clickCount of [1, 2]) {
+      await send(
+        'Input.dispatchMouseEvent',
+        { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount },
+        sid,
+      )
+      await send(
+        'Input.dispatchMouseEvent',
+        { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount },
+        sid,
+      )
+    }
+  }
+
   return {
     evaluate,
     viewport,
+    doubleClick,
     clickText,
     clickExactText,
     close: () => {
@@ -196,6 +213,10 @@ async function main() {
     await sleep(800)
     check('再按 W 退出网页全屏', !(await page.evaluate(`document.body.innerText.includes('退出网页全屏')`)))
 
+    // 双击画面这条**不能**在这里测：web 预览拿不到真实清单，播放器上盖着
+    // 一层取流失败的浮层，双击打不到 <video>。它只在真机 app 里成立
+    // （已验证：双击进/出网页全屏，播放状态不受影响）。
+
     check('点「弹幕设置」', await page.clickText('弹幕设置'))
     await sleep(600)
     check('弹幕设置面板出现', await page.evaluate(`/显示区域|不透明度/.test(document.body.innerText)`))
@@ -219,6 +240,7 @@ async function main() {
       })(),
     })`)
     check('筛选已生效且不会变多', filtered.pressed === 'true' && filtered.count <= before)
+
   } finally {
     page.close()
   }
