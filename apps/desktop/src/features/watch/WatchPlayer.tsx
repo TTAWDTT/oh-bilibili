@@ -205,6 +205,19 @@ function DanmakuComposer({
   )
 }
 
+/** 冒烟脚本读的播放器状态；只在 dev 构建挂到 window 上。 */
+type WatchProbe = {
+  state: () => {
+    now: number
+    duration: number
+    scrub: number | null
+    playing: boolean
+    ready: boolean
+    error: string | null
+    lastSeek: number | null
+  }
+}
+
 export function WatchPlayer({
   track,
   data,
@@ -260,6 +273,8 @@ export function WatchPlayer({
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
   const fullscreenSynced = useRef(false)
+  /** 冒烟脚本读的最后一次落位；播放时钟在无头预览里没有真值。 */
+  const lastSeek = useRef<number | null>(null)
   /** 当前生效的变体高度，降档时用它找下一档。 */
   const currentHeight = useRef<number>(0)
   /** 出错后想降到的目标高度；为 0 表示按 shaka 的默认选择。 */
@@ -454,6 +469,7 @@ export function WatchPlayer({
     const duration = data.duration_ms
     if (!duration) return
     const at = Math.round(Math.min(Math.max(ratio, 0), 1) * duration)
+    lastSeek.current = at
     void ipc.playerSeek(at).catch(() => {})
     const v = videoRef.current
     if (v) v.currentTime = at / 1000
@@ -771,8 +787,25 @@ export function WatchPlayer({
     return hit
   }
 
+  /** 正在拖动进度条时指针所在的百分比；null 表示没在拖。 */
+  const [scrub, setScrub] = useState<number | null>(null)
   const duration = data.duration_ms || track.duration_ms || 0
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
+  /** 拖动时进度条与时间跟着指针走，松手才真的落位。 */
+  const shownPercent = scrub === null ? percent : scrub * 100
+
+  // 冒烟脚本读的探针。无头预览取不到流，播放时钟始终是 0，seek 之后
+  // 500ms 就被它覆盖回去，只能让播放器自己报出收过的落点。
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const probe: WatchProbe = {
+      state: () => ({ now, duration, scrub, playing, ready, error, lastSeek: lastSeek.current }),
+    }
+    ;(window as unknown as { __ohBilibiliWatch?: WatchProbe }).__ohBilibiliWatch = probe
+    return () => {
+      delete (window as unknown as { __ohBilibiliWatch?: WatchProbe }).__ohBilibiliWatch
+    }
+  }, [now, duration, scrub, playing, ready, error])
 
   /** 当前该显示哪句字幕。台词按开始时间升序，取最后一条已经开始的。 */
   const cue = (() => {
@@ -1391,18 +1424,36 @@ export function WatchPlayer({
           aria-label="播放进度"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={Math.round(percent)}
+          aria-valuenow={Math.round(shownPercent)}
           tabIndex={0}
-          onClick={(event) => {
+          // B 站可以按住进度条拖：拖的时候填充、时间、预览图跟着指针走，
+          // 松手才真的落位。只做点击的话，拖到一半松手会跳到松手那一点，
+          // 中间完全没有反馈。
+          onPointerDown={(event) => {
+            // 辅助功能直接 press 进度条时事件没有坐标，clientX 会是 0；
+            // 那不是「拖到最左边」，交给方向键处理。
+            if (event.button !== 0 || event.clientX <= 0 || !duration) return
             const box = event.currentTarget.getBoundingClientRect()
-            const ratio = (event.clientX - box.left) / box.width
-            seekTo(ratio)
-            // 点完鼠标就停在这一点上，预览跟着亮起来，和 B 站一致。
-            if (duration) {
-              setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+            // 指针在事件之间被松开时 capture 会抛，抓不住也不影响后续按坐标算比例。
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId)
+            } catch {
+              /* 不影响拖动 */
             }
+            const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
+            setScrub(ratio)
+            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
             askShots()
           }}
+          onPointerUp={(event) => {
+            if (event.button !== 0 || event.clientX <= 0 || !duration) return
+            const box = event.currentTarget.getBoundingClientRect()
+            const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
+            setScrub(null)
+            seekTo(ratio)
+            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+          }}
+          onPointerCancel={() => setScrub(null)}
           // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
           // 方向键按 5 秒走。缺这一段，读屏和纯键盘用户完全拖不动进度。
           onKeyDown={(event) => {
@@ -1424,14 +1475,15 @@ export function WatchPlayer({
             seekTo(target)
           }}
           onMouseEnter={askShots}
-          onMouseMove={(event) => {
+          onPointerMove={(event) => {
             if (!duration) return
             const box = event.currentTarget.getBoundingClientRect()
             const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
             setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+            if (scrub !== null) setScrub(ratio)
           }}
           onMouseLeave={() => setHoverAt(null)}
-          className="group relative mb-1.5 h-3 cursor-pointer"
+          className="group relative mb-1.5 h-3 cursor-pointer touch-none"
         >
           <DanmakuBeats
             items={visibleDanmaku}
@@ -1501,11 +1553,13 @@ export function WatchPlayer({
           <span
             /* 主题只有一种强调色，进度条也用它。 */
             className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
-            style={{ width: `${percent}%` }}
+            style={{ width: `${shownPercent}%` }}
           />
           <span
-            className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-            style={{ left: `${percent}%` }}
+            className={`pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
+              scrub === null ? 'opacity-0' : 'opacity-100'
+            }`}
+            style={{ left: `${shownPercent}%` }}
           />
         </div>
 
@@ -1519,7 +1573,7 @@ export function WatchPlayer({
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
           <span className="num shrink-0 text-[12px] text-white/80">
-            {formatTime(now)}
+            {formatTime(scrub === null ? now : scrub * duration)}
             <span className="hidden sm:inline"> / {formatTime(duration)}</span>
           </span>
 

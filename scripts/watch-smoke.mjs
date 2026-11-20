@@ -125,6 +125,7 @@ async function connect() {
     evaluate,
     viewport,
     doubleClick,
+    mouseEvent: (params) => send('Input.dispatchMouseEvent', params, sid),
     clickText,
     clickExactText,
     close: () => {
@@ -190,6 +191,70 @@ async function main() {
     })()`)
     check('1320 宽没有横向溢出', layout.overflow === 0)
     check('画面保持 16:9', Math.abs(layout.ratio - 16 / 9) < 0.05)
+
+    // 无头预览取不到流，时间始终是 0，所以看播放器探针记录的落点，
+    // 而不是看画面上的进度。
+    const slider = await page.evaluate(`(() => {
+      const el = document.querySelector('[role="slider"][aria-label="播放进度"]')
+      if (!el) return null
+      const box = el.getBoundingClientRect()
+      return { left: box.left, y: box.top + box.height / 2, width: box.width }
+    })()`)
+    check('控制条上有进度条', !!slider)
+    if (slider) {
+      const at = (ratio) => slider.left + slider.width * ratio
+      await page.mouseEvent({ type: 'mouseMoved', x: at(0.2), y: slider.y })
+      await page.mouseEvent({
+        type: 'mousePressed',
+        x: at(0.2),
+        y: slider.y,
+        button: 'left',
+        buttons: 1,
+        clickCount: 1,
+      })
+      await page.mouseEvent({ type: 'mouseMoved', x: at(0.7), y: slider.y, buttons: 1 })
+      await sleep(150)
+      const during = await page.evaluate(`window.__ohBilibiliWatch?.state() ?? null`)
+      check('拖动时进度跟手但不落位', !!during && Math.abs((during.scrub ?? -1) - 0.7) < 0.02)
+      await page.mouseEvent({
+        type: 'mouseReleased',
+        x: at(0.7),
+        y: slider.y,
+        button: 'left',
+        buttons: 0,
+        clickCount: 1,
+      })
+      await sleep(150)
+      const after = await page.evaluate(`window.__ohBilibiliWatch?.state() ?? null`)
+      const want = during ? during.duration * 0.7 : 0
+      check(
+        '松手后落到松手位置',
+        !!after &&
+          after.scrub === null &&
+          after.lastSeek !== null &&
+          Math.abs(after.lastSeek - want) <= Math.max(500, want * 0.02),
+      )
+
+      const seekBefore = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
+      await page.evaluate(`(() => {
+        const el = document.querySelector('[role="slider"][aria-label="播放进度"]')
+        if (!el) return false
+        for (const type of ['pointerdown', 'pointerup']) {
+          el.dispatchEvent(new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: 0,
+            clientY: 0,
+            button: 0,
+            pointerId: 1,
+          }))
+        }
+        return true
+      })()`)
+      await sleep(150)
+      const seekAfter = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
+      check('没有坐标的 press 不会把进度打回开头', seekBefore !== null && seekAfter === seekBefore)
+    }
 
     await page.viewport(700, 860)
     await sleep(600)
