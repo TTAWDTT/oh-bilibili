@@ -15,6 +15,9 @@ import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
 
+/** 对话页大小，与后端 `reply/dialog/cursor` 的 `size` 参数一致。 */
+const DIALOG_PAGE_SIZE = 20
+
 /** 评论排序是用户偏好，切视频、重启后都应该沿用。 */
 const COMMENT_SORT_KEY = 'oh-bilibili:comments:hot'
 
@@ -803,7 +806,12 @@ function DialogModal({
       const page = await ipc.watchDialog(trackKey, root, anchor, next)
       setItems((prev) => (next === null ? page.items : [...prev, ...page.items]))
       setCursor(page.next)
-      setHasMore(page.has_more)
+      // B 站偶尔在最后一条之后还给一个 next_offset，下一页是空的。
+      // 空页就当到底，否则「展开更多」点一下什么都不发生，按钮才消失。
+      // B 站会在这条对话已经说完时照样给一个 next_offset，下一页是空的
+      // （实测一条 5 条的对话：点「展开更多」多打一次请求、一条也没多）。
+      // 满一页才认为可能还有下一页。
+      setHasMore(page.has_more && page.items.length >= DIALOG_PAGE_SIZE)
     } catch {
       setError(true)
     } finally {
