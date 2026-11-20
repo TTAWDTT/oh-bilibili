@@ -1499,7 +1499,7 @@ export function WatchPlayer({
             />
           ))}
           <span
-            /* B 站播放器的进度条是品牌粉，不是链接蓝。 */
+            /* 主题只有一种强调色，进度条也用它。 */
             className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
             style={{ width: `${percent}%` }}
           />
