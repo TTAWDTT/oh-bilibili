@@ -17,15 +17,18 @@ type DanmakuSettings = {
   blockWords: string[]
   /** 整个类型都不放：滚动 / 顶部 / 底部。 */
   blockTypes: DanmakuBlockType[]
+  /** 发弹幕时上次选的颜色；跨视频沿用。 */
+  sendColor: number
   setEnabled: (v: boolean) => void
   patch: (part: Partial<Pick<DanmakuSettings, 'opacity' | 'size' | 'speed' | 'area'>>) => void
   setBlockWords: (words: string[]) => void
   toggleBlockType: (type: DanmakuBlockType) => void
+  setSendColor: (color: number) => void
 }
 
 type Stored = Pick<
   DanmakuSettings,
-  'enabled' | 'opacity' | 'size' | 'speed' | 'area' | 'blockWords' | 'blockTypes'
+  'enabled' | 'opacity' | 'size' | 'speed' | 'area' | 'blockWords' | 'blockTypes' | 'sendColor'
 >
 
 const KEY = ['bilimusic', 'danmaku'].join('.')
@@ -49,6 +52,10 @@ function load(): Stored {
               (t): t is DanmakuBlockType => t === 'roll' || t === 'top' || t === 'bottom',
             )
           : [],
+        sendColor:
+          typeof v.sendColor === 'number' && v.sendColor >= 0 && v.sendColor <= 0xffffff
+            ? v.sendColor
+            : 0xffffff,
       }
     }
   } catch {
@@ -62,6 +69,7 @@ function load(): Stored {
     area: 1,
     blockWords: [],
     blockTypes: [],
+    sendColor: 0xffffff,
   }
 }
 
@@ -82,6 +90,7 @@ function snapshot(state: DanmakuSettings): Stored {
     area: state.area,
     blockWords: state.blockWords,
     blockTypes: state.blockTypes,
+    sendColor: state.sendColor,
   }
 }
 
@@ -107,5 +116,9 @@ export const useDanmakuSettings = create<DanmakuSettings>((set, get) => ({
       : [...get().blockTypes, type]
     set({ blockTypes })
     save({ ...snapshot(get()), blockTypes })
+  },
+  setSendColor: (sendColor) => {
+    set({ sendColor })
+    save({ ...snapshot(get()), sendColor })
   },
 }))

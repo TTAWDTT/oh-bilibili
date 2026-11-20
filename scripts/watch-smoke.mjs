@@ -303,6 +303,17 @@ async function main() {
     check('点「弹幕设置」', await page.clickText('弹幕设置'))
     await sleep(600)
     check('弹幕设置面板出现', await page.evaluate(`/显示区域|不透明度/.test(document.body.innerText)`))
+    const redClicked = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label="弹幕颜色 红"]')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(200)
+    const redStored = await page.evaluate(`(() => {
+      try { return JSON.parse(localStorage.getItem('bilimusic.danmaku') || '{}').sendColor } catch { return null }
+    })()`)
+    check('弹幕颜色写入偏好', redClicked && redStored === 16646914)
     await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`)
     await sleep(400)
 
@@ -323,6 +334,31 @@ async function main() {
       })(),
     })`)
     check('筛选已生效且不会变多', filtered.pressed === 'true' && filtered.count <= before)
+
+    // 弹幕颜色偏好跨页面重载沿用。
+    await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let hasVideoAgain = false
+    for (let i = 0; i < 30 && !hasVideoAgain; i += 1) {
+      await sleep(500)
+      hasVideoAgain = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    check('再次进入观看页', hasVideoAgain)
+    check('点「弹幕设置」重开', await page.clickText('弹幕设置'))
+    await sleep(600)
+    check(
+      '重载后弹幕颜色仍是红色',
+      (await page.evaluate(
+        `document.querySelector('button[aria-label="弹幕颜色 红"]')?.getAttribute('aria-pressed')`,
+      )) === 'true',
+    )
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`)
+    await sleep(400)
 
     // 结束卡：?forceEnded=1 让播放器直接落到播完状态。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?forceEnded=1`)}`)
