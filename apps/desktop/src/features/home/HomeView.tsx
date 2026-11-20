@@ -61,6 +61,8 @@ export function HomeView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  /** 上次失败是网络抖动：只有这种情况才给「重试」，到底了给的是「换一批」。 */
+  const [canRetry, setCanRetry] = useState(false)
   /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
   const nextFresh = useRef(feedMemory.nextFresh)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -96,6 +98,12 @@ export function HomeView() {
     setError(null)
     try {
       const list = await ipc.homeFeed(next)
+      // 成功才推进：失败就留在这一页，重试时不会再跳过一个 fresh_idx。
+      if (append) {
+        nextFresh.current = next + 1
+        feedMemory.nextFresh = next + 1
+      }
+      setCanRetry(false)
       // 推荐流会重复推同一条，按 key 去重后再追加。
       const base = append ? itemsRef.current : []
       const seen = new Set(base.map((t) => t.key))
@@ -121,6 +129,7 @@ export function HomeView() {
       }
     } catch (e) {
       setError(toWireError(e).message)
+      setCanRetry(true)
     } finally {
       if (append) setLoadingMore(false)
       else setLoading(false)
@@ -163,10 +172,7 @@ export function HomeView() {
     // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
     if (pending.current || loading || loadingMore || exhausted.current) return
     pending.current = true
-    const next = nextFresh.current
-    nextFresh.current = next + 1
-    feedMemory.nextFresh = next + 1
-    void load(next, true).finally(() => {
+    void load(nextFresh.current, true).finally(() => {
       pending.current = false
     })
   }
@@ -341,7 +347,16 @@ export function HomeView() {
 
       {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}
       {error && items.length === 0 ? (
-        <p className="py-6 text-[13px] text-[var(--text-3)]">{error}</p>
+        <div className="flex flex-col items-center gap-2 py-6">
+          <p className="text-[13px] text-[var(--text-3)]">{error}</p>
+          <button
+            type="button"
+            onClick={refreshAll}
+            className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            重新取一次
+          </button>
+        </div>
       ) : null}
 
       {/*
@@ -449,10 +464,10 @@ export function HomeView() {
           <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
           <button
             type="button"
-            onClick={refreshAll}
+            onClick={canRetry ? more : refreshAll}
             className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
-            换一批
+            {canRetry ? '重试这一页' : '换一批'}
           </button>
         </div>
       ) : null}
