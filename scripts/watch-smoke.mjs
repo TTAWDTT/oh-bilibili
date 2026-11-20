@@ -82,6 +82,14 @@ async function connect() {
     const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sid)
     return res.result?.result?.value
   }
+  /** 精确匹配按钮文字：评论里也有「UP主」徽标，includes 会点错。 */
+  const clickExactText = (text) =>
+    evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((node) => (node.textContent || '').trim() === ${JSON.stringify(text)})
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
   const clickText = (needle) =>
     evaluate(`(() => {
       const hit = [...document.querySelectorAll('button,[role="button"]')].find((node) =>
@@ -94,6 +102,7 @@ async function connect() {
   return {
     evaluate,
     clickText,
+    clickExactText,
     close: () => {
       ws.close()
       chrome.kill()
@@ -144,6 +153,26 @@ async function main() {
     check('点「弹幕设置」', await page.clickText('弹幕设置'))
     await sleep(600)
     check('弹幕设置面板出现', await page.evaluate(`/显示区域|不透明度/.test(document.body.innerText)`))
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`)
+    await sleep(400)
+
+    // 评论是异步取的，等它先出几条再切筛选。
+    let before = 0
+    for (let i = 0; i < 20 && before === 0; i += 1) {
+      await sleep(400)
+      before = await page.evaluate(`document.querySelectorAll('[data-comment-id]').length`)
+    }
+    check('评论列表渲染出多条', before > 0)
+    check('点「UP主」筛选', await page.clickExactText('UP主'))
+    await sleep(1200)
+    const filtered = await page.evaluate(`({
+      count: document.querySelectorAll('[data-comment-id]').length,
+      pressed: (() => {
+        const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === 'UP主')
+        return hit ? hit.getAttribute('aria-pressed') : null
+      })(),
+    })`)
+    check('筛选已生效且不会变多', filtered.pressed === 'true' && filtered.count <= before)
   } finally {
     page.close()
   }
