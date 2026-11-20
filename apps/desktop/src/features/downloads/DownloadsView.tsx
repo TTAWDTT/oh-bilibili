@@ -30,7 +30,6 @@ export function DownloadsView() {
   const items = useDownloadsStore((state) => state.items)
   const navigate = useAppStore((state) => state.navigate)
 
-  /** 在访达里定位文件。 */
   const reveal = async (key: string): Promise<void> => {
     try {
       await ipc.downloadReveal(key)
@@ -139,8 +138,8 @@ export function DownloadsView() {
                     {item.state === 'done' ? (
                       <button
                         type="button"
-                        aria-label={`在访达中显示 ${item.title}`}
-                        title="在访达中显示"
+                        aria-label={`在文件夹中显示 ${item.title}`}
+                        title="在文件夹中显示"
                         onClick={() => void reveal(item.key)}
                         className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]"
                       >

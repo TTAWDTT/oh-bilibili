@@ -6,12 +6,15 @@ import { Avatar } from '../shared/ui/Avatar'
 import * as ipc from '../shared/lib/ipc'
 import type { HotSearchItem } from '../shared/lib/ipc'
 import { toastFailure } from './notice'
+import { isMacOS, isTauri } from '../shared/lib/runtime'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon, type IconName } from '../shared/ui/Icon'
 import { useSearchHistory } from '../shared/lib/searchHistory'
 import { AnchoredPanel } from '../shared/ui/AnchoredPanel'
 import type { Anchor } from '../shared/ui/AnchoredPanel'
 import { LevelBadge } from '../shared/ui/LevelBadge'
+
+const overlayTitleBar = isTauri && isMacOS
 
 /**
  * 顶栏搜索框下面的建议面板。
@@ -192,7 +195,7 @@ export function TitleBar() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const drag = useWindowDrag()
 
-  // ⌘K / 左侧栏点击都会递增 nonce，这里跟着聚焦
+  // 搜索快捷键和左侧栏都会递增 nonce，这里跟着聚焦。
   useEffect(() => {
     if (focusNonce > 0) inputRef.current?.focus()
   }, [focusNonce])
@@ -265,12 +268,9 @@ export function TitleBar() {
 
   return (
     <div
-      {...drag}
-      className="safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pl-[74px] pr-3 md:gap-4 md:pl-[80px]"
+      onPointerDown={overlayTitleBar ? drag.onPointerDown : undefined}
+      className={`safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pr-3 md:gap-4 ${overlayTitleBar ? 'pl-[74px] md:pl-[80px]' : 'pl-3'}`}
     >
-      {/* 观看页把 logo 换成返回：B 站网页版的返回在页面顶栏，不压在画面上。
-          其余页面保持 logo —— 它不参与命中，按下时目标才是带 data-tauri-drag-region
-          的顶栏本身，窗口才能被拖动。 */}
       {viewing ? (
         <button
           type="button"
@@ -398,7 +398,9 @@ export function TitleBar() {
               <Icon name="close" size={12} />
             </button>
           ) : focused ? null : (
-            <span className="kbd shrink-0 text-[11px] text-[var(--text-3)]">⌘K</span>
+            <span className="hidden shrink-0 sm:inline">
+              <kbd className="kbd text-[11px] text-[var(--text-3)]">{isMacOS ? '⌘K' : 'Ctrl+K'}</kbd>
+            </span>
           )}
           <button
             type="submit"
