@@ -3,6 +3,7 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
+import { chaptersFrom } from '../../shared/lib/chapters'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
@@ -354,6 +355,8 @@ export function WatchView({ track }: { track: Track }) {
   const currentPageNo = page ?? data?.current_page ?? 1
   const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
+  const hasChapters =
+    chapters.length > 1 || (data ? chaptersFrom(data.desc).length > 1 : false)
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
   const nextUp: NextUp | null = nextPage
@@ -498,7 +501,7 @@ export function WatchView({ track }: { track: Track }) {
           }
         >
           {/* B 站网页端把标题压在画面之上：先知道在放什么，再决定看不看。 */}
-          {!cinema && data ? (
+          {!cinema && data && hasChapters ? (
             <WatchHead
               track={track}
               data={data}
@@ -579,6 +582,11 @@ export function WatchView({ track }: { track: Track }) {
           {!cinema && danmaku.length > 0 ? (
             <div className="border-t border-hairline md:hidden">
               <DanmakuList items={danmaku} />
+            </div>
+          ) : null}
+          {!cinema && data ? (
+            <div className="border-t border-hairline md:hidden">
+              <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} />
             </div>
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
