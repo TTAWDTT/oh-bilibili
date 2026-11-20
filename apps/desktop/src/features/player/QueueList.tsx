@@ -136,7 +136,7 @@ export function QueueList() {
       alive = false
     }
   }, [])
-  const navigate = useAppStore((state) => state.navigate)
+  const focusSearch = useAppStore((state) => state.focusSearch)
 
   if (!queue) return <BiliLoader compact label="正在取队列…" />
 
@@ -146,7 +146,7 @@ export function QueueList() {
         icon="biliTv"
         title="前方高能，队列还是空的"
         detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
-        action={{ label: '去搜索', onClick: () => navigate({ kind: 'search' }) }}
+        action={{ label: '去搜索', onClick: () => focusSearch() }}
         compact
       />
     )

@@ -25,8 +25,8 @@ import { useAuthStore } from '../auth/authStore'
 export function AuthorView({ name, mid }: { name: string; mid?: number | null }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
-  const navigate = useAppStore((state) => state.navigate)
-  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+  const focusSearch = useAppStore((state) => state.focusSearch)
+  const searchFor = useAppStore((state) => state.setHeroQuery)
   const me = useAuthStore((state) => state.auth?.user ?? null)
   const [followed, setFollowed] = useState(false)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
@@ -187,7 +187,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                     .catch((cause) => toastFailure('打开空间', cause))
                 },
               }
-            : { label: '回到搜索', onClick: () => navigate({ kind: 'search' }) }
+            : { label: '回到搜索', onClick: () => focusSearch() }
         }
       />
     )
@@ -353,7 +353,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         <div className="mt-6 flex justify-center">
           <button
             type="button"
-            onClick={() => setAuthorQuery(name)}
+            onClick={() => searchFor(name)}
             className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             在搜索里找他更多的投稿 →

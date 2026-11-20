@@ -178,6 +178,7 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
 export function TitleBar() {
   const focusNonce = useAppStore((state) => state.searchFocus)
   const setQuery = useAppStore((state) => state.setHeroQuery)
+  const closeSearch = useAppStore((state) => state.closeSearch)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const navigate = useAppStore((state) => state.navigate)
   const goBack = useAppStore((state) => state.goBack)
@@ -357,6 +358,7 @@ export function TitleBar() {
             event.stopPropagation()
             setFocused(false)
             inputRef.current?.blur()
+            closeSearch()
             return
           }
           if (event.key !== 'ArrowDown' || event.target !== inputRef.current) return
@@ -391,6 +393,7 @@ export function TitleBar() {
               title="清空"
               onClick={() => {
                 setText('')
+                closeSearch()
                 inputRef.current?.focus()
               }}
               className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"

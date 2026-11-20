@@ -53,7 +53,7 @@ const EMPTY_TIMES: number[] = []
 
 export function LyricsView({ track }: { track: Track | null }) {
   const seek = usePlayerStore((state) => state.seek)
-  const navigate = useAppStore((state) => state.navigate)
+  const focusSearch = useAppStore((state) => state.focusSearch)
   const toggleRail = useAppStore((state) => state.toggleRail)
   const [doc, setDoc] = useState<LyricDoc | null>(null)
   const [loading, setLoading] = useState(false)
@@ -150,7 +150,7 @@ export function LyricsView({ track }: { track: Track | null }) {
         action={
           track
             ? { label: failed ? '重新取一次' : '看看队列', onClick: failed ? () => setNonce((n) => n + 1) : () => toggleRail('queue') }
-            : { label: '去搜索', onClick: () => navigate({ kind: 'search' }) }
+            : { label: '去搜索', onClick: () => focusSearch() }
         }
         compact
       />

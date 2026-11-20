@@ -46,10 +46,15 @@ export function useShortcuts(): void {
         return
       }
       if (event.key === 'Escape') {
+        // 搜索面板盖在内容上，Esc 先收它，再谈全屏与右栏。
+        const app = useAppStore.getState()
+        if (app.searchOpen) {
+          app.closeSearch()
+          return
+        }
         // 弹窗自己在 Modal 里处理 Esc，这里只负责没有弹窗时的收尾：
         // 先退出全屏，再收右栏。
         if (!dialogOpen) {
-          const app = useAppStore.getState()
           if (app.cinema) {
             app.setCinema(false)
             app.setOsFullscreen(false)

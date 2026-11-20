@@ -40,7 +40,11 @@ function searchKey(query: string, partition: string, order: string, duration: nu
   return [query, partition, order, duration].join('\u0000')
 }
 
-export function SearchView() {
+/**
+ * 搜索结果面板。搜索没有独立页面：顶栏输入框下面直接长出这一块，
+ * 点结果或按 Esc 收起，主页面保持在原处。
+ */
+export function SearchPanel() {
   const storeQuery = useAppStore((state) => state.currentQuery)
   const [query, setQuery] = useState(storeQuery)
   const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
@@ -100,8 +104,7 @@ export function SearchView() {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
   const setSearchFilters = useAppStore((state) => state.setSearchFilters)
-  const authorQuery = useAppStore((state) => state.authorQuery)
-  const setAuthorQuery = useAppStore((state) => state.setAuthorQuery)
+  const closeSearch = useAppStore((state) => state.closeSearch)
 
   // 把实际在搜的词与筛选条件同步给 store：
   // 顶栏跟着它走，切走再回来也能恢复。
@@ -121,19 +124,9 @@ export function SearchView() {
     setHeroQuery(null)
   }, [heroQuery, setHeroQuery])
 
-  // 从别处点 UP 主进来时，把名字填进搜索框并立刻搜一次。
-  useEffect(() => {
-    if (!authorQuery) return
-    setQuery(authorQuery)
-    setPage(1)
-    setNonce((n) => n + 1)
-    setAuthorQuery(null)
-  }, [authorQuery, setAuthorQuery])
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
   const usersSeq = useRef(0)
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const focusSeq = useAppStore((state) => state.searchFocus)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
   /** 上一页返回空就说明到底了；否则自动补齐会对着空页无限重试。 */
@@ -170,13 +163,6 @@ export function SearchView() {
       searchMemory.page = page
     }
   }, [trimmed, partition, order, duration, dataKey, tracks, users, usersQuery, page])
-
-  // ⌘K 只在自增时抢焦点，用户自己点进来的渲染不会被打断。
-  useEffect(() => {
-    if (focusSeq === 0) return
-    inputRef.current?.focus()
-    inputRef.current?.select()
-  }, [focusSeq])
 
   // UP 主属于关键词，视频翻页和筛选不能作废它；先排队以免被视频预取挡住。
   useEffect(() => {
@@ -297,12 +283,18 @@ export function SearchView() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-
-
+    <div className="bili-search-overlay">
+      {/* 点面板外收起。压一层半透明底色，页面退后一步，面板才是焦点。 */}
       <div
+        aria-hidden
+        onClick={closeSearch}
+        className="absolute inset-0 bg-[color-mix(in_oklab,var(--text-1)_10%,transparent)]"
+      />
+      <section
+        role="dialog"
+        aria-label="搜索结果"
         ref={scrollerRef}
-        id="scroll-main"
+        id="search-scroll"
         onScroll={(event) => {
           const el = event.currentTarget
           if (!searchMemory) return
@@ -313,16 +305,19 @@ export function SearchView() {
             searchMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
           }
         }}
-        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+        className="bili-search-sheet absolute inset-x-0 top-0 mx-auto h-[calc(100%-10px)] w-[min(1240px,calc(100%-24px))] overflow-y-auto rounded-b-[12px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-5 pb-10 pt-4"
       >
         {trimmed.length === 0 ? (
           <div className="flex min-h-[320px] items-center justify-center text-[13px] text-[var(--text-3)]">
             在顶部搜索栏输入关键词
           </div>
         ) : (
-          <section className="mt-6">
+          <section>
             {/* B 站搜索页的分类 tab：综合里同时有 UP 主和视频，也可以只看其中一类。 */}
-            <nav aria-label="搜索结果分类" className="-mt-2 mb-4 flex gap-6 border-b border-[var(--line)]">
+            <nav
+              aria-label="搜索结果分类"
+              className="sticky top-0 z-10 -mx-5 mb-3 flex gap-6 border-b border-[var(--line)] bg-[var(--panel)] px-5"
+            >
               {(
                 [
                   ['all', '综合'],
@@ -347,6 +342,15 @@ export function SearchView() {
                   {label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={closeSearch}
+                aria-label="关闭搜索"
+                title="关闭搜索"
+                className="t press mb-2 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
+              >
+                <Icon name="close" size={15} />
+              </button>
             </nav>
             {tab !== 'video' && usersQuery === trimmed && users.length > 0 ? (
               <div className="mb-4">
@@ -624,7 +628,7 @@ export function SearchView() {
             )}
           </section>
         )}
-      </div>
+      </section>
     </div>
   )
 }
