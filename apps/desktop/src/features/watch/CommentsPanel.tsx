@@ -1404,7 +1404,7 @@ export function CommentsPanel({
           ))}
           {onlyUp && !loading && !error && items.length > 0 && visible.length === 0 ? (
             <li className="py-6 text-center text-[12px] text-[var(--text-3)]">
-              这一页还没有 UP 主本人的评论。
+              前几页还没有 UP 主本人的评论。
             </li>
           ) : null}
         </ul>
