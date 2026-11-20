@@ -19,6 +19,14 @@
   outline-offset: 2px;
 }
 
+/* 进度条只有 12px 高，默认的 2px 外描边会在画面上铺成一整条蓝带。
+   键盘聚焦时改用轨道内的一条白线，鼠标点过不抢画面。 */
+.bili-progress:focus-visible {
+  outline: none;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
 /* 横向卡片条：滚动手势还在，但不留一条常驻的滚动条。 */
 .no-scrollbar {
   scrollbar-width: none;
