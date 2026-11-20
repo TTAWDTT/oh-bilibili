@@ -843,9 +843,14 @@ impl Engine {
         let playing = lock(&self.player).clock().is_playing();
         if playing {
             lock(&self.player).pause();
-            let mut st = lock(&self.state);
-            let current = std::mem::replace(&mut *st, PlayerState::Idle);
-            *st = current.pause();
+            {
+                let mut st = lock(&self.state);
+                let current = std::mem::replace(&mut *st, PlayerState::Idle);
+                *st = current.pause();
+            }
+            // emit_state 内部会 snapshot()，那里还要再锁一次 state。
+            // 在锁没放的时候调它，同一个线程会把自己锁死——实测整个界面
+            // 冻住、CPU 0%，采样里所有线程都停在 snapshot 的第一把锁上。
             self.emit_state();
         }
         self.snapshot()
