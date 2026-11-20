@@ -911,3 +911,39 @@ async fn 有字幕的视频能取到台词() {
     assert!(cues.iter().all(|c| c.end_ms >= c.at_ms), "结束时间不该早于开始");
     assert!(cues.iter().all(|c| !c.text.is_empty()), "不该有空台词");
 }
+
+/// 字幕挂在每一 P 上。观影页把当前 P 的 cid 传下来时必须按它取；不给 cid
+/// 才退回第一 P——这条约定坏了，多 P 视频的每一集都会显示第一集的台词。
+#[tokio::test]
+#[ignore = "真实网络，核对按 P 取字幕"]
+async fn 字幕按传入的cid取而不是总拿第一P() {
+    let source = Source::open().await.expect("Source");
+    let cookie_path = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
+        .expect("HOME");
+    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
+        println!("没有 cookies.json，跳过");
+        return;
+    };
+    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
+    source.import_cookies(&pairs);
+    let _ = source.refresh_session().await;
+
+    let key = bilimusic_model::TrackKey::from_provider("BV1vs411n7TH");
+    let detail = source.detail(&key).await.expect("详情");
+    assert!(detail.pages.len() > 3, "这条投稿应当是多 P");
+    let first = detail.pages[0].cid;
+    let third = detail.pages[2].cid;
+
+    let named = source.subtitle_cues(&key, Some(third), None).await.expect("P3 字幕");
+    let fallback = source.subtitle_cues(&key, None, None).await.expect("默认字幕");
+    let by_first = source.subtitle_cues(&key, Some(first), None).await.expect("P1 字幕");
+    println!(
+        "P3 {} 条 / 不给 cid {} 条 / P1 {} 条",
+        named.len(),
+        fallback.len(),
+        by_first.len()
+    );
+    assert!(!named.is_empty(), "P3 应该有字幕");
+    assert_eq!(fallback.len(), by_first.len(), "不给 cid 时必须退回第一 P");
+}
