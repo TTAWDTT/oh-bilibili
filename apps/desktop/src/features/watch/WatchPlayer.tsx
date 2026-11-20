@@ -1483,7 +1483,7 @@ export function WatchPlayer({
             if (scrub !== null) setScrub(ratio)
           }}
           onMouseLeave={() => setHoverAt(null)}
-          className="group relative mb-1.5 h-3 cursor-pointer touch-none"
+          className="bili-progress group relative mb-1.5 h-3 cursor-pointer touch-none"
         >
           <DanmakuBeats
             items={visibleDanmaku}
