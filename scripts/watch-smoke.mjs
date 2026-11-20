@@ -143,9 +143,14 @@ async function main() {
         (b.getAttribute('aria-label') || '').startsWith('观看'))
       if (card) card.click()
     })()`)
-    await sleep(6000)
+    // 页面是异步取数再挂播放器，固定 sleep 会抖：轮询到 video 出现为止。
+    let hasVideo = false
+    for (let i = 0; i < 30 && !hasVideo; i += 1) {
+      await sleep(500)
+      hasVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
 
-    check('进入观看页（有 video 元素）', await page.evaluate(`!!document.querySelector('video')`))
+    check('进入观看页（有 video 元素）', hasVideo)
 
     check('点「分享」', await page.clickText('分享'))
     await sleep(700)
@@ -174,6 +179,22 @@ async function main() {
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
     await page.viewport(1320, 900)
     await sleep(400)
+
+    // 网页全屏：W 进去要有明确的退出入口，画面不能被拉变形，弹幕输入还在。
+    await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }))`)
+    await sleep(1200)
+    const cinema = await page.evaluate(`(() => {
+      const exit = [...document.querySelectorAll('button')].some((b) => (b.textContent || '').includes('退出网页全屏'))
+      const video = document.querySelector('video')
+      const fit = video ? getComputedStyle(video).objectFit : ''
+      return { exit, fit, composer: !!document.querySelector('input[placeholder*="弹幕"]') }
+    })()`)
+    check('网页全屏有退出入口', cinema.exit)
+    check('网页全屏画面等比（contain）', cinema.fit === 'contain')
+    check('网页全屏保留弹幕输入', cinema.composer)
+    await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }))`)
+    await sleep(800)
+    check('再按 W 退出网页全屏', !(await page.evaluate(`document.body.innerText.includes('退出网页全屏')`)))
 
     check('点「弹幕设置」', await page.clickText('弹幕设置'))
     await sleep(600)
