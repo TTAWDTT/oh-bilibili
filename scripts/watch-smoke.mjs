@@ -259,6 +259,24 @@ async function main() {
     await page.viewport(700, 860)
     await sleep(600)
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
+    const speedAt700 = await page.evaluate(`(() => {
+      const btn = document.querySelector('button[aria-label^="播放倍速"]')
+      if (!btn) return null
+      const box = btn.getBoundingClientRect()
+      return { visible: box.width > 0 && getComputedStyle(btn).display !== 'none' }
+    })()`)
+    check('700 宽仍能改播放倍速', !!speedAt700?.visible)
+    if (speedAt700?.visible) {
+      await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
+      await sleep(200)
+      check(
+        '窄屏倍速菜单可打开',
+        await page.evaluate(
+          `[...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === '1.5x')`,
+        ),
+      )
+      await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
+    }
     await page.viewport(1320, 900)
     await sleep(400)
 

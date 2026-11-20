@@ -2047,7 +2047,7 @@ export function WatchPlayer({
             <Icon name="repeatOne" size={16} />
           </button>
 
-          <div className="relative hidden shrink-0 lg:block">
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -2088,7 +2088,7 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          {/* 音量与倍速在窄屏交给系统：手机上调的是系统音量，不是应用音量。 */}
+          {/* 音量在窄屏交给系统；倍速是播放器状态，任何宽度都得留着。 */}
           <span
             className="hidden shrink-0 items-center xl:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
