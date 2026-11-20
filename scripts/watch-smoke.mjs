@@ -5,10 +5,14 @@
 // 它不依赖真机窗口，锁屏时也能跑；视觉与真机验收仍然要在 app 里做。
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const WEB = 'http://127.0.0.1:1420/'
 const PORT = 9224
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
+  ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
+  : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -31,7 +35,7 @@ async function connect() {
       '--no-first-run',
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
-      '--user-data-dir=/tmp/oh-bilibili-smoke',
+      `--user-data-dir=${join(tmpdir(), 'oh-bilibili-smoke')}`,
       'about:blank',
     ],
     { stdio: 'ignore', detached: false },
