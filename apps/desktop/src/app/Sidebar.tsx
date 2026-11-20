@@ -23,7 +23,6 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'weekly' }, label: '每周必看', icon: 'calendar' },
       { view: { kind: 'live' }, label: '直播', icon: 'live' },
       { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumi' },
-      { view: { kind: 'search' }, label: '搜索', icon: 'search' },
     ],
   },
   {

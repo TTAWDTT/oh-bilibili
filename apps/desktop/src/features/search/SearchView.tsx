@@ -15,7 +15,6 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAuthStore } from '../auth/authStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
-import { ContinueListening } from './ContinueListening'
 import { DurationFilter, type DurationKey } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
 
@@ -77,9 +76,7 @@ export function SearchView() {
   const [tab, setTab] = useState<'all' | 'video' | 'user'>('all')
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
-  const clearHistory = useSearchHistory((s) => s.clear)
-  const removeHistory = useSearchHistory((s) => s.remove)
-  /** 热搜榜。取不到就退回内置建议，不让搜索页空着。 */
+  /** 热搜榜。取不到就退回内置建议，给空结果提供可点的替代词。 */
   const [hotWords, setHotWords] = useState<HotSearchItem[]>([])
   useEffect(() => {
     let cancelled = false
@@ -318,83 +315,9 @@ export function SearchView() {
         }}
         className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
       >
-        {/* 搜索框在顶栏，这里只呈现结果。 */}
-
-        {/* 只有搜索历史就没有可展示的了（热搜在下面有整块榜单，
-            这里再排一遍同样的词就是重复）。 */}
-        {trimmed.length === 0 && history.length > 0 ? (
-          <div className="bili-suggest relative z-20 -mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-b-[8px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-4 py-3 shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)]">
-            <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[17px] text-[var(--text-3)]">
-              历史
-            </span>
-            {history.slice(0, 8).map((word) => (
-              <span key={word} className="group/h inline-flex max-w-full items-center">
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => pick(word)}
-                  className="t max-w-full break-all text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
-                >
-                  {word}
-                </button>
-                {/* B 站的历史词也能单独删，不必为了去掉一个词清空整串。 */}
-                <button
-                  type="button"
-                  aria-label={`删除历史 ${word}`}
-                  title="删除这个词"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => removeHistory(word)}
-                  className="t ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] opacity-0 hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] group-hover/h:opacity-100"
-                >
-                  <Icon name="close" size={10} />
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={clearHistory}
-              className="t ml-auto shrink-0 text-[11.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              清除
-            </button>
-          </div>
-        ) : null}
-
         {trimmed.length === 0 ? (
-          <div className="mt-2 pb-10">
-            <ContinueListening />
-
-            {/* 热搜榜。B 站搜索页左侧就是这份榜单，带名次；这里铺成两列，
-                页面的空档也就填上了。 */}
-            <div className="mt-9">
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-[14px] font-medium text-[var(--text-1)]">热搜</h2>
-                <span className="text-[12px] text-[var(--text-3)]">大家都在搜</span>
-              </div>
-              <ol className="mt-3 grid grid-cols-1 gap-x-8 gap-y-1.5 md:grid-cols-2 xl:grid-cols-3">
-                {trending.map((item, index) => (
-                  <li key={`${item.keyword}-${index}`}>
-                    <button
-                      type="button"
-                      onClick={() => pick(item.keyword)}
-                      className="t flex w-full items-baseline gap-2.5 rounded-[4px] py-1 text-left hover:bg-[var(--panel-alt)]"
-                    >
-                      <span
-                        className={`num w-4 shrink-0 text-right text-[13px] ${
-                          index < 3 ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
-                      {item.icon ? <img src={item.icon} alt="" className="h-3.5 w-auto shrink-0" /> : null}
-                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-[var(--text-1)]">
-                        {item.label}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            </div>
+          <div className="flex min-h-[320px] items-center justify-center text-[13px] text-[var(--text-3)]">
+            在顶部搜索栏输入关键词
           </div>
         ) : (
           <section className="mt-6">

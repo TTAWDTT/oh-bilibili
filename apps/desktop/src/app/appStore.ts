@@ -206,7 +206,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),
-  focusSearch: () => set((state) => ({ view: { kind: 'search' }, searchFocus: state.searchFocus + 1 })),
+  focusSearch: () => set((state) => ({ searchFocus: state.searchFocus + 1 })),
   setHeroQuery: (q) => set({ heroQuery: q, view: { kind: 'search' } }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
   setSearchFilters: (partition, order, duration = 0) =>
