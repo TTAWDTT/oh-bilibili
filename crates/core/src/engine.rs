@@ -32,6 +32,85 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// 观看页打开的代际门。详情查询可能比后来的打开慢，旧请求不能改队列、
+/// 分P、续播点，也不能起播。key 还用于让旧页面的 close_watch 只取消自己。
+#[derive(Default)]
+struct WatchGate {
+    state: Mutex<WatchGateState>,
+}
+
+#[derive(Default)]
+struct WatchGateState {
+    generation: u64,
+    key: Option<String>,
+}
+
+impl WatchGate {
+    fn begin(&self, key: &str) -> u64 {
+        let mut state = lock(&self.state);
+        state.generation += 1;
+        state.key = Some(key.to_string());
+        state.generation
+    }
+
+    fn is_current(&self, generation: u64) -> bool {
+        lock(&self.state).generation == generation
+    }
+
+    fn is_key(&self, key: &str) -> bool {
+        lock(&self.state).key.as_deref() == Some(key)
+    }
+
+    fn cancel_for(&self, key: &str) {
+        let mut state = lock(&self.state);
+        if state.key.as_deref() != Some(key) {
+            return;
+        }
+        state.generation += 1;
+        state.key = None;
+    }
+
+    fn cancel(&self) {
+        let mut state = lock(&self.state);
+        state.generation += 1;
+        state.key = None;
+    }
+}
+
+#[cfg(test)]
+mod watch_gate_tests {
+    use super::WatchGate;
+
+    #[test]
+    fn 旧的打开和旧的关闭都碰不到新的观看页() {
+        let gate = WatchGate::default();
+        let first = gate.begin("BV1A");
+        assert!(gate.is_current(first));
+        assert!(gate.is_key("BV1A"));
+
+        let second = gate.begin("BV1B");
+        assert!(!gate.is_current(first));
+        assert!(gate.is_current(second));
+        assert!(!gate.is_key("BV1A"));
+        assert!(gate.is_key("BV1B"));
+
+        gate.cancel_for("BV1A");
+        assert!(gate.is_current(second));
+        gate.cancel_for("BV1B");
+        assert!(!gate.is_current(second));
+        assert!(!gate.is_key("BV1B"));
+    }
+
+    #[test]
+    fn 关闭全部会取消当前() {
+        let gate = WatchGate::default();
+        let generation = gate.begin("BV1A");
+        gate.cancel();
+        assert!(!gate.is_current(generation));
+        assert!(!gate.is_key("BV1A"));
+    }
+}
+
 pub struct Engine {
     /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
     cookie_file: std::path::PathBuf,
@@ -65,6 +144,7 @@ pub struct Engine {
     last_transport_at: Mutex<std::time::Instant>,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
+    watch_gate: WatchGate,
 }
 
 impl Engine {
@@ -104,6 +184,7 @@ impl Engine {
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
             last_transport_at: Mutex::new(std::time::Instant::now()),
+            watch_gate: WatchGate::default(),
         });
         engine.restore_queue();
         engine.start_progress_persist();
@@ -358,10 +439,16 @@ impl Engine {
         page: Option<u32>,
         resume_at_ms: Option<u64>,
     ) -> Result<WatchView, WireError> {
+        let generation = self.watch_gate.begin(key.as_opaque());
         // 打开观看页就是「看」模式：底部音频条按模式隐藏，
         // 不会出现「没在听却挂着一条音频」。
         *lock(&self.mode) = crate::wire::PlayMode::Watch;
         let detail = self.source.detail(key).await?;
+        // 详情查询可能跨越一次切视频。迟到的旧详情不能再改队列、分P、
+        // 续播点，更不能起播；否则用户已经看到 B，声音却被 A 抢走。
+        if !self.watch_gate.is_current(generation) {
+            return Err(WireError::internal("打开已过期，用户已经切走"));
+        }
         // 观看也把这一条设成队列当前项：否则切到「听」会接着放队列里上一首，
         // 用户看到的是 A 却听到 B。实测踩到过。
         // jump_by_key 只在条目已存在时有效，所以不存在要先插进去。
@@ -477,10 +564,20 @@ impl Engine {
             return self.snapshot();
         }
         if let Some(key) = key {
-            let current = self.snapshot().track.map(|t| t.key);
-            if current.as_ref() != Some(key) {
-                return self.snapshot();
+            // 旧页面的 cleanup 可能晚于新页面的打开到达。只取消自己那一代，
+            // 不能把后来页面或用户主动播放的声音停掉。
+            if self.watch_gate.is_key(key.as_opaque()) {
+                self.watch_gate.cancel_for(key.as_opaque());
+            } else {
+                // 新页面还没真正起播时，旧音轨仍可能是这一条；让它停下，
+                // 但不要动新页面那一代的打开。
+                let current = self.snapshot().track.map(|t| t.key);
+                if current.as_ref() != Some(key) {
+                    return self.snapshot();
+                }
             }
+        } else {
+            self.watch_gate.cancel();
         }
         lock(&self.player).stop();
         {
