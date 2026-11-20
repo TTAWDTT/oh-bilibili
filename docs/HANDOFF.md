@@ -218,6 +218,14 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     旧的灰色骨架屏和上下起伏的另一只电视已删除。冷启动时 `index.html` 先画同形状的预渲染电视，React 挂载后 160ms 淡出；
     原生窗口 `theme` 与 `backgroundColor` 已改成浅色 `#f6f7f8`，启动第一帧不再闪黑。
 
+34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
+    音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
+    弹幕读取与投递（`danmaku_colored` / `send_danmaku`）、字幕正文（`subtitle_cues`）、
+    进度条预览图（`video_shots`）。除 `video_shots` 外都做成 `Option<u64>`：给了按它取，不给才退回第一 P。
+    这几处都曾直接拿 `detail.cid`，而它永远是第一 P；表现出来就是「P3 播到 13:29 就当成播完跳下一集」
+    「P3 显示的是 P1 的弹幕和字幕」。回归见 `crates/bili/tests/live.rs` 的
+    `字幕按传入的cid取而不是总拿第一P`、`弹幕按传入的cid取而不是总拿第一P`。
+
 ## 一句话现状
 
 能跑通的 B 站桌面客户端。搜索、播放、歌单、歌词、弹幕、下载、历史、收藏夹、关注、动态和消息中心都能用，
