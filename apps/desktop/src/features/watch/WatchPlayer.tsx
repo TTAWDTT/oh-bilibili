@@ -298,6 +298,9 @@ export function WatchPlayer({
   const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
   const [controls, setControls] = useState(true)
+  /** 画中画只在浏览器/WebView 支持时出现；不支持就不摆假按钮。 */
+  const [pip, setPip] = useState(false)
+  const pipSupported = typeof document !== 'undefined' && document.pictureInPictureEnabled
   const [qualityOpen, setQualityOpen] = useState(false)
   const [speedOpen, setSpeedOpen] = useState(false)
   const [pagesOpen, setPagesOpen] = useState(false)
@@ -476,6 +479,32 @@ export function WatchPlayer({
     })
     poke()
   }
+
+  const togglePip = (): void => {
+    const v = videoRef.current
+    if (!v || !pipSupported) return
+    void (async () => {
+      try {
+        if (document.pictureInPictureElement === v) await document.exitPictureInPicture()
+        else await v.requestPictureInPicture()
+      } catch (cause) {
+        reportActionError('画中画', cause)
+      }
+    })()
+  }
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const enter = (): void => setPip(true)
+    const leave = (): void => setPip(false)
+    v.addEventListener('enterpictureinpicture', enter)
+    v.addEventListener('leavepictureinpicture', leave)
+    return () => {
+      v.removeEventListener('enterpictureinpicture', enter)
+      v.removeEventListener('leavepictureinpicture', leave)
+    }
+  }, [])
 
   const seekTo = (ratio: number): void => {
     const duration = data.duration_ms || track.duration_ms || 0
@@ -1686,6 +1715,21 @@ export function WatchPlayer({
           >
             <Icon name="camera" size={16} />
           </button>
+
+          {pipSupported ? (
+            <button
+              type="button"
+              onClick={togglePip}
+              aria-pressed={pip}
+              aria-label={pip ? '退出画中画' : '画中画'}
+              title={pip ? '退出画中画' : '画中画'}
+              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
+                pip ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
+              }`}
+            >
+              <Icon name="pip" size={16} />
+            </button>
+          ) : null}
 
           <button
             type="button"

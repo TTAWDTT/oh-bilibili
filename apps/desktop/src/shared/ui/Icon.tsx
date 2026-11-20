@@ -314,6 +314,13 @@ const ICONS = {
       <path d="M20 15v4h-4" />
     </>
   ),
+  /** 画中画：大画面右下角嵌入一个小画面。 */
+  pip: (
+    <>
+      <rect x="3.6" y="5" width="16.8" height="14" rx="2.2" />
+      <rect x="12.2" y="11.6" width="6.2" height="4.8" rx="1" fill="currentColor" stroke="none" />
+    </>
+  ),
   chevronLeft: <path d="m14.5 6-6 6 6 6" />,
   chevronRight: <path d="m9.5 6 6 6-6 6" />,
   rocket: (
