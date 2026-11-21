@@ -73,6 +73,11 @@ export function StageLyrics({
     )
   }
 
+  const resumeFollowing = (): void => {
+    scroller.current?.focus({ preventScroll: true })
+    setFollowing(true)
+  }
+
   return (
     <div data-stage-lyrics className="flex h-full min-h-0 flex-col">
       <div className="mb-2 flex h-8 shrink-0 items-center justify-between gap-3 px-2 text-[12px] text-[var(--text-3)]">
@@ -80,7 +85,7 @@ export function StageLyrics({
         {!following && synced ? (
           <button
             type="button"
-            onClick={() => setFollowing(true)}
+            onClick={resumeFollowing}
             className="t press rounded-full bg-[var(--panel)]/80 px-3 py-1 text-[12px] text-[var(--text-1)] shadow-sm hover:text-[var(--accent-strong)]"
           >
             回到当前句

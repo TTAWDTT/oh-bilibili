@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import { useSmoothIndex } from '../../shared/lib/useSmoothIndex'
@@ -44,6 +44,8 @@ export function StageView() {
   const [lyricsFailed, setLyricsFailed] = useState<string | null>(null)
   const [lyricsAttempt, setLyricsAttempt] = useState(0)
   const [relatedOpen, setRelatedOpen] = useState(false)
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const previousFocus = useRef<HTMLElement | null>(null)
   const track = snapshot?.track ?? null
   const local = snapshot?.local ?? false
 
@@ -95,13 +97,23 @@ export function StageView() {
 
   useEffect(() => {
     if (!open) return
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = requestAnimationFrame(() => {
+      stageRef.current?.querySelector<HTMLButtonElement>('button[aria-label="退出舞台"]')?.focus()
+    })
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setStage(false)
     }
     window.addEventListener('keydown', onKey)
     return () => {
+      cancelAnimationFrame(frame)
       window.removeEventListener('keydown', onKey)
-      document.querySelector<HTMLButtonElement>('button[aria-label="打开播放舞台"]')?.focus()
+      const fallback = document.querySelector<HTMLButtonElement>('button[aria-label="打开播放舞台"]')
+      const restore =
+        previousFocus.current?.isConnected && previousFocus.current !== document.body
+          ? previousFocus.current
+          : fallback
+      restore?.focus()
     }
   }, [open, setStage])
 
@@ -127,8 +139,30 @@ export function StageView() {
 
   return (
     <div
+      ref={stageRef}
       {...swipe}
-      className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden md:pb-[168px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="听歌舞台"
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab' || !stageRef.current) return
+        const focusable = [
+          ...stageRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ].filter((element) => element.getClientRects().length > 0)
+        const first = focusable[0]
+        const last = focusable.at(-1)
+        if (!first || !last) return
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }}
+      className="stage fixed inset-0 z-40 flex flex-col items-center justify-center overflow-hidden"
       style={{ background: 'var(--ga0)' }}
     >
       {/* 背景：同一张封面铺满并重度模糊，画面颜色全部来自这张图 */}
@@ -162,7 +196,7 @@ export function StageView() {
 
       {local ? null : <DanmakuPanel />}
 
-      <div className="relative z-10 flex min-h-0 w-full max-w-[1180px] flex-1 flex-col px-4 pb-4 pt-16 md:px-8">
+      <div className="stage-content relative z-10 flex min-h-0 w-full max-w-[1180px] flex-1 flex-col px-4 pb-4 pt-16 md:px-8">
         <div className="grid min-h-0 flex-1 content-start items-start gap-5 lg:content-center lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
           <div className="flex min-h-0 flex-col items-center justify-center">
             <div className="stage-disc" data-playing={snapshot?.phase === 'playing'}>
@@ -188,7 +222,7 @@ export function StageView() {
             </p>
 
             {local ? null : (
-              <div className="mt-3 hidden w-full max-w-[360px] justify-center lg:flex">
+              <div className="stage-extra mt-3 hidden w-full max-w-[360px] justify-center lg:flex">
                 <DanmakuComposer trackKey={track.key} />
               </div>
             )}
@@ -203,52 +237,53 @@ export function StageView() {
               </button>
             ) : null}
             {local ? null : (
-              <div className="hidden w-full lg:block">
+              <div className="stage-extra hidden w-full lg:block">
                 <VideoInfo trackKey={track.key} />
               </div>
             )}
           </div>
 
-          <div className="h-[min(30vh,320px)] min-h-[170px] w-full lg:h-[min(58vh,520px)]">
-            <StageLyrics
-              lines={lines}
-              synced={Boolean(doc?.synced)}
-              active={active}
-              loading={lyricsLoading}
-              failed={lyricsFailed}
-              source={doc?.source ?? ''}
-              trackKey={track.key}
-              onSeek={(at) => void usePlayerStore.getState().seek(at)}
-              onRetry={() => setLyricsAttempt((current) => current + 1)}
-            />
+          <div className="stage-lyrics-pane h-[min(30vh,320px)] min-h-[170px] w-full lg:h-[min(58vh,520px)]">
+            {relatedOpen ? (
+              <div data-stage-related className="flex h-full min-h-0 flex-col">
+                <div className="mb-2 flex h-8 shrink-0 items-center px-2 text-[12px] text-[var(--text-3)]">相关推荐</div>
+                <div className="no-scrollbar flex min-h-0 flex-1 gap-3 overflow-x-auto pb-1">
+                  {related.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setStage(false)
+                        navigate({ kind: 'watch', track: item })
+                      }}
+                      title={item.title}
+                      className="group w-[128px] shrink-0 self-start text-left"
+                    >
+                      <span className="relative block overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
+                        <Cover cover={item.cover} title={item.title} className="h-full w-full" />
+                      </span>
+                      <span className="mt-1 line-clamp-2 text-[12px] leading-4 text-[var(--text-2)] group-hover:text-[var(--accent-strong)]">
+                        {item.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <StageLyrics
+                lines={lines}
+                synced={Boolean(doc?.synced)}
+                active={active}
+                loading={lyricsLoading}
+                failed={lyricsFailed}
+                source={doc?.source ?? ''}
+                trackKey={track.key}
+                onSeek={(at) => void usePlayerStore.getState().seek(at)}
+                onRetry={() => setLyricsAttempt((current) => current + 1)}
+              />
+            )}
           </div>
         </div>
-
-        {relatedOpen && related.length > 0 ? (
-          <div data-stage-related className="mt-2 shrink-0 border-t border-[var(--line)] pt-2">
-            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-              {related.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => {
-                    setStage(false)
-                    navigate({ kind: 'watch', track: item })
-                  }}
-                  title={item.title}
-                  className="group w-[112px] shrink-0 text-left"
-                >
-                  <span className="relative block overflow-hidden rounded-[4px]" style={{ aspectRatio: '16 / 10' }}>
-                    <Cover cover={item.cover} title={item.title} className="h-full w-full" />
-                  </span>
-                  <span className="mt-1 line-clamp-1 text-[11px] text-[var(--text-2)] group-hover:text-[var(--accent-strong)]">
-                    {item.title}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         <div className="mt-3 flex shrink-0 items-center justify-center gap-4 text-[var(--text-2)] sm:gap-6">
           <button

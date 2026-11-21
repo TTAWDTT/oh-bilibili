@@ -319,6 +319,32 @@
   }
 }
 
+@media (max-height: 700px) {
+  .stage-content {
+    padding-top: 2.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .stage-content .stage-vinyl {
+    width: 96px;
+    height: 96px;
+  }
+
+  .stage-content h2 {
+    margin-top: 0.75rem;
+    font-size: 18px;
+  }
+
+  .stage-extra {
+    display: none;
+  }
+
+  .stage-lyrics-pane {
+    height: 140px !important;
+    min-height: 120px !important;
+  }
+}
+
 /* 直播的「LIVE」红点与封面上那三根跳动的电平条：B 站直播卡上最认得出的两处动效。 */
 @keyframes bili-live-pulse {
   0%,
