@@ -39,11 +39,13 @@
   /* 文本三级 */
   --text-1: #18191c;
   --text-2: #61666d;
-  --text-3: #9499a0;
+  --text-3: #697079;
 
   /* 唯一的强调色：只用于焦点、进度、激活态 */
   --accent: #00aeec;
   --accent-soft: rgb(0 174 236 / 0.14);
+  --accent-strong: #007a9f;
+  --accent-strong-hover: #006e92;
 
   /* 语义色：成功、失败、警告、金币。三处状态色原本各写各的 hex，
      深色主题留下过一版霓虹绿，现在统一在这里。 */
@@ -72,7 +74,7 @@
   --dur: 200ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --rail-w: 320px;
-  --focus-ring: var(--accent);
+  --focus-ring: var(--accent-strong);
 }
 
 html,

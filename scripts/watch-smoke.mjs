@@ -18,6 +18,21 @@ const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+function luminance(color) {
+  const channels = color.match(/\d+(?:\.\d+)?/g).slice(0, 3).map(Number)
+  const linear = channels.map((channel) => {
+    const value = channel / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+}
+
+function contrastRatio(foreground, background) {
+  const a = luminance(foreground)
+  const b = luminance(background)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
 async function reachable(url) {
   try {
     const res = await fetch(url)
@@ -677,6 +692,43 @@ async function main() {
       return
     }
     await sleep(6000)
+
+    const primaryButtons = await page.evaluate(`(() => {
+      const button = (text) =>
+        [...document.querySelectorAll('button')].find((element) => (element.textContent || '').trim() === text)
+      return ['搜索', '投稿', '登录'].map((label) => {
+        const element = button(label)
+        if (!element) return null
+        const style = getComputedStyle(element)
+        const box = element.getBoundingClientRect()
+        return {
+          label,
+          color: style.color,
+          background: style.backgroundColor,
+          center: [box.left + box.width / 2, box.top + box.height / 2],
+        }
+      })
+    })()`)
+    check(
+      '顶栏主按钮白字达到 4.5:1',
+      primaryButtons.every(
+        (button) => button && contrastRatio(button.color, button.background) >= 4.5,
+      ),
+    )
+    const searchButton = primaryButtons.find((button) => button?.label === '搜索')
+    if (searchButton) {
+      await page.mouseEvent({ type: 'mouseMoved', x: searchButton.center[0], y: searchButton.center[1] })
+      await sleep(250)
+      const hovered = await page.evaluate(`(() => {
+        const element = [...document.querySelectorAll('button')].find(
+          (button) => (button.textContent || '').trim() === '搜索',
+        )
+        const style = element ? getComputedStyle(element) : null
+        return style ? { color: style.color, background: style.backgroundColor } : null
+      })()`)
+      check('搜索按钮悬停时仍达到 4.5:1', hovered && contrastRatio(hovered.color, hovered.background) >= 4.5)
+      await page.mouseEvent({ type: 'mouseMoved', x: 4, y: 4 })
+    }
 
     const heroAuthor = await page.evaluate(`(() => {
       const card = document.querySelector('[data-home-recommend] div.bili-hero-swap button')
@@ -1577,6 +1629,24 @@ async function main() {
       await sleep(400)
       historyReady = await page.evaluate(`document.querySelectorAll('[data-track-card]').length > 0`)
     }
+    const authorContrast = await page.evaluate(`(() => {
+      const author = [...document.querySelectorAll('#scroll-main [data-track-card] span')]
+        .find((element) => element.textContent?.trim() === '周杰伦')
+      if (!author) return null
+      let background = getComputedStyle(document.body).backgroundColor
+      for (let node = author; node; node = node.parentElement) {
+        const color = getComputedStyle(node).backgroundColor
+        if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+          background = color
+          break
+        }
+      }
+      return { color: getComputedStyle(author).color, background }
+    })()`)
+    check(
+      '历史作者名达到 4.5:1',
+      authorContrast && contrastRatio(authorContrast.color, authorContrast.background) >= 4.5,
+    )
     const firstPage = await page.evaluate(`(() => ({
       cards: document.querySelectorAll('[data-track-card]').length,
       loadMore: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
