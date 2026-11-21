@@ -1060,6 +1060,67 @@ mod tests {
         dir
     }
 
+    fn v3_migration_fixture(path: &Path) -> Connection {
+        let conn = Connection::open(path).unwrap();
+        for sql in &MIGRATIONS[..3] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.execute_batch(
+            "INSERT INTO tracks (id, provider_key, title) VALUES (4, 'BVlegacy', '旧曲目');
+             INSERT INTO playlists (id, name, sort_key) VALUES (7, '旧歌单', 1024);
+             INSERT INTO playlist_tracks (playlist_id, track_id, sort_key) VALUES (7, 4, 1024);
+             INSERT INTO history (id, track_id, played_at) VALUES (9, 4, 1234);",
+        )
+        .unwrap();
+        conn.pragma_update(None, "user_version", 3).unwrap();
+        conn
+    }
+
+    fn open_and_check_migrated_library(path: &Path) -> Result<()> {
+        let library = Library::open(path)?;
+        assert_eq!(
+            library.with(|conn| {
+                conn.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+            })?,
+            SCHEMA_VERSION
+        );
+        assert_eq!(
+            library.playlists()?,
+            vec![Playlist {
+                id: 7,
+                name: "旧歌单".into(),
+                sort_key: 1024,
+            }]
+        );
+        let tracks = library.playlist_tracks(7)?;
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].key.as_opaque(), "BVlegacy");
+        let history = library.history_with_time(10, None)?;
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].0.key.as_opaque(), "BVlegacy");
+        assert_eq!((history[0].1, history[0].2, history[0].3), (1234, 0, 9));
+        Ok(())
+    }
+
+    #[test]
+    fn 迁移_中断在第四版第一列后仍能重开() {
+        let dir = temp_dir("migrate-v4-interrupted");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = v3_migration_fixture(&db);
+            conn.execute("ALTER TABLE tracks ADD COLUMN up_mid INTEGER", [])
+                .unwrap();
+        }
+
+        let first = open_and_check_migrated_library(&db);
+        let second = open_and_check_migrated_library(&db);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(
+            first.is_ok() && second.is_ok(),
+            "两次打开都应成功。第一次 {first:?}，第二次 {second:?}"
+        );
+    }
+
     #[test]
     fn 下载记录与错误跨重开保留() {
         let dir = temp_dir("downloads");
