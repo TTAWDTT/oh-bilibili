@@ -1353,7 +1353,12 @@ async function main() {
           lastCard && nextHeading
             ? nextHeading.getBoundingClientRect().top - lastCard.getBoundingClientRect().bottom
             : null,
-        sentinel: sentinel ? getComputedStyle(sentinel).position : null,
+        sentinel: sentinel
+          ? {
+              position: getComputedStyle(sentinel).position,
+              display: getComputedStyle(sentinel).display,
+            }
+          : null,
       }
     })()`)
     check(
@@ -1361,7 +1366,8 @@ async function main() {
       historySpacing &&
         historySpacing.gap >= 24 &&
         historySpacing.gap <= 32 &&
-        historySpacing.sentinel === 'absolute',
+        historySpacing.sentinel?.position === 'absolute' &&
+        historySpacing.sentinel.display !== 'none',
     )
     await page.clickExactText('加载更早记录')
     let loadedAll = false
