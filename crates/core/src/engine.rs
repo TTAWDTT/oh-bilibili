@@ -1285,6 +1285,12 @@ impl Engine {
         lock(&self.known).insert(track.key.as_opaque().to_string(), track.clone());
     }
 
+    fn remember_persisted(&self, track: &Track) {
+        lock(&self.known)
+            .entry(track.key.as_opaque().to_string())
+            .or_insert_with(|| track.clone());
+    }
+
     fn find_track(&self, key: &TrackKey) -> Result<Option<Track>, WireError> {
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
             return Ok(Some(t));
@@ -2831,7 +2837,7 @@ impl Engine {
     pub fn history(&self, limit: u32) -> Result<Vec<Track>, WireError> {
         let tracks = self.library.history(limit)?;
         for track in &tracks {
-            self.remember(track);
+            self.remember_persisted(track);
         }
         Ok(tracks)
     }
@@ -2860,7 +2866,7 @@ impl Engine {
             .library
             .history_with_time(limit, before.map(|(played_at, id)| (played_at, id as i64)))?;
         for (track, _, _, _) in &entries {
-            self.remember(track);
+            self.remember_persisted(track);
         }
         Ok(entries)
     }
@@ -2894,7 +2900,7 @@ impl Engine {
     pub fn playlist_tracks(&self, playlist_id: i64) -> Result<Vec<Track>, WireError> {
         let tracks = self.library.playlist_tracks(playlist_id)?;
         for track in &tracks {
-            self.remember(track);
+            self.remember_persisted(track);
         }
         Ok(tracks)
     }
@@ -4132,14 +4138,47 @@ mod offline_boot_tests {
 
         lock(&engine.known).clear();
         let playlist_tracks = engine.playlist_tracks(playlist.id).expect("读歌单");
-        let history = engine.history_with_time(10, None).expect("读历史");
         let keys = [playlist_tracks[0].key.as_opaque().to_string()];
-        assert_eq!(history.len(), 1);
         assert_eq!(engine.tracks_for(&keys).len(), 1, "歌单曲目没有进入播放缓存");
+        assert_eq!(engine.playlist_tracks(playlist.id).expect("重复读歌单").len(), 1);
+
+        lock(&engine.known).clear();
+        assert_eq!(engine.history(10).expect("读历史").len(), 1);
         assert!(
             lock(&engine.known).contains_key(track.key.as_opaque()),
-            "历史曲目没有进入播放缓存"
+            "旧历史接口没有进入播放缓存"
         );
+
+        lock(&engine.known).clear();
+        assert_eq!(engine.history_with_time(10, None).expect("读带时间历史").len(), 1);
+        assert!(
+            lock(&engine.known).contains_key(track.key.as_opaque()),
+            "带时间历史没有进入播放缓存"
+        );
+
+        let mut detailed = track.clone();
+        detailed.views = Some(123);
+        detailed.tname = Some("音乐".into());
+        let readers: [Box<dyn Fn(&Engine)>; 3] = [
+            Box::new(|engine: &Engine| {
+                engine.playlist_tracks(playlist.id).expect("读歌单");
+            }),
+            Box::new(|engine: &Engine| {
+                engine.history(10).expect("读历史");
+            }),
+            Box::new(|engine: &Engine| {
+                engine.history_with_time(10, None).expect("读带时间历史");
+            }),
+        ];
+        for read in readers {
+            lock(&engine.known).clear();
+            engine.remember(&detailed);
+            read(&engine);
+            let cached = lock(&engine.known);
+            let cached = cached.get(track.key.as_opaque()).expect("缓存仍在");
+            assert_eq!(cached.views, Some(123), "持久化旧值覆盖了已知详情");
+            assert_eq!(cached.tname.as_deref(), Some("音乐"), "持久化旧值覆盖了分区");
+        }
 
         drop(engine);
         for suffix in ["", "-wal", "-shm"] {
