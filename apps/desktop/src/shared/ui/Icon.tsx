@@ -142,14 +142,14 @@ const ICONS = {
   ),
   prev: (
     <>
-      <path d="M18.5 6v12" />
-      <path d="M15.5 12 7 6.4v11.2L15.5 12Z" fill="currentColor" stroke="none" />
+      <path d="M5.5 6v12" />
+      <path d="M8.5 12 17 6.4v11.2L8.5 12Z" fill="currentColor" stroke="none" />
     </>
   ),
   next: (
     <>
-      <path d="M5.5 6v12" />
-      <path d="M8.5 12 17 6.4v11.2L8.5 12Z" fill="currentColor" stroke="none" />
+      <path d="M18.5 6v12" />
+      <path d="M15.5 12 7 6.4v11.2L15.5 12Z" fill="currentColor" stroke="none" />
     </>
   ),
   shuffle: (
