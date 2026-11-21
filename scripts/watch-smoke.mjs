@@ -531,7 +531,7 @@ async function main() {
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       if (!input) return false
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input, '周杰伦')
+      setter?.call(input, '晴天')
       input.dispatchEvent(new Event('input', { bubbles: true }))
       return true
     })()`)
@@ -545,9 +545,35 @@ async function main() {
     let searched = false
     for (let i = 0; i < 20 && !searched; i += 1) {
       await sleep(400)
-      searched = await page.evaluate(`document.body.innerText.includes('综合') && document.querySelectorAll('[data-track-card]').length > 0`)
+      searched = await page.evaluate(`(() => {
+        const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+        return !!dialog && dialog.querySelectorAll('[data-track-card]').length > 0
+      })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
+    await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      dialog?.querySelector('button[aria-label^="观看"]')?.click()
+    })()`)
+    let searchVideo = false
+    for (let i = 0; i < 30 && !searchVideo; i += 1) {
+      await sleep(500)
+      searchVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(900)
+    const returned = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      const active = document.activeElement
+      return {
+        dialog: !!dialog,
+        query: input ? input.value : '',
+        focused: !!active?.closest?.('[data-track-card]'),
+      }
+    })()`)
+    check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
+    check('返回后焦点落回结果卡片', returned.focused)
 
     // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
