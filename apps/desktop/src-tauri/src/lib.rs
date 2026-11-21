@@ -530,8 +530,11 @@ fn library_history_timed(
     before_played_at: Option<i64>,
     before_id: Option<i64>,
 ) -> Result<Vec<HistoryEntryView>, WireError> {
+    let before = before_played_at
+        .zip(before_id)
+        .map(|(played_at, id)| (played_at, id as u64));
     Ok(engine
-        .history_with_time(limit, before_played_at.zip(before_id))?
+        .history_with_time(limit, before)?
         .into_iter()
         .map(|(track, played_at, position_ms, id)| HistoryEntryView {
             id,

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastDone } from '../../app/notice'
 import type { Track, WireError } from '../../shared/lib/contract'
@@ -28,6 +28,8 @@ type SearchMemory = {
   tracks: Track[]
   users: ipc.UserHit[]
   page: number
+  usersPage: number
+  usersEnded: boolean
   scrollTop: number
   /** 顶部第一张卡的序号；窗口化以后只靠像素恢复不回原处。 */
   index: number
@@ -61,7 +63,13 @@ export function SearchPanel() {
   const [page, setPage] = useState(restored?.page ?? 1)
   const [tracks, setTracks] = useState<Track[]>(restored?.tracks ?? [])
   const [users, setUsers] = useState<ipc.UserHit[]>(restored?.users ?? [])
-  const [usersQuery, setUsersQuery] = useState(restored?.users.length ? query.trim() : '')
+  const [usersScope, setUsersScope] = useState(
+    restored?.users.length ? [query.trim(), partition].join('\u0000') : '',
+  )
+  const [usersPage, setUsersPage] = useState(restored?.usersPage ?? 1)
+  const [usersEnded, setUsersEnded] = useState(restored?.usersEnded ?? false)
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersMoreError, setUsersMoreError] = useState(false)
   const [usersError, setUsersError] = useState(false)
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
@@ -76,6 +84,7 @@ export function SearchPanel() {
   const [ended, setEnded] = useState(false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [usersNonce, setUsersNonce] = useState(0)
   /** B 站搜索页的结果分类。默认综合，视频与 UP 主分开看。 */
   const [tab, setTab] = useState<'all' | 'video' | 'user'>('all')
   const navigate = useAppStore((state) => state.navigate)
@@ -132,8 +141,22 @@ export function SearchPanel() {
   const usersSeq = useRef(0)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const trimmed = query.trim()
+  const userScope = [trimmed, partition].join('\u0000')
+  const usersReady = usersScope === userScope
   /** 上一页返回空就说明到底了；否则自动补齐会对着空页无限重试。 */
   const reachedEnd = useRef(false)
+
+  const loadFollowed = useCallback((list: ipc.UserHit[]): void => {
+    if (list.length === 0) return
+    void ipc
+      .relationFollowedMany(list.map((u) => u.mid))
+      .then((rows) => {
+        setFollowedMids(
+          (prev) => new Set([...prev, ...rows.filter(([, on]) => on).map(([mid]) => mid)]),
+        )
+      })
+      .catch(() => {})
+  }, [])
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
@@ -169,47 +192,59 @@ export function SearchPanel() {
     }
     const key = searchKey(trimmed, partition, order, duration)
     if (dataKey !== key) return
-    const currentUsers = usersQuery === trimmed ? users : []
+    const currentUsers = usersReady ? users : []
+    const currentUsersPage = usersReady ? usersPage : 1
+    const currentUsersEnded = usersReady ? usersEnded : false
     if (!searchMemory || searchMemory.key !== key) {
-      searchMemory = { key, tracks, users: currentUsers, page, scrollTop: 0, index: 0 }
+      searchMemory = {
+        key,
+        tracks,
+        users: currentUsers,
+        page,
+        usersPage: currentUsersPage,
+        usersEnded: currentUsersEnded,
+        scrollTop: 0,
+        index: 0,
+      }
     } else {
       searchMemory.tracks = tracks
       searchMemory.users = currentUsers
       searchMemory.page = page
+      searchMemory.usersPage = currentUsersPage
+      searchMemory.usersEnded = currentUsersEnded
     }
-  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersQuery, page])
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page])
 
-  // UP 主属于关键词，视频翻页和筛选不能作废它；先排队以免被视频预取挡住。
+  // UP 主结果按关键词与分区重置；视频翻页、排序和时长筛选不动它。先排队以免被视频预取挡住。
   useEffect(() => {
-    if (usersQuery === trimmed) return
+    if (usersScope === userScope && users.length > 0) return
     const ticket = ++usersSeq.current
+    setUsersScope('')
+    setUsers([])
+    setUsersPage(1)
+    setUsersEnded(false)
+    setUsersLoading(false)
+    setUsersMoreError(false)
     setUsersError(false)
-    if (trimmed.length === 0) {
-      setUsers([])
-      setUsersQuery('')
-      return
-    }
+    if (trimmed.length === 0) return
     const handle = window.setTimeout(() => {
       void ipc
         .searchUsers(trimmed, 1)
         .then((list) => {
           if (usersSeq.current !== ticket) return
           setUsers(list)
-          setUsersQuery(trimmed)
+          setUsersScope(userScope)
+          setUsersPage(1)
+          setUsersEnded(list.length === 0)
           setUsersError(false)
-          void ipc
-            .relationFollowedMany(list.map((u) => u.mid))
-            .then((rows) => {
-              setFollowedMids(
-                (prev) => new Set([...prev, ...rows.filter(([, on]) => on).map(([mid]) => mid)]),
-              )
-            })
-            .catch(() => {})
+          loadFollowed(list)
         })
         .catch(() => {
           if (usersSeq.current !== ticket) return
           setUsers([])
-          setUsersQuery(trimmed)
+          setUsersScope(userScope)
+          setUsersPage(1)
+          setUsersEnded(false)
           setUsersError(true)
         })
     }, 320)
@@ -217,7 +252,7 @@ export function SearchPanel() {
       window.clearTimeout(handle)
       usersSeq.current += 1
     }
-  }, [trimmed, usersQuery])
+  }, [userScope, usersNonce, loadFollowed])
 
   useEffect(() => {
     if (trimmed.length === 0) {
@@ -288,6 +323,38 @@ export function SearchPanel() {
     if (tab === 'user' || status !== 'ready' || loadingMore || moreError || reachedEnd.current) return
     setLoadingMore(true)
     setPage((p) => p + 1)
+  }
+
+  const loadMoreUsers = (): void => {
+    if (!usersReady || usersLoading || usersEnded) return
+    const ticket = ++usersSeq.current
+    const nextPage = usersPage + 1
+    setUsersLoading(true)
+    setUsersMoreError(false)
+    void ipc
+      .searchUsers(trimmed, nextPage)
+      .then((list) => {
+        if (usersSeq.current !== ticket) return
+        setUsers((prev) => {
+          const seen = new Set(prev.map((user) => user.mid))
+          const merged = [...prev]
+          for (const user of list) {
+            if (seen.has(user.mid)) continue
+            seen.add(user.mid)
+            merged.push(user)
+          }
+          return merged
+        })
+        setUsersPage(nextPage)
+        setUsersEnded(list.length === 0)
+        setUsersLoading(false)
+        loadFollowed(list)
+      })
+      .catch(() => {
+        if (usersSeq.current !== ticket) return
+        setUsersLoading(false)
+        setUsersMoreError(true)
+      })
   }
 
   const pick = (value: string): void => {
@@ -367,7 +434,7 @@ export function SearchPanel() {
                 <Icon name="close" size={15} />
               </button>
             </nav>
-            {tab !== 'video' && usersQuery === trimmed && users.length > 0 ? (
+            {tab !== 'video' && usersReady && users.length > 0 ? (
               <div className="mb-4">
                 {tab === 'user' ? null : (
                   <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
@@ -382,6 +449,7 @@ export function SearchPanel() {
                   {(tab === 'user' ? users : users.slice(0, 6)).map((user) => (
                     <div
                       key={user.mid}
+                      data-user-mid={user.mid}
                       className={`bili-card flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)] ${tab === 'user' ? 'w-full' : 'w-[248px] shrink-0'}`}
                     >
                     <button
@@ -452,23 +520,48 @@ export function SearchPanel() {
                 </div>
               </div>
             ) : null}
-            {tab === 'user' && usersQuery !== trimmed ? (
+            {tab === 'user' && !usersReady ? (
               <BiliLoader label="正在找 UP 主…" />
             ) : null}
-            {tab === 'user' && usersQuery === trimmed && usersError ? (
+            {tab === 'user' && usersReady && usersError ? (
               <div className="py-16 text-center text-[13px] text-[var(--text-3)]">
                 UP 主没取到
                 <button
                   type="button"
-                  onClick={() => setUsersQuery('')}
+                  onClick={() => setUsersNonce((current) => current + 1)}
                   className="t press ml-2 text-[var(--accent)] hover:underline"
                 >
                   重试
                 </button>
               </div>
             ) : null}
-            {tab === 'user' && usersQuery === trimmed && !usersError && users.length === 0 ? (
+            {tab === 'user' && usersReady && !usersError && users.length === 0 ? (
               <p className="py-16 text-center text-[13px] text-[var(--text-3)]">没有找到相关 UP 主</p>
+            ) : null}
+            {tab === 'user' && usersReady && !usersError && users.length > 0 && !usersEnded ? (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                {usersMoreError ? (
+                  <button
+                    type="button"
+                    onClick={loadMoreUsers}
+                    className="t press text-[13px] text-[var(--accent)] hover:underline"
+                  >
+                    没加载出来，重试这一页
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={usersLoading}
+                      onClick={loadMoreUsers}
+                      className="t press h-8 rounded-[4px] border border-[var(--line)] bg-[var(--panel)] px-4 text-[13px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                    >
+                      更多 UP 主
+                    </button>
+                    {usersLoading ? <BiliLoader compact label="正在加载更多…" /> : null}
+                  </>
+                )}
+              </div>
             ) : null}
             {tab === 'user' ? null : (
             <div>
