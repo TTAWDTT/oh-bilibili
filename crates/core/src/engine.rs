@@ -146,13 +146,13 @@ mod queue_restore_tests {
         let a = track("BV1");
         let b = track("BV2");
         let c = track("BV3");
-        let mut queue = Queue::from_tracks(&[a.clone(), b.clone()], 1);
-        let expected = keys(&[a.clone(), b.clone()]);
+        // 旧格式恢复时本地全未命中，补全从空队列开始。
+        let mut queue = Queue::from_tracks(&[], 0);
+        let generation = queue.generation();
 
         assert!(replace_queue_if_untouched(
             &mut queue,
-            &expected,
-            Some(1),
+            generation,
             &[a.clone(), b.clone(), c.clone()],
             1
         ));
@@ -166,37 +166,42 @@ mod queue_restore_tests {
         let b = track("BV2");
         let c = track("BV3");
         let filled = [a.clone(), b.clone(), c.clone()];
-        let expected = keys(&[a.clone(), b.clone()]);
 
-        let mut cleared = Queue::from_tracks(&[], 0);
+        let mut cleared = Queue::from_tracks(&[a.clone(), b.clone()], 1);
+        let generation = cleared.generation();
+        cleared.replace_from_tracks(&[], 0);
         assert!(!replace_queue_if_untouched(
             &mut cleared,
-            &expected,
-            Some(1),
+            generation,
             &filled,
             1
         ));
         assert_eq!(cleared.items().len(), 0, "清空后不能被补全带回来");
 
         let mut reordered = Queue::from_tracks(&[b.clone(), a.clone()], 0);
+        let generation = reordered.generation();
+        let b_id = reordered.entry_id_of("BV2").expect("队列里有 BV2");
+        let a_id = reordered.entry_id_of("BV1").expect("队列里有 BV1");
+        reordered.move_entry(a_id, Some(b_id));
         assert!(!replace_queue_if_untouched(
             &mut reordered,
-            &expected,
-            Some(0),
+            generation,
             &filled,
             0
         ));
         assert_eq!(
             keys(&reordered.items()),
-            keys(&[b.clone(), a.clone()]),
+            keys(&[a.clone(), b.clone()]),
             "重排后保持用户顺序"
         );
 
-        let mut switched = Queue::from_tracks(&[a.clone(), b.clone()], 1);
+        let mut switched = Queue::from_tracks(&[a.clone(), b.clone()], 0);
+        let generation = switched.generation();
+        let b_id = switched.entry_id_of("BV2").expect("队列里有 BV2");
+        switched.jump(b_id);
         assert!(!replace_queue_if_untouched(
             &mut switched,
-            &expected,
-            Some(0),
+            generation,
             &filled,
             0
         ));
@@ -204,14 +209,31 @@ mod queue_restore_tests {
     }
 
     #[test]
-    fn 没补到任何曲目就不替换() {
-        let a = track("BV1");
-        let expected = keys(&[a.clone()]);
-        let mut queue = Queue::from_tracks(&[a], 0);
+    fn 补全等待期间换歌再清空_迟到的曲目不能落回() {
+        let mut queue = Queue::from_tracks(&[], 0);
+        let generation = queue.generation();
+        // 用户换到 X，再清空；当前值又回到空队列。
+        let x_id = queue.push_back(track("BVX"));
+        queue.jump(x_id);
+        queue.replace_from_tracks(&[], 0);
+
         assert!(!replace_queue_if_untouched(
             &mut queue,
-            &expected,
-            Some(0),
+            generation,
+            &[track("BV1"), track("BV2")],
+            0
+        ));
+        assert!(queue.is_empty(), "迟到的 A/B 不能把清空后的队列填回来");
+    }
+
+    #[test]
+    fn 没补到任何曲目就不替换() {
+        let a = track("BV1");
+        let mut queue = Queue::from_tracks(&[a], 0);
+        let generation = queue.generation();
+        assert!(!replace_queue_if_untouched(
+            &mut queue,
+            generation,
             &[],
             0
         ));
@@ -998,7 +1020,7 @@ impl Engine {
             .ok_or_else(|| WireError::input("index", "越界"))?;
         {
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&tracks, start);
+            q.replace_from_tracks(&tracks, start);
         }
         self.persist_queue();
         self.play_key(&key).await
@@ -1543,7 +1565,7 @@ impl Engine {
             }
             let start = saved_index.min(saved_tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&saved_tracks, start);
+            q.replace_from_tracks(&saved_tracks, start);
             *lock(&self.resume_at_ms) = saved_ms;
             return;
         }
@@ -1551,24 +1573,16 @@ impl Engine {
         if !tracks.is_empty() {
             let start = saved_index.min(tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&tracks, start);
+            q.replace_from_tracks(&tracks, start);
         }
         *lock(&self.resume_at_ms) = saved_ms;
 
         // 有缺的就后台补，补完再整体替换队列。
         let already = tracks.len();
         if already < keys.len() {
-            // 补全期间用户可能清空、重排、切歌或换了新队列。记下当时的队列形态，
-            // 回来时只要对不上就不覆盖。
-            let expected_keys: Vec<String> = tracks
-                .iter()
-                .map(|t| t.key.as_opaque().to_string())
-                .collect();
-            let expected_index = if tracks.is_empty() {
-                None
-            } else {
-                Some(saved_index.min(tracks.len() - 1))
-            };
+            // 补全期间用户可能清空、重排、切歌或换了新队列。记下开始时的
+            // 队列代数，回来时只要变过就不覆盖。
+            let generation = lock(&self.queue).generation();
             let engine = self.clone();
             std::thread::spawn(move || {
                 let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -1594,8 +1608,7 @@ impl Engine {
                     let filled = engine.tracks_for(&keys);
                     replace_queue_if_untouched(
                         &mut lock(&engine.queue),
-                        &expected_keys,
-                        expected_index,
+                        generation,
                         &filled,
                         saved_index,
                     );
@@ -1631,7 +1644,7 @@ impl Engine {
     pub fn queue_clear(&self) -> Result<QueueView, WireError> {
         {
             let mut queue = lock(&self.queue);
-            *queue = Queue::from_tracks(&[], 0);
+            queue.replace_from_tracks(&[], 0);
         }
         self.persist_queue();
         Ok(QueueView {
@@ -2321,30 +2334,21 @@ impl Engine {
     }
 }
 
-/// 后台补全回来时，只有队列还是发起补全时的样子才替换。
+/// 后台补全回来时，只有队列代数还是发起补全时的那一代才替换。
 ///
 /// 补全可能跨几秒到几十秒，期间用户可能清空、重排、切歌或换了新队列；
-/// 这些操作都会改变键列表或光标，任何一项对不上就不覆盖。
+/// 只看曲目和下标不够——换到 X 再清空又会回到空队列。
 fn replace_queue_if_untouched(
     queue: &mut Queue,
-    expected_keys: &[String],
-    expected_index: Option<usize>,
+    generation: u64,
     filled: &[Track],
     saved_index: usize,
 ) -> bool {
-    if filled.is_empty() {
-        return false;
-    }
-    let current_keys: Vec<String> = queue
-        .items()
-        .iter()
-        .map(|t| t.key.as_opaque().to_string())
-        .collect();
-    if current_keys != expected_keys || queue.index() != expected_index {
+    if filled.is_empty() || queue.generation() != generation {
         return false;
     }
     let start = saved_index.min(filled.len() - 1);
-    *queue = Queue::from_tracks(filled, start);
+    queue.replace_from_tracks(filled, start);
     true
 }
 

@@ -25,6 +25,9 @@ pub struct Queue {
     cursor: Option<EntryId>,
     order: Option<PlayOrder>,
     next_id: u64,
+    /// 每改一次队列就 +1。后台补全据此判断期间有没有被用户编辑过：
+    /// 只看曲目和下标不行，换到别的歌再清空会回到相同的空形状。
+    generation: u64,
 }
 
 impl Queue {
@@ -44,6 +47,12 @@ impl Queue {
     }
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+    fn bump(&mut self) {
+        self.generation += 1;
     }
     pub fn items(&self) -> Vec<Track> {
         self.entries.iter().map(|e| e.track.clone()).collect()
@@ -83,6 +92,7 @@ impl Queue {
         if self.cursor.is_none() {
             self.cursor = Some(id);
         }
+        self.bump();
         id
     }
 
@@ -100,6 +110,7 @@ impl Queue {
         if let Some(PlayOrder::Shuffle { perm, .. }) = self.order.as_mut() {
             perm.push(id);
         }
+        self.bump();
         id
     }
 
@@ -120,6 +131,7 @@ impl Queue {
         if was_current {
             self.cursor = self.entries.get(pos.min(self.entries.len().saturating_sub(1))).map(|e| e.id);
         }
+        self.bump();
         true
     }
 
@@ -132,6 +144,7 @@ impl Queue {
             .and_then(|b| self.position_of(b))
             .unwrap_or(self.entries.len());
         self.entries.insert(to.min(self.entries.len()), entry);
+        self.bump();
         true
     }
 
@@ -139,12 +152,16 @@ impl Queue {
         if self.position_of(id).is_none() {
             return false;
         }
+        if self.cursor == Some(id) {
+            return true;
+        }
         self.cursor = Some(id);
         if let Some(PlayOrder::Shuffle { perm, at }) = self.order.as_mut() {
             if let Some(i) = perm.iter().position(|e| *e == id) {
                 *at = i;
             }
         }
+        self.bump();
         true
     }
 
@@ -175,9 +192,11 @@ impl Queue {
                     .and_then(|c| perm.iter().position(|e| *e == c))
                     .unwrap_or(0);
                 self.order = Some(PlayOrder::Shuffle { perm, at });
+                self.bump();
             }
-        } else {
+        } else if self.order.is_some() {
             self.order = None;
+            self.bump();
         }
     }
 
@@ -216,6 +235,7 @@ impl Queue {
             }
         };
         self.cursor = Some(id);
+        self.bump();
         self.current()
     }
 
@@ -235,7 +255,15 @@ impl Queue {
             }
         };
         self.cursor = Some(id);
+        self.bump();
         self.current()
+    }
+
+    /// 整队替换时保持代数单调，后台补全不会把新队列误认成旧队列。
+    pub fn replace_from_tracks(&mut self, tracks: &[Track], start_at: usize) {
+        let generation = self.generation + 1;
+        *self = Queue::from_tracks(tracks, start_at);
+        self.generation = generation;
     }
 }
 
