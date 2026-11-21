@@ -292,9 +292,6 @@ fn dirs_cookies() -> Option<std::path::PathBuf> {
 
 /// 观看页的数据链路要能跑通：拿到 DASH 视频轨，合成只含视频的 MPD，
 /// 铸出句柄，再从句柄换回清单。全程不出声。
-///
-/// 用同步测试再自己建 runtime：Engine::new 在带登录态时会刷新 nav，
-/// 而它内部会 block_on 一个新 runtime，放进 tokio::test 里会直接 panic。
 #[test]
 #[ignore = "真实网络"]
 fn 观看页能拿到只含视频的清单() {
