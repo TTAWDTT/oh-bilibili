@@ -111,6 +111,114 @@ mod watch_gate_tests {
     }
 }
 
+#[cfg(test)]
+mod queue_restore_tests {
+    use super::replace_queue_if_untouched;
+    use crate::state::Queue;
+    use bilimusic_model::{Track, TrackKey};
+
+    fn track(key: &str) -> Track {
+        Track {
+            key: TrackKey::from_provider(key),
+            title: key.into(),
+            artist: String::new(),
+            duration: None,
+            cover: None,
+            accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
+            up_mid: None,
+            tname: None,
+            typeid: None,
+        }
+    }
+
+    fn keys(items: &[Track]) -> Vec<String> {
+        items
+            .iter()
+            .map(|t| t.key.as_opaque().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn 后台补全只在队列没被动过时替换() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let mut queue = Queue::from_tracks(&[a.clone(), b.clone()], 1);
+        let expected = keys(&[a.clone(), b.clone()]);
+
+        assert!(replace_queue_if_untouched(
+            &mut queue,
+            &expected,
+            Some(1),
+            &[a.clone(), b.clone(), c.clone()],
+            1
+        ));
+        assert_eq!(queue.items().len(), 3);
+        assert_eq!(queue.index(), Some(1), "补全后光标还停在原来那一首");
+    }
+
+    #[test]
+    fn 用户清空重排或切歌后补全不覆盖() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let filled = [a.clone(), b.clone(), c.clone()];
+        let expected = keys(&[a.clone(), b.clone()]);
+
+        let mut cleared = Queue::from_tracks(&[], 0);
+        assert!(!replace_queue_if_untouched(
+            &mut cleared,
+            &expected,
+            Some(1),
+            &filled,
+            1
+        ));
+        assert_eq!(cleared.items().len(), 0, "清空后不能被补全带回来");
+
+        let mut reordered = Queue::from_tracks(&[b.clone(), a.clone()], 0);
+        assert!(!replace_queue_if_untouched(
+            &mut reordered,
+            &expected,
+            Some(0),
+            &filled,
+            0
+        ));
+        assert_eq!(
+            keys(&reordered.items()),
+            keys(&[b.clone(), a.clone()]),
+            "重排后保持用户顺序"
+        );
+
+        let mut switched = Queue::from_tracks(&[a.clone(), b.clone()], 1);
+        assert!(!replace_queue_if_untouched(
+            &mut switched,
+            &expected,
+            Some(0),
+            &filled,
+            0
+        ));
+        assert_eq!(switched.index(), Some(1), "切歌后的光标不能被拨回去");
+    }
+
+    #[test]
+    fn 没补到任何曲目就不替换() {
+        let a = track("BV1");
+        let expected = keys(&[a.clone()]);
+        let mut queue = Queue::from_tracks(&[a], 0);
+        assert!(!replace_queue_if_untouched(
+            &mut queue,
+            &expected,
+            Some(0),
+            &[],
+            0
+        ));
+        assert_eq!(queue.items().len(), 1);
+    }
+}
+
 pub struct Engine {
     /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
     cookie_file: std::path::PathBuf,
@@ -1397,18 +1505,13 @@ impl Engine {
                         *lock(&engine.restoring) = Some((done, total));
                     }
                     let filled = engine.tracks_for(&keys);
-                    if !filled.is_empty() {
-                        let mut q = lock(&engine.queue);
-                        let current_keys: Vec<String> = q
-                            .items()
-                            .iter()
-                            .map(|t| t.key.as_opaque().to_string())
-                            .collect();
-                        if current_keys == expected_keys && q.index() == expected_index {
-                            let start = saved_index.min(filled.len() - 1);
-                            *q = Queue::from_tracks(&filled, start);
-                        }
-                    }
+                    replace_queue_if_untouched(
+                        &mut lock(&engine.queue),
+                        &expected_keys,
+                        expected_index,
+                        &filled,
+                        saved_index,
+                    );
                     *lock(&engine.restoring) = None;
                 });
             });
@@ -2129,6 +2232,33 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+/// 后台补全回来时，只有队列还是发起补全时的样子才替换。
+///
+/// 补全可能跨几秒到几十秒，期间用户可能清空、重排、切歌或换了新队列；
+/// 这些操作都会改变键列表或光标，任何一项对不上就不覆盖。
+fn replace_queue_if_untouched(
+    queue: &mut Queue,
+    expected_keys: &[String],
+    expected_index: Option<usize>,
+    filled: &[Track],
+    saved_index: usize,
+) -> bool {
+    if filled.is_empty() {
+        return false;
+    }
+    let current_keys: Vec<String> = queue
+        .items()
+        .iter()
+        .map(|t| t.key.as_opaque().to_string())
+        .collect();
+    if current_keys != expected_keys || queue.index() != expected_index {
+        return false;
+    }
+    let start = saved_index.min(filled.len() - 1);
+    *queue = Queue::from_tracks(filled, start);
+    true
 }
 
 fn bangumi_view(item: bilimusic_bili::sync::BangumiItem) -> crate::wire::BangumiView {
