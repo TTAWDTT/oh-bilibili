@@ -1044,7 +1044,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       emit({ type: 'download', view: { ...view } })
       return { ...view }
     }
-    case 'download_remove': {
+    case 'download_remove_record': {
+      const key = str(args, 'key')
+      state.downloads = state.downloads.filter((d) => d.key !== key)
+      return state.downloads
+    }
+    case 'download_delete_audio': {
       const key = str(args, 'key')
       state.downloads = state.downloads.filter((d) => d.key !== key)
       return state.downloads

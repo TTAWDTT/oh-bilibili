@@ -2158,21 +2158,39 @@ impl Engine {
         self.auth()
     }
 
-    /// 删掉一条已下载的音轨：先删文件，再删记录。
+    /// 只删索引记录，不碰磁盘。
+    ///
+    /// 启动时记为 missing 的条目，路径后来可能重新出现文件：用户可能接回了磁盘，
+    /// 原路径上也可能是另一个同名文件。没有确认删除音频就不能动它。
+    pub fn download_remove_record(&self, key: &str) -> Result<Vec<DownloadView>, WireError> {
+        self.remove_download(key, false)
+    }
+
+    /// 确认删除音频：先删文件，再删记录。
     ///
     /// 文件已经被用户手动删掉时仍然把列表项去掉——用户点了删除，列表就不该再留着。
-    pub fn download_remove(&self, key: &str) -> Result<Vec<DownloadView>, WireError> {
-        let path = {
-            let list = lock(&self.downloads);
-            list.iter()
-                .find(|d| d.key == key)
-                .and_then(|d| d.path.clone())
-        };
-        if let Some(p) = path {
-            match std::fs::remove_file(&p) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(WireError::internal(format!("删不掉文件：{e}"))),
+    pub fn download_delete_audio(&self, key: &str) -> Result<Vec<DownloadView>, WireError> {
+        self.remove_download(key, true)
+    }
+
+    fn remove_download(
+        &self,
+        key: &str,
+        delete_file: bool,
+    ) -> Result<Vec<DownloadView>, WireError> {
+        if delete_file {
+            let path = {
+                let list = lock(&self.downloads);
+                list.iter()
+                    .find(|d| d.key == key)
+                    .and_then(|d| d.path.clone())
+            };
+            if let Some(p) = path {
+                match std::fs::remove_file(&p) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(WireError::internal(format!("删不掉文件：{e}"))),
+                }
             }
         }
         self.library.delete_download(key)?;

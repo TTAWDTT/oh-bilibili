@@ -43,14 +43,23 @@ export function DownloadsView() {
     }
   }
 
-  const remove = async (key: string, withFile: boolean): Promise<void> => {
+  const removeRecord = async (key: string): Promise<void> => {
     try {
-      // 删除后重新拉一次列表，保证界面与磁盘一致
-      await ipc.downloadRemove(key)
+      await ipc.downloadRemoveRecord(key)
       await useDownloadsStore.getState().load()
-      toastDone(withFile ? '已删除本地音频' : '已移除下载记录')
+      toastDone('已移除下载记录')
     } catch (e) {
-      reportActionError('删除下载', e)
+      reportActionError('移除下载记录', e)
+    }
+  }
+
+  const deleteAudio = async (key: string): Promise<void> => {
+    try {
+      await ipc.downloadDeleteAudio(key)
+      await useDownloadsStore.getState().load()
+      toastDone('已删除本地音频')
+    } catch (e) {
+      reportActionError('删除本地音频', e)
     }
   }
 
@@ -60,14 +69,14 @@ export function DownloadsView() {
       setDeleting(item)
       return
     }
-    void remove(item.key, false)
+    void removeRecord(item.key)
   }
 
   const confirmRemove = async (): Promise<void> => {
     const item = deleting
     if (!item) return
     setDeleting(null)
-    await remove(item.key, true)
+    await deleteAudio(item.key)
   }
 
   return (
@@ -191,11 +200,11 @@ export function DownloadsView() {
                     <button
                       type="button"
                       aria-label={
-                        item.state === 'done'
+                        item.state === 'done' && item.path
                           ? `删除本地音频 ${item.title}`
                           : `移除下载记录 ${item.title}`
                       }
-                      title={item.state === 'done' ? '删除本地音频' : '移除下载记录'}
+                      title={item.state === 'done' && item.path ? '删除本地音频' : '移除下载记录'}
                       onClick={() => askRemove(item)}
                       className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--accent)]"
                     >
