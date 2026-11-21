@@ -989,6 +989,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return buildLyrics(trackOf(str(args, 'key')))
     case 'auth_status':
       return state.auth
+    case 'auth_refresh':
+      return state.auth
     case 'auth_qrcode': {
       const key = `qr-${Date.now().toString(36)}`
       state.qr = {

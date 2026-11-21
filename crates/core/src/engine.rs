@@ -154,16 +154,10 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(db_path: &std::path::Path) -> Result<Arc<Engine>, WireError> {
-        let source = tauri_runtime::block_on_bili()?;
-        // 启动时把上次的登录态装回去，否则每次重开都要重新扫码。
-        let cookie_file = db_path.with_file_name("cookies.json");
-        if let Ok(raw) = std::fs::read_to_string(&cookie_file) {
-            if let Ok(pairs) = serde_json::from_str::<Vec<(String, String)>>(&raw) {
-                source.import_cookies(&pairs);
-                let _ = tauri_runtime::block_on_nav(&source);
-            }
-        }
         let library = Library::open(db_path)?;
+        let source = Source::new()?;
+        let cookie_file = db_path.with_file_name("cookies.json");
+        load_cookies(&source, &cookie_file);
         let player = Player::start().map_err(|e| WireError::internal(e.to_string()))?;
         let (events, _) = tokio::sync::broadcast::channel(256);
         let engine = Arc::new(Engine {
@@ -192,12 +186,34 @@ impl Engine {
             last_transport_at: Mutex::new(std::time::Instant::now()),
             watch_gate: WatchGate::default(),
         });
+        engine.start_session_refresh();
         engine.restore_queue();
         engine.start_progress_persist();
         engine.start_progress_report();
         engine.start_cookie_persist();
         engine.start_track_end_watch();
         Ok(engine)
+    }
+
+    /// 启动后异步补一次设备指纹与登录态。
+    ///
+    /// 这一步不能塞进 `Engine::new`：断网时网络请求会把 Tauri setup 一起拖住，
+    /// 本地曲库也跟着打不开。失败就保持默认的未登录快照，等下一次业务请求
+    /// 或用户手动刷新。
+    fn start_session_refresh(self: &Arc<Self>) {
+        let engine = self.clone();
+        std::thread::Builder::new()
+            .name("bilimusic-session".into())
+            .spawn(move || {
+                let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build()
+                else {
+                    return;
+                };
+                if rt.block_on(engine.source.refresh_session()).is_ok() {
+                    engine.emit(AppEvent::AuthChanged { auth: engine.auth() });
+                }
+            })
+            .ok();
     }
 
     /// 进度心跳。只在真的在播时发，UI 不用自己算时间。
@@ -1998,6 +2014,14 @@ impl Engine {
         }
     }
 
+    /// 重新拉一次设备指纹与登录态。网络恢复后由设置页触发，不用重启。
+    pub async fn refresh_session(&self) -> Result<AuthSnapshot, WireError> {
+        self.source.refresh_session().await?;
+        let auth = self.auth();
+        self.emit(AppEvent::AuthChanged { auth: auth.clone() });
+        Ok(auth)
+    }
+
     /// 把当前 cookie 写进应用数据目录。含登录令牌，只存本机。
     fn persist_cookies(&self) {
         let pairs = self.source.export_cookies();
@@ -2295,41 +2319,17 @@ fn bangumi_view(item: bilimusic_bili::sync::BangumiItem) -> crate::wire::Bangumi
     }
 }
 
-mod tauri_runtime {
-    use super::*;
-
-    /// 构造 Source 需要 async，但 Engine::new 是同步的（Tauri setup 与测试都会调用）。
-    ///
-    /// 在独立线程上开一个小 runtime，这样既不依赖调用方是否已经在 async 上下文里，
-    /// 也不会出现「runtime 里再 block_on」的 panic。
-    /// 用一次短 runtime 刷新 nav，让导入的 cookie 生效。
-    pub fn block_on_nav(source: &Source) -> Result<(), WireError> {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| WireError::internal(e.to_string()))?;
-        rt.block_on(source.refresh_session())
-            .map(|_| ())
-            .map_err(WireError::from)
-    }
-
-    pub fn block_on_bili() -> Result<Source, WireError> {
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::Builder::new()
-            .name("bilimusic-bootstrap".into())
-            .spawn(move || {
-                let out = match tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                {
-                    Ok(rt) => rt.block_on(Source::open()).map_err(WireError::from),
-                    Err(e) => Err(WireError::internal(e.to_string())),
-                };
-                let _ = tx.send(out);
-            })
-            .map_err(|e| WireError::internal(e.to_string()))?;
-        rx.recv().map_err(|e| WireError::internal(e.to_string()))?
-    }
+/// 启动时把上次的登录态装回去，否则每次重开都要重新扫码。
+///
+/// 读不到或格式不对就当没有登录态，不影响本地曲库。
+fn load_cookies(source: &Source, path: &std::path::Path) {
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(pairs) = serde_json::from_str::<Vec<(String, String)>>(&raw) else {
+        return;
+    };
+    source.import_cookies(&pairs);
 }
 
 /// 下载目录。界面上的「打开目录」用它，免得前端自己拼 HOME。
@@ -2338,4 +2338,91 @@ pub fn downloads_dir() -> std::path::PathBuf {
         .or_else(|| dirs::home_dir().map(|home| home.join("Music")))
         .unwrap_or_else(std::env::temp_dir)
         .join("BiliMusic")
+}
+
+#[cfg(test)]
+mod offline_boot_tests {
+    use super::Engine;
+    use std::ffi::OsString;
+    use std::time::{Duration, Instant};
+
+    /// 把所有代理指向一个必然拒绝连接的地址，等价于外网不可达。
+    struct BlockedNetwork {
+        old: Vec<(&'static str, Option<OsString>)>,
+    }
+
+    impl BlockedNetwork {
+        fn new() -> BlockedNetwork {
+            let keys = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
+            let old = keys.iter().map(|key| (*key, std::env::var_os(key))).collect();
+            for key in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"] {
+                std::env::set_var(key, "http://127.0.0.1:1");
+            }
+            std::env::set_var("NO_PROXY", "");
+            BlockedNetwork { old }
+        }
+    }
+
+    impl Drop for BlockedNetwork {
+        fn drop(&mut self) {
+            for (key, value) in &self.old {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
+
+    fn temp_db() -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("bilimusic-offline-{}-{nanos}.sqlite", std::process::id()))
+    }
+
+    #[test]
+    fn 断网时引擎仍能起来并读本地曲库() {
+        let network = BlockedNetwork::new();
+        let probe = bilimusic_bili::Source::new().expect("数据源构造不该联网");
+        let probe_rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        assert!(
+            probe_rt.block_on(probe.refresh_session()).is_err(),
+            "不可达代理应该让网络请求失败"
+        );
+
+        let db = temp_db();
+        let started = Instant::now();
+        let engine = Engine::new(&db).expect("断网不该挡住启动");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "Engine::new 不该等网络，实际 {:?}",
+            started.elapsed()
+        );
+        assert!(!engine.auth().logged_in, "断网时只该是未登录快照");
+        assert!(engine.auth().user.is_none());
+        assert!(
+            probe_rt.block_on(engine.refresh_session()).is_err(),
+            "断网时手动刷新应该报错，不能伪造登录态"
+        );
+        assert!(!engine.auth().logged_in);
+
+        let playlist = engine.create_playlist("离线歌单").expect("本地写入应该可用");
+        assert!(engine
+            .playlists()
+            .expect("读歌单")
+            .iter()
+            .any(|p| p.id == playlist.id));
+        assert!(engine.history(10).expect("读历史").is_empty());
+
+        drop(engine);
+        drop(network);
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", db.display()));
+        }
+    }
 }
