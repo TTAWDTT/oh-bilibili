@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
-import type { Followed } from '../../shared/lib/contract'
+import type { Followed, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -20,11 +20,12 @@ import { PREFETCH_PX } from '../../shared/lib/prefetch'
  */
 export function FollowingView() {
   const navigate = useAppStore((s) => s.navigate)
+  const setAuthOpen = useAppStore((s) => s.setAuthOpen)
   const [items, setItems] = useState<Followed[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<WireError | null>(null)
   const [done, setDone] = useState(false)
   /** 翻页没取到：停在已加载的人，链子别再自动往下撞。 */
   const [failed, setFailed] = useState(false)
@@ -50,7 +51,7 @@ export function FollowingView() {
     } catch (e) {
       // 第一页失败才是「关注列表没取到」；翻页失败只是这一段没取到，
       // 把已经拿到的人留在屏幕上，给个重试，别整页换成错误态。
-      if (next === 1) setError(toWireError(e).message)
+      if (next === 1) setError(toWireError(e))
       else setFailed(true)
     } finally {
       loadingRef.current = false
@@ -73,12 +74,18 @@ export function FollowingView() {
   }, [page, done, loading, failed])
 
   if (error) {
+    const action =
+      error.class === 'needs_login'
+        ? { label: '去登录', onClick: () => setAuthOpen(true) }
+        : error.class === 'retryable'
+          ? { label: '重试', onClick: () => void load(1) }
+          : null
     return (
       <EmptyState
         icon="user"
         title="关注列表没取到"
-        detail={error}
-        action={{ label: '去设置登录', onClick: () => navigate({ kind: 'settings' }) }}
+        detail={error.message}
+        action={action}
       />
     )
   }
