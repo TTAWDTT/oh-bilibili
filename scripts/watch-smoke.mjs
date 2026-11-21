@@ -1874,6 +1874,10 @@ async function main() {
     await sleep(300)
 
     await page.viewport(380, 560)
+    await page.evaluate(
+      `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+    )
+    await sleep(300)
     const narrowPlayer = await page.evaluate(`(() => {
       const bar = document.querySelector('button[aria-label="打开播放舞台"]')?.closest('section')
       const title = bar?.querySelector('.bili-marquee')
@@ -1898,7 +1902,22 @@ async function main() {
         queueCenter: [queueBox.left + queueBox.width / 2, queueBox.top + queueBox.height / 2],
       }
     })()`)
-    await page.pressSpace()
+    await page.keyEvent({
+      type: 'keyDown',
+      key: 'Enter',
+      code: 'Enter',
+      text: '\r',
+      unmodifiedText: '\r',
+      windowsVirtualKeyCode: 13,
+      nativeVirtualKeyCode: 13,
+    })
+    await page.keyEvent({
+      type: 'keyUp',
+      key: 'Enter',
+      code: 'Enter',
+      windowsVirtualKeyCode: 13,
+      nativeVirtualKeyCode: 13,
+    })
     let narrowQueueOpened = null
     for (let i = 0; i < 20; i += 1) {
       await sleep(100)
