@@ -103,8 +103,9 @@ function QueueRow({
           // 键盘触发的 click detail 为 0，鼠标为 1；只有键盘移除后搬焦点。
           onRemove(event.detail === 0)
         }}
-        // 按钮自己处理空格和 Enter，别再触发整行播放。
-        onKeyDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+        }}
         className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] border-0 bg-transparent p-0 text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
       >
         <Icon name="close" size={11} />
@@ -123,12 +124,22 @@ export function QueueList() {
   const clearUndo = usePlayerStore((state) => state.clearUndo)
   const [restore, setRestore] = useState<[number, number] | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const emptyRef = useRef<HTMLDivElement | null>(null)
   const removeAndFocus = async (key: string, index: number, focusNext: boolean): Promise<void> => {
+    const items = usePlayerStore.getState().queue?.items ?? []
+    const nextKey = items[index + 1]?.key ?? items[index - 1]?.key
     await removeFromQueue(key)
     if (!focusNext) return
     window.requestAnimationFrame(() => {
+      if (!nextKey) {
+        emptyRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+        return
+      }
       const buttons = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('[data-queue-remove]') ?? [])]
-      buttons[Math.min(index, buttons.length - 1)]?.focus()
+      const target = buttons.find((button) => button.dataset.queueRemove === nextKey)
+      const fallback = buttons[Math.min(index, buttons.length - 1)]
+      const focusTarget = target ?? fallback
+      focusTarget?.focus()
     })
   }
 
@@ -156,7 +167,7 @@ export function QueueList() {
 
   if (queue.items.length === 0) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div ref={emptyRef} className="flex h-full min-h-0 flex-col">
         {clearUndo ? (
           <div
             data-queue-undo
