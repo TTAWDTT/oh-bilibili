@@ -715,20 +715,44 @@ async function main() {
         (button) => button && contrastRatio(button.color, button.background) >= 4.5,
       ),
     )
-    const searchButton = primaryButtons.find((button) => button?.label === '搜索')
-    if (searchButton) {
-      await page.mouseEvent({ type: 'mouseMoved', x: searchButton.center[0], y: searchButton.center[1] })
+    for (const button of primaryButtons) {
+      if (!button) continue
+      await page.mouseEvent({ type: 'mouseMoved', x: button.center[0], y: button.center[1] })
       await sleep(250)
       const hovered = await page.evaluate(`(() => {
         const element = [...document.querySelectorAll('button')].find(
-          (button) => (button.textContent || '').trim() === '搜索',
+          (candidate) => (candidate.textContent || '').trim() === ${JSON.stringify(button.label)},
         )
         const style = element ? getComputedStyle(element) : null
         return style ? { color: style.color, background: style.backgroundColor } : null
       })()`)
-      check('搜索按钮悬停时仍达到 4.5:1', hovered && contrastRatio(hovered.color, hovered.background) >= 4.5)
-      await page.mouseEvent({ type: 'mouseMoved', x: 4, y: 4 })
+      check(
+        `${button.label}悬停时仍达到 4.5:1`,
+        hovered && contrastRatio(hovered.color, hovered.background) >= 4.5,
+      )
     }
+    await page.mouseEvent({ type: 'mouseMoved', x: 4, y: 4 })
+    const loginFocus = await page.evaluate(`(() => {
+      const login = [...document.querySelectorAll('button')].find(
+        (button) => (button.textContent || '').trim() === '登录',
+      )
+      login?.focus()
+      if (!login) return null
+      const style = getComputedStyle(login)
+      return {
+        focusVisible: login.matches(':focus-visible'),
+        outlineColor: style.outlineColor,
+        outlineWidth: style.outlineWidth,
+        background: getComputedStyle(document.body).backgroundColor,
+      }
+    })()`)
+    check(
+      '登录按钮键盘焦点环清晰',
+      loginFocus &&
+        loginFocus.focusVisible &&
+        Number.parseFloat(loginFocus.outlineWidth) >= 2 &&
+        contrastRatio(loginFocus.outlineColor, loginFocus.background) >= 3,
+    )
 
     const heroAuthor = await page.evaluate(`(() => {
       const card = document.querySelector('[data-home-recommend] div.bili-hero-swap button')
@@ -1641,12 +1665,39 @@ async function main() {
           break
         }
       }
-      return { color: getComputedStyle(author).color, background }
+      const box = author.getBoundingClientRect()
+      return {
+        color: getComputedStyle(author).color,
+        background,
+        center: [box.left + box.width / 2, box.top + box.height / 2],
+      }
     })()`)
     check(
       '历史作者名达到 4.5:1',
       authorContrast && contrastRatio(authorContrast.color, authorContrast.background) >= 4.5,
     )
+    if (authorContrast) {
+      await page.mouseEvent({ type: 'mouseMoved', x: authorContrast.center[0], y: authorContrast.center[1] })
+      await sleep(250)
+      const hoveredAuthor = await page.evaluate(`(() => {
+        const author = [...document.querySelectorAll('#scroll-main [data-track-card] span')]
+          .find((element) => element.textContent?.trim() === '周杰伦')
+        if (!author) return null
+        let background = getComputedStyle(document.body).backgroundColor
+        for (let node = author; node; node = node.parentElement) {
+          const color = getComputedStyle(node).backgroundColor
+          if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+            background = color
+            break
+          }
+        }
+        return { color: getComputedStyle(author).color, background }
+      })()`)
+      check(
+        '历史作者名悬停时仍达到 4.5:1',
+        hoveredAuthor && contrastRatio(hoveredAuthor.color, hoveredAuthor.background) >= 4.5,
+      )
+    }
     const firstPage = await page.evaluate(`(() => ({
       cards: document.querySelectorAll('[data-track-card]').length,
       loadMore: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),

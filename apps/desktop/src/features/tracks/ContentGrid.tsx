@@ -255,7 +255,7 @@ const TrackCard = memo(function TrackCard({
           type="button"
           title={`看 ${track.artist} 的更多视频`}
           onClick={() => onAuthor(track)}
-          className="flex min-w-0 items-center gap-1 hover:text-[var(--accent)]"
+          className="flex min-w-0 items-center gap-1 hover:text-[var(--accent-strong)]"
         >
           <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
           <span className="truncate">{track.artist}</span>

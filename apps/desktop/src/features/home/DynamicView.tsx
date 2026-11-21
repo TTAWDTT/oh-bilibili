@@ -147,10 +147,10 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyn
         </button>
       </span>
       <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
-        <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent)]">
+        <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent-strong)]">
           {item.title}
         </span>
-        <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-3)]">
+        <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-2)]">
           <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
             <Icon name="play" size={12} />
             {formatCount(item.views)}
@@ -175,7 +175,7 @@ function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenD
       className="group/read t flex w-full gap-3 rounded-[6px] bg-[var(--ga1)] p-3 text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] transition-colors group-hover/read:text-[var(--accent)]">
+        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] transition-colors group-hover/read:text-[var(--accent-strong)]">
           {item.title}
         </span>
         {text ? (
@@ -214,11 +214,11 @@ function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyna
         </span>
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-2 text-[14px] leading-[21px] text-[var(--text-1)] transition-colors group-hover/live:text-[var(--accent)]">
+        <span className="line-clamp-2 text-[14px] leading-[21px] text-[var(--text-1)] transition-colors group-hover/live:text-[var(--accent-strong)]">
           {item.title}
         </span>
-        <span className="mt-1 truncate text-[12px] text-[var(--text-3)]">{item.live_area}</span>
-        <span className="num mt-auto text-[12px] text-[var(--text-3)]">
+        <span className="mt-1 truncate text-[12px] text-[var(--text-2)]">{item.live_area}</span>
+        <span className="num mt-auto text-[12px] text-[var(--text-2)]">
           {formatCount(item.views)} 人气
         </span>
       </span>
@@ -344,11 +344,11 @@ function OrigCard({
           className="t flex min-w-0 items-center gap-2"
         >
           <Avatar src={orig.face} alt={orig.author} size={24} />
-          <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent)]">
+          <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent-strong)]">
             {orig.author}
           </span>
         </button>
-        <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-3)]">
+        <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-2)]">
           {orig.pub_time}
         </span>
       </div>
@@ -405,7 +405,7 @@ function DynamicCard({
             <button
               type="button"
               onClick={onAuthor}
-              className="t block max-w-full truncate text-left text-[15px] font-medium leading-[20px] text-[var(--text-1)] hover:text-[var(--accent)]"
+              className="t block max-w-full truncate text-left text-[15px] font-medium leading-[20px] text-[var(--text-1)] hover:text-[var(--accent-strong)]"
             >
               {item.author}
             </button>
