@@ -1713,12 +1713,12 @@ export function WatchPlayer({
           />
         </div>
 
-        <div data-watch-controls className="flex items-center gap-2">
+        <div data-watch-controls className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={togglePlay}
             aria-label={playing ? '暂停' : '播放'}
-            className="bili-icon-btn t press flex h-[22px] w-9 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="bili-icon-btn t press flex h-[22px] w-8 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15 sm:w-9"
           >
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
@@ -1749,7 +1749,7 @@ export function WatchPlayer({
             onClick={captureShot}
             aria-label="截图"
             title="截图"
-            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 md:hidden xl:flex"
+            className="bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 sm:flex md:hidden xl:flex"
           >
             <Icon name="camera" size={16} />
           </button>
@@ -1856,7 +1856,7 @@ export function WatchPlayer({
               <BiliDanmakuSetting size={17} />
             </button>
             {danmakuPanel ? (
-              <div className="absolute bottom-9 right-0 z-30 max-h-[70vh] w-[236px] overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+              <div className="absolute bottom-9 right-0 z-30 max-h-[70vh] w-[196px] overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur sm:w-[236px]">
                 <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
                   <span>显示区域</span>
                   <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
@@ -2039,13 +2039,13 @@ export function WatchPlayer({
                 aria-expanded={pagesOpen}
                 aria-label="选集"
                 title="选集"
-                className="t press flex h-7 items-center gap-1 rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+                className="t press flex h-7 items-center gap-1 rounded-[4px] px-1 text-[12px] hover:bg-white/15 sm:px-2"
               >
-                选集
+                <span className="hidden sm:inline">选集</span>
                 <span className="num text-[11px] text-white/55">P{currentPage}</span>
               </button>
               {pagesOpen ? (
-                <div className="absolute bottom-8 right-0 z-30 flex max-h-[320px] w-[280px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                <div className="absolute bottom-8 right-0 z-30 flex max-h-[320px] w-[200px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur sm:w-[280px]">
                   {data.pages.map((page) => {
                     const on = page.no === currentPage
                     return (
@@ -2137,7 +2137,7 @@ export function WatchPlayer({
             aria-label={loopOne ? '关闭单集循环' : '单集循环'}
             title={loopOne ? '关闭单集循环' : '单集循环'}
             onClick={() => setLoopOne(!loopOne)}
-            className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+            className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] sm:flex ${
               loopOne ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
             }`}
           >
