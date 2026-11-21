@@ -754,6 +754,7 @@ async function main() {
     check('结束卡保留自动连播开关', !!endCard?.autoplay)
 
     // 搜索入口只在顶栏：点开有联想 panel，提交后进结果页；侧栏不再有独立搜索页。
+    await page.viewport(640, 560)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     await sleep(5000)
     check(
@@ -794,9 +795,14 @@ async function main() {
       })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
-    await page.evaluate(`(() => {
+    const singleResult = await page.evaluate(`(() => {
       const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
-      dialog?.querySelector('button[aria-label^="观看"]')?.click()
+      if (!dialog) return null
+      dialog.scrollTop = dialog.scrollHeight - dialog.clientHeight
+      const scrollTop = dialog.scrollTop
+      const count = dialog.querySelectorAll('[data-track-card]').length
+      dialog.querySelector('button[aria-label^="观看"]')?.click()
+      return { scrollTop, count }
     })()`)
     let searchVideo = false
     for (let i = 0; i < 30 && !searchVideo; i += 1) {
@@ -813,10 +819,15 @@ async function main() {
         dialog: !!dialog,
         query: input ? input.value : '',
         focused: !!active?.closest?.('[data-track-card]'),
+        scrollTop: dialog?.scrollTop,
       }
     })()`)
     check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
     check('返回后焦点落回结果卡片', returned.focused)
+    check(
+      `单条结果保留滚动位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
+      singleResult?.count === 1 && singleResult.scrollTop > 0 && returned.scrollTop === singleResult.scrollTop,
+    )
 
     // 再次进入同一结果：只点顶栏搜索框后按 Esc 收联想，不能抹掉返回目标。
     const reopenedResult = await page.evaluate(`(() => {
@@ -863,6 +874,78 @@ async function main() {
       'Esc 收联想后返回仍回结果面板与原卡片',
       secondReturn.dialog && secondReturn.query === '晴天' && secondReturn.focused,
     )
+
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '周杰伦')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.closest('form')?.requestSubmit()
+    })()`)
+    let resultCount = 0
+    for (let i = 0; i < 20 && resultCount < 5; i += 1) {
+      await sleep(400)
+      resultCount = await page.evaluate(`document.querySelectorAll('#search-scroll [data-track-card]').length`)
+    }
+
+    const filters = ['音乐', '最多播放', '10 分钟以下']
+    const filtersSelected = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const buttons = [...(dialog?.querySelectorAll('button') ?? [])]
+      return ${JSON.stringify(filters)}.every((label) => {
+        const button = buttons.find((button) => button.textContent.trim() === label)
+        button?.click()
+        return !!button
+      })
+    })()`)
+    await sleep(1200)
+    const manyResults = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const cards = dialog?.querySelectorAll('[data-track-card]')
+      const button = cards?.[2]?.querySelector('button[aria-label^="观看"]')
+      if (!button) return null
+      dialog.scrollTop = Math.floor((dialog.scrollHeight - dialog.clientHeight) / 3)
+      button.focus({ preventScroll: true })
+      return {
+        count: cards.length,
+        scrollTop: dialog.scrollTop,
+        focused: document.activeElement?.getAttribute('aria-label'),
+      }
+    })()`)
+    await page.pressSpace()
+    let keyboardOpened = false
+    for (let i = 0; i < 30 && !keyboardOpened; i += 1) {
+      await sleep(500)
+      keyboardOpened = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(900)
+    const returnedMany = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const pressed = [...(dialog?.querySelectorAll('button[aria-pressed="true"]') ?? [])]
+      return {
+        scrollTop: dialog?.scrollTop,
+        focused: document.activeElement?.getAttribute('aria-label'),
+        query: document.querySelector('input[aria-label="顶栏搜索"]')?.value,
+        filters: pressed.map((button) => button.textContent.trim()),
+      }
+    })()`)
+    check(
+      `多条结果保留滚动位置（${manyResults?.scrollTop} → ${returnedMany.scrollTop}）`,
+      keyboardOpened && manyResults?.count === 5 && manyResults.scrollTop > 0 && returnedMany.scrollTop === manyResults.scrollTop,
+    )
+    check('键盘打开后焦点回到同一张结果卡片', keyboardOpened && !!manyResults?.focused && returnedMany.focused === manyResults.focused)
+    check(
+      '返回后保留关键词、分区、排序和时长',
+      filtersSelected && returnedMany.query === '周杰伦' && filters.every((filter) => returnedMany.filters.includes(filter)),
+    )
+    await page.evaluate(`document.querySelector('#search-scroll button[aria-label="关闭搜索"]')?.click()`)
+    check(
+      '主动关闭搜索后露出原页面',
+      await page.evaluate(`!document.querySelector('#search-scroll') && !!document.querySelector('[data-home-recommend]')`),
+    )
+    await page.viewport(1320, 900)
 
     // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
