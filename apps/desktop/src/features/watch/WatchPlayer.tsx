@@ -8,6 +8,7 @@ import type { QualityOption, Track, WatchView as WatchData } from '../../shared/
 import { formatCount, formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
+import { watchUrl } from './watchUrl'
 import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
@@ -82,6 +83,24 @@ const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '
  */
 const QUALITY_KEY = 'bilimusic.quality'
 const QUALITY_ID_KEY = 'bilimusic.quality.id'
+const QUALITY_AUTO_KEY = 'bilimusic.quality.auto'
+
+/** 没手动选过档就是自动；手选一次以后按那一档走，直到用户点回「自动」。 */
+function loadQualityAuto(): boolean {
+  try {
+    return localStorage.getItem(QUALITY_AUTO_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveQualityAuto(auto: boolean): void {
+  try {
+    localStorage.setItem(QUALITY_AUTO_KEY, auto ? '1' : '0')
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
 
 function loadQualityId(): number {
   try {
@@ -297,6 +316,7 @@ export function WatchPlayer({
   /** 播放器自己报的缓冲态：卡住时画面上要有转圈，不然只能看到画面定格。 */
   const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [qualityAuto, setQualityAuto] = useState(loadQualityAuto)
   const [controls, setControls] = useState(true)
   /** 画中画只在浏览器/WebView 支持时出现；不支持就不摆假按钮。 */
   const [pip, setPip] = useState(false)
@@ -745,7 +765,9 @@ export function WatchPlayer({
         // 降档重试优先；没有降档就按上次选的档位来。
         const preferredId = loadQualityId()
         const preferredQuality = data.qualities.find((q) => q.id === preferredId)
-        const preferred = wantHeight.current || preferredQuality?.height || loadQualityHeight()
+        // 自动档交给 shaka 的 ABR，只有降档重试或手选过档才强制某一档。
+        const preferred =
+          wantHeight.current || (loadQualityAuto() ? 0 : preferredQuality?.height || loadQualityHeight())
         if (preferred > 0) {
           const variants = player.getVariantTracks().filter((t) => (t.height ?? 0) > 0)
           const exact = variants
@@ -814,8 +836,21 @@ export function WatchPlayer({
     if (!best) return
     player.selectVariantTrack(best, true)
     setActiveId(q.id)
+    setQualityAuto(false)
+    saveQualityAuto(false)
     saveQualityId(q.id)
     saveQualityHeight(q.height)
+  }
+
+  /** 回到自动：重新打开 ABR，下一次开播不再强制某一档。 */
+  const pickAutoQuality = (): void => {
+    const player = playerRef.current
+    if (!player) return
+    player.configure?.({ abr: { enabled: true } })
+    wantHeight.current = 0
+    setActiveId(null)
+    setQualityAuto(true)
+    saveQualityAuto(true)
   }
 
   /** 某个时刻落在哪一章。章节按时间升序，取最后一个不超过它的。 */
@@ -955,7 +990,7 @@ export function WatchPlayer({
 
   const copyWatchLink = (): void => {
     setShotMenu(null)
-    void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+    void copyText(watchUrl(track.key, currentPage)).then((ok) =>
       toastDone(ok ? '已复制视频链接' : '复制失败'),
     )
   }
@@ -1055,6 +1090,7 @@ export function WatchPlayer({
         })
         poke()
       }}
+      data-watch-player
       className={
         cinema
           ? 'relative flex h-full w-full flex-col justify-center bg-black'
@@ -1470,7 +1506,9 @@ export function WatchPlayer({
       {statsOn && stats ? (
         <div className="pointer-events-none absolute left-3 top-3 z-30 rounded-[4px] bg-black/70 px-3 py-2 font-mono text-[11px] leading-[18px] text-white/90">
           <div>分辨率　{stats.width}×{stats.height}</div>
-          <div>画质　　{data.qualities.find((q) => q.id === activeId)?.label ?? '—'}</div>
+          <div>
+            画质　　{qualityAuto ? '自动' : (data.qualities.find((q) => q.id === activeId)?.label ?? '—')}
+          </div>
           <div>丢帧　　{stats.dropped}</div>
           <div>缓冲　　{stats.buffer.toFixed(1)} s</div>
           <div>倍速　　{stats.rate}×</div>
@@ -1675,7 +1713,7 @@ export function WatchPlayer({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div data-watch-controls className="flex items-center gap-2">
           <button
             type="button"
             onClick={togglePlay}
@@ -1711,7 +1749,7 @@ export function WatchPlayer({
             onClick={captureShot}
             aria-label="截图"
             title="截图"
-            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15"
+            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 md:hidden xl:flex"
           >
             <Icon name="camera" size={16} />
           </button>
@@ -1723,7 +1761,7 @@ export function WatchPlayer({
               aria-pressed={pip}
               aria-label={pip ? '退出画中画' : '画中画'}
               title={pip ? '退出画中画' : '画中画'}
-              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
+              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] md:flex ${
                 pip ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -1989,7 +2027,7 @@ export function WatchPlayer({
           </div>
 
           {data.pages.length > 1 ? (
-            <div className="relative shrink-0">
+            <div className="relative flex shrink-0 md:hidden xl:flex">
               <button
                 type="button"
                 onClick={() => {
@@ -2055,10 +2093,22 @@ export function WatchPlayer({
                 aria-expanded={qualityOpen}
                 className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
               >
-                {data.qualities.find((q) => q.id === activeId)?.label ?? '画质'}
+                {qualityAuto ? '自动' : (data.qualities.find((q) => q.id === activeId)?.label ?? '画质')}
               </button>
               {qualityOpen ? (
                 <div className="absolute bottom-8 right-0 z-30 flex max-h-[220px] w-[104px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      pickAutoQuality()
+                      setQualityOpen(false)
+                    }}
+                    className={`t press px-2 py-1 text-left text-[12px] ${
+                      qualityAuto ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                    }`}
+                  >
+                    自动
+                  </button>
                   {data.qualities.map((q) => (
                     <button
                       key={`${q.id}-${q.height}`}
@@ -2068,7 +2118,9 @@ export function WatchPlayer({
                         setQualityOpen(false)
                       }}
                       className={`t press px-2 py-1 text-left text-[12px] ${
-                        activeId === q.id ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                        !qualityAuto && activeId === q.id
+                          ? 'text-[var(--accent)]'
+                          : 'text-white/85 hover:bg-white/10'
                       }`}
                     >
                       {q.label}
@@ -2133,12 +2185,11 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          {/* 音量在窄屏交给系统；倍速是播放器状态，任何宽度都得留着。 */}
           <span
-            className="hidden shrink-0 items-center xl:flex"
+            className="hidden shrink-0 items-center md:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
           >
-            <VolumeControl />
+            <VolumeControl compact />
           </span>
 
           {/* B 站播放器在这两个位置摆的是「网页全屏」和「全屏」。
@@ -2148,7 +2199,7 @@ export function WatchPlayer({
             onClick={() => setStageMode(!cinema, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
+            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] md:flex ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >

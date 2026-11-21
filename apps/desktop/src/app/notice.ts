@@ -23,3 +23,7 @@ export function toastFailure(op: string, cause: unknown): void {
 export function toastDone(title: string, detail: string | null = null): void {
   useAppStore.getState().pushToast('success', title, detail)
 }
+
+export function toastWarn(title: string, detail: string): void {
+  useAppStore.getState().pushToast('warn', title, detail)
+}

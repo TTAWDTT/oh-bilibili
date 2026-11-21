@@ -3,7 +3,6 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { chaptersFrom } from '../../shared/lib/chapters'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
@@ -355,10 +354,13 @@ export function WatchView({ track }: { track: Track }) {
   const currentPageNo = page ?? data?.current_page ?? 1
   const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
-  const hasChapters =
-    chapters.length > 1 || (data ? chaptersFrom(data.desc).length > 1 : false)
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
+  // 分 P 播完接下一 P；合集里的单集播完接下一集。B 站两者都是自动连播，
+  // 不走相关推荐——只有既没有下一 P 也没有下一集时才退到推荐第一条。
+  const seasonEpisodes = data?.season?.episodes ?? []
+  const seasonIndex = seasonEpisodes.findIndex((ep) => ep.key === track.key)
+  const nextSeasonEp = seasonIndex >= 0 ? seasonEpisodes[seasonIndex + 1] ?? null : null
   const nextUp: NextUp | null = nextPage
     ? {
         title: nextPage.title || `第 ${nextPage.no} P`,
@@ -368,7 +370,16 @@ export function WatchView({ track }: { track: Track }) {
         durationMs: nextPage.duration_ms,
         page: nextPage.no,
       }
-    : related[0]
+    : nextSeasonEp
+      ? {
+          title: nextSeasonEp.title,
+          owner: data?.owner ?? track.artist,
+          cover: nextSeasonEp.cover,
+          views: nextSeasonEp.views ?? null,
+          durationMs: nextSeasonEp.duration_ms || null,
+          page: null,
+        }
+      : related[0]
       ? {
           title: related[0].title,
           owner: related[0].artist,
@@ -381,6 +392,20 @@ export function WatchView({ track }: { track: Track }) {
   const playNext = (): void => {
     if (nextPage) {
       changePage(nextPage.no)
+      return
+    }
+    if (nextSeasonEp) {
+      replace({
+        kind: 'watch',
+        track: {
+          key: nextSeasonEp.key,
+          title: nextSeasonEp.title,
+          artist: '',
+          duration_ms: nextSeasonEp.duration_ms || null,
+          cover: nextSeasonEp.cover,
+          views: nextSeasonEp.views,
+        },
+      })
       return
     }
     const track = related[0]
@@ -489,7 +514,7 @@ export function WatchView({ track }: { track: Track }) {
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       {/* 返回在顶栏（TitleBar），不在画面上：浮在视频角上会挡住画面内容。 */}
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
             之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
         <div
@@ -501,7 +526,7 @@ export function WatchView({ track }: { track: Track }) {
           }
         >
           {/* B 站网页端把标题压在画面之上：先知道在放什么，再决定看不看。 */}
-          {!cinema && data && hasChapters ? (
+          {!cinema && data ? (
             <WatchHead
               track={track}
               data={data}
@@ -566,7 +591,7 @@ export function WatchView({ track }: { track: Track }) {
               onTriple={triple}
               onSeek={seekTo}
               ownerRow={
-                <div className="md:hidden">
+                <div className="xl:hidden">
                   <OwnerCard
                     data={data}
                     card={card}
@@ -580,17 +605,17 @@ export function WatchView({ track }: { track: Track }) {
             />
           ) : null}
           {!cinema && danmaku.length > 0 ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <DanmakuList items={danmaku} />
             </div>
           ) : null}
           {!cinema && data ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} />
             </div>
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <PageList
                 pages={data.pages}
                 current={page ?? data.current_page}
@@ -601,12 +626,12 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           {!cinema && data?.season ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <SeasonList season={data.season} />
             </div>
           ) : null}
           {!cinema ? (
-            <div className="border-t border-hairline md:hidden">
+            <div data-watch-inline className="border-t border-hairline xl:hidden">
               <RelatedAside items={related} />
             </div>
           ) : null}
@@ -618,7 +643,10 @@ export function WatchView({ track }: { track: Track }) {
         </div>
 
         {!cinema ? (
-          <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
+          <aside
+            data-watch-rail
+            className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline xl:block"
+          >
             {data ? (
               <OwnerCard
                 data={data}
