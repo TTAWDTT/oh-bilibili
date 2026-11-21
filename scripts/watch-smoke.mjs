@@ -479,6 +479,24 @@ async function main() {
 
     await page.viewport(700, 860)
     await sleep(600)
+    for (const width of [380, 420]) {
+      await page.viewport(width, 560)
+      await sleep(600)
+      const fit = await controlFit(page)
+      check(`${width} 宽控制条没有被裁切`, !!fit && fit.overflow <= 1 && fit.outside === 0)
+      check(`${width} 宽保留全屏`, !!fit?.full)
+      const focused = await page.evaluate(`(() => {
+        const btn = document.querySelector('button[aria-label="全屏"]')
+        const frame = document.querySelector('[data-watch-player]')?.getBoundingClientRect()
+        if (!btn || !frame) return false
+        btn.focus()
+        const box = btn.getBoundingClientRect()
+        return document.activeElement === btn && box.right <= frame.right + 0.5
+      })()`)
+      check(`${width} 宽全屏可聚焦且在画面内`, focused)
+    }
+    await page.viewport(700, 860)
+    await sleep(600)
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
     const speedAt700 = await page.evaluate(`(() => {
       const btn = document.querySelector('button[aria-label^="播放倍速"]')
@@ -768,6 +786,13 @@ async function main() {
     })()`)
     await sleep(1600)
     check('多 P 预览切到 P2', multiVideo && switchedP2)
+    await page.viewport(380, 560)
+    await sleep(600)
+    const multiFit380 = await controlFit(page)
+    check('380 宽多 P 控制条没有被裁切', !!multiFit380 && multiFit380.overflow <= 1 && multiFit380.outside === 0)
+    check('380 宽多 P 保留全屏', !!multiFit380?.full)
+    await page.viewport(1320, 900)
+    await sleep(400)
     await page.evaluate(`(() => {
       window.__copied = ''
       Object.defineProperty(navigator, 'clipboard', {
