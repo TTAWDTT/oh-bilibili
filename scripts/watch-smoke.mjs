@@ -622,6 +622,72 @@ async function main() {
       '分享当前分 P 带 p=2 和时间',
       withTimeToggled && embedParams?.p === '2' && embedParams?.t !== null,
     )
+    check(
+      '短选集不出现找分集',
+      !(await page.evaluate(`!!document.querySelector('input[aria-label="找分集"]')`)),
+    )
+
+    // 长分 P 预览：找分集只筛选列表，选中才切 P，清空后完整列表和当前项都回来。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?manyPages=1`)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let manyVideo = false
+    for (let i = 0; i < 30 && !manyVideo; i += 1) {
+      await sleep(500)
+      manyVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    const visiblePanel = `[...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)`
+    const pageRows = `(() => {
+      const panel = ${visiblePanel}
+      const list = panel?.querySelector('ol')
+      const rows = list ? [...list.querySelectorAll('li')] : []
+      return {
+        count: rows.length,
+        text: rows.map((row) => row.textContent?.trim() ?? '').join('|'),
+        active: rows.find((row) => row.querySelector('button[aria-pressed="true"]'))?.textContent?.trim() ?? '',
+        header: panel?.querySelector('h3')?.parentElement?.textContent?.trim() ?? '',
+      }
+    })()`
+    const typeIntoFilter = (value) => page.evaluate(`(() => {
+      const input = ${visiblePanel}?.querySelector('input[aria-label="找分集"]')
+      if (!input) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, ${JSON.stringify(value)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    const beforeFilter = await page.evaluate(pageRows)
+    check('长分 P 选集出现找分集', manyVideo && beforeFilter.count === 80)
+    check('找分集输入框可用', await typeIntoFilter('P62'))
+    await sleep(300)
+    const byNumber = await page.evaluate(pageRows)
+    check(
+      '输入 P62 只筛选不切换',
+      byNumber.count === 1 &&
+        byNumber.text.includes('P62') &&
+        byNumber.header === beforeFilter.header,
+    )
+    await typeIntoFilter('现场')
+    await sleep(300)
+    const byTitle = await page.evaluate(pageRows)
+    check('输入标题片段只留下匹配集', byTitle.count === 1 && byTitle.text.includes('晴天 · 现场版'))
+    await typeIntoFilter('P62')
+    await sleep(200)
+    await page.evaluate(`${visiblePanel}?.querySelector('ol li button')?.click()`)
+    await sleep(1500)
+    const picked = await page.evaluate(pageRows)
+    check('选中筛选结果才切到 P62', picked.header.includes('(62/80)'))
+    await page.evaluate(`${visiblePanel}?.querySelector('button[aria-label="清除筛选"]')?.click()`)
+    await sleep(300)
+    const cleared = await page.evaluate(pageRows)
+    check(
+      '清除筛选恢复 80 集并保留当前项标记',
+      cleared.count === 80 && cleared.active.includes('P62'),
+    )
 
   } finally {
     page.close()

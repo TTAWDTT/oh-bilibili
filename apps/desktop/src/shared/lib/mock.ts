@@ -610,12 +610,22 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       setDuration(track.duration_ms ?? 30_000)
       const multiP =
         import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiP')
-      const pages = multiP
-        ? [
-            { no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 },
-            { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: track.duration_ms ?? 30_000 },
-          ]
-        : [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }]
+      const manyPages =
+        import.meta.env.DEV && new URLSearchParams(window.location.search).has('manyPages')
+      const pages = manyPages
+        ? Array.from({ length: 80 }, (_, index) => ({
+            no: index + 1,
+            cid: 100 + index,
+            title:
+              index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : `第 ${index + 1} 集 · 预览`,
+            duration_ms: 30_000 + index * 1000,
+          }))
+        : multiP
+          ? [
+              { no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 },
+              { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: track.duration_ms ?? 30_000 },
+            ]
+          : [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }]
       const requestedPage = Number(args.page ?? 1) || 1
       const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
       return {
