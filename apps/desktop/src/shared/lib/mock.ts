@@ -78,25 +78,30 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'search_users': {
       const keyword = str(args, 'keyword').trim()
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
       const seen = new Map<number, string>()
       for (const t of CATALOG) {
         if (!t.up_mid || !t.artist) continue
         if (keyword && !t.artist.includes(keyword) && !keyword.includes(t.artist)) continue
         seen.set(t.up_mid, t.artist)
       }
-      return [...seen].slice(0, 4).map(([mid, name], i) => ({
-        mid,
-        name,
-        face: null,
-        fans: 12000 * (i + 1),
-        videos: 40 + i * 7,
-        sign: '预览模式的占位签名',
-        level: 6,
-        // 前后两条各带一种认证，第三条挂直播，预览里能核对徽章。
-        official: i === 0 ? 1 : i === 3 ? 0 : null,
-        verify: i === 0 ? '机构认证' : i === 3 ? '个人认证' : '',
-        live: i === 2,
-      }))
+      const start = (page - 1) * 4
+      return [...seen].slice(start, start + 4).map(([mid, name], offset) => {
+        const i = start + offset
+        return {
+          mid,
+          name,
+          face: null,
+          fans: 12000 * (i + 1),
+          videos: 40 + i * 7,
+          sign: '预览模式的占位签名',
+          level: 6,
+          // 前后两条各带一种认证，第三条挂直播，预览里能核对徽章。
+          official: i === 0 ? 1 : i === 3 ? 0 : null,
+          verify: i === 0 ? '机构认证' : i === 3 ? '个人认证' : '',
+          live: i === 2,
+        }
+      })
     }
     case 'author_card': {
       const mid = num(args, 'mid')
