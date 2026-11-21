@@ -431,9 +431,14 @@ export function unfavFrom(key: string, folderId: number): Promise<null> {
   return call<null>('unfav_from', { key, folder_id: folderId })
 }
 
-/** 删掉一条已下载的音轨（连文件一起）。 */
-export function downloadRemove(key: string): Promise<DownloadView[]> {
-  return call<DownloadView[]>('download_remove', { key })
+/** 只移除下载记录，不碰磁盘。 */
+export function downloadRemoveRecord(key: string): Promise<DownloadView[]> {
+  return call<DownloadView[]>('download_remove_record', { key })
+}
+
+/** 用户确认后删除本地音频文件，并移除记录。 */
+export function downloadDeleteAudio(key: string): Promise<DownloadView[]> {
+  return call<DownloadView[]>('download_delete_audio', { key })
 }
 
 /** 在文件管理器里定位这个文件。 */

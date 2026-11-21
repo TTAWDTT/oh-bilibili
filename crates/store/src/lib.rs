@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub const SCHEMA_VERSION: i64 = 5;
+pub const SCHEMA_VERSION: i64 = 6;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -72,6 +72,16 @@ pub struct Playlist {
     pub id: i64,
     pub name: String,
     pub sort_key: i64,
+}
+
+/// 一条下载记录。`state` 的取值由 core 定义，store 只原样保存。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredDownload {
+    pub key: TrackKey,
+    pub title: String,
+    pub path: Option<String>,
+    pub state: String,
+    pub error: Option<String>,
 }
 
 pub struct Library {
@@ -612,6 +622,101 @@ impl Library {
             Ok(())
         })
     }
+
+    /// 记一条下载。曲目元数据一起入库，重启后标题还在。
+    pub fn save_download(
+        &self,
+        track: &Track,
+        path: Option<&str>,
+        state: &str,
+        error: Option<&str>,
+    ) -> Result<()> {
+        let track_id = self.upsert_track(track)?;
+        self.with(|conn| {
+            conn.execute(
+                "INSERT INTO downloads (track_id, path, state, error) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(track_id) DO UPDATE SET
+                   path = excluded.path,
+                   state = excluded.state,
+                   error = excluded.error,
+                   created_at = unixepoch() * 1000",
+                params![track_id.0, path, state, error],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// 后台任务完成或中断时只更新下载行，曲目元数据不动。
+    pub fn update_download(
+        &self,
+        key: &str,
+        path: Option<&str>,
+        state: &str,
+        error: Option<&str>,
+    ) -> Result<()> {
+        self.with(|conn| {
+            conn.execute(
+                "UPDATE downloads SET path = ?2, state = ?3, error = ?4
+                 WHERE track_id = (SELECT id FROM tracks WHERE provider_key = ?1)",
+                params![key, path, state, error],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// 从磁盘重建时只知道文件名。曲目不在库里就补一条最小记录，
+    /// 免得用户删掉的条目下次启动又被扫回来。
+    pub fn adopt_download(&self, key: &TrackKey, title: &str, path: &str) -> Result<()> {
+        self.with(|conn| {
+            conn.execute(
+                "INSERT INTO tracks (provider_key, title) VALUES (?1, ?2)
+                 ON CONFLICT(provider_key) DO NOTHING",
+                params![key.as_opaque(), title],
+            )?;
+            conn.execute(
+                "INSERT INTO downloads (track_id, path, state)
+                 VALUES ((SELECT id FROM tracks WHERE provider_key = ?1), ?2, 'done')
+                 ON CONFLICT(track_id) DO UPDATE SET
+                   path = excluded.path,
+                   state = excluded.state,
+                   error = NULL,
+                   created_at = unixepoch() * 1000",
+                params![key.as_opaque(), path],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn downloads(&self) -> Result<Vec<StoredDownload>> {
+        self.with(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT t.provider_key, t.title, d.path, d.state, d.error
+                 FROM downloads d JOIN tracks t ON t.id = d.track_id
+                 ORDER BY d.created_at, d.track_id",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok(StoredDownload {
+                    key: TrackKey::from_provider(row.get::<_, String>(0)?),
+                    title: row.get(1)?,
+                    path: row.get(2)?,
+                    state: row.get(3)?,
+                    error: row.get(4)?,
+                })
+            })?;
+            rows.collect()
+        })
+    }
+
+    pub fn delete_download(&self, key: &str) -> Result<()> {
+        self.with(|conn| {
+            conn.execute(
+                "DELETE FROM downloads
+                 WHERE track_id = (SELECT id FROM tracks WHERE provider_key = ?1)",
+                params![key],
+            )?;
+            Ok(())
+        })
+    }
 }
 
 fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
@@ -666,7 +771,7 @@ fn now_ms() -> i64 {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 5] = [r#"
+const MIGRATIONS: [&str; 6] = [r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -762,6 +867,9 @@ ALTER TABLE tracks ADD COLUMN up_avatar TEXT;
 -- v5：历史要记「看到哪了」。B 站的历史卡片底下有一条播放进度，
 -- 只有时间没有位置的话，卡片永远看起来像没看过。
 ALTER TABLE history ADD COLUMN position_ms INTEGER NOT NULL DEFAULT 0;
+"#, r#"
+-- v6：下载失败要能说明为什么，重启后仍给出同一条信息。
+ALTER TABLE downloads ADD COLUMN error TEXT;
 "#];
 
 #[cfg(test)]
@@ -937,6 +1045,114 @@ mod tests {
         l.save_queue(r#"["BV1","BV2"]"#).unwrap();
         l.save_queue(r#"["BV3"]"#).unwrap();
         assert_eq!(l.load_queue().unwrap().as_deref(), Some(r#"["BV3"]"#));
+    }
+
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "bilimusic-store-{tag}-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn 下载记录与错误跨重开保留() {
+        let dir = temp_dir("downloads");
+        let db = dir.join("library.sqlite");
+        let audio = dir.join("晴天 [BV1xx411c7mD].m4a");
+        std::fs::write(&audio, b"audio").unwrap();
+
+        {
+            let l = Library::open(&db).unwrap();
+            l.save_download(
+                &track("done"),
+                Some(audio.to_str().unwrap()),
+                "done",
+                None,
+            )
+            .unwrap();
+            l.save_download(&track("failed"), None, "failed", Some("yt-dlp 退出 1"))
+                .unwrap();
+        }
+
+        let l = Library::open(&db).unwrap();
+        let rows = l.downloads().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].key.as_opaque(), "BVdone");
+        assert_eq!(rows[0].path.as_deref(), audio.to_str());
+        assert_eq!(rows[0].state, "done");
+        assert_eq!(rows[0].error, None);
+        assert_eq!(rows[1].state, "failed");
+        assert_eq!(rows[1].error.as_deref(), Some("yt-dlp 退出 1"));
+
+        l.delete_download("BVdone").unwrap();
+        assert_eq!(l.downloads().unwrap().len(), 1);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 从磁盘补录的下载能读回也能删掉() {
+        let dir = temp_dir("adopt");
+        let db = dir.join("library.sqlite");
+        let path = dir.join("未知曲目 [BV1xx411c7mD].m4a");
+        let l = Library::open(&db).unwrap();
+        let key = TrackKey::from_provider("BV1xx411c7mD");
+        l.adopt_download(&key, "未知曲目", path.to_str().unwrap())
+            .unwrap();
+
+        let rows = l.downloads().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].title, "未知曲目");
+        assert_eq!(rows[0].state, "done");
+
+        l.delete_download("BV1xx411c7mD").unwrap();
+        assert!(l.downloads().unwrap().is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 五版旧库升级会补上下载错误列() {
+        let dir = temp_dir("migrate-v5");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = Connection::open(&db).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE tracks (
+                   id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                   provider_key TEXT NOT NULL UNIQUE,
+                   title        TEXT NOT NULL
+                 );
+                 CREATE TABLE downloads (
+                   track_id    INTEGER PRIMARY KEY,
+                   path        TEXT,
+                   state       TEXT NOT NULL,
+                   bytes_done  INTEGER NOT NULL DEFAULT 0,
+                   bytes_total INTEGER,
+                   created_at  INTEGER NOT NULL DEFAULT 0
+                 );
+                 PRAGMA user_version = 5;",
+            )
+            .unwrap();
+        }
+
+        let l = Library::open(&db).unwrap();
+        let columns = l
+            .with(|conn| {
+                let mut stmt = conn.prepare("PRAGMA table_info(downloads)")?;
+                let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .unwrap();
+        assert!(
+            columns.iter().any(|name| name == "error"),
+            "v6 应该给 downloads 补 error 列，实际列：{columns:?}"
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

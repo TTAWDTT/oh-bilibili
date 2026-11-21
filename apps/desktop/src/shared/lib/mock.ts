@@ -1123,14 +1123,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const track = trackOf(key)
       const existing = state.downloads.find((item) => item.key === key)
       if (existing && (existing.state === 'queued' || existing.state === 'running')) return { ...existing }
-      const view: DownloadView = { key, title: track.title, state: 'queued', progress: 0, path: null }
+      const view: DownloadView = { key, title: track.title, state: 'queued', progress: 0, path: null, error: null }
       const index = state.downloads.findIndex((item) => item.key === key)
       if (index >= 0) state.downloads[index] = view
       else state.downloads.push(view)
       emit({ type: 'download', view: { ...view } })
       return { ...view }
     }
-    case 'download_remove': {
+    case 'download_remove_record': {
+      const key = str(args, 'key')
+      state.downloads = state.downloads.filter((d) => d.key !== key)
+      return state.downloads
+    }
+    case 'download_delete_audio': {
       const key = str(args, 'key')
       state.downloads = state.downloads.filter((d) => d.key !== key)
       return state.downloads

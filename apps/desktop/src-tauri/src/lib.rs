@@ -1013,11 +1013,20 @@ async fn danmaku_send(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn download_remove(
+fn download_remove_record(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
 ) -> Result<Vec<DownloadView>, WireError> {
-    engine.download_remove(&key)
+    engine.download_remove_record(&key)
+}
+
+/// 删文件是单独的意图：界面只有在用户确认删除音频后才调用它。
+#[tauri::command(rename_all = "snake_case")]
+fn download_delete_audio(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Vec<DownloadView>, WireError> {
+    engine.download_delete_audio(&key)
 }
 
 /// 在系统文件管理器里定位这个文件。路径来自下载记录，不接受前端传任意路径。
@@ -1113,6 +1122,7 @@ fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
             state: d.state,
             progress: d.progress,
             path: d.path,
+            error: d.error,
         })
         .collect()
 }
@@ -1130,6 +1140,7 @@ async fn download_enqueue(
         state: view.state,
         progress: view.progress,
         path: view.path,
+        error: view.error,
     })
 }
 
@@ -1269,7 +1280,8 @@ pub fn run() {
             auth_logout,
             downloads_list,
             danmaku_send,
-            download_remove,
+            download_remove_record,
+            download_delete_audio,
             download_reveal,
             download_open_dir,
             open_external,
