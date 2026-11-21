@@ -183,6 +183,105 @@ async function main() {
   try {
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     await sleep(6000)
+
+    // 首页卡片：hover 只露出听、稍后再看和更多；低频动作收进更多。
+    await page.evaluate(`document.querySelector('[data-track-card]')?.scrollIntoView({ block: 'center' })`)
+    await sleep(500)
+    const cardBox = await page.evaluate(`(() => {
+      const card = document.querySelector('[data-track-card]')
+      const more = card?.querySelector('button[aria-label="更多"]')?.getBoundingClientRect()
+      const box = card?.getBoundingClientRect()
+      if (!box || !more) return null
+      return {
+        x: box.left + box.width / 2,
+        y: box.top + 12,
+        moreX: more.left + more.width / 2,
+        moreY: more.top + more.height / 2,
+        later: card.querySelectorAll('button[aria-label="稍后再看"]').length,
+      }
+    })()`)
+    await page.mouseEvent({ type: 'mouseMoved', x: cardBox.x, y: cardBox.y })
+    await sleep(350)
+    const hoveredCard = await page.evaluate(`(() => {
+      const row = document.querySelector('[data-track-card] [data-card-actions]')
+      if (!row) return null
+      return {
+        opacity: getComputedStyle(row).opacity,
+        labels: [...row.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') || (b.textContent || '').trim()),
+      }
+    })()`)
+    check(
+      '卡片 hover 露出听、稍后再看和更多',
+      hoveredCard?.opacity === '1' &&
+        hoveredCard.labels.some((label) => label.startsWith('听 ')) &&
+        hoveredCard.labels.includes('稍后再看') &&
+        hoveredCard.labels.includes('更多'),
+    )
+    check('每张卡只有一个稍后再看', cardBox.later === 1 && hoveredCard?.labels.length === 3)
+    const clickAt = async (x, y) => {
+      await page.mouseEvent({ type: 'mouseMoved', x, y })
+      await page.mouseEvent({ type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 })
+      await page.mouseEvent({ type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 })
+      await sleep(300)
+    }
+    await clickAt(cardBox.moreX, cardBox.moreY)
+    const menuItems = await page.evaluate(`(() => {
+      const menu = document.querySelector('[data-track-card] [role="menu"]')
+      return menu ? [...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.getAttribute('aria-label') || (b.textContent || '').trim()) : null
+    })()`)
+    check(
+      '鼠标能打开更多，四项低频动作都在',
+      menuItems?.length === 4 &&
+        menuItems.includes('点赞') &&
+        menuItems.includes('投币') &&
+        menuItems.includes('收藏') &&
+        menuItems.includes('下载'),
+    )
+    await clickAt(cardBox.moreX, cardBox.moreY)
+    check('再点更多收起菜单', !(await page.evaluate(`!!document.querySelector('[data-track-card] [role="menu"]')`)))
+    const focusedMore = await page.evaluate(`(() => {
+      const button = document.querySelector('[data-track-card] button[aria-label="更多"]')
+      button?.focus()
+      return document.activeElement?.getAttribute('aria-label')
+    })()`)
+    check('键盘能聚焦更多', focusedMore === '更多')
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+    await sleep(300)
+    check('键盘 Enter 打开更多', await page.evaluate(`!!document.querySelector('[data-track-card] [role="menu"]')`))
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await sleep(300)
+    const keyboardClosed = await page.evaluate(`(() => ({
+      menu: !!document.querySelector('[data-track-card] [role="menu"]'),
+      focused: document.activeElement?.getAttribute('aria-label'),
+    }))()`)
+    check('Esc 关闭更多并把焦点还给触发按钮', !keyboardClosed.menu && keyboardClosed.focused === '更多')
+
+    // 焦点离开菜单和触发器时也要收起，不能两张卡的菜单同时挂着。
+    await page.evaluate(`document.querySelectorAll('[data-track-card] button[aria-label="更多"]')[0]?.focus()`)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+    await sleep(200)
+    await page.evaluate(`document.querySelectorAll('[data-track-card] button[aria-label="更多"]')[1]?.focus()`)
+    await sleep(200)
+    const afterBlur = await page.evaluate(`document.querySelectorAll('[data-track-card] [role="menu"]').length`)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+    await sleep(200)
+    const afterSecond = await page.evaluate(`(() => {
+      const menus = [...document.querySelectorAll('[data-track-card] [role="menu"]')]
+      return {
+        count: menus.length,
+        second: menus[0]?.closest('[data-track-card]') === document.querySelectorAll('[data-track-card]')[1],
+      }
+    })()`)
+    check('焦点移到第二张卡后第一张菜单收起', afterBlur === 0)
+    check('第二张卡只开一个菜单', afterSecond.count === 1 && afterSecond.second)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await sleep(200)
+    check(
+      '第二张卡 Esc 关闭并回到触发按钮',
+      (await page.evaluate(`document.querySelectorAll('[data-track-card] [role="menu"]').length`)) === 0 &&
+        (await page.evaluate(`document.activeElement?.getAttribute('aria-label')`)) === '更多',
+    )
+
     await page.evaluate(`(() => {
       const card = [...document.querySelectorAll('button')].find((b) =>
         (b.getAttribute('aria-label') || '').startsWith('观看'))
