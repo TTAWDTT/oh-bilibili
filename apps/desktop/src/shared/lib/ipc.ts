@@ -773,6 +773,13 @@ export function downloadsList(): Promise<DownloadView[]> {
   return call<DownloadView[]>('downloads_list', {})
 }
 
-export function syncNow(): Promise<null> {
-  return call<null>('sync_now', {})
+export type SyncOutcome = {
+  synced: number
+  deferred: number
+  rejected: number
+  detail: string | null
+}
+
+export function syncNow(): Promise<SyncOutcome> {
+  return call<SyncOutcome>('sync_now', {})
 }

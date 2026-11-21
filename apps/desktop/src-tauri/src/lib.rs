@@ -11,7 +11,7 @@ use std::sync::Arc;
 use bilimusic_core::engine::Engine;
 use bilimusic_core::engine::DownloadView;
 use bilimusic_core::lyrics::LyricDoc;
-use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, WireError};
+use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, SyncOutcome, WireError};
 use bilimusic_model::{Track, TrackKey};
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -1131,7 +1131,7 @@ async fn download_enqueue(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-async fn sync_now(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError> {
+async fn sync_now(engine: tauri::State<'_, Arc<Engine>>) -> Result<SyncOutcome, WireError> {
     let arc = engine.inner().clone();
     arc.sync_now().await
 }
