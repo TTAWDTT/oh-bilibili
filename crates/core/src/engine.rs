@@ -154,6 +154,11 @@ mod download_restore_tests {
         dir
     }
 
+    /// 下载完成要过解码探测，测试里落盘的必须是真音频。
+    fn audio_fixture() -> &'static [u8] {
+        include_bytes!("../../audio/tests/fixtures/fragmented.m4s")
+    }
+
     #[test]
     fn 下载记录重开后按磁盘现状恢复() {
         let dir = temp_dir("download-restore");
@@ -497,8 +502,8 @@ mod download_restore_tests {
         let p2 = track("BV1vs411n7TH_p2");
         let audio = dir.join("歌 [BV1vs411n7TH_p1].m4a");
         let audio_p2 = dir.join("歌 [BV1vs411n7TH_p2].m4a");
-        std::fs::write(&audio, b"original P1 audio").unwrap();
-        std::fs::write(&audio_p2, b"original P2 audio").unwrap();
+        std::fs::write(&audio, audio_fixture()).unwrap();
+        std::fs::write(&audio_p2, audio_fixture()).unwrap();
         {
             let library = Library::open(&db).unwrap();
             library.upsert_track(&video).unwrap();
@@ -557,7 +562,7 @@ mod download_restore_tests {
             .iter()
             .any(|key| key == legacy.key.as_opaque()));
         assert_eq!(enqueued.state, "done");
-        assert_eq!(std::fs::read(&audio).unwrap(), b"original P1 audio");
+        assert_eq!(std::fs::read(&audio).unwrap(), audio_fixture());
 
         let rows = Library::open(&db).unwrap().downloads().unwrap();
         assert_eq!(rows.len(), 2);
@@ -593,9 +598,13 @@ mod download_restore_tests {
 
         let dir = temp_dir("download-legacy-p1-metadata");
         let helper = dir.join("yt-dlp");
-        std::fs::write(&helper, "#!/bin/sh\nprintf '\"audio.m4a\"\\n'\n").unwrap();
+        std::fs::write(
+            &helper,
+            "#!/bin/sh\ndir=$(dirname \"$0\")\ncp \"$dir/fixture.m4s\" \"$dir/audio.m4a\"\nprintf '\"audio.m4a\"\\n'\n",
+        )
+        .unwrap();
         std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
-        std::fs::write(dir.join("audio.m4a"), b"audio").unwrap();
+        std::fs::write(dir.join("fixture.m4s"), audio_fixture()).unwrap();
 
         let video = track("BV1vs411n7TH");
         let legacy = track("BV1vs411n7TH_p1");
@@ -705,7 +714,7 @@ mod download_restore_tests {
         let db = dir.join("library.sqlite");
         let legacy = track("BV1xx411c7mD");
         let legacy_audio = dir.join("晴天 [BV1xx411c7mD].m4a");
-        std::fs::write(&legacy_audio, b"legacy audio").unwrap();
+        std::fs::write(&legacy_audio, audio_fixture()).unwrap();
         let video = track("BV1vs411n7TH");
         {
             let library = Library::open(&db).unwrap();
@@ -715,17 +724,20 @@ mod download_restore_tests {
                 .unwrap();
         }
         let helper = dir.join("yt-dlp");
+        std::fs::write(dir.join("fixture.m4s"), audio_fixture()).unwrap();
         std::fs::write(
             &helper,
             r#"#!/bin/sh
+dir=$(dirname "$0")
 for url do :; done
 printf '%s\n' "$url" >> urls
 case "$url" in
     *'?p=2') id=BV1vs411n7TH_p2 ;;
     *) id=BV1vs411n7TH_p1 ;;
 esac
+printf '%s\n' "$id" >> ids
 file="歌 [$id].m4a"
-printf '%s' "$id" > "$file"
+cp "$dir/fixture.m4s" "$file"
 printf '"%s"\n' "$file"
 "#,
         )
@@ -769,8 +781,9 @@ printf '"%s"\n' "$file"
                 );
             }
             assert_eq!(
-                std::fs::read_to_string(&path).unwrap(),
-                format!("BV1vs411n7TH_p{page}")
+                std::fs::read(&path).unwrap(),
+                audio_fixture(),
+                "P{page} 落的应该是真音频"
             );
             assert_eq!(download_key_of(&path).unwrap().0, key.as_opaque());
             paths.push((view.key, path));
