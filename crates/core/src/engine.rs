@@ -255,7 +255,10 @@ mod download_restore_tests {
             .map(|item| item.key)
             .collect();
         let enqueued = engine
-            .enqueue_download_in(&video.key, helper, dir.clone())
+            .enqueue_download_in(&video.key, helper.clone(), dir.clone())
+            .unwrap();
+        let legacy_enqueued = engine
+            .enqueue_download_in(&legacy.key, helper, dir.clone())
             .unwrap();
         let items = tokio::time::timeout(Duration::from_secs(5), async {
             loop {
@@ -279,6 +282,7 @@ mod download_restore_tests {
             "P1 records for the same file"
         );
         assert!(restored_keys.contains(&enqueued.key));
+        assert_eq!(legacy_enqueued.key, enqueued.key);
         assert!(!restored_keys
             .iter()
             .any(|key| key == legacy.key.as_opaque()));
@@ -3001,7 +3005,8 @@ impl Engine {
         helper: std::path::PathBuf,
         dir: std::path::PathBuf,
     ) -> Result<DownloadView, WireError> {
-        let (track, url) = self.download_target(key)?;
+        let key = TrackKey::from_provider(canonical_download_key(key.as_opaque()));
+        let (track, url) = self.download_target(&key)?;
         std::fs::create_dir_all(&dir)
             .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
