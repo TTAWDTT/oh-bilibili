@@ -7,6 +7,7 @@ type DownloadsStore = {
   items: DownloadView[] | null
   load: () => Promise<void>
   enqueue: (key: string) => Promise<void>
+  retry: (key: string) => Promise<void>
   upsert: (view: DownloadView) => void
 }
 
@@ -17,26 +18,31 @@ function merge(items: DownloadView[] | null, view: DownloadView): DownloadView[]
   return list.map((item, at) => (at === index ? view : item))
 }
 
-export const useDownloadsStore = create<DownloadsStore>()((set) => ({
-  items: null,
-  load: async () => {
-    try {
-      set({ items: await ipc.downloadsList() })
-    } catch (cause) {
-      set({ items: [] })
-      toastFailure('读取下载列表', cause)
-    }
-  },
-  enqueue: async (key) => {
+export const useDownloadsStore = create<DownloadsStore>()((set) => {
+  const start = async (key: string, done: string): Promise<void> => {
     try {
       const view = await ipc.downloadEnqueue(key)
       set((state) => ({ items: merge(state.items, view) }))
-      toastDone('已加入下载队列', view.title)
+      toastDone(done, view.title)
     } catch (cause) {
       toastFailure('下载', cause)
     }
-  },
-  upsert: (view) => {
-    set((state) => ({ items: merge(state.items, view) }))
-  },
-}))
+  }
+
+  return {
+    items: null,
+    load: async () => {
+      try {
+        set({ items: await ipc.downloadsList() })
+      } catch (cause) {
+        set({ items: [] })
+        toastFailure('读取下载列表', cause)
+      }
+    },
+    enqueue: (key) => start(key, '已加入下载队列'),
+    retry: (key) => start(key, '已重新加入下载队列'),
+    upsert: (view) => {
+      set((state) => ({ items: merge(state.items, view) }))
+    },
+  }
+})

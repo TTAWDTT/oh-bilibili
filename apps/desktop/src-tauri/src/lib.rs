@@ -1106,6 +1106,7 @@ fn downloads_list(engine: tauri::State<'_, Arc<Engine>>) -> Vec<DownloadView> {
             state: d.state,
             progress: d.progress,
             path: d.path,
+            error: d.error,
         })
         .collect()
 }
@@ -1123,6 +1124,7 @@ async fn download_enqueue(
         state: view.state,
         progress: view.progress,
         path: view.path,
+        error: view.error,
     })
 }
 
