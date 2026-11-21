@@ -2113,10 +2113,9 @@ impl Engine {
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
             let id = self.library.upsert_track(&t)?;
             if let Some(mid) = self.source.nav().mid {
-                self.library.set_reaction(id, mid, ReactionKind::Like, liked)?;
-                let reactions = self.library.pending_reactions(mid, 50)?;
-                if let Some(r) = reactions.iter().find(|r| r.track_id == id && r.kind == ReactionKind::Like) {
-                    self.library.mark_reaction(r, ReactionState::Synced)?;
+                let reaction = self.library.set_reaction(id, mid, ReactionKind::Like, liked)?;
+                if reaction.state == ReactionState::Pending {
+                    self.library.mark_reaction(&reaction, ReactionState::Synced)?;
                 }
             }
         }
@@ -2406,13 +2405,9 @@ impl Engine {
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
             let id = self.library.upsert_track(&t)?;
             if let Some(mid) = self.source.nav().mid {
-                self.library.set_reaction(id, mid, ReactionKind::Fav, faved)?;
-                let pending = self.library.pending_reactions(mid, 50)?;
-                if let Some(r) = pending
-                    .iter()
-                    .find(|r| r.track_id == id && r.kind == ReactionKind::Fav)
-                {
-                    self.library.mark_reaction(r, ReactionState::Synced)?;
+                let reaction = self.library.set_reaction(id, mid, ReactionKind::Fav, faved)?;
+                if reaction.state == ReactionState::Pending {
+                    self.library.mark_reaction(&reaction, ReactionState::Synced)?;
                 }
             }
         }
@@ -2912,6 +2907,25 @@ mod sync_state_tests {
             library.pending_reactions(42, 50).unwrap().is_empty(),
             "没有遗留待办"
         );
+    }
+
+    #[tokio::test]
+    async fn 同步中改了意图会留给下一轮() {
+        let library = library_with_pending(1);
+        sync_pending(&library, 42, |_, reaction| {
+            let library = &library;
+            async move {
+                assert!(reaction.want);
+                library.set_reaction(reaction.track_id, 42, ReactionKind::Like, false)?;
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+
+        let pending = library.pending_reactions_all(42).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert!(!pending[0].want);
     }
 
     #[tokio::test]
