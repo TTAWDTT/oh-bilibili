@@ -420,6 +420,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return snapshot()
     }
     case 'home_feed': {
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('heroAllocation')) {
+        const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
+        if (fresh > 1) return []
+        return CATALOG.slice(0, 16).map((track, index) => ({
+          ...track,
+          key: `allocation-${index}`,
+          title: `首页分配 ${index + 1}`,
+        }))
+      }
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('failHome')) {
         await sleep(120)
         throw Object.assign(new Error('连不上 B 站，检查一下网络。'), { class: 'retryable' })

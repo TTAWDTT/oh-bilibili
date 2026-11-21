@@ -287,6 +287,49 @@ async function checkLibraryPartial(page) {
   check(`曲库没有控制台错误或未处理异常（${page.errors.length} 条）`, page.errors.length === 0)
 }
 
+async function checkHeroAllocation(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('heroAllocation', '1')
+  await page.viewport(1024, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+  let ready = false
+  for (let i = 0; i < 40 && !ready; i += 1) {
+    await sleep(250)
+    ready = await page.evaluate(
+      `document.querySelectorAll('[data-home-hero-grid] > button').length === 6 &&
+       document.querySelectorAll('[data-home-feed] [data-track-card]').length >= 5`,
+    )
+  }
+  const read = () =>
+    page.evaluate(`(() => {
+      const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
+        .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
+      const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
+        .map((card) => card.textContent.trim())
+      return { grid, feed }
+    })()`)
+  const wide = await read()
+  await page.viewport(1023, 900)
+  await sleep(500)
+  const narrow = await page.evaluate(`(() => ({
+    grid: document.querySelector('[data-home-hero-grid]') !== null,
+    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.textContent.trim()),
+  }))()`)
+  await page.viewport(1024, 900)
+  await sleep(500)
+  const restored = await read()
+  check(
+    '首屏推荐在 1024 与 1023 两侧都有入口',
+    ready &&
+      wide.grid.length === 6 &&
+      wide.grid.every((title) => narrow.feed.some((text) => text.includes(title))) &&
+      !narrow.grid &&
+      restored.grid.length === 6 &&
+      restored.feed.every((text) => !restored.grid.some((title) => text.includes(title))),
+  )
+  await page.viewport(1320, 900)
+}
+
 async function controlFit(page) {
   return page.evaluate(`(() => {
     const frame = document.querySelector('[data-watch-player]')
@@ -482,6 +525,7 @@ async function main() {
   try {
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkHeroAllocation(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     if (DYNAMIC_RETURN) {
       await dynamicReturn(page)
