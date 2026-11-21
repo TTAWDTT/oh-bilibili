@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
+import type { DynamicReturn, DynamicTab } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed } from '../../shared/lib/contract'
@@ -15,16 +16,21 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
 const FEED = 'mx-auto w-full max-w-[700px] px-4 md:px-0'
-const TABS: { key: 'all' | 'video' | 'opus'; label: string }[] = [
+const TABS: { key: DynamicTab; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'video', label: '视频投稿' },
   { key: 'opus', label: '图文' },
 ]
 
+type DynamicOpenEvent = MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>
+type OpenDynamic = (event: DynamicOpenEvent) => void
+type OpenDynamicItem = (item: ipc.DynamicItem, event: DynamicOpenEvent) => void
+type DynamicBody = { id: string; initiallyExpanded: boolean }
+
 /** 动态正文：超过六行折起来，B 站卡片也是先露出前几行再给「展开」。 */
-function RichText({ text }: { text: string }) {
+function RichText({ text, body }: { text: string; body: DynamicBody }) {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(body.initiallyExpanded)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
   const bodyNodes = text.split(/(#[^#\s]{1,40}#)/g).map((part, index) => {
@@ -65,6 +71,9 @@ function RichText({ text }: { text: string }) {
       {overflow || expanded ? (
         <button
           type="button"
+          name="dynamic-body"
+          value={body.id}
+          aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           className="t mt-1 text-[13px] text-[var(--accent)] hover:underline"
         >
@@ -75,7 +84,7 @@ function RichText({ text }: { text: string }) {
   )
 }
 
-function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDynamic }) {
   const later = (event: MouseEvent): void => {
     event.stopPropagation()
     if (!item.bvid) return
@@ -88,17 +97,20 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => v
   return (
     <div
       role="button"
+      data-dynamic-open="video"
       tabIndex={0}
       onClick={(event) => {
         // 封面右下角的「稍后再看」自己处理点击，别让整卡跟着进视频。
         if ((event.target as HTMLElement).closest('button')) return
-        onOpen()
+        event.stopPropagation()
+        onOpen(event)
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         if (event.target !== event.currentTarget) return
         event.preventDefault()
-        onOpen()
+        event.stopPropagation()
+        onOpen(event)
       }}
       className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
@@ -154,7 +166,7 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => v
 }
 
 /** 专栏投稿：B 站动态里是左边标题摘要、右边封面，底下挂「专栏」。 */
-function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDynamic }) {
   const text = item.text.trim()
   return (
     <button
@@ -185,7 +197,7 @@ function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () =>
 }
 
 /** 关注流里夹的直播推荐卡。B 站把它画成普通直播封面 + 主播 + 分区。 */
-function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDynamic }) {
   return (
     <button
       type="button"
@@ -214,7 +226,15 @@ function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => vo
   )
 }
 
-function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () => void }) {
+function DynamicContent({
+  item,
+  body,
+  onOpen,
+}: {
+  item: ipc.DynamicItem
+  body: DynamicBody
+  onOpen: OpenDynamic
+}) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   if (item.kind === 'article') return <DynamicArticle item={item} onOpen={onOpen} />
@@ -226,7 +246,7 @@ function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () =>
           {item.title}
         </p>
       ) : null}
-      {text ? <RichText text={text} /> : null}
+      {text ? <RichText text={text} body={body} /> : null}
       {item.kind === 'video' ? <DynamicVideo item={item} onOpen={onOpen} /> : null}
       {item.kind === 'opus' && item.images.length > 0 ? (
         <div
@@ -266,24 +286,19 @@ function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: () =>
 }
 
 /** 转发动态里被转的那条。再套转发只画到这里，不再往下一层。 */
-function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
+function OrigCard({
+  orig,
+  body,
+  onOpenVideo,
+}: {
+  orig: ipc.DynamicItem
+  body: DynamicBody
+  onOpenVideo: OpenDynamicItem
+}) {
   const navigate = useAppStore((state) => state.navigate)
-  const open = (): void => {
+  const open: OpenDynamic = (event) => {
     if (orig.kind === 'video' && orig.bvid) {
-      navigate({
-        kind: 'watch',
-        track: {
-          key: orig.bvid,
-          title: orig.title,
-          artist: orig.author,
-          cover: orig.cover,
-          duration_ms: orig.duration_ms,
-          views: orig.views,
-          danmaku: orig.danmaku,
-          up_avatar: orig.face,
-          up_mid: orig.mid,
-        },
-      })
+      onOpenVideo(orig, event)
     } else if (orig.kind === 'article' && orig.article_id) {
       void ipc
         .openExternal(`https://www.bilibili.com/read/cv${orig.article_id}`)
@@ -302,10 +317,11 @@ function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
   return (
     <div
       role="button"
+      data-dynamic-open="forward"
       tabIndex={0}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button')) return
-        open()
+        open(event)
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
@@ -317,7 +333,7 @@ function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
           return
         }
         event.preventDefault()
-        open()
+        open(event)
       }}
       className="mt-1 cursor-pointer rounded-[6px] border border-[var(--line)] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
@@ -336,22 +352,26 @@ function OrigCard({ orig }: { orig: ipc.DynamicItem }) {
           {orig.pub_time}
         </span>
       </div>
-      <DynamicContent item={orig} onOpen={open} />
+      <DynamicContent item={orig} body={body} onOpen={open} />
     </div>
   )
 }
 
 function DynamicCard({
   item,
+  expandedBodies,
   onOpen,
   onAuthor,
   onExternal,
 }: {
   item: ipc.DynamicItem
-  onOpen: () => void
+  expandedBodies: readonly string[]
+  onOpen: OpenDynamicItem
   onAuthor: () => void
   onExternal: () => void
 }) {
+  const body = { id: item.id, initiallyExpanded: expandedBodies.includes(item.id) }
+  const originalId = `${item.id}/original`
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   const kindLabel =
@@ -366,7 +386,11 @@ function DynamicCard({
           : '发布了动态'
 
   return (
-    <article className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5">
+    <article
+      data-dynamic-id={item.id}
+      tabIndex={-1}
+      className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5"
+    >
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -423,11 +447,17 @@ function DynamicCard({
       <div className="ml-[60px] mt-3">
         {item.kind === 'forward' ? (
           <>
-            {text ? <RichText text={text} /> : null}
-            {item.orig ? <OrigCard orig={item.orig} /> : null}
+            {text ? <RichText text={text} body={body} /> : null}
+            {item.orig ? (
+              <OrigCard
+                orig={item.orig}
+                body={{ id: originalId, initiallyExpanded: expandedBodies.includes(originalId) }}
+                onOpenVideo={onOpen}
+              />
+            ) : null}
           </>
         ) : (
-          <DynamicContent item={item} onOpen={onOpen} />
+          <DynamicContent item={item} body={body} onOpen={(event) => onOpen(item, event)} />
         )}
       </div>
       <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
@@ -448,14 +478,37 @@ function DynamicCard({
   )
 }
 
+function restoreDynamicPosition(scroller: HTMLElement, position: DynamicReturn): void {
+  const cards = [...scroller.querySelectorAll<HTMLElement>('[data-dynamic-id]')]
+  const byId = new Map(cards.map((card) => [card.dataset.dynamicId, card]))
+  const original = byId.get(position.itemIds[position.index])
+  let card = original
+  for (let distance = 1; !card && distance < position.itemIds.length; distance += 1) {
+    card = byId.get(position.itemIds[position.index + distance])
+      ?? byId.get(position.itemIds[position.index - distance])
+  }
+  card ??= cards[Math.min(position.index, cards.length - 1)]
+  if (!card) return
+
+  const selector = original ? `[data-dynamic-open="${position.trigger}"]` : '[data-dynamic-open]'
+  const target = card.querySelector<HTMLElement>(selector) ?? card
+  scroller.scrollTop += target.getBoundingClientRect().top
+    - scroller.getBoundingClientRect().top
+    - position.top
+  if (!original || position.restoreFocus) target.focus({ preventScroll: true })
+}
+
 export function DynamicView() {
   const navigate = useAppStore((state) => state.navigate)
+  const dynamicReturn = useAppStore((state) => state.dynamicReturn)
+  const [returnPosition, setReturnPosition] = useState(dynamicReturn)
+  const loadedPages = useRef(0)
   const auth = useAuthStore((state) => state.auth)
   const me = auth?.logged_in ? auth.user : null
-  const [following, setFollowing] = useState<Followed[]>([])
+  const [following, setFollowing] = useState<Followed[] | null>(null)
   const authorHover = useAuthorHover()
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
-  const [tab, setTab] = useState<'all' | 'video' | 'opus'>('all')
+  const [tab, setTab] = useState<DynamicTab>(dynamicReturn?.tab ?? 'all')
   const [offset, setOffset] = useState('')
   const [hasMore, setHasMore] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -465,6 +518,7 @@ export function DynamicView() {
   const pending = useRef(false)
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const expandedBodies = returnPosition?.expandedBodies ?? []
   const visible =
     tab === 'all'
       ? items
@@ -480,6 +534,7 @@ export function DynamicView() {
     setError(null)
     try {
       const page = await ipc.dynamicFeed(next)
+      loadedPages.current = append ? loadedPages.current + 1 : 1
       setItems((prev) => {
         if (!append) return page.items
         const seen = new Set(prev.map((item) => item.id))
@@ -506,16 +561,63 @@ export function DynamicView() {
     void ipc
       .following(1)
       .then(([users]) => setFollowing(users))
-      .catch(() => {})
+      .catch(() => setFollowing([]))
   }, [])
 
   // 一页只有 20 条，滑两屏就断粮。首屏之后连补 4 页，把可视区之外垫到 100 条。
   useEffect(() => {
     if (!loaded || !hasMore || loading || error) return
-    if (items.length === 0 || items.length >= 100 || prefetchPages.current >= 4) return
-    prefetchPages.current += 1
+    if (loadedPages.current >= (returnPosition?.pages ?? 0)) {
+      if (items.length === 0 || items.length >= 100 || prefetchPages.current >= 4) return
+      prefetchPages.current += 1
+    }
     void load(offset, true)
-  }, [loaded, hasMore, loading, error, items.length, offset, load])
+  }, [loaded, hasMore, loading, error, items.length, offset, load, returnPosition])
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (!returnPosition || !scroller || !loaded || following === null) return
+    if (!error && hasMore && loadedPages.current < returnPosition.pages) return
+    const frame = requestAnimationFrame(() => {
+      restoreDynamicPosition(scroller, returnPosition)
+      setReturnPosition(undefined)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [loaded, items, following, hasMore, error, returnPosition])
+
+  const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
+    const scroller = scrollerRef.current
+    const target = event.currentTarget
+    const position: DynamicReturn | undefined = scroller
+      ? {
+          tab,
+          itemIds: visible.map((entry) => entry.id),
+          index,
+          expandedBodies: Array.from(
+            scroller.querySelectorAll<HTMLButtonElement>('button[name="dynamic-body"][aria-expanded="true"]'),
+            (button) => button.value,
+          ),
+          top: target.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
+          trigger: target.dataset.dynamicOpen === 'forward' ? 'forward' : 'video',
+          restoreFocus: event.type === 'keydown',
+          pages: loadedPages.current,
+        }
+      : undefined
+    navigate({
+      kind: 'watch',
+      track: {
+        key: item.bvid,
+        title: item.title,
+        artist: item.author,
+        cover: item.cover,
+        duration_ms: item.duration_ms,
+        views: item.views,
+        danmaku: item.danmaku,
+        up_avatar: item.face,
+        up_mid: item.mid,
+      },
+    }, position)
+  }
 
   if (!loaded && loading) return <BiliLoader label="正在取动态…" />
   if (error && items.length === 0) {
@@ -560,7 +662,10 @@ export function DynamicView() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void load(null, false)}
+              onClick={() => {
+                setReturnPosition(undefined)
+                void load(null, false)
+              }}
               disabled={loading}
               aria-label="刷新动态"
               title="刷新动态"
@@ -577,6 +682,7 @@ export function DynamicView() {
                 key={entry.key}
                 type="button"
                 onClick={() => {
+                  setReturnPosition(undefined)
                   setTab(entry.key)
                   scrollerRef.current?.scrollTo({ top: 0 })
                 }}
@@ -613,7 +719,7 @@ export function DynamicView() {
           </span>
         </button>
       </div>
-      {following.length > 0 ? (
+      {following?.length ? (
         <div className={`${FEED} pt-4`}>
           <div
             onScroll={authorHover.hide}
@@ -663,37 +769,25 @@ export function DynamicView() {
         }}
       />
       <div className={`${FEED} flex flex-col gap-3 pt-4`}>
-        {visible.map((item) => (
+        {visible.map((item, index) => (
           <DynamicCard
             key={item.id}
             item={item}
-            onOpen={() => {
-              if (item.kind === 'video' && item.bvid) {
-                navigate({
-                  kind: 'watch',
-                  track: {
-                    key: item.bvid,
-                    title: item.title,
-                    artist: item.author,
-                    cover: item.cover,
-                    duration_ms: item.duration_ms,
-                    views: item.views,
-                    danmaku: item.danmaku,
-                    up_avatar: item.face,
-                    up_mid: item.mid,
-                  },
-                })
-              } else if (item.kind === 'article' && item.article_id) {
+            expandedBodies={expandedBodies}
+            onOpen={(opened, event) => {
+              if (opened.kind === 'video' && opened.bvid) {
+                openVideo(opened, event, index)
+              } else if (opened.kind === 'article' && opened.article_id) {
                 void ipc
-                  .openExternal(`https://www.bilibili.com/read/cv${item.article_id}`)
+                  .openExternal(`https://www.bilibili.com/read/cv${opened.article_id}`)
                   .catch((cause) => toastFailure('打开专栏', cause))
-              } else if (item.kind === 'live' && item.room_id) {
+              } else if (opened.kind === 'live' && opened.room_id) {
                 void ipc
-                  .openExternal(`https://live.bilibili.com/${item.room_id}`)
+                  .openExternal(`https://live.bilibili.com/${opened.room_id}`)
                   .catch((cause) => toastFailure('打开直播间', cause))
-              } else if (item.kind !== 'video') {
+              } else if (opened.kind !== 'video') {
                 void ipc
-                  .openExternal(`https://www.bilibili.com/opus/${item.id}`)
+                  .openExternal(`https://www.bilibili.com/opus/${opened.id}`)
                   .catch((cause) => toastFailure('打开动态', cause))
               }
             }}

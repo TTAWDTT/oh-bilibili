@@ -9,8 +9,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
-const PORT = Number(process.env.SMOKE_CDP_PORT || 9224)
+const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const libraryPartialOnly = process.argv.includes('--library-partial')
+const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
   : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
@@ -34,10 +35,12 @@ async function connect() {
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
+      ...(DYNAMIC_RETURN || libraryPartialOnly
+        ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1']
+        : []),
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
-      `--user-data-dir=${join(tmpdir(), process.env.SMOKE_CDP_PORT ? `oh-bilibili-smoke-${PORT}` : 'oh-bilibili-smoke')}`,
-      ...(libraryPartialOnly ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1'] : []),
+      `--user-data-dir=${join(tmpdir(), `oh-bilibili-smoke-${PORT}`)}`,
       'about:blank',
     ],
     { stdio: 'ignore', detached: false },
@@ -67,19 +70,16 @@ async function connect() {
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data)
     if (msg.method === 'Runtime.exceptionThrown') {
-      runtimeErrors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text)
+      const detail = msg.params.exceptionDetails
+      errors.push(detail.exception?.description ?? detail.text)
     }
     if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
-      runtimeErrors.push(msg.params.args.map((arg) => arg.value ?? arg.description).join(' '))
+      errors.push(msg.params.args.map((arg) => arg.description ?? arg.value).join(' '))
     }
     const done = msg.id ? pending.get(msg.id) : null
     if (done) {
       pending.delete(msg.id)
       done(msg)
-    } else if (msg.method === 'Runtime.exceptionThrown') {
-      errors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text)
-    } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
-      errors.push(msg.params.args.map((arg) => arg.value ?? arg.description).join(' '))
     }
   }
   const send = (method, params = {}, sessionId) =>
@@ -168,6 +168,7 @@ async function connect() {
     doubleClick,
     pressSpace,
     mouseEvent: (params) => send('Input.dispatchMouseEvent', params, sid),
+    keyEvent: (params) => send('Input.dispatchKeyEvent', params, sid),
     clickText,
     clickExactText,
     close: () => {
@@ -321,10 +322,153 @@ async function controlFit(page) {
   })()`)
 }
 
+async function dynamicReturn(page) {
+  const title = '起风了｜深夜卧室版'
+  const cardSelector = (name) => `[...document.querySelectorAll('article [role="button"]')].find(
+    (button) => button.textContent.includes(${JSON.stringify(name)}),
+  )`
+  const readCard = (name = title) => page.evaluate(`(async () => {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const scroller = document.querySelector('#scroll-main')
+    const card = ${cardSelector(name)}
+    if (!scroller || !card) return null
+    const rect = card.getBoundingClientRect()
+    const viewport = scroller.getBoundingClientRect()
+    const header = scroller.querySelector('header').getBoundingClientRect()
+    const bodyToggle = [...card.closest('article').querySelectorAll('button')]
+      .find((button) => button.textContent === '收起' || button.textContent === '展开')
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      top: rect.top - viewport.top,
+      scroll: scroller.scrollTop,
+      videoOnly: !scroller.innerText.includes('点歌台｜今晚只放你点的歌'),
+      focused: document.activeElement === card,
+      bodyToggle: bodyToggle?.textContent,
+      visible: rect.top >= header.bottom && rect.bottom <= viewport.bottom,
+    }
+  })()`)
+  const waitForCard = async (name) => {
+    for (let i = 0; i < 30; i += 1) {
+      const card = await readCard(name)
+      if (card) return card
+      await sleep(100)
+    }
+    return null
+  }
+
+  const openFeed = async (scenario) => {
+    if (scenario) {
+      const url = new URL(WEB)
+      url.searchParams.set(scenario, '1')
+      const href = JSON.stringify(url.href)
+      await page.evaluate(`location.href = ${href}`)
+      for (let i = 0; i < 30; i += 1) {
+        if (await page.evaluate(`location.href === ${href}`)) break
+        await sleep(100)
+      }
+    }
+    for (let i = 0; i < 30; i += 1) {
+      const opened = await page.evaluate(`(() => {
+        const tab = [...document.querySelectorAll('[aria-label="主要导航"] button')]
+          .find((button) => button.textContent.trim() === '动态')
+        if (!tab) return false
+        tab.click()
+        return true
+      })()`)
+      if (opened) break
+      await sleep(100)
+    }
+    if (!(await waitForCard()) || !(await page.clickExactText('视频投稿'))) {
+      throw new Error('640×560 预览未载入视频投稿')
+    }
+    await page.evaluate("document.querySelector('#scroll-main').scrollTop = 483")
+    return readCard()
+  }
+  const openWithEnter = async () => {
+    await page.evaluate(`(${cardSelector(title)})?.focus({ preventScroll: true })`)
+    const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }
+    await page.keyEvent({ type: 'keyDown', ...enter })
+    await page.keyEvent({ type: 'keyUp', ...enter })
+    return page.clickExactText('返回')
+  }
+  const toggleBody = (label) => page.evaluate(`(() => {
+    const article = (${cardSelector(title)})?.closest('article')
+    if (!article) return false
+    const toggle = [...article.querySelectorAll('button')]
+      .find((button) => button.textContent === ${JSON.stringify(label)})
+    if (!toggle) return false
+    toggle.click()
+    return true
+  })()`)
+
+  const firstError = page.runtimeErrors.length
+  await page.viewport(640, 560)
+  const before = await openFeed()
+  check('640×560 视频投稿已滚到第二条', before?.videoOnly && before.scroll > 0 && before.y < 560)
+  if (!before) return
+
+  const { x, y } = before
+  await page.mouseEvent({ type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 })
+  await page.mouseEvent({ type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 })
+  check('通过顶栏从第二条视频详情返回', await page.clickExactText('返回'))
+  const after = await waitForCard()
+  check('返回后保留视频投稿筛选', after?.videoOnly)
+  check(
+    `返回后第二条视频恢复位置，scrollTop ${before.scroll} → ${after?.scroll}`,
+    !!after && Math.abs(after.top - before.top) <= 1,
+  )
+
+  const keyboardBack = await openWithEnter()
+  const keyboardReturn = await waitForCard()
+  check('用 Enter 打开后返回，焦点回到第二条视频', keyboardBack && keyboardReturn?.focused)
+
+  const refresh = await page.clickText('刷新动态')
+  const refreshed = await waitForCard()
+  check('主动刷新回到顶部并保留筛选', refresh && refreshed?.scroll === 0 && refreshed.videoOnly)
+
+  await openFeed('longDynamicBody')
+  const expanded = await toggleBody('展开')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const expandedBefore = await readCard()
+  const expandedBack = await openWithEnter()
+  const expandedAfter = await waitForCard()
+  check(
+    `展开长正文后按 Enter 打开视频，返回时保留正文、筛选、位置和焦点，卡片距视口顶部 ${expandedBefore?.top} → ${expandedAfter?.top}`,
+    expanded && expandedBack &&
+      expandedBefore?.bodyToggle === '收起' && expandedBefore.visible &&
+      expandedAfter?.bodyToggle === '收起' && expandedAfter.visible && expandedAfter.videoOnly && expandedAfter.focused &&
+      Math.abs(expandedAfter.top - expandedBefore.top) <= 1 &&
+      Math.abs(expandedAfter.scroll - expandedBefore.scroll) <= 1,
+  )
+
+  const collapsed = await toggleBody('收起')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const collapsedBefore = await readCard()
+  const collapsedBack = await openWithEnter()
+  const collapsedAfter = await waitForCard()
+  check(
+    `收起长正文后返回，卡片距视口顶部 ${collapsedBefore?.top} → ${collapsedAfter?.top}`,
+    collapsed && collapsedBack && collapsedBefore?.visible && collapsedBefore.bodyToggle === '展开' &&
+      collapsedAfter?.visible && collapsedAfter.bodyToggle === '展开' && collapsedAfter.focused &&
+      Math.abs(collapsedAfter.top - collapsedBefore.top) <= 1,
+  )
+
+  await openFeed('removeDynamicOnReturn')
+  const removedBack = await openWithEnter()
+  const neighbor = await waitForCard('【翻唱】晴天｜一人双声部')
+  check('原条目删除后，返回同一筛选并聚焦相邻视频', removedBack && neighbor?.focused && neighbor.videoOnly && !(await readCard()))
+
+  const errors = page.runtimeErrors.slice(firstError)
+  check('动态返回没有控制台错误或未处理异常', errors.length === 0)
+  if (errors.length) console.error(errors)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
+    if (DYNAMIC_RETURN) process.exitCode = 1
     return
   }
   if (!(await reachable(WEB))) {
@@ -338,6 +482,11 @@ async function main() {
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    if (DYNAMIC_RETURN) {
+      await dynamicReturn(page)
+      if (checks.some((c) => !c.ok)) process.exitCode = 1
+      return
+    }
     await sleep(6000)
 
     // 首页卡片：hover 只露出听、稍后再看和更多；低频动作收进更多。

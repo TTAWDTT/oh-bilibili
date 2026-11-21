@@ -22,6 +22,20 @@ export type View =
   | { kind: 'following' }
   | { kind: 'settings' }
 
+export type DynamicTab = 'all' | 'video' | 'opus'
+export type DynamicReturn = {
+  tab: DynamicTab
+  itemIds: string[]
+  index: number
+  expandedBodies: string[]
+  top: number
+  trigger: 'video' | 'forward'
+  restoreFocus: boolean
+  pages: number
+}
+
+type HistoryEntry = { view: View; dynamicReturn: DynamicReturn | undefined }
+
 export type RailTab = 'lyrics' | 'queue'
 export type SidebarMode = 'full' | 'rail'
 export type ToastTone = 'error' | 'warn' | 'info' | 'success'
@@ -125,11 +139,12 @@ type AppStore = {
   osFullscreen: boolean
   toasts: Toast[]
   /** 当前视图之前去过哪里。返回按钮用它，不再写死跳某一页。 */
-  history: View[]
+  history: HistoryEntry[]
+  dynamicReturn: DynamicReturn | undefined
   /** 左栏是完整标签版还是只剩图标的窄条。 */
   sidebar: SidebarMode
   toggleSidebar: () => void
-  navigate: (view: View) => void
+  navigate: (view: View, dynamicReturn?: DynamicReturn) => void
   /** 换一条视频但不进历史：观看页里点相关推荐或自动连播，返回该回到来的那一页。 */
   replace: (view: View) => void
   /** 回上一层；没有历史就回发现页。 */
@@ -154,6 +169,7 @@ type AppStore = {
 export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'home' },
   history: [],
+  dynamicReturn: undefined,
   sidebar: loadSidebar(),
   toggleSidebar: () => {
     const next: SidebarMode = get().sidebar === 'full' ? 'rail' : 'full'
@@ -180,7 +196,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   cinema: false,
   osFullscreen: false,
   toasts: [],
-  navigate: (view) =>
+  navigate: (view, dynamicReturn) =>
     set((state) => {
       // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
       if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
@@ -192,12 +208,14 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         searchReturn: state.searchOpen && view.kind === 'watch' ? view.track.key : null,
         cinema: false,
         osFullscreen: false,
-        history: [...state.history, state.view].slice(-32),
+        history: [...state.history, { view: state.view, dynamicReturn }].slice(-32),
+        dynamicReturn: undefined,
       }
     }),
   replace: (view) =>
     set((state) => ({
       view,
+      dynamicReturn: undefined,
       searchOpen: false,
       searchReturn: view.kind === 'watch' ? state.searchReturn : null,
       cinema: false,
@@ -208,6 +226,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       const prev = state.history.at(-1)
       if (!prev) {
         return {
+          dynamicReturn: undefined,
           view: { kind: 'home' } as View,
           searchOpen: false,
           searchReturn: null,
@@ -216,7 +235,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         }
       }
       return {
-        view: prev,
+        view: prev.view,
+        dynamicReturn: prev.dynamicReturn,
         searchOpen: state.searchReturn !== null,
         searchReturn: null,
         searchFocusResult: state.searchReturn,
