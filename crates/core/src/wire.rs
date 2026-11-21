@@ -65,6 +65,17 @@ impl std::fmt::Display for WireError {
 
 impl std::error::Error for WireError {}
 
+/// 一次手动同步的结果。部分失败不能伪装成成功，界面据此决定提示。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SyncOutcome {
+    pub synced: u32,
+    /// 网络、限流或登录态问题：保留 pending，下次还能重试。
+    pub deferred: u32,
+    /// 明确的永久拒绝：已标为 rejected，并带第一条可读原因。
+    pub rejected: u32,
+    pub detail: Option<String>,
+}
+
 impl From<bilimusic_bili::error::BiliError> for WireError {
     fn from(e: bilimusic_bili::error::BiliError) -> WireError {
         use bilimusic_bili::error::BiliError as B;

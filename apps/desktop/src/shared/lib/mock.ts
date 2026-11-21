@@ -1055,7 +1055,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return state.downloads.map((item) => ({ ...item }))
     case 'sync_now':
       setTimeout(() => emit({ type: 'library_changed' }), 400)
-      return null
+      return { synced: 0, deferred: 0, rejected: 0, detail: null }
     default:
       throw fail('internal', `浏览器 mock 还没有实现 ${command}`)
   }
