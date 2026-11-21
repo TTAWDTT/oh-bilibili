@@ -147,6 +147,8 @@ pub struct Engine {
     last_transport_at: Mutex<std::time::Instant>,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
+    /// 最近一次清空前的完整队列。只保留一层，供界面上的「撤销」使用。
+    cleared_queue: Mutex<Option<Queue>>,
     watch_gate: WatchGate,
 }
 
@@ -184,6 +186,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            cleared_queue: Mutex::new(None),
             mode: Mutex::new(crate::wire::PlayMode::Listen),
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
@@ -1510,15 +1513,24 @@ impl Engine {
 
     /// 清空队列。
     pub fn queue_clear(&self) -> Result<QueueView, WireError> {
-        {
-            let mut queue = lock(&self.queue);
-            *queue = Queue::from_tracks(&[], 0);
-        }
+        let saved = lock(&self.queue).take_clear_snapshot();
+        *lock(&self.cleared_queue) = saved;
         self.persist_queue();
         Ok(QueueView {
             items: Vec::new(),
             index: None,
         })
+    }
+
+    /// 撤销最近一次清空：整个队列原样放回，随机顺序和当前项都不丢。
+    pub fn queue_undo_clear(&self) -> Result<QueueView, WireError> {
+        let saved = lock(&self.cleared_queue).take();
+        let Some(saved) = saved else {
+            return Err(WireError::input("queue", "没有可撤销的清空"));
+        };
+        *lock(&self.queue) = saved;
+        self.persist_queue();
+        Ok(self.queue_view())
     }
 
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
