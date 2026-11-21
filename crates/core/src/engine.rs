@@ -212,6 +212,117 @@ mod download_restore_tests {
             None
         );
     }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 下载分集后恢复并独立删除() {
+        use super::Engine;
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+
+        let dir = temp_dir("download-pages");
+        let db = dir.join("library.sqlite");
+        let legacy = track("BV1xx411c7mD");
+        let legacy_audio = dir.join("晴天 [BV1xx411c7mD].m4a");
+        std::fs::write(&legacy_audio, b"legacy audio").unwrap();
+        let video = track("BV1vs411n7TH");
+        {
+            let library = Library::open(&db).unwrap();
+            library.upsert_track(&video).unwrap();
+            library
+                .save_download(&legacy, legacy_audio.to_str(), "done", None)
+                .unwrap();
+        }
+        let helper = dir.join("yt-dlp");
+        std::fs::write(
+            &helper,
+            r#"#!/bin/sh
+for url do :; done
+printf '%s\n' "$url" >> urls
+case "$url" in
+    *'?p=2') id=BV1vs411n7TH_p2 ;;
+    *) id=BV1vs411n7TH_p1 ;;
+esac
+file="歌 [$id].m4a"
+printf '%s' "$id" > "$file"
+printf '"%s"\n' "$file"
+"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let engine = Engine::new(&db).unwrap();
+        let mut paths = Vec::new();
+        for page in [1, 2] {
+            let key = if page == 1 {
+                video.key.clone()
+            } else {
+                TrackKey::from_provider("BV1vs411n7TH_p2")
+            };
+            let view = engine
+                .enqueue_download_in(&key, helper.clone(), dir.clone())
+                .unwrap();
+            assert_eq!(view.key, key.as_opaque());
+            let finished = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let item = engine
+                        .downloads()
+                        .into_iter()
+                        .find(|item| item.key == view.key)
+                        .unwrap();
+                    if item.state != "running" {
+                        break item;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(finished.state, "done", "{:?}", finished.error);
+            let path = std::path::PathBuf::from(finished.path.unwrap());
+            let urls = std::fs::read_to_string(dir.join("urls")).unwrap();
+            if page == 2 {
+                assert_eq!(
+                    urls.lines().last(),
+                    Some("https://www.bilibili.com/video/BV1vs411n7TH?p=2")
+                );
+            }
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap(),
+                format!("BV1vs411n7TH_p{page}")
+            );
+            assert_eq!(download_key_of(&path).unwrap().0, key.as_opaque());
+            paths.push((view.key, path));
+        }
+        assert_ne!(paths[0].0, paths[1].0);
+        assert_ne!(paths[0].1, paths[1].1);
+
+        let restored = Engine::new(&db).unwrap();
+        let items = restored.downloads();
+        assert_eq!(items.len(), 3);
+        for (key, path) in &paths {
+            let item = items.iter().find(|item| &item.key == key).unwrap();
+            assert_eq!(item.state, "done");
+            assert_eq!(item.path.as_deref(), path.to_str());
+        }
+        assert!(items.iter().any(|item| {
+            item.key == legacy.key.as_opaque()
+                && item.state == "done"
+                && item.path.as_deref() == legacy_audio.to_str()
+        }));
+        let remaining = restored.download_delete_audio(&paths[1].0).unwrap();
+        assert_eq!(remaining.len(), 2);
+        let p1 = remaining.iter().find(|item| item.key == paths[0].0).unwrap();
+        assert_eq!(p1.state, "done");
+        assert_eq!(p1.path.as_deref(), paths[0].1.to_str());
+        assert!(paths[0].1.is_file());
+        assert!(!paths[1].1.exists());
+        let remaining = Library::open(&db).unwrap().downloads().unwrap();
+        assert_eq!(remaining.len(), 2);
+        assert!(remaining.iter().any(|item| item.key.as_opaque() == paths[0].0));
+        assert!(remaining.iter().all(|item| item.key.as_opaque() != paths[1].0));
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }
 
 #[cfg(test)]
@@ -2714,10 +2825,18 @@ impl Engine {
         self: &Arc<Self>,
         key: &TrackKey,
     ) -> Result<DownloadView, WireError> {
-        let track = self.track_of(key)?;
         let helper = crate::download::find_helper()
             .ok_or_else(|| WireError::internal("找不到 yt-dlp，请检查应用安装或 PATH"))?;
-        let dir = downloads_dir();
+        self.enqueue_download_in(key, helper, downloads_dir())
+    }
+
+    fn enqueue_download_in(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        helper: std::path::PathBuf,
+        dir: std::path::PathBuf,
+    ) -> Result<DownloadView, WireError> {
+        let (track, url) = self.download_target(key)?;
         std::fs::create_dir_all(&dir)
             .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
@@ -2744,7 +2863,6 @@ impl Engine {
             view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
         });
 
-        let url = format!("https://www.bilibili.com/video/{}", key.as_opaque());
         let engine = self.clone();
         let view_key = view.key.clone();
 
@@ -2778,6 +2896,24 @@ impl Engine {
         });
 
         Ok(view)
+    }
+
+    fn download_target(&self, key: &TrackKey) -> Result<(Track, String), WireError> {
+        let id = key.as_opaque();
+        let root = "https://www.bilibili.com/video";
+        let Some((bvid, page)) = download_part(id) else {
+            return Ok((self.track_of(key)?, format!("{root}/{id}")));
+        };
+        let track = match self.library.track_by_key(key)? {
+            Some(track) => track,
+            None => {
+                let mut track = self.track_of(&TrackKey::from_provider(bvid))?;
+                track.key = key.clone();
+                track.title = format!("{} · P{page}", track.title);
+                track
+            }
+        };
+        Ok((track, format!("{root}/{bvid}?p={page}")))
     }
 
     /// 网络、限流、登录态属于可重试，保留 pending；其余才是永久拒绝。
@@ -3041,6 +3177,12 @@ fn restored_download(record: &StoredDownload) -> DownloadView {
 
 const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];
 
+fn download_part(key: &str) -> Option<(&str, u32)> {
+    let (bvid, part) = key.rsplit_once("_p")?;
+    let page = part.parse::<std::num::NonZeroU32>().ok()?.get();
+    bvid.starts_with("BV").then_some((bvid, page))
+}
+
 /// yt-dlp 的 `-o` 模板是「标题 [id].扩展名」。只认这种文件名，
 /// 半截的 .part 与目录里的其它文件不碰。
 fn download_key_of(path: &std::path::Path) -> Option<(String, String)> {
@@ -3054,6 +3196,10 @@ fn download_key_of(path: &std::path::Path) -> Option<(String, String)> {
     if key.is_empty() || key.contains(char::is_whitespace) {
         return None;
     }
+    let key = match download_part(key) {
+        Some((bvid, 1)) => bvid,
+        _ => key,
+    };
     let title = stem[..open].trim();
     Some((
         key.to_string(),

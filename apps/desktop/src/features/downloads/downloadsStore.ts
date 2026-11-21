@@ -5,6 +5,7 @@ import { toastDone, toastFailure } from '../../app/notice'
 
 type DownloadsStore = {
   items: DownloadView[] | null
+  pending: ReadonlySet<string>
   load: () => Promise<void>
   enqueue: (key: string) => Promise<void>
   retry: (key: string) => Promise<void>
@@ -18,19 +19,28 @@ function merge(items: DownloadView[] | null, view: DownloadView): DownloadView[]
   return list.map((item, at) => (at === index ? view : item))
 }
 
-export const useDownloadsStore = create<DownloadsStore>()((set) => {
+export const useDownloadsStore = create<DownloadsStore>()((set, get) => {
   const start = async (key: string, done: string): Promise<void> => {
+    if (get().pending.has(key)) return
+    set((state) => ({ pending: new Set(state.pending).add(key) }))
     try {
       const view = await ipc.downloadEnqueue(key)
       set((state) => ({ items: merge(state.items, view) }))
       toastDone(done, view.title)
     } catch (cause) {
       toastFailure('下载', cause)
+    } finally {
+      set((state) => {
+        const pending = new Set(state.pending)
+        pending.delete(key)
+        return { pending }
+      })
     }
   }
 
   return {
     items: null,
+    pending: new Set(),
     load: async () => {
       try {
         set({ items: await ipc.downloadsList() })
