@@ -302,31 +302,40 @@ async function checkHeroAllocation(page) {
   }
   const read = () =>
     page.evaluate(`(() => {
+      const carousel = [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+        .map((image) => image.dataset.trackTitle ?? '')
       const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
         .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
       const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
         .map((card) => card.dataset.trackTitle ?? '')
-      return { grid, feed }
+      return { carousel, grid, feed }
     })()`)
   const wide = await read()
   await page.viewport(1023, 900)
   await sleep(500)
   const narrow = await page.evaluate(`(() => ({
+    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+      .map((image) => image.dataset.trackTitle ?? ''),
     grid: document.querySelector('[data-home-hero-grid]') !== null,
     feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
   }))()`)
   await page.viewport(1024, 900)
   await sleep(500)
   const restored = await read()
+  const initialTitles = Array.from({ length: 16 }, (_, index) => `首页分配 ${index + 1}`)
+  const placedOnce = (expected, titles) =>
+    expected.every((title) => titles.filter((entry) => entry === title).length === 1) &&
+    new Set(titles).size === titles.length
   check(
-    '首屏推荐在 1024 与 1023 两侧都有入口且不重复',
+    '首屏推荐在 1024 与 1023 两侧各有一次入口',
     ready &&
+      wide.carousel.length === 5 &&
       wide.grid.length === 6 &&
-      new Set(wide.grid).size === wide.grid.length &&
-      wide.grid.every((title) => narrow.feed.filter((text) => text === title).length === 1) &&
+      placedOnce(initialTitles, [...wide.carousel, ...wide.grid, ...wide.feed]) &&
+      placedOnce(initialTitles, [...narrow.carousel, ...narrow.feed]) &&
       !narrow.grid &&
       restored.grid.length === 6 &&
-      restored.feed.every((title) => !restored.grid.includes(title)),
+      placedOnce(initialTitles, [...restored.carousel, ...restored.grid, ...restored.feed]),
   )
   const refreshedButton = await page.evaluate(`(() => {
     const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '换一换')
@@ -345,22 +354,31 @@ async function checkHeroAllocation(page) {
   await page.viewport(1023, 900)
   await sleep(500)
   const refreshedNarrow = await page.evaluate(`(() => ({
+    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+      .map((image) => image.dataset.trackTitle ?? ''),
     grid: document.querySelector('[data-home-hero-grid]') !== null,
     feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
   }))()`)
+  const refreshedTitles = [
+    ...Array.from({ length: 6 }, (_, index) => `换一换 ${index + 1}`),
+    ...Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`),
+  ]
+  const refreshedOnce = (titles) => placedOnce(refreshedTitles, titles)
   check(
     '换一换后首屏和推荐流仍不重复、不丢项',
     refreshedButton &&
       refreshedReady &&
       refreshed.grid.length === 6 &&
-      refreshed.feed.every((title) => !refreshed.grid.includes(title)) &&
-      Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`).every((title) =>
-        [...refreshed.grid, ...refreshed.feed].includes(title),
-      ) &&
+      refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) &&
       !refreshedNarrow.grid &&
-      new Set(refreshedNarrow.feed).size === refreshedNarrow.feed.length &&
-      refreshedNarrow.feed.filter((title) => refreshed.grid.includes(title)).length === refreshed.grid.length,
+      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed]),
   )
+  if (
+    !refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) ||
+    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed])
+  ) {
+    console.log(JSON.stringify({ refreshed, refreshedNarrow, refreshedTitles }))
+  }
   await page.viewport(1320, 900)
 }
 

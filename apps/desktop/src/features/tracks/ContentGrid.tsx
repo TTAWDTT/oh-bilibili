@@ -319,7 +319,9 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
   }, [leadKey])
   /** 列表被删短时窗口跟着收，别留下越界的下标。 */
   useEffect(() => {
-    setShown((current) => Math.min(current, Math.max(tracks.length, RENDER_INITIAL)))
+    setShown((current) =>
+      Math.min(tracks.length, Math.max(current, Math.min(tracks.length, RENDER_INITIAL))),
+    )
   }, [tracks.length])
 
   // 缓冲不够深就继续向接口要；这里只管数据，不把新页直接挂进 DOM。

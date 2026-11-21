@@ -47,6 +47,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       {slides.map((t, i) => (
         <img
           key={t.key}
+          data-track-title={t.title}
           src={thumbWide(t.cover, 1600) ?? ''}
           alt=""
           aria-hidden
