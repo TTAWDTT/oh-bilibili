@@ -32,6 +32,10 @@ export function StageView() {
   const toggle = usePlayerStore((state) => state.toggle)
   const next = usePlayerStore((state) => state.next)
   const prev = usePlayerStore((state) => state.prev)
+  const shuffle = usePlayerStore((state) => state.snapshot?.shuffle ?? false)
+  const repeat = usePlayerStore((state) => state.snapshot?.repeat ?? 'off')
+  const setShuffle = usePlayerStore((state) => state.setShuffle)
+  const cycleRepeat = usePlayerStore((state) => state.cycleRepeat)
   const [doc, setDoc] = useState<LyricDoc | null>(null)
   const [related, setRelated] = useState<Track[]>([])
   const track = snapshot?.track ?? null
@@ -168,6 +172,15 @@ export function StageView() {
         )}
 
         <div className="mt-4 flex items-center gap-6 text-[var(--text-2)]">
+          <button
+            type="button"
+            aria-label={shuffle ? '关闭随机播放' : '随机播放'}
+            aria-pressed={shuffle}
+            onClick={() => setShuffle(!shuffle)}
+            className={['t press hover:text-[var(--text-1)]', shuffle ? 'text-[var(--accent)]' : ''].join(' ')}
+          >
+            <Icon name="shuffle" size={18} />
+          </button>
           <button type="button" aria-label="上一首" onClick={() => void prev()} className="t press hover:text-[var(--text-1)]">
             <Icon name="prev" size={22} />
           </button>
@@ -182,6 +195,15 @@ export function StageView() {
           </button>
           <button type="button" aria-label="下一首" onClick={() => void next()} className="t press hover:text-[var(--text-1)]">
             <Icon name="next" size={22} />
+          </button>
+          <button
+            type="button"
+            aria-label={repeat === 'off' ? '循环：关' : repeat === 'all' ? '循环：列表' : '循环：单曲'}
+            aria-pressed={repeat !== 'off'}
+            onClick={() => void cycleRepeat()}
+            className={['t press hover:text-[var(--text-1)]', repeat !== 'off' ? 'text-[var(--accent)]' : ''].join(' ')}
+          >
+            <Icon name={repeat === 'one' ? 'repeatOne' : 'repeat'} size={18} />
           </button>
         </div>
 

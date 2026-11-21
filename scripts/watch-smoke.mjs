@@ -1575,28 +1575,94 @@ async function main() {
       queue.focus()
       return {
         overflow: bar.scrollWidth - bar.clientWidth,
+        barInside: barBox.left >= 0 && barBox.right <= window.innerWidth,
         titleWidth: titleBox.width,
+        titleVisible:
+          getComputedStyle(title).visibility !== 'hidden' &&
+          Number(getComputedStyle(title).opacity) > 0.5 &&
+          getComputedStyle(title).color !== 'rgba(0, 0, 0, 0)',
         queueInside: queueBox.left >= barBox.left && queueBox.right <= barBox.right,
+        queueTabIndex: queue.tabIndex,
+        queueDisabled: queue.disabled,
         queueFocused: document.activeElement === queue,
+        queueCenter: [queueBox.left + queueBox.width / 2, queueBox.top + queueBox.height / 2],
       }
     })()`)
     await page.pressSpace()
     await sleep(400)
-    const narrowQueueOpened = await page.evaluate(
-      `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
-    )
+    const narrowQueueOpened = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+      return {
+        open: !!dialog,
+        focusInside: !!dialog && dialog.contains(document.activeElement),
+        initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
+      }
+    })()`)
+    const focusWraps = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+      if (!dialog) return false
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]):not([tabindex="-1"])')]
+        .filter((element) => element.getClientRects().length > 0)
+      if (focusable.length < 2) return false
+      focusable[0].focus()
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+      )
+      return document.activeElement === focusable.at(-1)
+    })()`)
     await page.evaluate(
       `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
     )
+    await sleep(300)
+    const queueClosedByKey = await page.evaluate(`(() => ({
+      closed: !document.querySelector('[role="dialog"][aria-label="播放详情"]'),
+      focusReturned: document.activeElement === document.querySelector('button[aria-label="播放队列"]'),
+    }))()`)
+    await clickAt(narrowPlayer.queueCenter[0], narrowPlayer.queueCenter[1])
+    const queueOpenedByMouse = await page.evaluate(
+      `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
+    )
+    await page.evaluate(
+      `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+    )
+    await sleep(300)
+    const openedNarrowStage = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label="打开播放舞台"]')
+      hit?.click()
+      return !!hit
+    })()`)
+    await sleep(400)
+    const narrowStageControls = await page.evaluate(`(() => {
+      const visible = (label) => {
+        const button = document.querySelector('.stage button[aria-label="' + label + '"]')
+        return !!button && button.getClientRects().length > 0 && button.getBoundingClientRect().width > 0
+      }
+      return visible('随机播放') || visible('关闭随机播放')
+        ? visible('循环：关') || visible('循环：列表') || visible('循环：单曲')
+        : false
+    })()`)
+    await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
     await sleep(300)
     check(
       '380 宽播放条保留曲名和队列，键盘可打开队列',
       narrowPlayer &&
         narrowPlayer.overflow === 0 &&
+        narrowPlayer.barInside &&
         narrowPlayer.titleWidth >= 120 &&
+        narrowPlayer.titleVisible &&
         narrowPlayer.queueInside &&
+        narrowPlayer.queueTabIndex === 0 &&
+        !narrowPlayer.queueDisabled &&
         narrowPlayer.queueFocused &&
-        narrowQueueOpened &&
+        narrowQueueOpened.open &&
+        narrowQueueOpened.focusInside &&
+        narrowQueueOpened.initialFocus === '关闭详情' &&
+        focusWraps &&
+        queueClosedByKey.closed &&
+        queueClosedByKey.focusReturned &&
+        queueOpenedByMouse &&
+        openedNarrowStage &&
+        narrowStageControls &&
         !(await page.evaluate(`!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`)),
     )
     await page.viewport(1320, 900)
