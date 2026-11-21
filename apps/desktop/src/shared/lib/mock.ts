@@ -1,4 +1,4 @@
-import type { DownloadView, QrStatus } from './contract'
+import type { DownloadView, QrStatus, WireError } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -41,11 +41,24 @@ const FOLLOW_SEEDS: {
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
 
+const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
+const settledListFailures = new Set<string>()
+
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
   // 队列相关命令都在 player 侧实现
   if (command.startsWith('queue_') || command.startsWith('player_')) {
     return playerCommand(command, args)
+  }
+
+  if (listError && (command === 'watch_later_list' || command === 'following')) {
+    if (listError === 'needs_login') throw fail('needs_login', '需要登录')
+    if (!settledListFailures.has(command) && (listError === 'retryable' || listError === 'input')) {
+      await sleep(50)
+      settledListFailures.add(command)
+      const message = listError === 'retryable' ? 'operation timed out' : '列表请求无效'
+      throw { class: listError, message } satisfies WireError
+    }
   }
 
   switch (command) {
