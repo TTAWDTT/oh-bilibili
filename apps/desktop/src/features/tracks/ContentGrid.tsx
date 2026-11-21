@@ -404,7 +404,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
         data-shown={shown}
         /* 190 是让 1320 窗口（内容 1056）落成 5 列的分界：5*190+4*20=1030。
            B 站首页推荐流同宽也是 5 列，206 的写法会掉成 4 列、卡片大一圈。 */
-        className="grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
+        className="relative grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
       >
         {tracks.slice(0, shown).map((track, index) => {
           const active = track.key === activeKey
@@ -435,7 +435,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
           )
         })}
         {/* 窗口的哨兵：进到可视区前两屏就把下一段缓冲接出来。 */}
-        <div ref={sentinel} aria-hidden className="col-span-full h-px" />
+        <div ref={sentinel} aria-hidden className="pointer-events-none absolute bottom-0 h-px" />
         {picking ? (
           <FavPicker open busy={favBusy} onClose={() => setPicking(null)} onPick={(folderId) => void favTo(folderId)} />
         ) : null}

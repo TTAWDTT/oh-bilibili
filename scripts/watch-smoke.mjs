@@ -1397,6 +1397,37 @@ async function main() {
       '历史首屏 60 条并给出加载更早',
       openedHistory && historyReady && firstPage.cards === 60 && firstPage.loadMore,
     )
+    const historySpacing = await page.evaluate(`(() => {
+      const groups = [...document.querySelectorAll('#scroll-main section')]
+      const first = groups[0]
+      const second = groups[1]
+      if (!first || !second) return null
+      const cards = [...first.querySelectorAll('[data-track-card]')]
+      const lastCard = cards.at(-1)
+      const nextHeading = second.querySelector('h2')
+      const grid = cards[0]?.parentElement
+      const sentinel = grid?.querySelector(':scope > [aria-hidden]')
+      return {
+        gap:
+          lastCard && nextHeading
+            ? nextHeading.getBoundingClientRect().top - lastCard.getBoundingClientRect().bottom
+            : null,
+        sentinel: sentinel
+          ? {
+              position: getComputedStyle(sentinel).position,
+              display: getComputedStyle(sentinel).display,
+            }
+          : null,
+      }
+    })()`)
+    check(
+      '历史日期组只留一层间距，预取哨兵不占行',
+      historySpacing &&
+        historySpacing.gap >= 24 &&
+        historySpacing.gap <= 32 &&
+        historySpacing.sentinel?.position === 'absolute' &&
+        historySpacing.sentinel.display !== 'none',
+    )
     await page.clickExactText('加载更早记录')
     let loadedAll = false
     for (let i = 0; i < 20 && !loadedAll; i += 1) {

@@ -192,7 +192,7 @@ export function HistoryView() {
       </div>
 
       {groups.map((group) => (
-        <section key={group.key} className="mb-8">
+        <section key={group.key}>
           <div className="mb-3 flex items-baseline gap-2">
             <h2 className="text-[15px] font-medium text-[var(--text-1)]">{group.label}</h2>
             <span className="num text-[12px] text-[var(--text-3)]">{group.items.length} 个</span>
