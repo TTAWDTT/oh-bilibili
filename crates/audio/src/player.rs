@@ -3,6 +3,7 @@
 //! 声卡回调在自己的线程上，解码在另一个线程上，中间是一个无锁环形缓冲。
 //! 位置由回调按帧数推进，是全应用唯一的时间真值。
 
+use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -348,7 +349,7 @@ fn run_engine(
         }
     };
     let device_rate = supported.sample_rate();
-    let channels = supported.channels() as usize;
+    let device_channels = supported.channels() as usize;
     let config: cpal::StreamConfig = supported.config();
 
     let rb = HeapRb::<f32>::new(RING_CAPACITY);
@@ -398,7 +399,7 @@ fn run_engine(
             } else {
                 cb_clock.set_level(0.0);
             }
-            advance_played(&cb_clock, written, channels);
+            advance_played(&cb_clock, written, device_channels);
         },
         |err| eprintln!("音频输出错误: {err}"),
         None,
@@ -419,7 +420,7 @@ fn run_engine(
 
     let mut decoder: Option<Session> = None;
     let mut at_eof = false;
-    let mut resampler = LinearResampler::new(device_rate as f64, channels);
+    let mut resampler = LinearResampler::new(device_rate as f64, device_channels);
     // 倍速通过缩放重采样率实现：1.5 倍速就是让解码输出按 1.5 倍速被消费。
     let mut base_rate: f64 = device_rate as f64;
     let mut speed: f64 = 1.0;
@@ -429,6 +430,7 @@ fn run_engine(
             match cmd {
                 Cmd::Load(media) => {
                     // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
+                    resampler.pending.clear();
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.reset_load();
                     at_eof = false;
@@ -476,6 +478,7 @@ fn run_engine(
                     if let Some(d) = decoder.as_mut() {
                         at_eof = false;
                         lifecycle.clear_eof();
+                        resampler.pending.clear();
                         request_flush(&flush_requested, &flush_done);
                         let target = SeekTo::Time {
                             time: Time::from(ms as f64 / 1000.0),
@@ -494,6 +497,7 @@ fn run_engine(
                     }
                 }
                 Cmd::Stop => {
+                    resampler.pending.clear();
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.set_paused(false);
                     lifecycle.reset_load();
@@ -522,7 +526,7 @@ fn run_engine(
         }
 
         // 缓冲够满就歇一会儿，别把 CPU 烧了。
-        if producer.vacant_len() < 4096 {
+        if !resampler.flush_pending(&mut producer) || producer.vacant_len() < 4096 {
             std::thread::sleep(Duration::from_millis(4));
             continue;
         }
@@ -563,7 +567,7 @@ fn run_engine(
                     spec,
                 );
                 sb.copy_interleaved_ref(decoded);
-                resampler.push(sb.samples(), &mut producer);
+                resampler.push(sb.samples(), spec.channels.count(), &mut producer);
             }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
             Err(_) => {
@@ -578,23 +582,24 @@ fn run_engine(
     }
 }
 
-/// 线性重采样。设备采样率与内容采样率一致时是直通。
 struct LinearResampler {
     source_rate: f64,
     device_rate: f64,
-    channels: usize,
+    device_channels: usize,
     pos: f64,
     tail: Vec<f32>,
+    pending: Vec<f32>,
 }
 
 impl LinearResampler {
-    fn new(device_rate: f64, channels: usize) -> LinearResampler {
+    fn new(device_rate: f64, device_channels: usize) -> LinearResampler {
         LinearResampler {
             source_rate: device_rate,
             device_rate,
-            channels,
+            device_channels,
             pos: 0.0,
             tail: Vec::new(),
+            pending: Vec::new(),
         }
     }
 
@@ -604,37 +609,151 @@ impl LinearResampler {
         self.tail.clear();
     }
 
-    fn push(&mut self, samples: &[f32], producer: &mut impl Producer<Item = f32>) {
-        if self.source_rate <= 0.0 || self.channels == 0 {
-            return;
+    fn flush_pending(&mut self, producer: &mut impl Producer<Item = f32>) -> bool {
+        if !self.pending.is_empty() {
+            let written = producer.push_slice(&self.pending);
+            self.pending.drain(..written);
         }
+        self.pending.is_empty()
+    }
+
+    fn push(
+        &mut self,
+        samples: &[f32],
+        source_channels: usize,
+        producer: &mut impl Producer<Item = f32>,
+    ) {
+        let samples = self.resample(samples, source_channels);
+        let written = producer.push_slice(&samples);
+        self.pending.extend_from_slice(&samples[written..]);
+    }
+
+    fn resample<'a>(&mut self, samples: &'a [f32], source_channels: usize) -> Cow<'a, [f32]> {
+        if self.source_rate <= 0.0 || self.device_channels == 0 {
+            return Cow::Borrowed(&[]);
+        }
+        let samples = self.map_channels(samples, source_channels);
         if (self.source_rate - self.device_rate).abs() < 0.5 {
-            producer.push_slice(samples);
-            return;
+            return samples;
         }
         let step = self.source_rate / self.device_rate;
 
         let mut combined = std::mem::take(&mut self.tail);
-        combined.extend_from_slice(samples);
-        let total = combined.len() / self.channels;
+        combined.extend_from_slice(&samples);
+        let total = combined.len() / self.device_channels;
 
-        let mut out: Vec<f32> = Vec::with_capacity(((total as f64 / step) as usize + 2) * self.channels);
+        let mut out = Vec::with_capacity(((total as f64 / step) as usize + 2) * self.device_channels);
         let mut pos = self.pos;
         while (pos.floor() as usize) + 1 < total {
             let i = pos.floor() as usize;
             let frac = (pos - i as f64) as f32;
-            for c in 0..self.channels {
-                let a = combined[i * self.channels + c];
-                let b = combined[(i + 1) * self.channels + c];
+            for c in 0..self.device_channels {
+                let a = combined[i * self.device_channels + c];
+                let b = combined[(i + 1) * self.device_channels + c];
                 out.push(a + (b - a) * frac);
             }
             pos += step;
         }
         // 留下最后一个完整帧给下一批用，保证跨包连续。
         let consumed_frames = (pos.floor() as usize).min(total);
-        self.tail = combined[consumed_frames * self.channels..].to_vec();
+        self.tail = combined[consumed_frames * self.device_channels..].to_vec();
         self.pos = pos - consumed_frames as f64;
-        producer.push_slice(&out);
+        Cow::Owned(out)
+    }
+
+    fn map_channels<'a>(&self, samples: &'a [f32], source_channels: usize) -> Cow<'a, [f32]> {
+        if source_channels == self.device_channels {
+            return Cow::Borrowed(samples);
+        }
+
+        let frames = samples.chunks_exact(source_channels);
+        let mut mapped = Vec::with_capacity(frames.len() * self.device_channels);
+        let copied_channels = source_channels.min(self.device_channels);
+        for frame in frames {
+            mapped.extend_from_slice(&frame[..copied_channels]);
+            let fill = if source_channels == 1 { frame[0] } else { 0.0 };
+            mapped.resize(mapped.len() + self.device_channels - copied_channels, fill);
+        }
+        Cow::Owned(mapped)
+    }
+}
+
+#[cfg(test)]
+mod resampler_tests {
+    use super::{Consumer, HeapRb, LinearResampler, Split};
+
+    #[test]
+    fn 单声道每帧应写入双声道() {
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(8).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+
+        resampler.push(&[0.25, -0.5, 0.75], 1, &mut producer);
+
+        let mut output = [0.0; 8];
+        assert_eq!(consumer.pop_slice(&mut output), 6);
+        assert_eq!(output[..6], [0.25, 0.25, -0.5, -0.5, 0.75, 0.75]);
+    }
+
+    #[test]
+    fn 双声道保持每帧的左右样本() {
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(8).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+        let input = [0.25, -0.5, 0.75, -1.0];
+
+        resampler.push(&input, 2, &mut producer);
+
+        let mut output = [0.0; 8];
+        assert_eq!(consumer.pop_slice(&mut output), 4);
+        assert_eq!(output[..4], input);
+    }
+
+    #[test]
+    fn 单声道重采样跨包保持连续() {
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(12).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+        resampler.set_source_rate(24_000.0);
+
+        resampler.push(&[0.25, -0.75], 1, &mut producer);
+        resampler.push(&[0.75], 1, &mut producer);
+
+        let mut output = [0.0; 12];
+        assert_eq!(consumer.pop_slice(&mut output), 8);
+        assert_eq!(
+            output[..8],
+            [0.25, 0.25, -0.25, -0.25, -0.75, -0.75, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn 环形缓冲部分写入后保留重采样余量() {
+        const CAPACITY: usize = 4096;
+        const SAMPLES: usize = 4454;
+        let input: Vec<f32> = (0..1024).map(|sample| sample as f32 / 1024.0).collect();
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(CAPACITY).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+        resampler.set_source_rate(22_050.0);
+        resampler.push(&input, 1, &mut producer);
+
+        let mut output = vec![0.0; SAMPLES];
+        let first = consumer.pop_slice(&mut output[..256]);
+        assert_eq!(first, 256);
+        assert!(
+            !resampler.flush_pending(&mut producer),
+            "重试后仍应保留写不下的样本"
+        );
+        let written = first + consumer.pop_slice(&mut output[first..]);
+        assert!(resampler.flush_pending(&mut producer));
+        assert_eq!(
+            written + consumer.pop_slice(&mut output[written..]),
+            SAMPLES
+        );
+
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(SAMPLES).split();
+        resampler.set_source_rate(22_050.0);
+        resampler.push(&input, 1, &mut producer);
+        let mut expected = vec![0.0; SAMPLES];
+        assert_eq!(consumer.pop_slice(&mut expected), SAMPLES);
+        assert_eq!(output, expected);
     }
 }
 

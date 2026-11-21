@@ -9,7 +9,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
-const PORT = 9224
+const PORT = Number(process.env.SMOKE_CDP_PORT || 9224)
+const libraryPartialOnly = process.argv.includes('--library-partial')
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
   : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
@@ -35,7 +36,8 @@ async function connect() {
       '--no-first-run',
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
-      `--user-data-dir=${join(tmpdir(), 'oh-bilibili-smoke')}`,
+      `--user-data-dir=${join(tmpdir(), process.env.SMOKE_CDP_PORT ? `oh-bilibili-smoke-${PORT}` : 'oh-bilibili-smoke')}`,
+      ...(libraryPartialOnly ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1'] : []),
       'about:blank',
     ],
     { stdio: 'ignore', detached: false },
@@ -57,7 +59,7 @@ async function connect() {
   const ws = new WebSocket(version.webSocketDebuggerUrl)
   let id = 0
   const pending = new Map()
-  const runtimeErrors = []
+  const errors = []
   await new Promise((res, rej) => {
     ws.onopen = res
     ws.onerror = rej
@@ -74,6 +76,10 @@ async function connect() {
     if (done) {
       pending.delete(msg.id)
       done(msg)
+    } else if (msg.method === 'Runtime.exceptionThrown') {
+      errors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text)
+    } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+      errors.push(msg.params.args.map((arg) => arg.value ?? arg.description).join(' '))
     }
   }
   const send = (method, params = {}, sessionId) =>
@@ -156,7 +162,8 @@ async function connect() {
 
   return {
     evaluate,
-    runtimeErrors,
+    errors,
+    runtimeErrors: errors,
     viewport,
     doubleClick,
     pressSpace,
@@ -237,6 +244,48 @@ async function checkListErrors(page) {
   for (const error of listErrors) console.log(error)
 }
 
+async function checkLibraryPartial(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('libraryPartial', '1')
+  await page.evaluate(`location.href = ${JSON.stringify(url)}`)
+  let opened = false
+  for (let i = 0; i < 40 && !opened; i += 1) {
+    await sleep(250)
+    opened = await page.clickText('曲库')
+  }
+  check('打开曲库', opened)
+  await sleep(600)
+
+  const card = (name) => `document.querySelector('#scroll-main button [title="${name}"]')?.closest('button')`
+  const labels = await page.evaluate(`[
+    ${card('深夜循环')},
+    ${card('翻唱现场')},
+    ${card('纯音乐与白噪音')},
+  ].map((button) => button?.innerText.split('\\n').at(-1))`)
+  check(`有歌的歌单显示 5 首（实际：${labels[0]}）`, labels[0] === '5 首')
+  check(`失败的歌单提示曲目数未取到（实际：${labels[1]}）`, labels[1] === '曲目数未取到')
+  check(`真正空的歌单显示空歌单（实际：${labels[2]}）`, labels[2] === '空歌单')
+
+  const retried = await page.evaluate(`(() => {
+    performance.clearMarks('library_tracks')
+    const retry = [...(${card('翻唱现场')}?.parentElement.querySelectorAll('button') ?? [])]
+      .find((button) => button.textContent.trim() === '重试')
+    retry?.click()
+    return !!retry
+  })()`)
+  await sleep(600)
+  const reads = await page.evaluate(`performance.getEntriesByName('library_tracks').map((entry) => entry.detail)`)
+  check(`重试只读取翻唱现场一次（实际：${JSON.stringify(reads)}）`, retried && reads.length === 1 && reads[0] === 2)
+  const recovered = await page.evaluate(`${card('翻唱现场')}?.innerText.split('\\n').at(-1)`)
+  check('重试成功后显示 4 首', recovered === '4 首')
+
+  await page.evaluate(`${card('深夜循环')}?.click()`)
+  await sleep(600)
+  const tracks = await page.evaluate(`[...document.querySelectorAll('#scroll-main [data-row="track"]')].map((row) => row.innerText)`)
+  check('打开深夜循环后显示 5 首歌', tracks.length === 5 && tracks[0].includes('晴天'))
+  check(`曲库没有控制台错误或未处理异常（${page.errors.length} 条）`, page.errors.length === 0)
+}
+
 async function controlFit(page) {
   return page.evaluate(`(() => {
     const frame = document.querySelector('[data-watch-player]')
@@ -274,6 +323,7 @@ async function controlFit(page) {
 
 async function main() {
   if (!existsSync(CHROME)) {
+    if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
     return
   }
@@ -285,6 +335,8 @@ async function main() {
 
   const page = await connect()
   try {
+    await checkLibraryPartial(page)
+    if (libraryPartialOnly) return
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     await sleep(6000)
 
@@ -1258,6 +1310,38 @@ async function main() {
       '撤销恢复曲目和当前项',
       afterUndo.rows === queueBefore.count && afterUndo.active && !afterUndo.strip,
     )
+    const beforeRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      const target = rows[1]
+      if (!target) return null
+      target.focus()
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        next: rows[2]?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    await page.pressSpace()
+    await sleep(800)
+    const afterRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        focus: document.activeElement?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    check(
+      '键盘移除单曲且不切歌、焦点落到下一项',
+      beforeRemove &&
+        afterRemove.count === beforeRemove.count - 1 &&
+        afterRemove.current === beforeRemove.current &&
+        afterRemove.focus === beforeRemove.next,
+    )
 
     // 首页慢请求：8 秒只提示慢，10 秒成功仍要展示；重试后旧响应按请求 id 丢弃。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?slowHome=1`)}`)
@@ -1320,9 +1404,8 @@ async function main() {
     await checkListErrors(page)
   } finally {
     page.close()
+    if (checks.some((c) => !c.ok)) process.exitCode = 1
   }
-
-  if (checks.some((c) => !c.ok)) process.exitCode = 1
 }
 
 main().catch((e) => {
