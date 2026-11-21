@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { useAuthStore } from '../auth/authStore'
-import { toastDone, toastFailure } from '../../app/notice'
+import { toastDone, toastFailure, toastWarn } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import type { Health } from '../../shared/lib/ipc'
@@ -135,8 +135,19 @@ export function SettingsView() {
     if (syncing) return
     setSyncing(true)
     try {
-      await ipc.syncNow()
-      toastDone('同步完成', '喜欢与收藏已经推给 B 站。')
+      const outcome = await ipc.syncNow()
+      const failed = outcome.deferred + outcome.rejected
+      if (failed > 0) {
+        const parts = [`已推送 ${outcome.synced} 条`]
+        if (outcome.deferred > 0) parts.push(`${outcome.deferred} 条暂时失败，下次同步会重试`)
+        if (outcome.rejected > 0) parts.push(`${outcome.rejected} 条被拒绝`)
+        const reason = outcome.detail ? `：${outcome.detail}` : ''
+        toastWarn(outcome.rejected > 0 ? '部分同步失败' : '同步稍后重试', `${parts.join('，')}${reason}`)
+      } else if (outcome.synced === 0) {
+        toastDone('同步完成', '没有待同步的喜欢与收藏。')
+      } else {
+        toastDone('同步完成', `已推送 ${outcome.synced} 条喜欢与收藏。`)
+      }
     } catch (cause) {
       toastFailure('同步', cause)
     } finally {

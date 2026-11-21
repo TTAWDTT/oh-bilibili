@@ -1,16 +1,93 @@
 //! 端到端验证：真实接口搜到歌，真的把音频喂给声卡，位置真的在走。
 //!
-//! 运行：cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
+//! 运行：`scripts/live-test.sh`。
+//! 需要登录态的用例只读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json。
+//! 直接跑 `cargo test --ignored` 而没有配置时会失败，不会把「跳过」计成通过。
 
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use bilimusic_core::Engine;
 
+const LIVE_COOKIES_ENV: &str = "BILIMUSIC_LIVE_COOKIES";
+
+/// 每个测试一个唯一临时目录，退出时连同复制的 cookies.json 一起删掉。
+struct TestDir(PathBuf);
+
+impl TestDir {
+    fn new(name: &str) -> Self {
+        let sequence = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "bilimusic-{name}-{}-{sequence}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("创建临时目录");
+        Self(dir)
+    }
+}
+
+impl std::ops::Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TestDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn live_cookies(required: bool) -> Option<PathBuf> {
+    let Some(path) = std::env::var_os(LIVE_COOKIES_ENV).map(PathBuf::from) else {
+        if required {
+            panic!(
+                "这条用例需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>。\
+                 请运行 scripts/live-test.sh：未配置时它会明确 skip，而不是把用例计为 passed"
+            );
+        } else {
+            println!("未设置 {LIVE_COOKIES_ENV}，以游客态运行");
+        }
+        return None;
+    };
+    let raw = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "{LIVE_COOKIES_ENV} 指向的凭据文件读不了（{}）：{error}",
+            path.display()
+        )
+    });
+    serde_json::from_str::<Vec<(String, String)>>(&raw).unwrap_or_else(|error| {
+        panic!(
+            "{LIVE_COOKIES_ENV} 必须是 cookies.json 的 [(name, value)] 数组（{}）：{error}",
+            path.display()
+        )
+    });
+    Some(path)
+}
+
+fn stage_live_cookies(dir: &Path, required: bool) {
+    let Some(source) = live_cookies(required) else {
+        return;
+    };
+    std::fs::copy(source, dir.join("cookies.json")).expect("复制登录态");
+}
+
+fn require_live_login(engine: &Engine) {
+    assert!(
+        engine.auth().logged_in,
+        "{LIVE_COOKIES_ENV} 指向的账号未登录"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
 async fn 引擎能搜到歌并真的开始播放() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-test-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
+    let dir = TestDir::new("test");
 
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎应该能起来");
     engine.set_volume(0.0);
@@ -118,8 +195,7 @@ async fn 起播等待期可以暂停且位置不前进() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
 async fn 打开观看页会让音频引擎自己起播() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-watch-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
+    let dir = TestDir::new("watch");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     engine.set_volume(0.0);
 
@@ -156,8 +232,7 @@ async fn 打开观看页会让音频引擎自己起播() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
 async fn 打开观看页会从历史位置续播() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-resume-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
+    let dir = TestDir::new("resume");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
@@ -209,16 +284,7 @@ async fn 打开观看页会从历史位置续播() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与 yt-dlp"]
 async fn 能把一首歌下载到本地并落到磁盘() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-dl-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    // 测试跑完要自己收干净：之前的版本每次跑都留一个 160KB 的目录。
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-    let _cleanup = Cleanup(dir.clone());
+    let dir = TestDir::new("dl");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
@@ -251,15 +317,7 @@ async fn 能把一首歌下载到本地并落到磁盘() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 歌词三级回退的实际命中情况() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-lrc-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-    let _cleanup = Cleanup(dir.clone());
+    let dir = TestDir::new("lrc");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
@@ -288,13 +346,7 @@ async fn 歌词三级回退的实际命中情况() {
 #[ignore = "真实网络，用来量歌词耗时"]
 async fn 歌词要多久() {
     use std::time::Instant;
-    let dir = std::env::temp_dir().join(format!("bilimusic-lrc-t-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
-    }
-    let _c = Cleanup(dir.clone());
+    let dir = TestDir::new("lrc-t");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索");
     for track in tracks.iter().take(4) {
@@ -317,8 +369,7 @@ async fn 歌词要多久() {
 #[tokio::test]
 #[ignore]
 async fn 连续两次打开不会把状态打成失败() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-race-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
+    let dir = TestDir::new("race");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎应该能起来");
     let found = engine.search("晴天 周杰伦".into(), 1).await.expect("搜索");
     let key = found.first().map(|t| t.key.clone()).expect("至少一条结果");
@@ -341,27 +392,13 @@ async fn 连续两次打开不会把状态打成失败() {
     );
 }
 
-fn dirs_cookies() -> Option<std::path::PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    let p = std::path::PathBuf::from(home)
-        .join("Library/Application Support/dev.bilimusic.app/cookies.json");
-    p.exists().then_some(p)
-}
-
 /// 观看页的数据链路要能跑通：拿到 DASH 视频轨，合成只含视频的 MPD，
 /// 铸出句柄，再从句柄换回清单。全程不出声。
 #[test]
 #[ignore = "真实网络"]
 fn 观看页能拿到只含视频的清单() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-watch-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    match dirs_cookies() {
-        Some(src) => {
-            std::fs::copy(&src, dir.join("cookies.json")).expect("复制登录态");
-            println!("已带入登录态");
-        }
-        None => println!("没有找到本机登录态，画质会退到未登录档位"),
-    }
+    let dir = TestDir::new("watch-manifest");
+    stage_live_cookies(&dir, false);
 
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -404,11 +441,8 @@ fn 观看页能拿到只含视频的清单() {
 #[test]
 #[ignore = "真实网络"]
 fn 弹幕能取到真实数据() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-dm-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("dm");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -435,11 +469,8 @@ fn 弹幕能取到真实数据() {
 #[test]
 #[ignore = "真实网络"]
 fn 评论能取到真实数据与嵌套回复() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-cm-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("cm");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -478,11 +509,8 @@ fn 评论能取到真实数据与嵌套回复() {
 #[test]
 #[ignore = "真实网络"]
 fn 分P_列表与切换() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-pg-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("pg");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -531,11 +559,8 @@ fn 分P_列表与切换() {
 #[test]
 #[ignore = "真实网络"]
 fn 首页推荐能取到卡片() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-fd-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("fd");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -559,11 +584,8 @@ fn 首页推荐能取到卡片() {
 #[test]
 #[ignore = "真实网络；音量置 0 所以无声"]
 fn 切到听视频能接管并接上位置() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-listen-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("listen");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     // 先静音，后面整条链路都不会出声
     engine.set_volume(0.0);
@@ -622,11 +644,8 @@ fn 切到听视频能接管并接上位置() {
 #[test]
 #[ignore = "真实网络；音量 0 所以无声"]
 fn 听视频接的是正在看的那一条() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-focus-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("focus");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     engine.set_volume(0.0);
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -680,14 +699,12 @@ fn 听视频接的是正在看的那一条() {
 
 /// 进度上报要能通。这里直接调一次，不去等 20 秒的定时器。
 #[test]
-#[ignore = "真实网络"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 fn 观看进度能上报() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-rp-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("rp");
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -719,14 +736,12 @@ async fn like_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::Trac
 /// 早先写成「先点再取」，结果把用户本来点过赞的视频取消了——
 /// 验证写操作之前必须先想清楚怎么恢复。
 #[test]
-#[ignore = "真实网络；结束时恢复账号原状"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复账号原状"]
 fn 点赞能写入也能取消() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-like-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("like");
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -755,36 +770,75 @@ fn 点赞能写入也能取消() {
     });
 }
 
-/// 稍后再看的往返：加进去，再拿出来。写路径是否可用，用这条可逆的操作判定。
+/// 稍后再看的往返：先读原始成员关系，选一条确认没保存过的，加入、验证、移除、再验证。
+///
+/// 不能拿搜索第一项直接「加完再删」：账号原本就存过这条时，删除会把原条目移走。
 #[test]
-#[ignore = "真实网络；结束时恢复"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复"]
 fn 稍后再看能写入也能移除() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-wl-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("wl");
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .expect("runtime");
     rt.block_on(async {
-        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
-        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
-        println!("目标 {}", key.as_opaque());
-        match engine.watch_later_set(&key, true).await {
-            Ok(()) => println!("加入稍后再看: ok"),
-            Err(e) => {
-                println!("加入失败: {}", e.message());
-                panic!("写路径不可用");
+        let saved: std::collections::HashSet<String> = engine
+            .watch_later_list()
+            .await
+            .expect("读取稍后再看")
+            .iter()
+            .map(|track| track.key.as_opaque().to_string())
+            .collect();
+        println!("账号原有 {} 条稍后再看", saved.len());
+
+        let mut chosen = None;
+        for page in 1..=3 {
+            let tracks = engine
+                .search("周杰伦 晴天".into(), page)
+                .await
+                .expect("搜索");
+            for track in tracks {
+                if !saved.contains(track.key.as_opaque()) {
+                    chosen = Some(track.key.clone());
+                    break;
+                }
+            }
+            if chosen.is_some() {
+                break;
             }
         }
-        // 立刻移除，保持账号状态不变
-        match engine.watch_later_set(&key, false).await {
-            Ok(()) => println!("移出稍后再看: ok"),
-            Err(e) => panic!("移出失败，账号可能被弄脏: {}", e.message()),
+        let key = chosen.expect("搜索结果都已在稍后再看，找不到可安全加入的目标");
+        println!("目标 {}，已确认不在原始列表", key.as_opaque());
+
+        engine
+            .watch_later_set(&key, true)
+            .await
+            .expect("加入稍后再看");
+        let after_add = engine.watch_later_list().await.expect("加入后读取");
+        if !after_add
+            .iter()
+            .any(|track| track.key.as_opaque() == key.as_opaque())
+        {
+            let _ = engine.watch_later_set(&key, false).await;
+            panic!("加入后没有出现在稍后再看");
         }
+        println!("加入并确认存在");
+
+        engine
+            .watch_later_set(&key, false)
+            .await
+            .expect("移出失败，账号可能残留");
+        let after_remove = engine.watch_later_list().await.expect("移出后读取");
+        assert!(
+            !after_remove
+                .iter()
+                .any(|track| track.key.as_opaque() == key.as_opaque()),
+            "移出后仍然存在，账号可能残留"
+        );
+        println!("移出并确认不存在");
     });
 }
 
@@ -792,14 +846,12 @@ fn 稍后再看能写入也能移除() {
 ///
 /// 投币不可逆（会真花掉硬币），所以不在这里验；这条只覆盖可逆的收藏。
 #[test]
-#[ignore = "真实网络；结束时恢复"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复"]
 fn 收藏能写入也能取消() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-fav-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("fav");
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -834,11 +886,8 @@ async fn fav_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::Track
 #[test]
 #[ignore = "真实网络，核对引擎层的字幕元信息"]
 fn 观看页元信息带出字幕轨() {
-    let dir = std::env::temp_dir().join(format!("bilimusic-meta-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("临时目录");
-    if let Some(src) = dirs_cookies() {
-        let _ = std::fs::copy(&src, dir.join("cookies.json"));
-    }
+    let dir = TestDir::new("meta");
+    stage_live_cookies(&dir, false);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()

@@ -417,20 +417,33 @@ impl Library {
     }
 
     /// 带播放时间的历史。前端要按「今天 / 昨天 / 更早」分组，得知道每条什么时候播的。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>> {
+    ///
+    /// 翻页用 `(played_at, id)` 作为边界，不用 offset：播放过的条目会跳到最前，
+    /// offset 会让下一页重复或漏掉。`before` 为 None 时从最新一条开始。
+    pub fn history_with_time(
+        &self,
+        limit: u32,
+        before: Option<(i64, i64)>,
+    ) -> Result<Vec<(Track, i64, u64, i64)>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
                 &format!(
-                    "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms
+                    "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms, h.id
                      FROM history h JOIN tracks t ON t.id = h.track_id
-                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?1"
+                     WHERE ?1 IS NULL OR h.played_at < ?1 OR (h.played_at = ?1 AND h.id < ?2)
+                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?3"
                 ),
             )?;
-            let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], |row| {
+            let (played_at, id) = match before {
+                Some((played_at, id)) => (Some(played_at), Some(id)),
+                None => (None, None),
+            };
+            let rows = stmt.query_map(params![played_at, id, limit.clamp(1, 500) as i64], |row| {
                 Ok((
                     row_to_track(row)?,
                     row.get::<_, i64>(7)?,
                     row.get::<_, i64>(8)?.max(0) as u64,
+                    row.get::<_, i64>(9)?,
                 ))
             })?;
             rows.collect()
@@ -507,27 +520,20 @@ impl Library {
                 "SELECT track_id, mid, kind, want, state, attempts FROM reactions
                  WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC LIMIT ?2",
             )?;
-            let rows = stmt.query_map(params![mid as i64, limit.clamp(1, 500) as i64], |r| {
-                let kind: String = r.get(2)?;
-                let state: String = r.get(4)?;
-                Ok(Reaction {
-                    track_id: TrackId(r.get(0)?),
-                    mid: r.get::<_, i64>(1)? as u64,
-                    kind: if kind == "like" {
-                        ReactionKind::Like
-                    } else {
-                        ReactionKind::Fav
-                    },
-                    want: r.get::<_, i32>(3)? != 0,
-                    state: match state.as_str() {
-                        "synced" => ReactionState::Synced,
-                        "rejected" => ReactionState::Rejected,
-                        "stale" => ReactionState::Stale,
-                        _ => ReactionState::Pending,
-                    },
-                    attempts: r.get::<_, i64>(5)? as u32,
-                })
-            })?;
+            let rows = stmt.query_map(params![mid as i64, limit.clamp(1, 500) as i64], row_to_reaction)?;
+            rows.collect()
+        })
+    }
+
+    /// 当前账号的全部待办。手动同步要一次处理完，不能因为排在后面的
+    /// 旧条目 attempts 已经累加过就留在下一轮。
+    pub fn pending_reactions_all(&self, mid: u64) -> Result<Vec<Reaction>> {
+        self.with(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT track_id, mid, kind, want, state, attempts FROM reactions
+                 WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC",
+            )?;
+            let rows = stmt.query_map(params![mid as i64], row_to_reaction)?;
             rows.collect()
         })
     }
@@ -624,6 +630,28 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         up_mid: row.get::<_, Option<i64>>(6)?.map(|v| v as u64),
         tname: None,
         typeid: None,
+    })
+}
+
+fn row_to_reaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Reaction> {
+    let kind: String = row.get(2)?;
+    let state: String = row.get(4)?;
+    Ok(Reaction {
+        track_id: TrackId(row.get(0)?),
+        mid: row.get::<_, i64>(1)? as u64,
+        kind: if kind == "like" {
+            ReactionKind::Like
+        } else {
+            ReactionKind::Fav
+        },
+        want: row.get::<_, i32>(3)? != 0,
+        state: match state.as_str() {
+            "synced" => ReactionState::Synced,
+            "rejected" => ReactionState::Rejected,
+            "stale" => ReactionState::Stale,
+            _ => ReactionState::Pending,
+        },
+        attempts: row.get::<_, i64>(5)? as u32,
     })
 }
 
@@ -859,6 +887,37 @@ mod tests {
     }
 
     #[test]
+    fn 可重试失败留在待办_永久拒绝才移除() {
+        let l = lib();
+        let id = l.upsert_track(&track("BVretry")).unwrap();
+        l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+
+        let first = l.pending_reactions(42, 10).unwrap();
+        assert_eq!(first.len(), 1);
+        l.mark_reaction(&first[0], ReactionState::Pending).unwrap();
+        let again = l.pending_reactions(42, 10).unwrap();
+        assert_eq!(again.len(), 1, "可重试失败不能从待办里消失");
+        assert_eq!(again[0].attempts, 1, "重试次数要累加，下一次轮转到后面的待办");
+
+        l.mark_reaction(&again[0], ReactionState::Rejected).unwrap();
+        assert!(
+            l.pending_reactions(42, 10).unwrap().is_empty(),
+            "永久拒绝不再重试"
+        );
+    }
+
+    #[test]
+    fn 全部待办一次取完不受批次上限影响() {
+        let l = lib();
+        for n in 0..21 {
+            let id = l.upsert_track(&track(&n.to_string())).unwrap();
+            l.set_reaction(id, 42, ReactionKind::Like, n % 2 == 0).unwrap();
+        }
+        assert_eq!(l.pending_reactions(42, 20).unwrap().len(), 20);
+        assert_eq!(l.pending_reactions_all(42).unwrap().len(), 21);
+    }
+
+    #[test]
     fn 换号后旧账号的待推项被标成过期() {
         let l = lib();
         let id = l.upsert_track(&track("1")).unwrap();
@@ -928,9 +987,35 @@ mod tests {
         let a = l.upsert_track(&track("BVpos")).unwrap();
         l.push_history(a, 0).unwrap();
         l.set_history_position("BVBVpos", 42_500).unwrap();
-        let rows = l.history_with_time(10).unwrap();
+        let rows = l.history_with_time(10, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].2, 42_500, "回写之后读到的应该是新位置");
+    }
+
+    #[test]
+    fn 历史按播放时间和_id_翻页_不重复不跳过() {
+        let l = lib();
+        // 倒序写入，让 A/B 成为最新两条，C/D 更早。
+        for key in ["BVpage4", "BVpage3", "BVpage2", "BVpage1"] {
+            let id = l.upsert_track(&track(key)).unwrap();
+            l.push_history(id, 0).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        let first = l.history_with_time(2, None).unwrap();
+        assert_eq!(first.len(), 2);
+        let cursor = (first[1].1, first[1].3);
+
+        // 把 D 重新播一次，它会跳到最前；旧的 B 游标仍应只带出 C。
+        let d = l.upsert_track(&track("BVpage4")).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        l.push_history(d, 0).unwrap();
+        let older = l.history_with_time(2, Some(cursor)).unwrap();
+        assert_eq!(older.len(), 1, "D 跳到最前后，C 仍应可读");
+        assert_eq!(older[0].0.key.as_opaque(), "BVBVpage3");
+        assert!(
+            !older.iter().any(|row| row.0.key.as_opaque() == "BVBVpage2"),
+            "B 已经在上一页，不能重复"
+        );
     }
 
     #[test]

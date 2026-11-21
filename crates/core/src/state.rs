@@ -19,7 +19,7 @@ pub enum PlayOrder {
     Shuffle { perm: Vec<EntryId>, at: usize },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Queue {
     entries: Vec<QueueEntry>,
     cursor: Option<EntryId>,
@@ -183,6 +183,17 @@ impl Queue {
 
     pub fn shuffle(&self) -> bool {
         self.order.is_some()
+    }
+
+    /// 清空并留下完整快照。撤销要连同随机顺序和当前项一起还回来，
+    /// 所以存的是整个队列，而不是曲目加下标。
+    pub fn take_clear_snapshot(&mut self) -> Option<Queue> {
+        if self.is_empty() {
+            return None;
+        }
+        let saved = self.clone();
+        *self = Queue::from_tracks(&[], 0);
+        Some(saved)
     }
 
     /// 下一首。`wrap` 为真时到末尾回到开头（列表循环）。
@@ -502,6 +513,33 @@ mod tests {
         assert!(q.remove(current));
         assert_eq!(q.len(), 2);
         assert!(q.current().is_some(), "光标不该悬空");
+    }
+
+    #[test]
+    fn 清空撤销保留随机顺序和当前项() {
+        let mut q = Queue::from_tracks(&[track(1), track(2), track(3), track(4), track(5)], 2);
+        q.set_shuffle(true);
+        let items = q.items();
+        let index = q.index();
+        let mut expected_next = Vec::new();
+        let mut probe = q.clone();
+        while let Some(entry) = probe.advance(false) {
+            expected_next.push(entry.track.key.clone());
+        }
+
+        let saved = q.take_clear_snapshot().expect("非空队列要留下快照");
+        assert!(q.is_empty());
+        assert!(!q.shuffle(), "清空后是空队列");
+
+        let mut restored = saved;
+        assert_eq!(restored.items(), items, "原顺序不能变");
+        assert_eq!(restored.index(), index, "当前项不能变");
+        assert!(restored.shuffle(), "随机模式不能变");
+        let mut actual_next = Vec::new();
+        while let Some(entry) = restored.advance(false) {
+            actual_next.push(entry.track.key.clone());
+        }
+        assert_eq!(actual_next, expected_next, "随机排列不能重新洗");
     }
 
     #[test]

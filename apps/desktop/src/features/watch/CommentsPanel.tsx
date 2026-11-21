@@ -109,7 +109,7 @@ function mentionLinks(
     .sort((a, b) => b[0].length - a[0].length)
     .map(([name]) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const pattern = new RegExp(
-    `(^|[^/\\s@])@(${names.join('|')})(?![\\p{L}\\p{N}_])`,
+    `(^|[^/@])@(${names.join('|')})(?![\\p{L}\\p{N}_])`,
     'gu',
   )
   const nodes: ReactNode[] = []
@@ -481,11 +481,9 @@ function CommentRow({
             ) : null}
             {c.pinned ? (
               <span className="flex shrink-0 items-center gap-0.5 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
-                <Icon name="thumb" size={9} />
-                UP主觉得很赞
+                置顶
               </span>
             ) : null}
-            {/* 置顶标记本身已经写明 UP 主，再挂一枚「UP主」就成了并排两块蓝底。 */}
             {!c.pinned && ownerMid && c.mid === ownerMid ? (
               <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 UP主

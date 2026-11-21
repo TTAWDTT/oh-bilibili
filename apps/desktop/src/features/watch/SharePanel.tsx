@@ -9,25 +9,34 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { SHARE_ICONS } from './ShareIcons'
+import { watchUrl } from './watchUrl'
 
 const SOCIALS = ['动态', '微信', 'QQ', 'QQ空间', '微博', '贴吧', '嵌入代码'] as const
 type Social = (typeof SOCIALS)[number]
 
 /**
  * B 站视频页的分享弹层：封面 + 分享链接、二维码，下面一排平台按钮。
- * 二维码用本地 qrcode 生成，链接和嵌入代码都从当前视频算，不经过第三方。
+ * 二维码用本地 qrcode 生成，链接和嵌入代码都从当前视频和分 P 算，不经过第三方。
  */
-export function SharePanel({ track, onClose }: { track: Track; onClose: () => void }) {
+export function SharePanel({
+  track,
+  page,
+  onClose,
+}: {
+  track: Track
+  page: number
+  onClose: () => void
+}) {
   const [withTime, setWithTime] = useState(false)
   const [startAt] = useState(() => Math.max(0, Math.round(readPlayhead())))
   const [qr, setQr] = useState<string | null>(null)
   const [qrError, setQrError] = useState(false)
   const [embedOpen, setEmbedOpen] = useState(false)
 
-  const baseUrl = `https://www.bilibili.com/video/${track.key}`
+  const baseUrl = watchUrl(track.key, page)
   const seconds = Math.floor(startAt / 1000)
-  const shareUrl = withTime ? `${baseUrl}?t=${seconds}` : baseUrl
-  const embedCode = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=1${
+  const shareUrl = withTime ? `${baseUrl}${page > 1 ? '&' : '?'}t=${seconds}` : baseUrl
+  const embedCode = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=${page}${
     withTime ? `&t=${seconds}` : ''
   }" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`
 

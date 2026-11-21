@@ -30,6 +30,9 @@ type PlayerStore = {
   moveInQueue: (from: string, to: string) => Promise<void>
   removeFromQueue: (key: string) => Promise<void>
   clearQueue: () => Promise<void>
+  undoClearQueue: () => Promise<void>
+  /** 最近一次清空的撤销窗口。放在 store 上，切右栏标签不会重置。 */
+  clearUndo: { count: number; expiresAt: number } | null
   applyProgress: (positionMs: number, durationMs: number, level?: number, sentAtMs?: number) => void
   applySnapshot: (snapshot: PlayerSnapshot) => void
   applyTrack: (track: Track) => void
@@ -41,6 +44,8 @@ type PlayerStore = {
 const SPEED_KEY = 'bilimusic.speed'
 /** 上次的音量。引擎重新启动时也把用户的选择补回去。 */
 const VOLUME_KEY = 'bilimusic.volume'
+const CLEAR_UNDO_MS = 6000
+let clearUndoTimer: number | null = null
 
 function loadSpeed(): number {
   try {
@@ -97,6 +102,7 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
   progress: { position_ms: 0, duration_ms: 0 },
   setProgress: (p) => set({ progress: p }),
     queue: null,
+    clearUndo: null,
     init: () => {
       if (initPromise) return initPromise
       initPromise = (async () => {
@@ -203,10 +209,32 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       }
     },
     clearQueue: async () => {
+      const count = get().queue?.items.length ?? 0
       try {
-        set({ queue: await ipc.queueClear() })
+        const next = await ipc.queueClear()
+        set({ queue: next })
+        if (count === 0 || next.items.length !== 0) return
+        if (clearUndoTimer !== null) window.clearTimeout(clearUndoTimer)
+        set({ clearUndo: { count, expiresAt: Date.now() + CLEAR_UNDO_MS } })
+        clearUndoTimer = window.setTimeout(() => {
+          clearUndoTimer = null
+          set({ clearUndo: null })
+        }, CLEAR_UNDO_MS)
       } catch {
         // 同上
+      }
+    },
+    undoClearQueue: async () => {
+      if (!get().clearUndo) return
+      try {
+        set({ queue: await ipc.queueUndoClear() })
+        if (clearUndoTimer !== null) {
+          window.clearTimeout(clearUndoTimer)
+          clearUndoTimer = null
+        }
+        set({ clearUndo: null })
+      } catch (cause) {
+        toastFailure('撤销清空', cause)
       }
     },
     applyProgress: (positionMs, durationMs, level = 0, sentAtMs) => {

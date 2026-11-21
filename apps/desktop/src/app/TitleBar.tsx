@@ -358,7 +358,9 @@ export function TitleBar() {
             event.stopPropagation()
             setFocused(false)
             inputRef.current?.blur()
-            closeSearch()
+            // 结果面板没开时 Esc 只收联想；这里清 searchReturn 会让
+            // 从搜索结果进入的视频失去返回目标。
+            if (useAppStore.getState().searchOpen) closeSearch()
             return
           }
           if (event.key !== 'ArrowDown' || event.target !== inputRef.current) return
