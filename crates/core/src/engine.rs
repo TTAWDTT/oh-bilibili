@@ -217,6 +217,7 @@ mod download_restore_tests {
 #[cfg(test)]
 mod queue_restore_tests {
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use super::{replace_queue_if_untouched, Engine};
     use crate::state::Queue;
@@ -251,15 +252,17 @@ mod queue_restore_tests {
 
     impl SavedQueue {
         fn new(tracks: &[Track]) -> Self {
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
             let stamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
             let dir = std::env::temp_dir().join(format!(
-                "bilimusic-queue-restore-{}-{stamp}",
+                "bilimusic-queue-restore-{}-{stamp}-{id}",
                 std::process::id()
             ));
-            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::create_dir(&dir).unwrap();
             let saved = Self(dir);
             let snapshot = serde_json::json!({
                 "tracks": tracks,
@@ -342,6 +345,51 @@ mod queue_restore_tests {
         assert_eq!(persisted["tracks"], serde_json::json!(queue.items));
         assert_eq!(persisted["index"], 0);
         assert_eq!(persisted["position_ms"], 0);
+    }
+
+    #[tokio::test]
+    async fn 移除加载中的曲目保持续播点() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let saved = SavedQueue::new(&[a.clone(), b.clone(), c.clone()]);
+        let engine = Engine::new(&saved.db()).unwrap();
+        assert_eq!(engine.snapshot().position_ms, 65_000);
+
+        let play = engine.toggle_or_load();
+        tokio::pin!(play);
+        tokio::select! {
+            biased;
+            result = &mut play => panic!("加载提前结束: {result:?}"),
+            () = std::future::ready(()) => {}
+        }
+        assert_eq!(engine.snapshot().phase, "loading");
+
+        let queue = engine.queue_remove(a.key.as_opaque()).unwrap();
+        let snapshot = engine.snapshot();
+        let persisted = saved.persisted();
+        assert_eq!(queue.items, [b.clone(), c]);
+        assert_eq!(queue.index, Some(0));
+        assert_eq!(persisted["tracks"], serde_json::json!(queue.items));
+        assert_eq!(persisted["index"], serde_json::json!(queue.index));
+        assert_eq!(persisted["position_ms"], 0);
+        assert_eq!(snapshot.phase, "loading");
+        assert_eq!(snapshot.track, Some(a));
+        assert_eq!(snapshot.position_ms, 65_000);
+        assert_eq!(engine.seek(18_000).position_ms, 18_000);
+        assert_eq!(saved.persisted()["position_ms"], 0);
+
+        let switch = engine.play_key(&b.key);
+        tokio::pin!(switch);
+        tokio::select! {
+            biased;
+            result = &mut switch => panic!("加载提前结束: {result:?}"),
+            () = std::future::ready(()) => {}
+        }
+        let snapshot = engine.snapshot();
+        assert_eq!(snapshot.phase, "loading");
+        assert_eq!(snapshot.track.as_ref(), Some(&b));
+        assert_eq!(snapshot.position_ms, 0);
     }
 
     #[test]
@@ -1927,13 +1975,14 @@ impl Engine {
 
     /// 从队列里移除一首。移除的是当前项时，光标落到原位置的下一首。
     pub fn queue_remove(&self, key: &str) -> Result<QueueView, WireError> {
+        let player_idle = matches!(*lock(&self.state), PlayerState::Idle);
         let mut queue = lock(&self.queue);
         let id = queue
             .entry_id_of(key)
             .ok_or_else(|| WireError::input("key", "这一项不在队列里"))?;
         let was_current = queue.current().is_some_and(|entry| entry.id == id);
         queue.remove(id);
-        if was_current {
+        if was_current && player_idle {
             self.discard_resume_for_other_track(queue.current().map(|entry| &entry.track.key));
         }
         drop(queue);
