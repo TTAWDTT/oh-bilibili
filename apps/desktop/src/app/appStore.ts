@@ -102,10 +102,8 @@ type AppStore = {
   heroQuery: string | null
   /** 搜索面板是否展开。搜索是顶栏的一个面板，不是独立页面。 */
   searchOpen: boolean
-  /** 从搜索结果进入视频后，返回时应重新展开这一组结果。 */
-  searchReturn: boolean
-  /** 每次从视频返回搜索时自增，搜索面板据此把焦点放回原卡片。 */
-  searchFocusResult: number
+  searchReturn: Track['key'] | null
+  searchFocusResult: Track['key'] | null
   /** 搜索面板当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
   currentQuery: string
   /** 搜索面板上次用的分区与排序，收起再打开要恢复。 */
@@ -168,8 +166,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   searchFocus: 0,
   heroQuery: null,
   searchOpen: false,
-  searchReturn: false,
-  searchFocusResult: 0,
+  searchReturn: null,
+  searchFocusResult: null,
   currentQuery: '',
   currentPartition: '全部',
   currentOrder: 'totalrank',
@@ -191,7 +189,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       return {
         view,
         searchOpen: false,
-        searchReturn: state.searchOpen && view.kind === 'watch',
+        searchReturn: state.searchOpen && view.kind === 'watch' ? view.track.key : null,
         cinema: false,
         osFullscreen: false,
         history: [...state.history, state.view].slice(-32),
@@ -201,28 +199,27 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((state) => ({
       view,
       searchOpen: false,
-      searchReturn: view.kind === 'watch' ? state.searchReturn : false,
+      searchReturn: view.kind === 'watch' ? state.searchReturn : null,
       cinema: false,
       osFullscreen: false,
     })),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)
-      const reopenSearch = state.searchReturn && prev !== undefined
       if (!prev) {
         return {
           view: { kind: 'home' } as View,
           searchOpen: false,
-          searchReturn: false,
+          searchReturn: null,
           cinema: false,
           osFullscreen: false,
         }
       }
       return {
         view: prev,
-        searchOpen: reopenSearch,
-        searchReturn: false,
-        searchFocusResult: reopenSearch ? state.searchFocusResult + 1 : state.searchFocusResult,
+        searchOpen: state.searchReturn !== null,
+        searchReturn: null,
+        searchFocusResult: state.searchReturn,
         cinema: false,
         osFullscreen: false,
         history: state.history.slice(0, -1),
@@ -235,8 +232,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   // null 只表示「这一条请求已被面板消费」，不该把面板重新打开。
   setHeroQuery: (q) =>
     q === null ? set({ heroQuery: null }) : set({ heroQuery: q, currentQuery: q, searchOpen: true }),
-  closeSearch: () => set({ searchOpen: false, searchReturn: false }),
-  clearSearchFocusResult: () => set({ searchFocusResult: 0 }),
+  closeSearch: () => set({ searchOpen: false, searchReturn: null }),
+  clearSearchFocusResult: () => set({ searchFocusResult: null }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
   setSearchFilters: (partition, order, duration = 0) =>
     set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),

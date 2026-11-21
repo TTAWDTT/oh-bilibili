@@ -23,6 +23,7 @@ const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
+type SearchTab = 'all' | 'video' | 'user'
 type SearchMemory = {
   key: string
   tracks: Track[]
@@ -30,9 +31,9 @@ type SearchMemory = {
   page: number
   usersPage: number
   usersEnded: boolean
+  tab: SearchTab
   scrollTop: number
-  /** 顶部第一张卡的序号；窗口化以后只靠像素恢复不回原处。 */
-  index: number
+  lastRenderedIndex: number
 }
 
 /** 搜索结果按查询条件缓存：从视频页返回时不该重新搜一遍，也不该跳回顶部。 */
@@ -74,7 +75,7 @@ export function SearchPanel() {
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
   const skipFirstFetch = useRef(restored !== null)
-  const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const scrollerRef = useRef<HTMLElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState(false)
   /** 这一批 UP 主里已经点过关注的人。只单向关注，不提供取关，避免误触。 */
@@ -86,7 +87,7 @@ export function SearchPanel() {
   const [nonce, setNonce] = useState(0)
   const [usersNonce, setUsersNonce] = useState(0)
   /** B 站搜索页的结果分类。默认综合，视频与 UP 主分开看。 */
-  const [tab, setTab] = useState<'all' | 'video' | 'user'>('all')
+  const [tab, setTab] = useState<SearchTab>(restored?.tab ?? 'all')
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   /** 热搜榜。取不到就退回内置建议，给空结果提供可点的替代词。 */
@@ -116,7 +117,6 @@ export function SearchPanel() {
   const closeSearch = useAppStore((state) => state.closeSearch)
   const searchFocusResult = useAppStore((state) => state.searchFocusResult)
   const clearSearchFocusResult = useAppStore((state) => state.clearSearchFocusResult)
-  const focusedResult = useRef(0)
 
   // 把实际在搜的词与筛选条件同步给 store：
   // 顶栏跟着它走，切走再回来也能恢复。
@@ -160,27 +160,23 @@ export function SearchPanel() {
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
-    if (!el || !restored) return
-    const card =
-      restored.index > 0
-        ? el.querySelector<HTMLElement>(`[data-track-card][data-index="${restored.index}"]`)
-        : null
-    if (card) {
-      el.scrollTop += card.getBoundingClientRect().top - el.getBoundingClientRect().top - 8
-    } else {
-      el.scrollTop = restored.scrollTop
+    if (!el) return
+    if (restored) el.scrollTop = restored.scrollTop
+    return () => {
+      if (!searchMemory) return
+      searchMemory.scrollTop = el.scrollTop
+      searchMemory.lastRenderedIndex = Number(el.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 1) - 1
     }
   }, [restored])
 
   useLayoutEffect(() => {
-    if (!restored || searchFocusResult === 0 || focusedResult.current === searchFocusResult) return
-    const card = scrollerRef.current?.querySelector<HTMLElement>(
-      `[data-track-card][data-index="${restored.index}"]`,
-    )
-    const button = card?.querySelector<HTMLButtonElement>('button')
-    if (!button) return
-    button.focus()
-    focusedResult.current = searchFocusResult
+    if (searchFocusResult === null) return
+    const index = restored?.tracks.findIndex((track) => track.key === searchFocusResult) ?? -1
+    if (index >= 0) {
+      scrollerRef.current
+        ?.querySelector<HTMLButtonElement>(`[data-track-card][data-index="${index}"] button`)
+        ?.focus({ preventScroll: true })
+    }
     clearSearchFocusResult()
   }, [restored, searchFocusResult, clearSearchFocusResult])
 
@@ -203,8 +199,9 @@ export function SearchPanel() {
         page,
         usersPage: currentUsersPage,
         usersEnded: currentUsersEnded,
+        tab,
         scrollTop: 0,
-        index: 0,
+        lastRenderedIndex: 0,
       }
     } else {
       searchMemory.tracks = tracks
@@ -212,8 +209,9 @@ export function SearchPanel() {
       searchMemory.page = page
       searchMemory.usersPage = currentUsersPage
       searchMemory.usersEnded = currentUsersEnded
+      searchMemory.tab = tab
     }
-  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page])
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page, tab])
 
   // UP 主结果按关键词与分区重置；视频翻页、排序和时长筛选不动它。先排队以免被视频预取挡住。
   useEffect(() => {
@@ -377,16 +375,6 @@ export function SearchPanel() {
         aria-label="搜索结果"
         ref={scrollerRef}
         id="search-scroll"
-        onScroll={(event) => {
-          const el = event.currentTarget
-          if (!searchMemory) return
-          searchMemory.scrollTop = el.scrollTop
-          const max = el.scrollHeight - el.clientHeight
-          const rendered = Number(el.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 0)
-          if (max > 0 && rendered > 1) {
-            searchMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
-          }
-        }}
         className="bili-search-sheet absolute inset-x-0 top-0 mx-auto h-[calc(100%-10px)] w-[min(1240px,calc(100%-24px))] overflow-y-auto rounded-b-[12px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-5 pb-10 pt-4"
       >
         {trimmed.length === 0 ? (
@@ -705,7 +693,7 @@ export function SearchPanel() {
                 playing={snapshot?.phase === 'playing'}
                 highlight={trimmed}
                 onNeedMore={needMore}
-                initialIndex={restored?.index ?? 0}
+                initialIndex={restored?.lastRenderedIndex ?? 0}
               />
             ) : null}
 
