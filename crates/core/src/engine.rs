@@ -1,9 +1,8 @@
 //! 编排层：把 B 站、曲库、声卡、歌词缝成 UI 能用的命令面。
 //!
-//! 三条纪律：
+//! 两条纪律：
 //! 1. 扛锁绝不跨 await，所以每个锁都在 await 之前释放。
 //! 2. 后台变化发事件，命令成功直接返回结果，UI 不用猜。
-//! 3. 位置只有声卡一个真值，快照是读出来的投影。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -217,9 +216,13 @@ mod download_restore_tests {
 
 #[cfg(test)]
 mod queue_restore_tests {
-    use super::replace_queue_if_untouched;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{replace_queue_if_untouched, Engine};
     use crate::state::Queue;
     use bilimusic_model::{Track, TrackKey};
+    use bilimusic_store::Library;
 
     fn track(key: &str) -> Track {
         Track {
@@ -243,6 +246,191 @@ mod queue_restore_tests {
             .iter()
             .map(|t| t.key.as_opaque().to_string())
             .collect()
+    }
+
+    struct SavedQueue(PathBuf);
+
+    impl SavedQueue {
+        fn new(tracks: &[Track]) -> Self {
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let dir = std::env::temp_dir().join(format!(
+                "bilimusic-queue-restore-{}-{stamp}-{id}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&dir).unwrap();
+            let saved = Self(dir);
+            let snapshot = serde_json::json!({
+                "tracks": tracks,
+                "index": 0,
+                "position_ms": 65_000,
+            });
+            Library::open(&saved.db())
+                .unwrap()
+                .save_queue(&snapshot.to_string())
+                .unwrap();
+            saved
+        }
+
+        fn db(&self) -> PathBuf {
+            self.0.join("library.sqlite")
+        }
+
+        fn persisted(&self) -> serde_json::Value {
+            let json = Library::open(&self.db())
+                .unwrap()
+                .load_queue()
+                .unwrap()
+                .unwrap();
+            serde_json::from_str(&json).unwrap()
+        }
+    }
+
+    impl Drop for SavedQueue {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn 播放前重排其他曲目保持续播点() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let saved = SavedQueue::new(&[a.clone(), b.clone(), c.clone()]);
+        let db = saved.db();
+
+        let engine = Engine::new(&db).unwrap();
+        let before = engine.snapshot();
+        let reordered = engine
+            .queue_move(c.key.as_opaque(), b.key.as_opaque())
+            .unwrap();
+        let after = engine.snapshot();
+        let persisted = saved.persisted();
+        drop(engine);
+        let restarted = Engine::new(&db).unwrap().snapshot();
+
+        assert_eq!(before.phase, "idle");
+        assert_eq!(reordered.items, [a.clone(), c, b]);
+        assert_eq!(reordered.index, Some(0));
+        assert_eq!(persisted["tracks"], serde_json::json!(reordered.items));
+        assert_eq!(persisted["index"], serde_json::json!(reordered.index));
+        assert_eq!(persisted["position_ms"], 65_000, "重排后落盘的续播点");
+        assert_eq!(before.position_ms, 65_000);
+        assert_eq!(after.track.as_ref(), Some(&a));
+        assert_eq!(after.position_ms, 65_000);
+        assert_eq!(restarted.track, Some(a));
+        assert_eq!(restarted.position_ms, 65_000);
+    }
+
+    #[test]
+    fn 移除当前曲目后新曲目从头开始() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let saved = SavedQueue::new(&[a.clone(), b.clone()]);
+        let engine = Engine::new(&saved.db()).unwrap();
+        assert_eq!(engine.snapshot().position_ms, 65_000);
+
+        let queue = engine.queue_remove(a.key.as_opaque()).unwrap();
+        let snapshot = engine.snapshot();
+        let persisted = saved.persisted();
+        assert_eq!(queue.items, [b.clone()]);
+        assert_eq!(queue.index, Some(0));
+        assert_eq!(snapshot.track, Some(b));
+        assert_eq!(snapshot.position_ms, 0);
+        assert_eq!(persisted["tracks"], serde_json::json!(queue.items));
+        assert_eq!(persisted["index"], 0);
+        assert_eq!(persisted["position_ms"], 0);
+    }
+
+    #[tokio::test]
+    async fn 移除加载中的曲目保持续播点() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let saved = SavedQueue::new(&[a.clone(), b.clone(), c.clone()]);
+        let engine = Engine::new(&saved.db()).unwrap();
+        assert_eq!(engine.snapshot().position_ms, 65_000);
+
+        let play = engine.toggle_or_load();
+        tokio::pin!(play);
+        tokio::select! {
+            biased;
+            result = &mut play => panic!("加载提前结束: {result:?}"),
+            () = std::future::ready(()) => {}
+        }
+        assert_eq!(engine.snapshot().phase, "loading");
+
+        let queue = engine.queue_remove(a.key.as_opaque()).unwrap();
+        let snapshot = engine.snapshot();
+        let persisted = saved.persisted();
+        assert_eq!(queue.items, [b.clone(), c]);
+        assert_eq!(queue.index, Some(0));
+        assert_eq!(persisted["tracks"], serde_json::json!(queue.items));
+        assert_eq!(persisted["index"], serde_json::json!(queue.index));
+        assert_eq!(persisted["position_ms"], 0);
+        assert_eq!(snapshot.phase, "loading");
+        assert_eq!(snapshot.track, Some(a));
+        assert_eq!(snapshot.position_ms, 65_000);
+        assert_eq!(engine.seek(18_000).position_ms, 18_000);
+        assert_eq!(saved.persisted()["position_ms"], 0);
+
+        let switch = engine.play_key(&b.key);
+        tokio::pin!(switch);
+        tokio::select! {
+            biased;
+            result = &mut switch => panic!("加载提前结束: {result:?}"),
+            () = std::future::ready(()) => {}
+        }
+        let snapshot = engine.snapshot();
+        assert_eq!(snapshot.phase, "loading");
+        assert_eq!(snapshot.track.as_ref(), Some(&b));
+        assert_eq!(snapshot.position_ms, 0);
+    }
+
+    #[test]
+    fn 撤销清空恢复待续播位置() {
+        let a = track("BV1");
+        let saved = SavedQueue::new(std::slice::from_ref(&a));
+        let engine = Engine::new(&saved.db()).unwrap();
+
+        let cleared = engine.queue_clear().unwrap();
+        assert!(cleared.items.is_empty());
+        assert_eq!(cleared.index, None);
+        assert_eq!(engine.snapshot().position_ms, 0);
+        let persisted = saved.persisted();
+        assert_eq!(persisted["tracks"], serde_json::json!([]));
+        assert_eq!(persisted["index"], serde_json::Value::Null);
+        assert_eq!(persisted["position_ms"], 0);
+
+        let restored = engine.queue_undo_clear().unwrap();
+        let snapshot = engine.snapshot();
+        let persisted = saved.persisted();
+        assert_eq!(restored.items, [a.clone()]);
+        assert_eq!(restored.index, Some(0));
+        assert_eq!(snapshot.track, Some(a));
+        assert_eq!(snapshot.position_ms, 65_000);
+        assert_eq!(persisted["position_ms"], 65_000);
+    }
+
+    #[test]
+    fn 播放前跳转更新待续播位置() {
+        let a = track("BV1");
+        let saved = SavedQueue::new(std::slice::from_ref(&a));
+        let engine = Engine::new(&saved.db()).unwrap();
+
+        assert_eq!(engine.seek(18_000).position_ms, 18_000);
+        assert_eq!(saved.persisted()["position_ms"], 18_000);
+        assert_eq!(engine.seek(0).position_ms, 0);
+        assert_eq!(saved.persisted()["position_ms"], 0);
+
+        let restarted = Engine::new(&saved.db()).unwrap().snapshot();
+        assert_eq!(restarted.track, Some(a));
+        assert_eq!(restarted.position_ms, 0);
     }
 
     #[test]
@@ -361,8 +549,7 @@ pub struct Engine {
     pending_prepared: Mutex<Option<(LoadToken, Prepared)>>,
     volume: Mutex<f32>,
     speed: Mutex<f32>,
-    /// 恢复队列时要跳回的位置（毫秒）。0 表示从头开始。
-    resume_at_ms: Mutex<u64>,
+    pending_resume: Mutex<Option<(TrackKey, u64)>>,
     /// 看模式下当前 P 的 cid。`detail.cid` 永远是第一 P，多 P 视频取音轨
     /// 必须换成用户正在看的那一 P，否则每一集放的都是 P1 的声音。
     watch_cid: Mutex<Option<(String, u64)>>,
@@ -407,7 +594,7 @@ impl Engine {
             pending_prepared: Mutex::new(None),
             volume: Mutex::new(0.7),
             speed: Mutex::new(1.0),
-            resume_at_ms: Mutex::new(0),
+            pending_resume: Mutex::new(None),
             watch_cid: Mutex::new(None),
             repeat: Mutex::new("off".into()),
             events,
@@ -589,6 +776,7 @@ impl Engine {
 
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        self.discard_resume_for_other_track(Some(key));
         *lock(&self.last_transport_at) = std::time::Instant::now();
         *lock(&self.pending_prepared) = None;
         {
@@ -611,13 +799,7 @@ impl Engine {
 
         match self.fetch_and_load(key, token).await {
             Ok(prepared) => {
-                // 恢复上次退出时的进度（只对恢复出来的第一首生效）。
-                let resume = {
-                    let mut at = lock(&self.resume_at_ms);
-                    let v = *at;
-                    *at = 0;
-                    v
-                };
+                let resume = self.pending_resume_for(key).unwrap_or(0);
                 // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
                 // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
                 let bounded = match track.duration {
@@ -720,7 +902,7 @@ impl Engine {
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
         // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
         // 不会出现「进度条先跳过去、音频还在 0」的竞态。
-        *lock(&self.resume_at_ms) = resume_at_ms.unwrap_or_else(|| {
+        let at = resume_at_ms.unwrap_or_else(|| {
             if page.is_none() {
                 self.library
                     .history_position(key.as_opaque())
@@ -731,6 +913,7 @@ impl Engine {
                 0
             }
         });
+        *lock(&self.pending_resume) = Some((key.clone(), at));
         // 打开观看页就要有声音。引擎是唯一的发声者，这里顺手把它挂上：
         // 前端不需要再补一次「开始播放」，也就不会因为调用失败而静音。
         // 起播要等拉流，放后台跑，页面先出来。
@@ -1258,27 +1441,35 @@ impl Engine {
     }
 
     pub fn seek(&self, position_ms: u64) -> PlayerSnapshot {
-        if lock(&self.state).phase() == "ended" {
+        let state = lock(&self.state).clone();
+        if state.phase() == "ended" {
             return self.snapshot();
         }
         *lock(&self.last_transport_at) = std::time::Instant::now();
         // 正好落在曲目时长上的 seek 会被解码器拒掉（实测按 End 之后位置不动、
         // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
         // 播完该切歌仍由 reached_track_end 负责。
-        let duration = {
-            let st = lock(&self.state);
-            st.track()
-                .and_then(|k| lock(&self.known).get(k.as_opaque()).cloned())
-                .and_then(|t| t.duration)
-                .map(|d| d.0)
-                .unwrap_or(0)
-        };
+        let track = self.snapshot_track(&state);
+        let duration = track.as_ref().and_then(|t| t.duration).map_or(0, |d| d.0);
         let target = if duration > 1000 && position_ms >= duration - 1000 {
             duration - 1000
         } else {
             position_ms
         };
+        let updated_resume = {
+            let mut pending = lock(&self.pending_resume);
+            match pending.as_mut() {
+                Some((key, at)) if track.as_ref().is_some_and(|track| &track.key == key) => {
+                    *at = target;
+                    true
+                }
+                _ => false,
+            }
+        };
         lock(&self.player).seek(target);
+        if updated_resume {
+            self.persist_queue();
+        }
         self.snapshot()
     }
 
@@ -1288,6 +1479,7 @@ impl Engine {
         let key = lock(&self.queue).current().map(|e| e.track.key.clone());
         match key {
             Some(k) => {
+                *lock(&self.pending_resume) = None;
                 let snap = self.play_key(&k).await?;
                 // 重播是从头看，历史进度也该归零。
                 let _ = self.library.set_history_position(k.as_opaque(), 0);
@@ -1332,21 +1524,10 @@ impl Engine {
 
     pub fn snapshot(&self) -> PlayerSnapshot {
         let state = lock(&self.state).clone();
-        let position_ms = {
-            let player = lock(&self.player);
-            player.clock().position_ms()
-        };
-        // 空闲但没有在播曲目时（比如刚恢复队列），把队列里的当前项亮出来，
-        // 让用户看到「上次听的是这首、停在第几秒」，而不是一片空白。
-        let track = state
-            .track()
-            .and_then(|k| lock(&self.known).get(k.as_opaque()).cloned())
-            .or_else(|| {
-                if state.phase() != "idle" {
-                    return None;
-                }
-                lock(&self.queue).current().map(|entry| entry.track.clone())
-            });
+        let track = self.snapshot_track(&state);
+        let position_ms = track
+            .as_ref()
+            .map_or(0, |track| self.position_for(&track.key, state.track()));
         let quality = state.prepared().map(|p| p.quality.kbps());
         PlayerSnapshot {
             phase: state.phase().to_string(),
@@ -1359,6 +1540,37 @@ impl Engine {
             shuffle: lock(&self.queue).shuffle(),
             quality_kbps: quality,
             mode: *lock(&self.mode),
+        }
+    }
+
+    fn snapshot_track(&self, state: &PlayerState) -> Option<Track> {
+        match state.track() {
+            Some(key) => lock(&self.known).get(key.as_opaque()).cloned(),
+            None => lock(&self.queue).current().map(|entry| entry.track.clone()),
+        }
+    }
+
+    fn pending_resume_for(&self, key: &TrackKey) -> Option<u64> {
+        lock(&self.pending_resume)
+            .as_ref()
+            .filter(|(track, _)| track == key)
+            .map(|(_, at)| *at)
+    }
+
+    fn position_for(&self, key: &TrackKey, state_track: Option<&TrackKey>) -> u64 {
+        if let Some(at) = self.pending_resume_for(key) {
+            at
+        } else if state_track == Some(key) {
+            lock(&self.player).clock().position_ms()
+        } else {
+            0
+        }
+    }
+
+    fn discard_resume_for_other_track(&self, key: Option<&TrackKey>) {
+        let mut pending = lock(&self.pending_resume);
+        if pending.as_ref().is_some_and(|(track, _)| Some(track) != key) {
+            *pending = None;
         }
     }
 
@@ -1512,8 +1724,9 @@ impl Engine {
                     let key = lock(&engine.queue).current().map(|e| e.track.key.clone());
                     if let Some(k) = key {
                         // 重载会重新签一次流地址；从断点续上，别让一次 CDN 断流把进度送回 0:00。
-                        let at = lock(&engine.player).clock().position_ms();
-                        *lock(&engine.resume_at_ms) = at;
+                        let state_track = lock(&engine.state).track().cloned();
+                        let at = engine.position_for(&k, state_track.as_ref());
+                        *lock(&engine.pending_resume) = Some((k.clone(), at));
                         let _ = rt.block_on(engine.play_key(&k));
                     }
                 }
@@ -1585,6 +1798,12 @@ impl Engine {
             }
             _ => return false,
         };
+        {
+            let mut pending = lock(&self.pending_resume);
+            if pending.as_ref().is_some_and(|(key, _)| key == &track_key) {
+                *pending = None;
+            }
+        }
         let next = current.stream_ready(token, prepared);
         let watch_mode = *lock(&self.mode) == crate::wire::PlayMode::Watch;
         *st = if ended {
@@ -1626,16 +1845,21 @@ impl Engine {
     }
 
     fn persist_queue(&self) {
-        let (tracks, index) = {
+        let (tracks, index, current) = {
             let queue = lock(&self.queue);
-            (queue.items(), queue.index())
+            let current = queue.current().map(|entry| entry.track.key.clone());
+            (queue.items(), queue.index(), current)
         };
+        let state_track = lock(&self.state).track().cloned();
+        let position_ms = current
+            .as_ref()
+            .map_or(0, |key| self.position_for(key, state_track.as_ref()));
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
         // 进度也一起存，否则用户还得自己拖回去。
         let snapshot = serde_json::json!({
             "tracks": tracks,
             "index": index,
-            "position_ms": self.snapshot().position_ms,
+            "position_ms": position_ms,
         });
         if let Ok(json) = serde_json::to_string(&snapshot) {
             let _ = self.library.save_queue(&json);
@@ -1690,7 +1914,7 @@ impl Engine {
             let start = saved_index.min(saved_tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
             q.replace_from_tracks(&saved_tracks, start);
-            *lock(&self.resume_at_ms) = saved_ms;
+            *lock(&self.pending_resume) = Some((saved_tracks[start].key.clone(), saved_ms));
             return;
         }
         let tracks = self.tracks_for(&keys);
@@ -1699,7 +1923,8 @@ impl Engine {
             let mut q = lock(&self.queue);
             q.replace_from_tracks(&tracks, start);
         }
-        *lock(&self.resume_at_ms) = saved_ms;
+        let saved_key = TrackKey::from_provider(keys[saved_index.min(keys.len() - 1)].clone());
+        *lock(&self.pending_resume) = Some((saved_key, saved_ms));
 
         // 有缺的就后台补，补完再整体替换队列。
         let already = tracks.len();
@@ -1750,11 +1975,16 @@ impl Engine {
 
     /// 从队列里移除一首。移除的是当前项时，光标落到原位置的下一首。
     pub fn queue_remove(&self, key: &str) -> Result<QueueView, WireError> {
+        let player_idle = matches!(*lock(&self.state), PlayerState::Idle);
         let mut queue = lock(&self.queue);
         let id = queue
             .entry_id_of(key)
             .ok_or_else(|| WireError::input("key", "这一项不在队列里"))?;
+        let was_current = queue.current().is_some_and(|entry| entry.id == id);
         queue.remove(id);
+        if was_current && player_idle {
+            self.discard_resume_for_other_track(queue.current().map(|entry| &entry.track.key));
+        }
         drop(queue);
         self.persist_queue();
         let queue = lock(&self.queue);
