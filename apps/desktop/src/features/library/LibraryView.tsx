@@ -7,9 +7,9 @@ import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { CreatePlaylistModal } from './CreatePlaylistModal'
-import { thumbUrl } from '../../shared/lib/thumb'
 import { useLibraryStore } from './libraryStore'
 import { usePlayerStore } from '../player/playerStore'
+import { PlaylistSleeve } from './PlaylistSleeve'
 
 export function LibraryView() {
   const playlists = useLibraryStore((state) => state.playlists)
@@ -52,7 +52,7 @@ export function LibraryView() {
             />
           </div>
         ) : (
-          <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+          <section className="mt-6 grid max-w-[1120px] grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-x-4 gap-y-7">
             {playlists.map((playlist) => (
               <PlaylistCard key={playlist.id} playlist={playlist} revision={revision} />
             ))}
@@ -99,36 +99,18 @@ function PlaylistCard({ playlist, revision }: { playlist: Playlist; revision: nu
   }
 
   return (
-    <div
-      className="bili-card bili-card-enter group relative overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)]"
+    <article
+      data-playlist-name={name}
+      className="bili-playlist-card bili-card-enter group relative min-w-0"
     >
       <button
         type="button"
         onClick={() => navigate({ kind: 'playlist', id, name })}
         className="block w-full text-left"
       >
-        <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
-          {Array.from({ length: 4 }, (_, i) => {
-            const cover = tracks?.[i]?.cover
-            return (
-              <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
-                {cover ? (
-                  <img
-                    src={thumbUrl(cover, 320, 180) ?? cover}
-                    alt=""
-                    aria-hidden
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                ) : null}
-              </span>
-            )
-          })}
-        </span>
-        <span className="block px-3 py-2">
-          <span className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]" title={name}>
+        <PlaylistSleeve name={name} tracks={tracks} />
+        <span className="mt-2 block min-h-[40px]">
+          <span className="line-clamp-2 text-[14px] font-medium leading-5 text-[var(--text-1)]" title={name}>
             {name}
           </span>
           <span className="num mt-0.5 block min-h-[1.5em] text-[12px] text-[var(--text-3)]">
@@ -144,23 +126,21 @@ function PlaylistCard({ playlist, revision }: { playlist: Playlist; revision: nu
             setTrackRead(undefined)
             setRetryCount((current) => current + 1)
           }}
-          className="t absolute bottom-2 right-3 rounded-[4px] text-[12px] text-[var(--accent)] hover:underline"
+          className="t mt-1 rounded-[4px] text-[12px] text-[var(--accent-strong)] hover:underline"
         >
           重试
         </button>
       ) : null}
-      {/* B 站歌单卡右上角也是就近播放：整单排进队列，不用先进详情页。 */}
-      <span className="pointer-events-none absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-        <button
-          type="button"
-          aria-label={`播放歌单 ${name}`}
-          title="播放全部"
-          onClick={() => void playPlaylist()}
-          className="bili-press flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] hover:opacity-90"
-        >
-          <Icon name="play" size={16} />
-        </button>
-      </span>
-    </div>
+      <button
+        type="button"
+        aria-label={`播放歌单 ${name}`}
+        title={tracks && tracks.length > 0 ? '播放全部' : '歌单里还没有可播放的曲目'}
+        disabled={!tracks || tracks.length === 0}
+        onClick={() => void playPlaylist()}
+        className="bili-playlist-play bili-press absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] disabled:cursor-default disabled:opacity-35"
+      >
+        <Icon name="play" size={16} />
+      </button>
+    </article>
   )
 }

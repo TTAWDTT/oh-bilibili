@@ -233,6 +233,9 @@ export const PLAYLIST_SEEDS: readonly PlaylistSeed[] = [
   { id: 1, name: '深夜循环', titles: ['晴天', '大鱼', '海底', '夜空中最亮的星', '白噪音 · 雨落屋檐'] },
   { id: 2, name: '翻唱现场', titles: ['起风了', '春庭雪', '关山酒', '山楂树之恋'] },
   { id: 3, name: '纯音乐与白噪音', titles: ['白噪音 · 雨落屋檐', '钢琴 · 月光练习曲', '吉他 · 午后四点'] },
+  { id: 4, name: '单曲循环 · 今晚只听这一首', titles: ['晴天'] },
+  { id: 5, name: '双声部现场', titles: ['起风了', '大鱼'] },
+  { id: 6, name: '暂时空着的歌单', titles: [] },
 ]
 
 export function avatarArt(): string {
