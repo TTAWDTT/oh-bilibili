@@ -415,6 +415,25 @@
   box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
 }
 
+.bili-playlist-play {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.bili-playlist-card:hover .bili-playlist-play,
+.bili-playlist-card:focus-within .bili-playlist-play {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none), (max-width: 767px) {
+  .bili-playlist-play {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* 侧边栏收起/展开不做宽度过渡。
    宽度一变，发现页那几十张卡片每帧都要重新排版，160ms 的过渡就是十来次全量
    reflow，点起来一顿一顿的。宽度瞬切只有一次重排，文字用透明度过一下眼。 */

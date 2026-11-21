@@ -45,6 +45,8 @@ let dynamicLoaded = false
 const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
 const settledListFailures = new Set<string>()
 const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
+const libraryBrokenCover =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryBrokenCover')
 let libraryPartialRecovered = false
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
@@ -1112,7 +1114,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (libraryPartial && playlist.id === 3) return []
       return playlist.keys.flatMap((key) => {
         const track = findTrack(key)
-        return track ? [track] : []
+        if (!track) return []
+        return [
+          libraryBrokenCover && playlist.id === 4
+            ? { ...track, cover: 'https://example.invalid/broken.jpg' }
+            : track,
+        ]
       })
     }
     case 'coin_set':
