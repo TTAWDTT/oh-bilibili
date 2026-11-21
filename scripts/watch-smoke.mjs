@@ -329,6 +329,7 @@ async function checkLibraryShelf(page) {
         playDisabled: play.disabled,
         playOpacity: getComputedStyle(play).opacity,
         playInside: playBox.right <= sleeveBox.right + 0.5 && playBox.left >= sleeveBox.left - 0.5,
+        countTop: card.querySelector('[data-track-count]')?.getBoundingClientRect().top ?? -1,
         text: card.innerText,
       }
     })`)
@@ -360,6 +361,10 @@ async function checkLibraryShelf(page) {
         card.text.includes(card.name) &&
         (card.playDisabled ? card.text.includes('空歌单') : /\d+ 首/.test(card.text)),
     ),
+  )
+  check(
+    '曲目数在同排封套下对齐',
+    new Set(shelf.map((card) => Math.round(card.countTop))).size === 1,
   )
 
   const firstCenter = await page.evaluate(`(() => {
@@ -419,7 +424,9 @@ async function checkLibraryShelf(page) {
   )
 
   await page.viewport(380, 800)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  const brokenUrl = new URL(WEB)
+  brokenUrl.searchParams.set('libraryBrokenCover', '1')
+  await page.evaluate(`location.href = ${JSON.stringify(brokenUrl.href)}`)
   await sleep(5000)
   await page.evaluate(`(() => {
     const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '曲库')
@@ -427,12 +434,42 @@ async function checkLibraryShelf(page) {
   })()`)
   await sleep(800)
   const narrow = await read()
+  let fallbackReady = false
+  for (let i = 0; i < 20 && !fallbackReady; i += 1) {
+    await sleep(200)
+    fallbackReady = await page.evaluate(`(() => {
+      const card = document.querySelector('[data-playlist-name="单曲循环 · 今晚只听这一首"]')
+      return card?.querySelector('[data-cover-count]')?.dataset.coverCount === '0' &&
+        !!card.querySelector('[data-playlist-fallback]')
+    })()`)
+  }
   check(
-    '窄窗和无悬停设备保留可读封套与播放全部',
+    '窄窗和无悬停设备保留可读封套与播放全部，坏图回落字标',
     narrow.length === 6 &&
       narrow.every((card) => card.width >= 140 && card.playInside) &&
       narrow.every((card) => card.playDisabled || card.playOpacity === '1') &&
+      fallbackReady &&
       !(await page.evaluate(`document.documentElement.scrollWidth > document.documentElement.clientWidth`)),
+  )
+
+  const openedLongDetail = await page.evaluate(`(() => {
+    const title = document.querySelector('[data-playlist-name="单曲循环 · 今晚只听这一首"] [title="单曲循环 · 今晚只听这一首"]')
+    title?.closest('button')?.click()
+    return !!title
+  })()`)
+  let longDetailReady = false
+  for (let i = 0; i < 20 && !longDetailReady; i += 1) {
+    await sleep(200)
+    longDetailReady = await page.evaluate(`document.querySelectorAll('#scroll-main h2').length > 0`)
+  }
+  const longDetail = await page.evaluate(`(() => {
+    const title = document.querySelector('#scroll-main h2')
+    const box = title?.getBoundingClientRect()
+    return box ? { width: box.width, height: box.height } : null
+  })()`)
+  check(
+    '窄窗歌单详情的标题和操作不互相挤压',
+    openedLongDetail && longDetailReady && longDetail && longDetail.width >= 220 && longDetail.height <= 64,
   )
   await page.viewport(1320, 900)
 }

@@ -109,11 +109,11 @@ function PlaylistCard({ playlist, revision }: { playlist: Playlist; revision: nu
         className="block w-full text-left"
       >
         <PlaylistSleeve name={name} tracks={tracks} />
-        <span className="mt-2 block min-h-[40px]">
-          <span className="line-clamp-2 text-[14px] font-medium leading-5 text-[var(--text-1)]" title={name}>
+        <span className="mt-2 block">
+          <span className="line-clamp-2 min-h-[40px] text-[14px] font-medium leading-5 text-[var(--text-1)]" title={name}>
             {name}
           </span>
-          <span className="num mt-0.5 block min-h-[1.5em] text-[12px] text-[var(--text-3)]">
+          <span data-track-count className="num mt-0.5 block min-h-[1.5em] text-[12px] text-[var(--text-3)]">
             {failed ? '曲目数未取到' : tracks && (tracks.length > 0 ? `${tracks.length} 首` : '空歌单')}
           </span>
         </span>
