@@ -179,14 +179,14 @@ export default function App() {
     if (!trackKey) return
     // 窄屏的右栏是一整张全屏面板，跟着每首歌自动弹出来会盖住正在看的页面；
     // 宽屏才把歌词栏拉回来，窄屏留给迷你播放条上的歌词/队列按钮。
-    if (!window.matchMedia('(min-width: 768px)').matches) return
+    if (!window.matchMedia('(min-width: 1280px)').matches) return
     if (useAppStore.getState().rail === null) setRail('lyrics')
   }, [trackKey, setRail])
 
   // 从宽窗口拖到窄窗口时，桌面的右栏会变成盖住整页的面板；跨过断点就收起，
   // 需要时再点播放条上的歌词/队列按钮打开。
   useEffect(() => {
-    const narrow = window.matchMedia('(max-width: 767px)')
+    const narrow = window.matchMedia('(max-width: 1279px)')
     const onChange = (event: MediaQueryListEvent): void => {
       if (event.matches) setRail(null)
     }
@@ -226,7 +226,7 @@ export default function App() {
             <CurrentView view={view} />
           </div>
         </main>
-        <div className="rail-slot hidden md:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
+        <div className="rail-slot hidden xl:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
         {musicView && listening ? <DanmakuStrip /> : null}
