@@ -390,6 +390,22 @@ export function WatchPlayer({
   const toggleDanmakuBlockType = useDanmakuSettings((s) => s.toggleBlockType)
   const setSendColor = useDanmakuSettings((s) => s.setSendColor)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
+  useEffect(() => {
+    if (!danmakuPanel && !pagesOpen) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      const modalOpen = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(
+        (el) => el.getClientRects().length > 0,
+      )
+      if (modalOpen) return
+      event.preventDefault()
+      event.stopPropagation()
+      setDanmakuPanel(false)
+      setPagesOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [danmakuPanel, pagesOpen])
   const [blockDraft, setBlockDraft] = useState('')
 
   /** 屏蔽词和屏蔽类型只作用于画面上的弹幕，右栏列表仍保留全部。 */
@@ -1856,7 +1872,17 @@ export function WatchPlayer({
               <BiliDanmakuSetting size={17} />
             </button>
             {danmakuPanel ? (
-              <div className="absolute bottom-9 right-0 z-30 max-h-[70vh] w-[196px] overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur sm:w-[236px]">
+              <div className="fixed inset-x-3 bottom-20 z-40 max-h-[60vh] w-auto overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur md:absolute md:inset-auto md:bottom-9 md:right-0 md:z-30 md:max-h-[70vh] md:w-[236px]">
+                <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between border-b border-white/10 bg-black/90 px-3 py-2 md:hidden">
+                  <span className="text-[12px] text-white/60">弹幕设置</span>
+                  <button
+                    type="button"
+                    onClick={() => setDanmakuPanel(false)}
+                    className="text-[12px] text-white/80 hover:text-white"
+                  >
+                    关闭
+                  </button>
+                </div>
                 <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
                   <span>显示区域</span>
                   <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
@@ -2045,7 +2071,17 @@ export function WatchPlayer({
                 <span className="num text-[11px] text-white/55">P{currentPage}</span>
               </button>
               {pagesOpen ? (
-                <div className="absolute bottom-8 right-0 z-30 flex max-h-[320px] w-[200px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur sm:w-[280px]">
+                <div className="fixed inset-x-3 bottom-20 z-40 flex max-h-[60vh] w-auto flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur md:absolute md:inset-auto md:bottom-8 md:right-0 md:z-30 md:max-h-[320px] md:w-[280px]">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-black/90 px-3 py-2 md:hidden">
+                    <span className="text-[12px] text-white/60">选集</span>
+                    <button
+                      type="button"
+                      onClick={() => setPagesOpen(false)}
+                      className="text-[12px] text-white/80 hover:text-white"
+                    >
+                      关闭
+                    </button>
+                  </div>
                   {data.pages.map((page) => {
                     const on = page.no === currentPage
                     return (
@@ -2216,6 +2252,16 @@ export function WatchPlayer({
           </button>
         </div>
       </div>
+      {danmakuPanel || pagesOpen ? (
+        <div
+          aria-hidden
+          onClick={() => {
+            setDanmakuPanel(false)
+            setPagesOpen(false)
+          }}
+          className="fixed inset-0 z-10 bg-black/30 md:hidden"
+        />
+      ) : null}
     </div>
     {!cinema ? (
       <div className="flex items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] px-3 py-2">
