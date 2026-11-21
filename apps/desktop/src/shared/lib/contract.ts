@@ -239,7 +239,7 @@ export type QrStatus = {
   auth: AuthSnapshot | null
 }
 
-export type DownloadState = 'queued' | 'running' | 'done' | 'failed'
+export type DownloadState = 'queued' | 'running' | 'done' | 'failed' | 'missing'
 
 export type DownloadView = {
   key: string
@@ -247,6 +247,7 @@ export type DownloadView = {
   state: DownloadState
   progress: number
   path: string | null
+  error: string | null
 }
 
 export type ErrorClass =

@@ -55,6 +55,7 @@ export const state: MockState = {
       state: 'done',
       progress: 1,
       path: '~/Music/BiliMusic/周杰伦 - 晴天.m4a',
+      error: null,
     },
     {
       key: 'seed-download-2',
@@ -62,6 +63,7 @@ export const state: MockState = {
       state: 'running',
       progress: 0.38,
       path: null,
+      error: null,
     },
   ],
   historyHidden: new Set<string>(),

@@ -140,6 +140,28 @@ fn 队列视图的字段_ts_侧都有() {
 }
 
 #[test]
+fn 下载视图的字段_ts_侧都有() {
+    let view = bilimusic_core::engine::DownloadView {
+        key: "BV1".into(),
+        title: "晴天".into(),
+        state: "done".into(),
+        progress: 1.0,
+        path: Some("/tmp/晴天.m4a".into()),
+        error: None,
+    };
+    let value = serde_json::to_value(&view).expect("可序列化");
+    let declared = ts_fields(&contract(), "DownloadView");
+    let top: std::collections::BTreeSet<String> = value
+        .as_object()
+        .expect("对象")
+        .keys()
+        .cloned()
+        .collect();
+    let missing: Vec<&String> = top.difference(&declared).collect();
+    assert!(missing.is_empty(), "DownloadView 缺字段：{missing:?}");
+}
+
+#[test]
 fn 事件类型标签_ts_联合里有() {
     let ts = contract();
     let events = [

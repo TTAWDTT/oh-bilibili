@@ -13,7 +13,7 @@ use bilimusic_audio::{Media, Player};
 use bilimusic_bili::media::RemoteMedia;
 use bilimusic_bili::Source;
 use bilimusic_model::{Millis, Quality, SearchQuery, Track, TrackKey};
-use bilimusic_store::{Library, ReactionKind, ReactionState};
+use bilimusic_store::{Library, ReactionKind, ReactionState, StoredDownload};
 
 use crate::lyrics::{self, LyricDoc};
 use crate::state::{LoadToken, PlayerState, Prepared, Queue};
@@ -26,6 +26,7 @@ pub struct DownloadView {
     pub state: String,
     pub progress: f32,
     pub path: Option<String>,
+    pub error: Option<String>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -111,6 +112,107 @@ mod watch_gate_tests {
     }
 }
 
+#[cfg(test)]
+mod download_restore_tests {
+    use super::{download_key_of, restored_download};
+    use bilimusic_model::{Track, TrackKey};
+    use bilimusic_store::Library;
+
+    fn track(key: &str) -> Track {
+        Track {
+            key: TrackKey::from_provider(key),
+            title: format!("歌 {key}"),
+            artist: "某人".into(),
+            duration: None,
+            cover: None,
+            accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
+            up_mid: None,
+            tname: None,
+            typeid: None,
+        }
+    }
+
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "bilimusic-core-{tag}-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn 下载记录重开后按磁盘现状恢复() {
+        let dir = temp_dir("download-restore");
+        let db = dir.join("library.sqlite");
+        let audio = dir.join("晴天 [BV1xx411c7mD].m4a");
+        std::fs::write(&audio, b"audio").unwrap();
+        let gone = dir.join("海底 [BV1yy411c7mE].m4a");
+
+        {
+            let library = Library::open(&db).unwrap();
+            library
+                .save_download(
+                    &track("BV1xx411c7mD"),
+                    Some(audio.to_str().unwrap()),
+                    "done",
+                    None,
+                )
+                .unwrap();
+            library
+                .save_download(
+                    &track("BV1yy411c7mE"),
+                    Some(gone.to_str().unwrap()),
+                    "done",
+                    None,
+                )
+                .unwrap();
+            library
+                .save_download(&track("BV1zz411c7mF"), None, "running", None)
+                .unwrap();
+        }
+
+        let library = Library::open(&db).unwrap();
+        let views: Vec<_> = library
+            .downloads()
+            .unwrap()
+            .iter()
+            .map(restored_download)
+            .collect();
+        assert_eq!(views.len(), 3);
+        assert_eq!(views[0].state, "done");
+        assert_eq!(views[0].path.as_deref(), audio.to_str());
+        assert_eq!(views[1].state, "missing");
+        assert_eq!(views[2].state, "failed");
+        assert_eq!(views[2].error.as_deref(), Some("上次下载被中断"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 从_yt_dlp_文件名认出键与标题() {
+        let path = std::path::Path::new("/tmp/晴天 [BV1xx411c7mD].m4a");
+        assert_eq!(
+            download_key_of(path),
+            Some(("BV1xx411c7mD".into(), "晴天".into()))
+        );
+        assert_eq!(
+            download_key_of(std::path::Path::new("/tmp/晴天.m4a")),
+            None
+        );
+        assert_eq!(
+            download_key_of(std::path::Path::new("/tmp/晴天 [BV1xx411c7mD].part")),
+            None
+        );
+    }
+}
+
 pub struct Engine {
     /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
     cookie_file: std::path::PathBuf,
@@ -187,6 +289,7 @@ impl Engine {
             watch_gate: WatchGate::default(),
         });
         engine.restore_queue();
+        engine.restore_downloads();
         engine.start_progress_persist();
         engine.start_progress_report();
         engine.start_cookie_persist();
@@ -1968,9 +2071,9 @@ impl Engine {
         self.auth()
     }
 
-    /// 删掉一条已下载的音轨：先删文件再从列表移除。
+    /// 删掉一条已下载的音轨：先删文件，再删记录。
     ///
-    /// 文件已经被用户手动删掉时仍然把列表项去掉——列表不该显示一个不存在的文件。
+    /// 文件已经被用户手动删掉时仍然把列表项去掉——用户点了删除，列表就不该再留着。
     pub fn download_remove(&self, key: &str) -> Result<Vec<DownloadView>, WireError> {
         let path = {
             let list = lock(&self.downloads);
@@ -1985,13 +2088,11 @@ impl Engine {
                 Err(e) => return Err(WireError::internal(format!("删不掉文件：{e}"))),
             }
         }
+        self.library.delete_download(key)?;
         {
             let mut list = lock(&self.downloads);
             list.retain(|d| d.key != key);
         }
-        self.emit(AppEvent::Download {
-            view: serde_json::json!({ "key": key, "state": "removed" }),
-        });
         Ok(lock(&self.downloads).clone())
     }
 
@@ -2026,6 +2127,77 @@ impl Engine {
         lock(&self.downloads).clone()
     }
 
+    /// 启动时把上次的下载记录装回来。文件已经不在的完成项标成 missing，
+    /// 上次没跑完的任务标成 failed，两者都能从界面重新发起。
+    fn restore_downloads(&self) {
+        let records = match self.library.downloads() {
+            Ok(records) => records,
+            Err(e) => {
+                eprintln!("读取下载记录失败：{e}");
+                return;
+            }
+        };
+        if records.is_empty() {
+            self.rebuild_downloads_from_disk();
+            return;
+        }
+
+        let mut views = Vec::with_capacity(records.len());
+        for record in &records {
+            if record.state != "done" && record.state != "failed" {
+                let _ = self.library.update_download(
+                    record.key.as_opaque(),
+                    record.path.as_deref(),
+                    "failed",
+                    Some("上次下载被中断"),
+                );
+            }
+            views.push(restored_download(record));
+        }
+        *lock(&self.downloads) = views;
+    }
+
+    /// 老版本从没写过下载记录。yt-dlp 的落盘文件名带着 `[BVxxx]`，据此把
+    /// 文件认回来；认出来的记录要落库，否则用户删掉的下次启动又会出现。
+    fn rebuild_downloads_from_disk(&self) {
+        let Ok(entries) = std::fs::read_dir(downloads_dir()) else {
+            return;
+        };
+        let mut views: Vec<DownloadView> = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some((key, fallback_title)) = download_key_of(&path) else {
+                continue;
+            };
+            if views.iter().any(|view| view.key == key) {
+                continue;
+            }
+            let track_key = TrackKey::from_provider(key.clone());
+            let title = self
+                .library
+                .track_by_key(&track_key)
+                .ok()
+                .flatten()
+                .map(|track| track.title)
+                .unwrap_or(fallback_title);
+            let path_text = path.to_string_lossy().to_string();
+            let _ = self.library.adopt_download(&track_key, &title, &path_text);
+            views.push(DownloadView {
+                key,
+                title,
+                state: "done".into(),
+                progress: 1.0,
+                path: Some(path_text),
+                error: None,
+            });
+        }
+        views.sort_by(|a, b| a.path.cmp(&b.path));
+        *lock(&self.downloads) = views;
+    }
+
     /// 用 yt-dlp 把一首歌落到本地。任务在后台跑，进度靠事件与轮询列表两种方式看。
     pub async fn enqueue_download(
         self: &Arc<Self>,
@@ -2044,7 +2216,9 @@ impl Engine {
             state: "running".into(),
             progress: 0.0,
             path: None,
+            error: None,
         };
+        self.library.save_download(&track, None, "running", None)?;
         {
             let mut list = lock(&self.downloads);
             if let Some(existing) = list.iter().find(|d| {
@@ -2064,18 +2238,26 @@ impl Engine {
         let view_key = view.key.clone();
 
         tokio::task::spawn_blocking(move || {
-            let (state, path) = match crate::download::audio(&helper, &dir, &url) {
-                Ok(path) => ("done", Some(path)),
+            let (state, path, error) = match crate::download::audio(&helper, &dir, &url) {
+                Ok(path) => ("done", Some(path), None),
                 Err(e) => {
                     eprintln!("下载失败：{e}");
-                    ("failed", None)
+                    ("failed", None, Some(e.to_string()))
                 }
             };
+            let path_text = path.map(|p| p.to_string_lossy().to_string());
+            let _ = engine.library.update_download(
+                &view_key,
+                path_text.as_deref(),
+                state,
+                error.as_deref(),
+            );
             let mut list = lock(&engine.downloads);
             if let Some(item) = list.iter_mut().find(|d| d.key == view_key) {
                 item.state = state.to_string();
                 item.progress = if state == "done" { 1.0 } else { 0.0 };
-                item.path = path.map(|p| p.to_string_lossy().to_string());
+                item.path = path_text;
+                item.error = error;
                 let snapshot = item.clone();
                 drop(list);
                 engine.emit(AppEvent::Download {
@@ -2163,6 +2345,55 @@ mod tauri_runtime {
             .map_err(|e| WireError::internal(e.to_string()))?;
         rx.recv().map_err(|e| WireError::internal(e.to_string()))?
     }
+}
+
+/// 把一条落盘记录还原成界面状态。`missing` 只活在内存里：文件回来时
+/// 下次启动会自动恢复成 done，不必把磁盘的暂时状态写进库。
+fn restored_download(record: &StoredDownload) -> DownloadView {
+    let on_disk = record
+        .path
+        .as_deref()
+        .is_some_and(|path| std::path::Path::new(path).is_file());
+    let (state, error) = match record.state.as_str() {
+        "done" if on_disk => ("done", record.error.clone()),
+        "done" => ("missing", record.error.clone()),
+        "failed" => ("failed", record.error.clone()),
+        _ => ("failed", Some("上次下载被中断".to_string())),
+    };
+    DownloadView {
+        key: record.key.as_opaque().to_string(),
+        title: record.title.clone(),
+        state: state.into(),
+        progress: if state == "done" { 1.0 } else { 0.0 },
+        path: record.path.clone(),
+        error,
+    }
+}
+
+const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];
+
+/// yt-dlp 的 `-o` 模板是「标题 [id].扩展名」。只认这种文件名，
+/// 半截的 .part 与目录里的其它文件不碰。
+fn download_key_of(path: &std::path::Path) -> Option<(String, String)> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    if !AUDIO_EXTS.contains(&ext.as_str()) {
+        return None;
+    }
+    let stem = path.file_stem()?.to_str()?;
+    let open = stem.rfind(" [")?;
+    let key = stem.get(open + 2..)?.strip_suffix(']')?;
+    if key.is_empty() || key.contains(char::is_whitespace) {
+        return None;
+    }
+    let title = stem[..open].trim();
+    Some((
+        key.to_string(),
+        if title.is_empty() {
+            stem.to_string()
+        } else {
+            title.to_string()
+        },
+    ))
 }
 
 /// 下载目录。界面上的「打开目录」用它，免得前端自己拼 HOME。
