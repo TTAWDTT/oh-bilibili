@@ -6,11 +6,18 @@ import { watchFav } from '../features/watch/watchActions'
 import { useAppStore } from './appStore'
 
 const TEXT_ENTRY = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
+const NATIVE_ACTIVATION = new Set(['BUTTON', 'A'])
 
-/** 输入框、可编辑区与滑块自己消费按键，全局快捷键不能抢。 */
-function isTextEntry(element: Element | null): boolean {
-  if (!(element instanceof HTMLElement)) return false
-  return TEXT_ENTRY.has(element.tagName) || element.isContentEditable || element.getAttribute('role') === 'textbox'
+/**
+ * 焦点元素自己会不会用空格：输入类往里打空格，按钮/链接由空格原生激活。
+ * 只在入口分一次类，后面的全局快捷键按它决定让不让。
+ */
+function keyTarget(element: Element | null): 'text' | 'activation' | 'other' {
+  if (!(element instanceof HTMLElement)) return 'other'
+  if (TEXT_ENTRY.has(element.tagName) || element.isContentEditable || element.getAttribute('role') === 'textbox') {
+    return 'text'
+  }
+  return NATIVE_ACTIVATION.has(element.tagName) ? 'activation' : 'other'
 }
 
 /** 静音前的音量：按 M 恢复时用它，避免恢复成 0。 */
@@ -37,10 +44,15 @@ export function useShortcuts(): void {
       // 按 querySelector 算的话，只要在播放（右栏存在）快捷键就全废。
       // 用 getClientRects 判断可见：弹窗是 position: fixed，offsetParent 恒为 null，
       // 按 offsetParent 判会把「正开着弹窗」当成没有弹窗。
-      const dialogOpen = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].some(
+      const dialogs = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].filter(
         (el) => el.getClientRects().length > 0,
       )
+      const dialogOpen = dialogs.length > 0
+      const modalOpen = dialogs.some((el) => el.getAttribute('aria-modal') === 'true')
+      const target = keyTarget(document.activeElement)
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        // 模态盖着整页时全局快捷键让路，焦点不能穿到遮罩后的搜索框。
+        if (modalOpen) return
         event.preventDefault()
         useAppStore.getState().focusSearch()
         return
@@ -64,10 +76,12 @@ export function useShortcuts(): void {
         return
       }
       if (dialogOpen || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
-      if (isTextEntry(document.activeElement)) return
+      if (target === 'text') return
 
       const player = usePlayerStore.getState()
       if (event.code === 'Space') {
+        // 焦点在按钮/链接上时，空格是原生激活，不能 preventDefault，也不能拿去播放。
+        if (target === 'activation') return
         event.preventDefault()
         if (player.snapshot?.track) void player.toggle()
         return
