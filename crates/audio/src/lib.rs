@@ -6,7 +6,7 @@
 use std::io::{Read, Seek, SeekFrom};
 
 pub mod player;
-pub use player::Player;
+pub use player::{probe_audio, Player};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -270,15 +270,10 @@ mod tests {
     use super::*;
     use std::fs::File;
 
-    /// 真实 B 站 DASH 音轨的解码验证。
-    /// fixture 是本地产物（testdata/ 已 gitignore），缺失时跳过而不是失败。
+    /// 真实 B 站 DASH 音轨的解码验证。夹具入库，全新检出也能跑。
     #[test]
     fn 能解码真实_b_站音轨() {
-        let path = std::path::Path::new("../../testdata/sample.m4s");
-        if !path.exists() {
-            eprintln!("跳过：没有 testdata/sample.m4s");
-            return;
-        }
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fragmented.m4s");
         let file = File::open(path).expect("fixture 应该能打开");
         let audio = decode_all(Media::new(file)).expect("symphonia 应该能解 fMP4 AAC");
 
@@ -291,7 +286,7 @@ mod tests {
         );
         assert!(audio.sample_rate >= 44_100, "采样率应该至少 44.1k");
         assert!(audio.channels >= 1);
-        assert!(audio.duration_ms() > 60_000, "这首 5 分 17 秒，应该解出超过 60 秒");
+        assert!(audio.duration_ms() >= 4_000, "这段分片应该解出 4 秒以上");
         assert!(
             audio.samples.iter().any(|s| *s != 0.0),
             "样本不该全是静音"

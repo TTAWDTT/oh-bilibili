@@ -16,17 +16,23 @@ fn audio_tests_enabled() -> bool {
     std::env::var("BILIMUSIC_AUDIO_TESTS").is_ok_and(|v| v == "1")
 }
 
+/// 显式开启这一组测试时才要求真实长样本；缺了就是环境没配好，不能算通过。
+fn sample_path() -> &'static std::path::Path {
+    let path = std::path::Path::new("../../testdata/sample.m4s");
+    assert!(
+        path.exists(),
+        "已设置 BILIMUSIC_AUDIO_TESTS=1，但缺少 testdata/sample.m4s"
+    );
+    path
+}
+
 #[test]
 fn 解码结束后时钟仍播完缓冲() {
     if !audio_tests_enabled() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
         return;
     }
-    let path = std::path::Path::new("../../testdata/sample.m4s");
-    if !path.exists() {
-        eprintln!("跳过：没有 testdata/sample.m4s");
-        return;
-    }
+    let path = sample_path();
     let Ok(player) = Player::start() else {
         eprintln!("跳过：当前环境打不开输出设备");
         return;
@@ -72,11 +78,7 @@ fn 加载前暂停不会在加载后自己起播() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
         return;
     }
-    let path = std::path::Path::new("../../testdata/sample.m4s");
-    if !path.exists() {
-        eprintln!("跳过：没有 testdata/sample.m4s");
-        return;
-    }
+    let path = sample_path();
     let Ok(player) = Player::start() else {
         eprintln!("跳过：当前环境打不开输出设备");
         return;
@@ -106,11 +108,7 @@ fn 尾部缓冲暂停后仍能继续播完() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
         return;
     }
-    let path = std::path::Path::new("../../testdata/sample.m4s");
-    if !path.exists() {
-        eprintln!("跳过：没有 testdata/sample.m4s");
-        return;
-    }
+    let path = sample_path();
     let Ok(player) = Player::start() else {
         eprintln!("跳过：当前环境打不开输出设备");
         return;
@@ -153,11 +151,7 @@ fn 播放时位置由声卡推进() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
         return;
     }
-    let path = std::path::Path::new("../../testdata/sample.m4s");
-    if !path.exists() {
-        eprintln!("跳过：没有 testdata/sample.m4s");
-        return;
-    }
+    let path = sample_path();
     let Ok(player) = Player::start() else {
         eprintln!("跳过：当前环境打不开输出设备");
         return;
@@ -194,11 +188,7 @@ fn 位置推进速度等于真实时间() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
         return;
     }
-    let path = std::path::Path::new("../../testdata/sample.m4s");
-    if !path.exists() {
-        eprintln!("跳过：没有 testdata/sample.m4s");
-        return;
-    }
+    let path = sample_path();
     let Ok(player) = Player::start() else {
         eprintln!("跳过：当前环境打不开输出设备");
         return;

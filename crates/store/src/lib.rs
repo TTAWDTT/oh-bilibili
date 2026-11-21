@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -65,6 +65,7 @@ pub struct Reaction {
     pub want: bool,
     pub state: ReactionState,
     pub attempts: u32,
+    version: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -512,18 +513,21 @@ impl Library {
         mid: u64,
         kind: ReactionKind,
         want: bool,
-    ) -> Result<()> {
+    ) -> Result<Reaction> {
         self.with(|conn| {
-            conn.execute(
-                "INSERT INTO reactions (track_id, mid, kind, want, state) VALUES (?1, ?2, ?3, ?4, 'pending')
+            conn.query_row(
+                "INSERT INTO reactions (track_id, mid, kind, want, state, version)
+                 VALUES (?1, ?2, ?3, ?4, 'pending', 1)
                  ON CONFLICT(track_id, mid, kind) DO UPDATE SET
                    want = excluded.want,
                    state = CASE WHEN reactions.want = excluded.want AND reactions.state = 'synced'
                                 THEN 'synced' ELSE 'pending' END,
-                   attempts = 0",
+                   attempts = 0,
+                   version = reactions.version + 1
+                 RETURNING track_id, mid, kind, want, state, attempts, version",
                 params![track_id.0, mid as i64, kind.as_str(), want as i32],
-            )?;
-            Ok(())
+                row_to_reaction,
+            )
         })
     }
 
@@ -531,7 +535,7 @@ impl Library {
     pub fn pending_reactions(&self, mid: u64, limit: u32) -> Result<Vec<Reaction>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT track_id, mid, kind, want, state, attempts FROM reactions
+                "SELECT track_id, mid, kind, want, state, attempts, version FROM reactions
                  WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC LIMIT ?2",
             )?;
             let rows = stmt.query_map(params![mid as i64, limit.clamp(1, 500) as i64], row_to_reaction)?;
@@ -544,7 +548,7 @@ impl Library {
     pub fn pending_reactions_all(&self, mid: u64) -> Result<Vec<Reaction>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT track_id, mid, kind, want, state, attempts FROM reactions
+                "SELECT track_id, mid, kind, want, state, attempts, version FROM reactions
                  WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC",
             )?;
             let rows = stmt.query_map(params![mid as i64], row_to_reaction)?;
@@ -562,13 +566,14 @@ impl Library {
             conn.execute(
                 "UPDATE reactions SET state = ?1, attempts = attempts + 1,
                    synced_at = COALESCE(?2, synced_at)
-                 WHERE track_id = ?3 AND mid = ?4 AND kind = ?5",
+                 WHERE track_id = ?3 AND mid = ?4 AND kind = ?5 AND version = ?6",
                 params![
                     state.as_str(),
                     synced_at,
                     r.track_id.0,
                     r.mid as i64,
-                    r.kind.as_str()
+                    r.kind.as_str(),
+                    r.version,
                 ],
             )?;
             Ok(())
@@ -809,6 +814,7 @@ fn row_to_reaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Reaction> {
             _ => ReactionState::Pending,
         },
         attempts: row.get::<_, i64>(5)? as u32,
+        version: row.get(6)?,
     })
 }
 
@@ -837,7 +843,7 @@ impl Migration {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [Migration; 6] = [
+const MIGRATIONS: [Migration; 7] = [
     Migration::Sql(
         r#"
 CREATE TABLE tracks (
@@ -946,6 +952,7 @@ ALTER TABLE history ADD COLUMN position_ms INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE downloads ADD COLUMN error TEXT;
 "#,
     ),
+    Migration::Sql("ALTER TABLE reactions ADD COLUMN version INTEGER NOT NULL DEFAULT 0;"),
 ];
 
 fn complete_v4_track_metadata(tx: &Transaction<'_>) -> rusqlite::Result<()> {
@@ -1088,6 +1095,59 @@ mod tests {
     }
 
     #[test]
+    fn 旧同步回执保留最新取消意图() {
+        let dir = temp_dir("stale-reaction-receipt");
+        let l = Library::open(&dir.join("library.sqlite")).unwrap();
+        let id = l.upsert_track(&track("BVstale")).unwrap();
+        l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+        let sent = l.pending_reactions(42, 10).unwrap().remove(0);
+
+        l.set_reaction(id, 42, ReactionKind::Like, false).unwrap();
+        l.mark_reaction(&sent, ReactionState::Synced).unwrap();
+        let pending = l.pending_reactions(42, 10).unwrap();
+        let stored = l
+            .with(|conn| {
+                conn.query_row(
+                    "SELECT want, state FROM reactions WHERE track_id = ?1",
+                    [id.0],
+                    |row| Ok((row.get::<_, bool>(0)?, row.get::<_, String>(1)?)),
+                )
+            })
+            .unwrap();
+
+        drop(l);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(stored, (false, "pending".into()));
+        assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
+    fn 取消再喜欢后只有最新版本的回执能完成同步() {
+        let dir = temp_dir("reaction-version");
+        let l = Library::open(&dir.join("library.sqlite")).unwrap();
+        let id = l.upsert_track(&track("BVversion")).unwrap();
+        l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+        let sent = l.pending_reactions_all(42).unwrap().remove(0);
+
+        let cancelled = l.set_reaction(id, 42, ReactionKind::Like, false).unwrap();
+        let latest = l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+        assert!(sent.version < cancelled.version && cancelled.version < latest.version);
+
+        l.mark_reaction(&sent, ReactionState::Synced).unwrap();
+        l.mark_reaction(&cancelled, ReactionState::Rejected).unwrap();
+        assert_eq!(l.pending_reactions_all(42).unwrap(), vec![latest.clone()]);
+
+        l.mark_reaction(&latest, ReactionState::Synced).unwrap();
+        assert!(l.pending_reactions_all(42).unwrap().is_empty());
+        let repeated = l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+        assert!(latest.version < repeated.version);
+        assert_eq!(repeated.state, ReactionState::Synced);
+
+        drop(l);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn 可重试失败留在待办_永久拒绝才移除() {
         let l = lib();
         let id = l.upsert_track(&track("BVretry")).unwrap();
@@ -1198,6 +1258,36 @@ mod tests {
         assert_eq!(history[0].0.key.as_opaque(), "BVlegacy");
         assert_eq!((history[0].1, history[0].2, history[0].3), (1234, 0, 9));
         Ok(())
+    }
+
+    #[test]
+    fn 迁移_第六版待同步意图仍可同步() {
+        let dir = temp_dir("migrate-v6-reactions");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = migration_fixture(&db, 6);
+            conn.execute(
+                "INSERT INTO reactions (track_id, mid, kind, want, attempts)
+                 VALUES (4, 42, 'fav', 0, 2)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let l = Library::open(&db).unwrap();
+        let pending = l.pending_reactions_all(42).unwrap();
+        assert_eq!(pending.len(), 1);
+        let reaction = &pending[0];
+        assert_eq!(reaction.track_id, TrackId(4));
+        assert_eq!(reaction.kind, ReactionKind::Fav);
+        assert!(!reaction.want);
+        assert_eq!(reaction.attempts, 2);
+        assert_eq!(reaction.version, 0);
+        l.mark_reaction(reaction, ReactionState::Synced).unwrap();
+        assert!(l.pending_reactions_all(42).unwrap().is_empty());
+
+        drop(l);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -1360,26 +1450,7 @@ mod tests {
     fn 五版旧库升级会补上下载错误列() {
         let dir = temp_dir("migrate-v5");
         let db = dir.join("library.sqlite");
-        {
-            let conn = Connection::open(&db).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE tracks (
-                   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                   provider_key TEXT NOT NULL UNIQUE,
-                   title        TEXT NOT NULL
-                 );
-                 CREATE TABLE downloads (
-                   track_id    INTEGER PRIMARY KEY,
-                   path        TEXT,
-                   state       TEXT NOT NULL,
-                   bytes_done  INTEGER NOT NULL DEFAULT 0,
-                   bytes_total INTEGER,
-                   created_at  INTEGER NOT NULL DEFAULT 0
-                 );
-                 PRAGMA user_version = 5;",
-            )
-            .unwrap();
-        }
+        drop(migration_fixture(&db, 5));
 
         let l = Library::open(&db).unwrap();
         let columns = l

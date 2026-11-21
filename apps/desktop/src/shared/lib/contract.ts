@@ -20,6 +20,7 @@ export type RepeatMode = 'off' | 'all' | 'one'
 export type PlayerSnapshot = {
   phase: PlayerPhase
   track: Track | null
+  local: boolean
   position_ms: number
   duration_ms: number
   volume: number

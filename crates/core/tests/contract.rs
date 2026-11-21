@@ -83,6 +83,7 @@ fn 播放快照的字段_ts_侧都有() {
         mode: bilimusic_core::wire::PlayMode::Listen,
         phase: "playing".into(),
         track: Some(sample_track()),
+        local: false,
         position_ms: 1000,
         duration_ms: 269_000,
         volume: 0.7,
