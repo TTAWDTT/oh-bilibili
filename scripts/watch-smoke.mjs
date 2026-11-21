@@ -983,6 +983,54 @@ async function main() {
     )
     check('取完 100 条后按钮收起', !afterLoad.more)
 
+    // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。
+    // 按 mid 去重后应得到 101、102、103，且整页重叠也要继续翻到空页收尾。
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, '重叠')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.closest('form')?.requestSubmit()
+      return true
+    })()`)
+    let overlapUsers = []
+    for (let i = 0; i < 20 && overlapUsers.length !== 2; i += 1) {
+      await sleep(300)
+      overlapUsers = await page.evaluate(
+        `[...document.querySelectorAll('[data-user-mid]')].map((el) => Number(el.dataset.userMid))`,
+      )
+    }
+    check('重叠分页首屏有两条 UP 主', overlapUsers.join(',') === '101,102')
+    await page.clickExactText('UP 主')
+    await sleep(200)
+    const clickMoreUsers = () =>
+      page.evaluate(`(() => {
+        const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '更多 UP 主')
+        if (!hit || hit.disabled) return false
+        hit.click()
+        return true
+      })()`)
+    const readUserMids = () =>
+      page.evaluate(
+        `[...document.querySelectorAll('[data-user-mid]')].map((el) => Number(el.dataset.userMid))`,
+      )
+    await clickMoreUsers()
+    for (let i = 0; i < 20 && (await readUserMids()).length !== 3; i += 1) await sleep(200)
+    check('重叠页按 mid 去重并追加新 UP 主', (await readUserMids()).join(',') === '101,102,103')
+    await clickMoreUsers()
+    await sleep(500)
+    check('整页重叠不卡住页码', (await readUserMids()).join(',') === '101,102,103')
+    await clickMoreUsers()
+    let usersEnded = false
+    for (let i = 0; i < 20 && !usersEnded; i += 1) {
+      await sleep(200)
+      usersEnded = await page.evaluate(
+        `![...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === '更多 UP 主')`,
+      )
+    }
+    check('翻到空页后收起「更多 UP 主」', usersEnded)
+
     // 快捷键：空格要留给聚焦的按钮，Ctrl+K 不能穿过模态去聚焦背景搜索框。
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     await sleep(5000)
