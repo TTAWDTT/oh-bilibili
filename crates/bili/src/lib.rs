@@ -143,10 +143,10 @@ fn xml_unescape(text: &str) -> String {
 }
 
 impl Source {
-    pub async fn open() -> Result<Source, BiliError> {
+    /// 只建立本地状态，不碰网络。指纹与登录态由 [`Source::refresh_session`]
+    /// 或第一次业务请求按需补上。
+    pub fn new() -> Result<Source, BiliError> {
         let client = Client::new()?;
-        client.ensure_fingerprint().await?;
-        let _ = client.refresh_nav().await?;
         Ok(Source {
             client,
             detail_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
@@ -166,6 +166,7 @@ impl Source {
         self.client.nav_snapshot()
     }
 
+    /// 拉一次设备指纹与 nav。登录态和 wbi 密钥都靠它，失败时返回原始网络错误。
     pub async fn refresh_session(&self) -> Result<client::NavState, BiliError> {
         self.client.refresh_nav().await
     }
@@ -301,7 +302,9 @@ impl Source {
     pub async fn poll_qr(&self, key: &str) -> Result<auth::QrStatus, BiliError> {
         let status = self.client.qrcode_poll(key).await?;
         if status == auth::QrStatus::Confirmed {
-            let _ = self.client.refresh_nav().await?;
+            // 登录已经成功，nav 刷新失败不该把这次扫码判成失败；
+            // 下一次业务请求还会按需补指纹与登录态。
+            let _ = self.client.refresh_nav().await;
         }
         Ok(status)
     }

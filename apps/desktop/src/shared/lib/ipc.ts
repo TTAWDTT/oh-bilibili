@@ -753,6 +753,11 @@ export function authStatus(): Promise<AuthSnapshot> {
   return call<AuthSnapshot>('auth_status', {})
 }
 
+/** 离线启动后重新拉一次设备指纹与登录态。 */
+export function authRefresh(): Promise<AuthSnapshot> {
+  return call<AuthSnapshot>('auth_refresh', {})
+}
+
 export function authQrCode(): Promise<QrChallenge> {
   return call<QrChallenge>('auth_qrcode', {})
 }

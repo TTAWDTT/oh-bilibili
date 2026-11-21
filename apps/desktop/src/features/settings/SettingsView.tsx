@@ -89,6 +89,7 @@ export function SettingsView() {
   const [healthFailed, setHealthFailed] = useState(false)
   const [healthNonce, setHealthNonce] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   /** 粉丝与关注数。和 UP 名片同一条接口，读不到就不显示。 */
   const [relation, setRelation] = useState<[number, number] | null>(null)
   const user = auth?.logged_in === true ? auth.user : null
@@ -153,6 +154,19 @@ export function SettingsView() {
       setSyncing(false)
     }
   }, [syncing])
+
+  const refreshAccount = useCallback(async (): Promise<void> => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      useAuthStore.getState().apply(await ipc.authRefresh())
+      toastDone('登录状态已刷新')
+    } catch (cause) {
+      toastFailure('刷新登录状态', cause)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshing])
 
   return (
     <div className="flex h-full flex-col">
@@ -241,13 +255,24 @@ export function SettingsView() {
                 <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-2)]">
                   登录后才能把喜欢与收藏写进 B 站账号。凭据只存本机，不上传。
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setAuthOpen(true)}
-                  className="t press mt-4 h-8 rounded-[6px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
-                >
-                  扫码登录
-                </button>
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthOpen(true)}
+                    className="t press h-8 rounded-[6px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
+                  >
+                    扫码登录
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void refreshAccount()}
+                    disabled={refreshing}
+                    className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
+                  >
+                    <Icon name="refresh" size={13} className={refreshing ? 'animate-spin' : ''} />
+                    {refreshing ? '刷新中…' : '刷新状态'}
+                  </button>
+                </div>
               </div>
             )}
           </Section>

@@ -33,7 +33,7 @@ fn live_cookies() -> Vec<(String, String)> {
 
 async fn source_with_live_cookies() -> Source {
     let cookies = live_cookies();
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
     source.import_cookies(&cookies);
     source.refresh_session().await.expect("刷新会话");
     assert!(
@@ -61,7 +61,7 @@ async fn live_preflight_credentials() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 每周必看能取到期数与片单() {
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
     let issues = source.weekly_issues().await.expect("期数列表应该能取到");
     assert!(issues.len() > 10, "期数应该有一长串，实际 {}", issues.len());
     let latest = issues.first().expect("至少一期");
@@ -87,7 +87,7 @@ async fn 每周必看能取到期数与片单() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 游客二维码接口能生成挑战() {
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
     let qr = source.login_qr().await.expect("二维码应该能生成");
     assert!(!qr.key.is_empty(), "qrcode_key 不能为空");
     assert!(qr.url.starts_with("http"), "二维码内容应该是一个链接");
@@ -97,7 +97,7 @@ async fn 游客二维码接口能生成挑战() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 搜索到取流的完整链路可用() {
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
 
     let query = SearchQuery::parse("周杰伦 晴天", 1).expect("查询合法");
     let tracks = source.search(&query).await.expect("搜索应该成功");
@@ -173,7 +173,7 @@ async fn 搜索到取流的完整链路可用() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 能取到真实弹幕() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
@@ -188,7 +188,7 @@ async fn 能取到真实弹幕() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 弹幕能算成密度曲线() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
@@ -204,7 +204,7 @@ async fn 弹幕能算成密度曲线() {
 #[ignore = "真实网络"]
 async fn 按播放量排序确实改变结果顺序() {
     use bilimusic_model::SearchOrder;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
 
     let default = source.search(&q).await.expect("默认排序");
@@ -235,7 +235,7 @@ async fn 按播放量排序确实改变结果顺序() {
 #[ignore = "真实网络"]
 async fn 分区过滤能按类型筛结果() {
     use bilimusic_model::SearchOrder;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let all = source
         .search_ordered(&q, SearchOrder::TotalRank)
@@ -251,7 +251,7 @@ async fn 分区过滤能按类型筛结果() {
 #[ignore = "真实网络"]
 async fn 按_up_主名能搜到他的投稿() {
     use bilimusic_model::SearchOrder;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("zyl2012_音乐无限", 1).expect("查询");
     let tracks = source
         .search_ordered(&q, SearchOrder::TotalRank)
@@ -269,7 +269,7 @@ async fn 按_up_主名能搜到他的投稿() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 搜索结果的_up_主带_mid() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let with_mid = tracks.iter().filter(|t| t.up_mid.is_some()).count();
@@ -280,7 +280,7 @@ async fn 搜索结果的_up_主带_mid() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 稍后再看未登录时明确报需要登录() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     source.logout().await;
     let key = bilimusic_model::TrackKey::from_provider("BV1d4411N7zD");
     match source.set_watch_later(&key, true).await {
@@ -292,7 +292,7 @@ async fn 稍后再看未登录时明确报需要登录() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 弹幕带真实颜色() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
@@ -306,7 +306,7 @@ async fn 弹幕带真实颜色() {
 #[ignore = "真实网络"]
 async fn tids_参数真的按分区过滤() {
     use bilimusic_model::SearchOrder;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
 
     let all = source.search_ordered(&q, SearchOrder::TotalRank).await.expect("全站");
@@ -348,7 +348,7 @@ async fn tids_参数真的按分区过滤() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn up_名片能拿到粉丝数与签名() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     // 影视飓风
     let c = source.author_card(946974).await.expect("名片");
     println!(
@@ -365,7 +365,7 @@ async fn up_名片能拿到粉丝数与签名() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 相关推荐的时长是毫秒不是秒() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     // 咒术回战续作，相关推荐里有大量几分钟到几十分钟的稿子
     let key = TrackKey::from_provider("BV1XeP9zYE8L");
     let items = source.related(&key).await.expect("相关推荐");
@@ -387,7 +387,7 @@ async fn 相关推荐的时长是毫秒不是秒() {
 #[ignore = "真实网络"]
 async fn 选最多播放时结果按播放量递减() {
     use bilimusic_model::SearchOrder;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let clicks = source
         .search_in_partition(&q, SearchOrder::Click, Some(129))
@@ -411,7 +411,7 @@ async fn 选最多播放时结果按播放量递减() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 音质标签与实际档位一致() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
@@ -437,7 +437,7 @@ async fn 音质标签与实际档位一致() {
 #[ignore = "真实网络，用来定位换歌延迟"]
 async fn 换歌的三个网络调用各自多久() {
     use std::time::Instant;
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let q = SearchQuery::parse("周杰伦 晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let key = &tracks[0].key;
@@ -520,7 +520,7 @@ async fn 赞过的视频带封面和分区() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 全站排行榜一次给一百条() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let list = source.ranking(0).await.expect("全站榜");
     println!("全站榜 {} 条", list.len());
     let first = list.first().expect("至少一条");
@@ -537,7 +537,7 @@ async fn 全站排行榜一次给一百条() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 热门榜能翻页() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let (first, no_more_first, notes) = source.popular(1).await.expect("热门第 1 页");
     let (second, no_more_second, _) = source.popular(2).await.expect("热门第 2 页");
     println!(
@@ -571,7 +571,7 @@ async fn 热门榜能翻页() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 入站必刷带推荐语() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let (title, explain, items) = source.precious().await.expect("入站必刷");
     println!("\n{title}：{explain}（{} 条）", items.len());
     for item in items.iter().take(3) {
@@ -634,7 +634,7 @@ async fn 评论游标能翻到第二页() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 评论带粉丝牌() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     // BV1kZWX62ENY（影视飓风）：UP 主自己的评论戴着「飓风」粉丝牌。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let page = source.comments(&key, None, true).await.expect("第一页评论");
@@ -668,7 +668,7 @@ async fn 评论带粉丝牌() {
 #[tokio::test]
 #[ignore = "真实网络，核对合集"]
 async fn 合集带全部集数与封面() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     // 影视飓风的「百万粉丝Q&A」是一个 10 集的合集。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let detail = source.detail(&key).await.expect("详情");
@@ -769,7 +769,7 @@ async fn 查看对话能翻页() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 直播与番剧都能取到() {
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
 
     let rooms = source.live_rooms(6, 1).await.expect("直播推荐应该能取到");
     println!(
@@ -814,7 +814,7 @@ async fn 直播与番剧都能取到() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
 async fn 番剧时间表能取到一周() {
-    let source = Source::open().await.expect("Source 应该能打开");
+    let source = Source::new().expect("Source 应该能打开");
     let days = source.bangumi_timeline().await.expect("时间表应该能取到");
     println!("天数 {}，第一天 {} 周{}，{} 部", days.len(), days[0].date, days[0].weekday, days[0].episodes.len());
     assert!(days.len() >= 7, "before=6&after=6 至少给七天，实际 {}", days.len());
@@ -865,7 +865,7 @@ async fn messages_live_cursor_pages_are_disjoint() {
 #[tokio::test]
 #[ignore = "真实网络，核对弹幕正文里的 XML 实体"]
 async fn 弹幕正文不带未解开的实体() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     // BV1ej4J67ERn：实测这条视频里有一条 `˶>ᗜ<˶` 的颜文字弹幕。
     let key = bilimusic_model::TrackKey::from_provider("BV1ej4J67ERn");
     let list = source.danmaku_colored(&key, None).await.expect("弹幕");
@@ -928,7 +928,7 @@ async fn 字幕按传入的cid取而不是总拿第一P() {
 #[tokio::test]
 #[ignore = "真实网络，核对按 P 取弹幕"]
 async fn 弹幕按传入的cid取而不是总拿第一P() {
-    let source = Source::open().await.expect("Source");
+    let source = Source::new().expect("Source");
     let key = bilimusic_model::TrackKey::from_provider("BV1vs411n7TH");
     let detail = source.detail(&key).await.expect("详情");
     assert!(detail.pages.len() > 3, "这条投稿应当是多 P");

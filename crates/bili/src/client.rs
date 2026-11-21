@@ -44,6 +44,8 @@ pub struct NavState {
 pub struct Client {
     http: reqwest::Client,
     jar: RwLock<HashMap<String, String>>,
+    /// 指纹只取一次。并发请求同时发现罐里没有 buvid3 时，只让一个真的发请求。
+    fingerprint: tokio::sync::Mutex<()>,
     keys: tokio::sync::Mutex<Option<(WbiKeys, Instant)>>,
     gate: tokio::sync::Mutex<Option<Instant>>,
     /// 播放专用的闸门，与通用闸门分开。
@@ -69,6 +71,9 @@ impl Client {
         let http = reqwest::Client::builder()
             .user_agent(UA)
             .timeout(Duration::from_secs(20))
+            // DNS 被断网/坏解析器拖住时，20 秒的整请求超时到不了；连接阶段单独兜底，
+            // 页面才能在几秒内进入自己的错误与重试状态。
+            .connect_timeout(Duration::from_secs(5))
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().last().is_some_and(session_origin)
                     && attempt.url().scheme() != "https"
@@ -82,6 +87,7 @@ impl Client {
         Ok(Client {
             http,
             jar: RwLock::new(HashMap::new()),
+            fingerprint: tokio::sync::Mutex::new(()),
             keys: tokio::sync::Mutex::new(None),
             gate: tokio::sync::Mutex::new(None),
             play_gate: tokio::sync::Mutex::new(None),
@@ -116,6 +122,17 @@ impl Client {
             }
         }
         request
+    }
+
+    /// 发请求。DNS 被坏解析器拖住时 reqwest 自己的 timeout 不一定会触发，
+    /// 这里再用 tokio 的超时兜一层，页面才能从 loading 进入错误与重试状态。
+    async fn send(&self, req: reqwest::RequestBuilder) -> Result<reqwest::Response, BiliError> {
+        const LIMIT: Duration = Duration::from_secs(20);
+        match tokio::time::timeout(LIMIT, req.send()).await {
+            Ok(Ok(resp)) => Ok(resp),
+            Ok(Err(e)) => Err(BiliError::Network(e.to_string())),
+            Err(_) => Err(BiliError::Network("请求超时，检查网络后重试".into())),
+        }
     }
 
     pub fn set_cookie(&self, name: &str, value: &str) {
@@ -157,13 +174,22 @@ impl Client {
         }
     }
 
-    /// 首次使用前必须调用：拿设备指纹，否则搜索会被风控挡成 HTML。
+    /// 拿设备指纹。每个业务请求前都会自动走这里，没有指纹时才会真的发请求。
     pub async fn ensure_fingerprint(&self) -> Result<(), BiliError> {
         if self.cookie_value("buvid3").is_some() {
             return Ok(());
         }
+        let _guard = self.fingerprint.lock().await;
+        if self.cookie_value("buvid3").is_some() {
+            return Ok(());
+        }
         let v = self
-            .get_json(&format!("{API}/x/frontend/finger/spi"), Duration::ZERO)
+            .send_json(
+                &format!("{API}/x/frontend/finger/spi"),
+                Duration::ZERO,
+                false,
+                false,
+            )
             .await?;
         if let Some(b3) = v["data"]["b_3"].as_str() {
             self.set_cookie("buvid3", b3);
@@ -182,8 +208,7 @@ impl Client {
                 &format!("{API}/x/web-interface/nav"),
                 Duration::from_millis(200),
             )
-            .await
-            .unwrap_or(Value::Null);
+            .await?;
         let data = &v["data"];
         let nav = NavState {
             is_login: data["isLogin"].as_bool().unwrap_or(false),
@@ -300,6 +325,17 @@ impl Client {
         if !ignore_cooldown {
             self.wait_cooldown().await?;
         }
+        self.ensure_fingerprint().await?;
+        self.send_json(url, min_interval, allow_guest, relation).await
+    }
+
+    async fn send_json(
+        &self,
+        url: &str,
+        min_interval: Duration,
+        allow_guest: bool,
+        relation: bool,
+    ) -> Result<Value, BiliError> {
         if relation {
             Client::wait_slot(&self.relation_gate, min_interval).await;
         } else {
@@ -312,7 +348,7 @@ impl Client {
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .header("Accept-Language", "zh-CN,zh;q=0.9");
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         let status = resp.status();
         if session_origin(resp.url()) {
             self.absorb_cookies(resp.headers());
@@ -366,24 +402,26 @@ impl Client {
     /// 取原始字节。弹幕接口给的是压缩流，需要调用方自己解。
     pub async fn get_bytes(&self, url: &str, min_interval: Duration) -> Result<Vec<u8>, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(min_interval).await;
         let req = self
             .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         Ok(resp.bytes().await.map_err(|e| BiliError::Network(e.to_string()))?.to_vec())
     }
 
     /// 取原始文本。弹幕接口返回的是 XML，不是 JSON。
     pub async fn get_text(&self, url: &str, min_interval: Duration) -> Result<String, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(min_interval).await;
         let req = self
             .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         resp.text().await.map_err(|e| BiliError::Network(e.to_string()))
     }
 
@@ -442,6 +480,7 @@ impl Client {
         form: Vec<(&str, String)>,
     ) -> Result<Value, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(Duration::from_millis(400)).await;
 
         let req = self
@@ -450,7 +489,7 @@ impl Client {
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .form(&form);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         let status = resp.status();
         if session_origin(resp.url()) {
             self.absorb_cookies(resp.headers());

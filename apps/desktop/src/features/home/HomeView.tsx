@@ -21,6 +21,9 @@ const PARTITION_FLOORS = [
   { rid: 4, title: '游戏' },
 ]
 
+/** 首页推荐等这么久还没回来就提示「加载较慢」，但请求继续等，不提前判死。 */
+const FEED_SLOW_MS = 8000
+
 /**
  * 发现页。
  *
@@ -61,6 +64,7 @@ export function HomeView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [slow, setSlow] = useState(false)
   /** 上次失败是网络抖动：只有这种情况才给「重试」，到底了给的是「换一批」。 */
   const [canRetry, setCanRetry] = useState(false)
   /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
@@ -68,6 +72,11 @@ export function HomeView() {
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   /** 滚动事件比 React 状态回写快，用它挡住同一批的重复请求。 */
   const pending = useRef(false)
+  /** 每次尝试的自增编号：只有最新一次的成功或失败能落到界面上。 */
+  const requestSeq = useRef(0)
+  const slowTimer = useRef<number | null>(null)
+  /** 最近一次尝试的参数，手动重试时原样再发一次。 */
+  const attempt = useRef({ next: 1, append: false })
   /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
   const exhausted = useRef(false)
   /** 频道条只在真的横向溢出时才给渐隐：滚到两端时不能还遮住首尾胶囊。 */
@@ -93,11 +102,20 @@ export function HomeView() {
   }, [])
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
-    if (append) setLoadingMore(true)
-    else setLoading(true)
+    attempt.current = { next, append }
+    const ticket = ++requestSeq.current
+    pending.current = append
+    if (slowTimer.current !== null) window.clearTimeout(slowTimer.current)
+    slowTimer.current = window.setTimeout(() => {
+      if (requestSeq.current === ticket) setSlow(true)
+    }, FEED_SLOW_MS)
+    setSlow(false)
+    setLoading(!append)
+    setLoadingMore(append)
     setError(null)
     try {
       const list = await ipc.homeFeed(next)
+      if (requestSeq.current !== ticket) return
       // 成功才推进：失败就留在这一页，重试时不会再跳过一个 fresh_idx。
       if (append) {
         nextFresh.current = next + 1
@@ -128,13 +146,29 @@ export function HomeView() {
         setError(append ? '这一轮的推荐已经到底了，换一批看看。' : '这次没拿到推荐，换一批试试。')
       }
     } catch (e) {
+      if (requestSeq.current !== ticket) return
       setError(toWireError(e).message)
       setCanRetry(true)
     } finally {
-      if (append) setLoadingMore(false)
-      else setLoading(false)
+      if (requestSeq.current === ticket) {
+        if (slowTimer.current !== null) {
+          window.clearTimeout(slowTimer.current)
+          slowTimer.current = null
+        }
+        setSlow(false)
+        pending.current = false
+        if (append) setLoadingMore(false)
+        else setLoading(false)
+      }
     }
   }, [])
+
+  useEffect(
+    () => () => {
+      if (slowTimer.current !== null) window.clearTimeout(slowTimer.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     nextFresh.current = feedMemory.nextFresh
@@ -171,10 +205,7 @@ export function HomeView() {
   const more = (): void => {
     // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
     if (pending.current || loading || loadingMore || exhausted.current) return
-    pending.current = true
-    void load(nextFresh.current, true).finally(() => {
-      pending.current = false
-    })
+    void load(nextFresh.current, true)
   }
 
   /**
@@ -219,6 +250,24 @@ export function HomeView() {
     exhausted.current = false
     void load(next)
   }
+
+  const retrySlow = (): void => {
+    void load(attempt.current.next, attempt.current.append)
+  }
+
+  const slowNotice = slow ? (
+    <div data-home-slow className="flex flex-col items-center gap-2 py-4">
+      <p className="text-center text-[12.5px] text-[var(--text-3)]">加载较慢，可能网络不太好。</p>
+      <button
+        type="button"
+        data-home-retry
+        onClick={retrySlow}
+        className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      >
+        重试
+      </button>
+    </div>
+  ) : null
 
   return (
     <div
@@ -358,6 +407,7 @@ export function HomeView() {
           </button>
         </div>
       ) : null}
+      {slow && !attempt.current.append ? slowNotice : null}
 
       {/*
        * B 站首页首屏是「大轮播 + 右侧卡片网格」：右侧给四张带封面的卡，
@@ -365,7 +415,7 @@ export function HomeView() {
        * 同一批推荐不会在屏上出现两次。
        */}
       {hero.length > 0 ? (
-        <div className="mb-4 px-4 pt-4 md:px-8">
+        <div data-home-recommend className="mb-4 px-4 pt-4 md:px-8">
           {/* 标题行给「换一换」一个和内容左右对齐的落点。之前是贴在右边缘的一整条竖卡，
               宽度顶出内容区，整页就多出一条横向滚动条。 */}
           <div className="mb-3 flex items-center justify-between gap-4">
@@ -459,6 +509,7 @@ export function HomeView() {
       ) : null}
       {loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
       {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
+      {slow && attempt.current.append ? slowNotice : null}
       {error && items.length > 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">
           <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>

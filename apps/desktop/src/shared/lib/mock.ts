@@ -404,6 +404,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return snapshot()
     }
     case 'home_feed': {
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('failHome')) {
+        await sleep(120)
+        throw Object.assign(new Error('连不上 B 站，检查一下网络。'), { class: 'retryable' })
+      }
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('slowHome')) {
+        await sleep(10_000)
+      }
       const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
       const size = 30
       const start = (fresh * size) % CATALOG.length
@@ -1074,6 +1081,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'lyrics_get':
       return buildLyrics(trackOf(str(args, 'key')))
     case 'auth_status':
+      return state.auth
+    case 'auth_refresh':
       return state.auth
     case 'auth_qrcode': {
       const key = `qr-${Date.now().toString(36)}`
