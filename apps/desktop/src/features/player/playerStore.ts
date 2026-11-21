@@ -253,13 +253,13 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
         void get().init()
         return
       }
-      apply({ ...current, track, duration_ms: track.duration_ms ?? current.duration_ms })
+      apply({ ...current, track, local: false, duration_ms: track.duration_ms ?? current.duration_ms })
       void refreshQueue()
     },
     applyBuffering: (track) => {
       const current = get().snapshot
       if (!current) return
-      apply({ ...current, track, phase: 'loading' })
+      apply({ ...current, track, local: false, phase: 'loading' })
     },
     applyStopped: () => {
       const current = get().snapshot

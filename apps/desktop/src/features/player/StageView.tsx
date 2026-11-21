@@ -35,6 +35,7 @@ export function StageView() {
   const [doc, setDoc] = useState<LyricDoc | null>(null)
   const [related, setRelated] = useState<Track[]>([])
   const track = snapshot?.track ?? null
+  const local = snapshot?.local ?? false
 
   useEffect(() => {
     if (!open || !track) return
@@ -52,7 +53,7 @@ export function StageView() {
 
   // 相关推荐只在舞台打开时拉，关掉就不再请求。
   useEffect(() => {
-    if (!open || !track) {
+    if (!open || !track || local) {
       setRelated([])
       return
     }
@@ -62,11 +63,13 @@ export function StageView() {
       .then((list) => {
         if (!cancelled) setRelated(list.slice(0, 8))
       })
-      .catch(() => setRelated([]))
+      .catch(() => {
+        if (!cancelled) setRelated([])
+      })
     return () => {
       cancelled = true
     }
-  }, [open, track])
+  }, [open, track, local])
 
   useEffect(() => {
     if (!open) return
@@ -113,11 +116,11 @@ export function StageView() {
       ) : null}
       {/* 白纱必须渐变：整层纯色会把模糊封面完全盖掉，舞台就退化成一张白纸 */}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),rgba(255,255,255,0.78)_58%,rgba(255,255,255,0.94))]" />
-      {/* 弹幕压到内容下面：标题与歌词是这一屏要读的字，不能被弹幕盖住 */}
-      <div className="pointer-events-none absolute inset-0 z-0">
-        {/* 舞台上弹幕是气氛，不是要读的字：降一档透明度，别和唱片、标题抢注意力。 */}
-        <DanmakuLayer trackKey={track.key} fade />
-      </div>
+      {local ? null : (
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <DanmakuLayer trackKey={track.key} fade />
+        </div>
+      )}
 
       <button
         type="button"
@@ -130,7 +133,7 @@ export function StageView() {
         退出
       </button>
 
-      <DanmakuPanel />
+      {local ? null : <DanmakuPanel />}
 
       <div className="relative flex w-full max-w-[560px] flex-col items-center px-8">
         <div className="stage-disc" data-playing={snapshot?.phase === 'playing'}>
@@ -158,11 +161,11 @@ export function StageView() {
           <p className="mt-3 text-[15px] leading-[1.5] text-[var(--text-3)]">{upcoming}</p>
         </div>
 
-        {/* 弹幕输入框放在播放键上方：真机窗口比网页矮，放下面会被底部的
-            「相关推荐」压住，实测看不到。 */}
-        <div className="mt-4 flex w-full justify-center px-8">
-          <DanmakuComposer trackKey={track.key} />
-        </div>
+        {local ? null : (
+          <div className="mt-4 flex w-full justify-center px-8">
+            <DanmakuComposer trackKey={track.key} />
+          </div>
+        )}
 
         <div className="mt-4 flex items-center gap-6 text-[var(--text-2)]">
           <button type="button" aria-label="上一首" onClick={() => void prev()} className="t press hover:text-[var(--text-1)]">
@@ -190,10 +193,10 @@ export function StageView() {
           <LevelBars />
         </div>
 
-        <VideoInfo trackKey={track.key} />
+        {local ? null : <VideoInfo trackKey={track.key} />}
       </div>
 
-      {related.length > 0 ? (
+      {!local && related.length > 0 ? (
         <div className="absolute inset-x-0 bottom-0 hidden border-t border-[var(--line)] bg-white/80 px-6 py-3 backdrop-blur md:block">
           <div className="mb-2 text-[12px] uppercase tracking-[0.18em] text-[var(--text-3)]">相关推荐</div>
           <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">

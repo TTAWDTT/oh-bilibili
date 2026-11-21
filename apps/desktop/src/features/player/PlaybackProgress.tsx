@@ -13,7 +13,7 @@ export function PlaybackProgress() {
   const [now, setNow] = useState(() => readPlayhead())
   const [scrub, setScrub] = useState<number | null>(null)
   const [heat, setHeat] = useState<number[]>([])
-  const trackKey = snapshot?.track?.key ?? null
+  const trackKey = snapshot?.local ? null : (snapshot?.track?.key ?? null)
 
   // 弹幕密度只在换歌时拉一次，进度推进不重拉。
   useEffect(() => {
@@ -46,7 +46,7 @@ export function PlaybackProgress() {
     setScrub(value)
     // 拖到最右等于「这首听完了」。解码器不接受落在时长上的 seek
     // （实测原地不动后从头重放），直接按切歌处理。
-    if (value > 0.999) {
+    if (!snapshot?.local && value > 0.999) {
       void next().finally(() => setScrub(null))
       return
     }

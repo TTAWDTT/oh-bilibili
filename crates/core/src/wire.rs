@@ -116,6 +116,7 @@ impl From<bilimusic_store::StoreError> for WireError {
 pub struct PlayerSnapshot {
     pub phase: String,
     pub track: Option<Track>,
+    pub local: bool,
     pub position_ms: u64,
     pub duration_ms: u64,
     pub volume: f32,

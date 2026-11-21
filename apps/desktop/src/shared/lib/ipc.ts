@@ -62,6 +62,10 @@ export function playerPlay(key: string): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_play', { key })
 }
 
+export function playerPlayLocal(key: string): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('player_play_local', { key })
+}
+
 export function playerPlayContext(keys: string[], index: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_play_context', { keys, index })
 }

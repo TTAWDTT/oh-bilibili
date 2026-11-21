@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { reportActionError } from '../../shared/lib/actionError'
 import type { DownloadState, DownloadView } from '../../shared/lib/contract'
 import { copyText } from '../../shared/lib/clipboard'
@@ -34,6 +34,19 @@ export function DownloadsView() {
   const retry = useDownloadsStore((state) => state.retry)
   const focusSearch = useAppStore((state) => state.focusSearch)
   const [deleting, setDeleting] = useState<DownloadView | null>(null)
+
+  useEffect(() => {
+    void useDownloadsStore.getState().load()
+  }, [])
+
+  const playLocal = async (key: string): Promise<void> => {
+    try {
+      await ipc.playerPlayLocal(key)
+    } catch (e) {
+      reportActionError('播放本地音频', e)
+      await useDownloadsStore.getState().load()
+    }
+  }
 
   const reveal = async (key: string): Promise<void> => {
     try {
@@ -159,7 +172,8 @@ export function DownloadsView() {
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
                       </button>
-                    ) : item.error ? (
+                    ) : null}
+                    {item.error ? (
                       <div
                         className="mt-1.5 line-clamp-2 max-w-full text-[12px] text-[var(--danger)]"
                         title={item.error}
@@ -184,6 +198,17 @@ export function DownloadsView() {
                         className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--accent)]"
                       >
                         <Icon name="refresh" size={13} />
+                      </button>
+                    ) : null}
+                    {item.state === 'done' && item.path ? (
+                      <button
+                        type="button"
+                        aria-label={`播放本地音频 ${item.title}`}
+                        title="播放本地音频"
+                        onClick={() => void playLocal(item.key)}
+                        className="flex h-5 w-5 items-center justify-center rounded-[3px] text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--accent)]"
+                      >
+                        <Icon name="play" size={13} />
                       </button>
                     ) : null}
                     {item.state === 'done' ? (

@@ -18,7 +18,7 @@ use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
-use symphonia::core::units::Time;
+use symphonia::core::units::{Time, TimeBase};
 
 use crate::AudioError;
 use crate::{Clock, Media, SharedClock};
@@ -29,10 +29,13 @@ use crate::{Clock, Media, SharedClock};
 const RING_CAPACITY: usize = 48000 * 2 * 4;
 
 enum Cmd {
-    Load(Media),
+    Load {
+        media: Media,
+        measure_duration: bool,
+    },
     Play,
     Pause,
-    Seek(u64),
+    Seek(u64, Option<Sender<()>>),
     /// 播放倍速，0.5..=2.0。
     SetSpeed(f64),
     Stop,
@@ -67,6 +70,7 @@ fn advance_played(clock: &Clock, written_samples: usize, channels: usize) {
 /// 已经读完、环形缓冲也排空后才成立。两个条件都不看墙钟或位置数字。
 #[derive(Default)]
 struct Lifecycle {
+    duration_ms: AtomicU64,
     armed: AtomicBool,
     started: AtomicBool,
     eof_pending: AtomicBool,
@@ -77,6 +81,7 @@ struct Lifecycle {
 
 impl Lifecycle {
     fn reset_load(&self) {
+        self.duration_ms.store(0, Ordering::Release);
         self.armed.store(false, Ordering::Release);
         self.started.store(false, Ordering::Release);
         self.eof_pending.store(false, Ordering::Release);
@@ -233,14 +238,29 @@ impl Player {
         self.lifecycle.failed()
     }
 
+    pub fn duration_ms(&self) -> u64 {
+        self.lifecycle.duration_ms.load(Ordering::Acquire)
+    }
+
     pub fn device_rate(&self) -> u32 {
         self.device_rate
     }
 
     pub fn load(&self, media: Media) -> Result<(), AudioError> {
+        self.load_source(media, false)
+    }
+
+    pub fn load_local(&self, media: Media) -> Result<(), AudioError> {
+        self.load_source(media, true)
+    }
+
+    fn load_source(&self, media: Media, measure_duration: bool) -> Result<(), AudioError> {
         self.lifecycle.reset_load();
         self.tx
-            .send(Cmd::Load(media))
+            .send(Cmd::Load {
+                media,
+                measure_duration,
+            })
             .map_err(|_| AudioError::Device("音频线程已退出".into()))
     }
     pub fn play(&self) {
@@ -257,7 +277,13 @@ impl Player {
         let _ = self.tx.send(Cmd::Stop);
     }
     pub fn seek(&self, position_ms: u64) {
-        let _ = self.tx.send(Cmd::Seek(position_ms));
+        let _ = self.tx.send(Cmd::Seek(position_ms, None));
+    }
+    pub fn seek_local(&self, position_ms: u64) {
+        let (done, finished) = channel();
+        if self.tx.send(Cmd::Seek(position_ms, Some(done))).is_ok() {
+            let _ = finished.recv();
+        }
     }
     /// 设置播放倍速。0.5 到 2.0，超范围会被夹住。
     pub fn set_speed(&self, speed: f64) {
@@ -283,9 +309,15 @@ struct Session {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn symphonia::core::codecs::Decoder>,
     track_id: u32,
+    sample_rate: u32,
+    duration_ms: u64,
 }
 
-fn open_decoder(media: Media) -> Result<Session, AudioError> {
+pub fn probe_audio(media: Media) -> Result<(), AudioError> {
+    open_decoder(media, false).map(|_| ())
+}
+
+fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioError> {
     let mss = MediaSourceStream::new(media.into_inner(), Default::default());
     let mut hint = Hint::new();
     hint.with_extension("m4a");
@@ -297,32 +329,53 @@ fn open_decoder(media: Media) -> Result<Session, AudioError> {
             &MetadataOptions::default(),
         )
         .map_err(|e| AudioError::Open(e.to_string()))?;
-    let format = probed.format;
+    let mut format = probed.format;
     let track = format
         .tracks()
         .iter()
         .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
         .ok_or(AudioError::NoTrack)?;
     let track_id = track.id;
+    let params = &track.codec_params;
+    let sample_rate = params.sample_rate.unwrap_or(48_000);
+    let time_base = params
+        .time_base
+        .unwrap_or_else(|| TimeBase::new(1, sample_rate));
+    let mut frames = params.n_frames.unwrap_or(0);
     let decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make(params, &DecoderOptions::default())
         .map_err(|e| AudioError::Decode(e.to_string()))?;
+
+    let scan_packets = measure_duration && frames == 0;
+    if scan_packets {
+        while let Ok(packet) = format.next_packet() {
+            if packet.track_id() == track_id {
+                frames = frames.max(packet.ts() + packet.dur());
+            }
+        }
+    }
+    let time = time_base.calc_time(frames);
+    let duration_ms = time.seconds * 1000 + (time.frac * 1000.0).round() as u64;
 
     // fMP4 把 moov 放在文件末尾，探针读完头已经在 EOF 附近，
     // 不回卷的话第一次 next_packet 直接 EOF，听起来像「点了播放没反应」。
-    let mut format = format;
-    let _ = format.seek(
+    let rewind = format.seek(
         SeekMode::Accurate,
         SeekTo::Time {
             time: Time::from(0.0),
             track_id: Some(track_id),
         },
     );
+    if scan_packets {
+        rewind.map_err(|e| AudioError::Open(e.to_string()))?;
+    }
 
     Ok(Session {
         format,
         decoder,
         track_id,
+        sample_rate,
+        duration_ms,
     })
 }
 
@@ -428,22 +481,19 @@ fn run_engine(
     loop {
         while let Ok(cmd) = rx.try_recv() {
             match cmd {
-                Cmd::Load(media) => {
+                Cmd::Load {
+                    media,
+                    measure_duration,
+                } => {
                     // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
                     resampler.pending.clear();
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.reset_load();
                     at_eof = false;
-                    match open_decoder(media) {
+                    match open_decoder(media, measure_duration) {
                         Ok(d) => {
-                            let rate = d
-                                .format
-                                .tracks()
-                                .iter()
-                                .find(|t| t.id == d.track_id)
-                                .and_then(|t| t.codec_params.sample_rate)
-                                .unwrap_or(48_000);
-                            base_rate = rate as f64;
+                            lifecycle.duration_ms.store(d.duration_ms, Ordering::Release);
+                            base_rate = d.sample_rate as f64;
                             resampler.set_source_rate(base_rate * speed);
                             lifecycle.arm();
                             clock.reset(device_rate);
@@ -474,7 +524,7 @@ fn run_engine(
                     lifecycle.set_paused(true);
                     clock.set_playing(false);
                 }
-                Cmd::Seek(ms) => {
+                Cmd::Seek(ms, done) => {
                     if let Some(d) = decoder.as_mut() {
                         at_eof = false;
                         lifecycle.clear_eof();
@@ -494,6 +544,9 @@ fn run_engine(
                             }
                             Err(e) => eprintln!("seek 失败: {e}"),
                         }
+                    }
+                    if let Some(done) = done {
+                        let _ = done.send(());
                     }
                 }
                 Cmd::Stop => {
@@ -675,6 +728,18 @@ impl LinearResampler {
             mapped.resize(mapped.len() + self.device_channels - copied_channels, fill);
         }
         Cow::Owned(mapped)
+    }
+}
+
+#[cfg(test)]
+mod duration_tests {
+    use super::{open_decoder, Media};
+
+    #[test]
+    fn 分片文件没有容器时长时按音频包计算() {
+        let file = std::fs::File::open("../../testdata/sample.m4s").unwrap();
+        let session = open_decoder(Media::new(file), true).unwrap();
+        assert!((315_000..=320_000).contains(&session.duration_ms));
     }
 }
 
