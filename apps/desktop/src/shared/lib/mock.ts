@@ -1055,6 +1055,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return state.downloads.map((item) => ({ ...item }))
     case 'sync_now':
       setTimeout(() => emit({ type: 'library_changed' }), 400)
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('syncPartial')) {
+        return { synced: 1, deferred: 2, rejected: 0, detail: '请求超时' }
+      }
       return { synced: 0, deferred: 0, rejected: 0, detail: null }
     default:
       throw fail('internal', `浏览器 mock 还没有实现 ${command}`)
