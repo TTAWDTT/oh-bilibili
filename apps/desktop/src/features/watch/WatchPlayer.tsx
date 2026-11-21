@@ -2259,7 +2259,7 @@ export function WatchPlayer({
             setDanmakuPanel(false)
             setPagesOpen(false)
           }}
-          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          className="fixed inset-0 z-10 bg-black/30 md:hidden"
         />
       ) : null}
     </div>
