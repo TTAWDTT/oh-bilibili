@@ -1856,7 +1856,7 @@ export function WatchPlayer({
               <BiliDanmakuSetting size={17} />
             </button>
             {danmakuPanel ? (
-              <div className="absolute bottom-9 right-0 z-30 max-h-[70vh] w-[236px] overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur">
+              <div className="fixed inset-x-3 bottom-20 z-40 max-h-[60vh] w-auto overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur md:absolute md:inset-auto md:bottom-9 md:right-0 md:z-30 md:max-h-[70vh] md:w-[236px]">
                 <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
                   <span>显示区域</span>
                   <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
@@ -2045,7 +2045,7 @@ export function WatchPlayer({
                 <span className="num text-[11px] text-white/55">P{currentPage}</span>
               </button>
               {pagesOpen ? (
-                <div className="absolute bottom-8 right-0 z-30 flex max-h-[320px] w-[280px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
+                <div className="fixed inset-x-3 bottom-20 z-40 flex max-h-[60vh] w-auto flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur md:absolute md:inset-auto md:bottom-8 md:right-0 md:z-30 md:max-h-[320px] md:w-[280px]">
                   {data.pages.map((page) => {
                     const on = page.no === currentPage
                     return (
