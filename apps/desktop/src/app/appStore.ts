@@ -27,8 +27,10 @@ export type DynamicReturn = {
   tab: DynamicTab
   itemIds: string[]
   index: number
+  expandedBodies: string[]
   top: number
-  focus: 'video' | 'forward' | null
+  trigger: 'video' | 'forward'
+  restoreFocus: boolean
   pages: number
 }
 

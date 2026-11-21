@@ -25,11 +25,12 @@ const TABS: { key: DynamicTab; label: string }[] = [
 type DynamicOpenEvent = MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>
 type OpenDynamic = (event: DynamicOpenEvent) => void
 type OpenDynamicItem = (item: ipc.DynamicItem, event: DynamicOpenEvent) => void
+type DynamicBody = { id: string; initiallyExpanded: boolean }
 
 /** 动态正文：超过六行折起来，B 站卡片也是先露出前几行再给「展开」。 */
-function RichText({ text }: { text: string }) {
+function RichText({ text, body }: { text: string; body: DynamicBody }) {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(body.initiallyExpanded)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
   const bodyNodes = text.split(/(#[^#\s]{1,40}#)/g).map((part, index) => {
@@ -70,6 +71,9 @@ function RichText({ text }: { text: string }) {
       {overflow || expanded ? (
         <button
           type="button"
+          name="dynamic-body"
+          value={body.id}
+          aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           className="t mt-1 text-[13px] text-[var(--accent)] hover:underline"
         >
@@ -222,7 +226,15 @@ function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyna
   )
 }
 
-function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDynamic }) {
+function DynamicContent({
+  item,
+  body,
+  onOpen,
+}: {
+  item: ipc.DynamicItem
+  body: DynamicBody
+  onOpen: OpenDynamic
+}) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   if (item.kind === 'article') return <DynamicArticle item={item} onOpen={onOpen} />
@@ -234,7 +246,7 @@ function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenD
           {item.title}
         </p>
       ) : null}
-      {text ? <RichText text={text} /> : null}
+      {text ? <RichText text={text} body={body} /> : null}
       {item.kind === 'video' ? <DynamicVideo item={item} onOpen={onOpen} /> : null}
       {item.kind === 'opus' && item.images.length > 0 ? (
         <div
@@ -276,9 +288,11 @@ function DynamicContent({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenD
 /** 转发动态里被转的那条。再套转发只画到这里，不再往下一层。 */
 function OrigCard({
   orig,
+  body,
   onOpenVideo,
 }: {
   orig: ipc.DynamicItem
+  body: DynamicBody
   onOpenVideo: OpenDynamicItem
 }) {
   const navigate = useAppStore((state) => state.navigate)
@@ -338,22 +352,26 @@ function OrigCard({
           {orig.pub_time}
         </span>
       </div>
-      <DynamicContent item={orig} onOpen={open} />
+      <DynamicContent item={orig} body={body} onOpen={open} />
     </div>
   )
 }
 
 function DynamicCard({
   item,
+  expandedBodies,
   onOpen,
   onAuthor,
   onExternal,
 }: {
   item: ipc.DynamicItem
+  expandedBodies: readonly string[]
   onOpen: OpenDynamicItem
   onAuthor: () => void
   onExternal: () => void
 }) {
+  const body = { id: item.id, initiallyExpanded: expandedBodies.includes(item.id) }
+  const originalId = `${item.id}/original`
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   const kindLabel =
@@ -429,11 +447,17 @@ function DynamicCard({
       <div className="ml-[60px] mt-3">
         {item.kind === 'forward' ? (
           <>
-            {text ? <RichText text={text} /> : null}
-            {item.orig ? <OrigCard orig={item.orig} onOpenVideo={onOpen} /> : null}
+            {text ? <RichText text={text} body={body} /> : null}
+            {item.orig ? (
+              <OrigCard
+                orig={item.orig}
+                body={{ id: originalId, initiallyExpanded: expandedBodies.includes(originalId) }}
+                onOpenVideo={onOpen}
+              />
+            ) : null}
           </>
         ) : (
-          <DynamicContent item={item} onOpen={(event) => onOpen(item, event)} />
+          <DynamicContent item={item} body={body} onOpen={(event) => onOpen(item, event)} />
         )}
       </div>
       <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
@@ -466,22 +490,18 @@ function restoreDynamicPosition(scroller: HTMLElement, position: DynamicReturn):
   card ??= cards[Math.min(position.index, cards.length - 1)]
   if (!card) return
 
-  scroller.scrollTop += card.getBoundingClientRect().top
+  const selector = original ? `[data-dynamic-open="${position.trigger}"]` : '[data-dynamic-open]'
+  const target = card.querySelector<HTMLElement>(selector) ?? card
+  scroller.scrollTop += target.getBoundingClientRect().top
     - scroller.getBoundingClientRect().top
     - position.top
-  if (!original || position.focus) {
-    const target = original
-      ? card.querySelector<HTMLElement>(`[data-dynamic-open="${position.focus}"]`)
-      : card.querySelector<HTMLElement>('[data-dynamic-open]')
-    const focus = target ?? card
-    focus.focus({ preventScroll: true })
-  }
+  if (!original || position.restoreFocus) target.focus({ preventScroll: true })
 }
 
 export function DynamicView() {
   const navigate = useAppStore((state) => state.navigate)
   const dynamicReturn = useAppStore((state) => state.dynamicReturn)
-  const returnPosition = useRef(dynamicReturn)
+  const [returnPosition, setReturnPosition] = useState(dynamicReturn)
   const loadedPages = useRef(0)
   const auth = useAuthStore((state) => state.auth)
   const me = auth?.logged_in ? auth.user : null
@@ -498,6 +518,7 @@ export function DynamicView() {
   const pending = useRef(false)
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const expandedBodies = returnPosition?.expandedBodies ?? []
   const visible =
     tab === 'all'
       ? items
@@ -546,33 +567,39 @@ export function DynamicView() {
   // 一页只有 20 条，滑两屏就断粮。首屏之后连补 4 页，把可视区之外垫到 100 条。
   useEffect(() => {
     if (!loaded || !hasMore || loading || error) return
-    if (loadedPages.current >= (returnPosition.current?.pages ?? 0)) {
+    if (loadedPages.current >= (returnPosition?.pages ?? 0)) {
       if (items.length === 0 || items.length >= 100 || prefetchPages.current >= 4) return
       prefetchPages.current += 1
     }
     void load(offset, true)
-  }, [loaded, hasMore, loading, error, items.length, offset, load])
+  }, [loaded, hasMore, loading, error, items.length, offset, load, returnPosition])
 
   useLayoutEffect(() => {
-    const position = returnPosition.current
     const scroller = scrollerRef.current
-    if (!position || !scroller || !loaded || following === null) return
-    if (!error && hasMore && loadedPages.current < position.pages) return
-    restoreDynamicPosition(scroller, position)
-    returnPosition.current = undefined
-  }, [loaded, items, following, hasMore, error])
+    if (!returnPosition || !scroller || !loaded || following === null) return
+    if (!error && hasMore && loadedPages.current < returnPosition.pages) return
+    const frame = requestAnimationFrame(() => {
+      restoreDynamicPosition(scroller, returnPosition)
+      setReturnPosition(undefined)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [loaded, items, following, hasMore, error, returnPosition])
 
   const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
     const scroller = scrollerRef.current
-    const card = event.currentTarget.closest('[data-dynamic-id]')
-    const trigger = event.currentTarget.dataset.dynamicOpen === 'forward' ? 'forward' : 'video'
-    const position: DynamicReturn | undefined = scroller && card
+    const target = event.currentTarget
+    const position: DynamicReturn | undefined = scroller
       ? {
           tab,
           itemIds: visible.map((entry) => entry.id),
           index,
-          top: card.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
-          focus: event.type === 'keydown' ? trigger : null,
+          expandedBodies: Array.from(
+            scroller.querySelectorAll<HTMLButtonElement>('button[name="dynamic-body"][aria-expanded="true"]'),
+            (button) => button.value,
+          ),
+          top: target.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
+          trigger: target.dataset.dynamicOpen === 'forward' ? 'forward' : 'video',
+          restoreFocus: event.type === 'keydown',
           pages: loadedPages.current,
         }
       : undefined
@@ -636,7 +663,7 @@ export function DynamicView() {
             <button
               type="button"
               onClick={() => {
-                returnPosition.current = undefined
+                setReturnPosition(undefined)
                 void load(null, false)
               }}
               disabled={loading}
@@ -655,7 +682,7 @@ export function DynamicView() {
                 key={entry.key}
                 type="button"
                 onClick={() => {
-                  returnPosition.current = undefined
+                  setReturnPosition(undefined)
                   setTab(entry.key)
                   scrollerRef.current?.scrollTo({ top: 0 })
                 }}
@@ -746,6 +773,7 @@ export function DynamicView() {
           <DynamicCard
             key={item.id}
             item={item}
+            expandedBodies={expandedBodies}
             onOpen={(opened, event) => {
               if (opened.kind === 'video' && opened.bvid) {
                 openVideo(opened, event, index)

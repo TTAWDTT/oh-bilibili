@@ -448,30 +448,33 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'dynamic_feed': {
       const now = Math.floor(Date.now() / 1000)
+      const params = import.meta.env.DEV ? new URLSearchParams(window.location.search) : undefined
+      const longBody = params?.has('longDynamicBody')
+      const firstVideo = {
+        id: '{{SECRET_8pepx2sb}}',
+        mid: 5000,
+        kind: 'video',
+        author: '造梦阿瑄',
+        face: CATALOG[0]?.up_avatar ?? '',
+        official: 0,
+        vip: true,
+        pub_time: '3小时前',
+        pub_ts: now - 10_800,
+        text: '新一期翻唱上啦，这次把副歌改成了双声部。',
+        bvid: 'BV1xx411c7mD',
+        title: '【翻唱】晴天｜一人双声部',
+        cover: CATALOG[0]?.cover ?? '',
+        duration_ms: CATALOG[0]?.duration_ms ?? null,
+        images: [],
+        views: 128_000,
+        danmaku: 2_340,
+        forwards: 3,
+        comments: 12,
+        likes: 45,
+      }
       const page = {
         items: [
-          {
-            id: '{{SECRET_8pepx2sb}}',
-            mid: 5000,
-            kind: 'video',
-            author: '造梦阿瑄',
-            face: CATALOG[0]?.up_avatar ?? '',
-            official: 0,
-            vip: true,
-            pub_time: '3小时前',
-            pub_ts: now - 10_800,
-            text: '新一期翻唱上啦，这次把副歌改成了双声部。',
-            bvid: 'BV1xx411c7mD',
-            title: '【翻唱】晴天｜一人双声部',
-            cover: CATALOG[0]?.cover ?? '',
-            duration_ms: CATALOG[0]?.duration_ms ?? null,
-            images: [],
-            views: 128_000,
-            danmaku: 2_340,
-            forwards: 3,
-            comments: 12,
-            likes: 45,
-          },
+          firstVideo,
           {
             id: '{{SECRET_6mt0ir88}}',
             mid: 5002,
@@ -482,7 +485,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             vip: false,
             pub_time: '昨天 18:20',
             pub_ts: now - 79_200,
-            text: '',
+            text: longBody ? '录音那天，窗外一直在下雨。\n'.repeat(28) : '',
             bvid: 'BV1yy411c7mE',
             title: '起风了｜深夜卧室版',
             cover: CATALOG[1]?.cover ?? '',
@@ -611,7 +614,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         offset: '',
         has_more: false,
       }
-      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('removeDynamicOnReturn')) {
+      if (longBody) {
+        page.items.push(...Array.from({ length: 4 }, (_, index) => ({
+          ...firstVideo,
+          id: `long-body-followup-${index}`,
+          title: `录音片段 ${index + 1}`,
+        })))
+      }
+      if (params?.has('removeDynamicOnReturn')) {
         if (dynamicLoaded) page.items.splice(1, 1)
         dynamicLoaded = true
       }

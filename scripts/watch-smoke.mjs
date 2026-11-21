@@ -222,12 +222,16 @@ async function dynamicReturn(page) {
   const cardSelector = (name) => `[...document.querySelectorAll('article [role="button"]')].find(
     (button) => button.textContent.includes(${JSON.stringify(name)}),
   )`
-  const readCard = (name = title) => page.evaluate(`(() => {
+  const readCard = (name = title) => page.evaluate(`(async () => {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
     const scroller = document.querySelector('#scroll-main')
     const card = ${cardSelector(name)}
     if (!scroller || !card) return null
     const rect = card.getBoundingClientRect()
     const viewport = scroller.getBoundingClientRect()
+    const header = scroller.querySelector('header').getBoundingClientRect()
+    const bodyToggle = [...card.closest('article').querySelectorAll('button')]
+      .find((button) => button.textContent === '收起' || button.textContent === '展开')
     return {
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
@@ -235,6 +239,8 @@ async function dynamicReturn(page) {
       scroll: scroller.scrollTop,
       videoOnly: !scroller.innerText.includes('点歌台｜今晚只放你点的歌'),
       focused: document.activeElement === card,
+      bodyToggle: bodyToggle?.textContent,
+      visible: rect.top >= header.bottom && rect.bottom <= viewport.bottom,
     }
   })()`)
   const waitForCard = async (name) => {
@@ -246,7 +252,17 @@ async function dynamicReturn(page) {
     return null
   }
 
-  const openFeed = async () => {
+  const openFeed = async (scenario) => {
+    if (scenario) {
+      const url = new URL(WEB)
+      url.searchParams.set(scenario, '1')
+      const href = JSON.stringify(url.href)
+      await page.evaluate(`location.href = ${href}`)
+      for (let i = 0; i < 30; i += 1) {
+        if (await page.evaluate(`location.href === ${href}`)) break
+        await sleep(100)
+      }
+    }
     for (let i = 0; i < 30; i += 1) {
       const opened = await page.evaluate(`(() => {
         const tab = [...document.querySelectorAll('[aria-label="主要导航"] button')]
@@ -271,6 +287,15 @@ async function dynamicReturn(page) {
     await page.keyEvent({ type: 'keyUp', ...enter })
     return page.clickExactText('返回')
   }
+  const toggleBody = (label) => page.evaluate(`(() => {
+    const article = (${cardSelector(title)})?.closest('article')
+    if (!article) return false
+    const toggle = [...article.querySelectorAll('button')]
+      .find((button) => button.textContent === ${JSON.stringify(label)})
+    if (!toggle) return false
+    toggle.click()
+    return true
+  })()`)
 
   const firstError = page.runtimeErrors.length
   await page.viewport(640, 560)
@@ -297,14 +322,34 @@ async function dynamicReturn(page) {
   const refreshed = await waitForCard()
   check('主动刷新回到顶部并保留筛选', refresh && refreshed?.scroll === 0 && refreshed.videoOnly)
 
-  const removed = new URL(WEB)
-  removed.searchParams.set('removeDynamicOnReturn', '1')
-  await page.evaluate(`location.href = ${JSON.stringify(removed.href)}`)
-  for (let i = 0; i < 30; i += 1) {
-    if (await page.evaluate(`location.href === ${JSON.stringify(removed.href)}`)) break
-    await sleep(100)
-  }
-  await openFeed()
+  await openFeed('longDynamicBody')
+  const expanded = await toggleBody('展开')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const expandedBefore = await readCard()
+  const expandedBack = await openWithEnter()
+  const expandedAfter = await waitForCard()
+  check(
+    `展开长正文后按 Enter 打开视频，返回时保留正文、筛选、位置和焦点，卡片距视口顶部 ${expandedBefore?.top} → ${expandedAfter?.top}`,
+    expanded && expandedBack &&
+      expandedBefore?.bodyToggle === '收起' && expandedBefore.visible &&
+      expandedAfter?.bodyToggle === '收起' && expandedAfter.visible && expandedAfter.videoOnly && expandedAfter.focused &&
+      Math.abs(expandedAfter.top - expandedBefore.top) <= 1 &&
+      Math.abs(expandedAfter.scroll - expandedBefore.scroll) <= 1,
+  )
+
+  const collapsed = await toggleBody('收起')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const collapsedBefore = await readCard()
+  const collapsedBack = await openWithEnter()
+  const collapsedAfter = await waitForCard()
+  check(
+    `收起长正文后返回，卡片距视口顶部 ${collapsedBefore?.top} → ${collapsedAfter?.top}`,
+    collapsed && collapsedBack && collapsedBefore?.visible && collapsedBefore.bodyToggle === '展开' &&
+      collapsedAfter?.visible && collapsedAfter.bodyToggle === '展开' && collapsedAfter.focused &&
+      Math.abs(collapsedAfter.top - collapsedBefore.top) <= 1,
+  )
+
+  await openFeed('removeDynamicOnReturn')
   const removedBack = await openWithEnter()
   const neighbor = await waitForCard('【翻唱】晴天｜一人双声部')
   check('原条目删除后，返回同一筛选并聚焦相邻视频', removedBack && neighbor?.focused && neighbor.videoOnly && !(await readCard()))
