@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from './appStore'
 import { NowPlayingRail } from '../features/player/NowPlayingRail'
 import { Icon } from '../shared/ui/Icon'
@@ -13,8 +13,17 @@ export function MobileRailSheet({ tab }: { tab: 'lyrics' | 'queue' }) {
   const closeRail = useAppStore((state) => state.closeRail)
   const toggleRail = useAppStore((state) => state.toggleRail)
   const panel = useRef<HTMLDivElement | null>(null)
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const sync = (): void => setMobile(media.matches)
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!mobile) return
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     panel.current?.querySelector<HTMLButtonElement>('button[aria-label="关闭详情"]')?.focus()
     const onKey = (event: KeyboardEvent): void => {
@@ -42,7 +51,7 @@ export function MobileRailSheet({ tab }: { tab: 'lyrics' | 'queue' }) {
       document.removeEventListener('keydown', onKey)
       if (previous?.isConnected) previous.focus()
     }
-  }, [closeRail])
+  }, [closeRail, mobile])
 
   return (
     <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="播放详情">

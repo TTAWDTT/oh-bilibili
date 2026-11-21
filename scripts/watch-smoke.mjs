@@ -1672,6 +1672,24 @@ async function main() {
       }
     })()`)
     await sleep(300)
+    await page.evaluate(`document.querySelector('button[aria-label="播放队列"]')?.click()`)
+    await sleep(300)
+    const desktopFocusKept = await page.evaluate(`(() => {
+      const stageButton = document.querySelector('button[aria-label="打开播放舞台"]')
+      stageButton?.focus()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      return document.activeElement === stageButton
+    })()`)
+    await sleep(300)
+    check(
+      '桌面关闭队列不抢走播放舞台的焦点',
+      desktopFocusKept &&
+        (await page.evaluate(
+          `document.activeElement === document.querySelector('button[aria-label="打开播放舞台"]')`,
+        )),
+    )
+    await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+    await sleep(300)
 
     const loginFocused = await page.evaluate(`(() => {
       const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '登录')
