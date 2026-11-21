@@ -8,6 +8,7 @@ import type { QualityOption, Track, WatchView as WatchData } from '../../shared/
 import { formatCount, formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { copyText } from '../../shared/lib/clipboard'
+import { watchUrl } from './watchUrl'
 import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
@@ -989,7 +990,7 @@ export function WatchPlayer({
 
   const copyWatchLink = (): void => {
     setShotMenu(null)
-    void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+    void copyText(watchUrl(track.key, currentPage)).then((ok) =>
       toastDone(ok ? '已复制视频链接' : '复制失败'),
     )
   }

@@ -9,6 +9,7 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { SHARE_ICONS } from './ShareIcons'
+import { watchUrl } from './watchUrl'
 
 const SOCIALS = ['动态', '微信', 'QQ', 'QQ空间', '微博', '贴吧', '嵌入代码'] as const
 type Social = (typeof SOCIALS)[number]
@@ -32,8 +33,7 @@ export function SharePanel({
   const [qrError, setQrError] = useState(false)
   const [embedOpen, setEmbedOpen] = useState(false)
 
-  const pageParam = page > 1 ? `?p=${page}` : ''
-  const baseUrl = `https://www.bilibili.com/video/${track.key}${pageParam}`
+  const baseUrl = watchUrl(track.key, page)
   const seconds = Math.floor(startAt / 1000)
   const shareUrl = withTime ? `${baseUrl}${page > 1 ? '&' : '?'}t=${seconds}` : baseUrl
   const embedCode = `<iframe src="//player.bilibili.com/player.html?isOutside=true&bvid=${track.key}&p=${page}${

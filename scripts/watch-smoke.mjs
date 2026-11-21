@@ -598,6 +598,52 @@ async function main() {
     check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
     check('返回后焦点落回结果卡片', returned.focused)
 
+    // 再次进入同一结果：只点顶栏搜索框后按 Esc 收联想，不能抹掉返回目标。
+    const reopenedResult = await page.evaluate(`(() => {
+      const card = document.activeElement?.closest?.('[data-track-card]')
+      const button = card?.querySelector('button[aria-label^="观看"]')
+      if (!button) return false
+      button.click()
+      return true
+    })()`)
+    let reopenedVideo = false
+    for (let i = 0; i < 30 && !reopenedVideo; i += 1) {
+      await sleep(500)
+      reopenedVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    const inputFocused = await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return false
+      input.focus()
+      return true
+    })()`)
+    await sleep(500)
+    const suggestBeforeEsc = await page.evaluate(`!!document.querySelector('[data-search-suggest-panel]')`)
+    const escSent = await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return false
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      return true
+    })()`)
+    await sleep(400)
+    const suggestAfterEsc = await page.evaluate(`!!document.querySelector('[data-search-suggest-panel]')`)
+    check('Esc 收起顶栏搜索联想', reopenedVideo && inputFocused && suggestBeforeEsc && escSent && !suggestAfterEsc)
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(900)
+    const secondReturn = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      return {
+        dialog: !!dialog,
+        query: input ? input.value : '',
+        focused: !!document.activeElement?.closest?.('[data-track-card]'),
+      }
+    })()`)
+    check(
+      'Esc 收联想后返回仍回结果面板与原卡片',
+      secondReturn.dialog && secondReturn.query === '晴天' && secondReturn.focused,
+    )
+
     // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
     await sleep(5000)
@@ -623,8 +669,28 @@ async function main() {
     })()`)
     await sleep(1600)
     check('多 P 预览切到 P2', multiVideo && switchedP2)
+    await page.evaluate(`(() => {
+      window.__copied = ''
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async (text) => { window.__copied = text } },
+      })
+      return true
+    })()`)
     await page.clickText('分享')
     await sleep(700)
+    const shareLinkClicked = await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((b) =>
+        (b.textContent || '').trim() === '获取视频分享链接')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(200)
+    const shareLinkParams = await page.evaluate(`(() => {
+      try { return { p: new URL(window.__copied).searchParams.get('p') } } catch { return null }
+    })()`)
+    check('分享面板复制链接带 p=2', shareLinkClicked && shareLinkParams?.p === '2')
     const withTimeToggled = await page.evaluate(`(() => {
       const input = [...document.querySelectorAll('input[type="checkbox"]')].find((el) =>
         (el.closest('label')?.textContent || '').includes('开始分享'))
@@ -649,6 +715,65 @@ async function main() {
       '短选集不出现找分集',
       !(await page.evaluate(`!!document.querySelector('input[aria-label="找分集"]')`)),
     )
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await sleep(400)
+    const titleLinkCopied = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[title="复制 BV 号与链接"]')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(200)
+    const titleLinkParams = await page.evaluate(`(() => {
+      try { return { p: new URL(window.__copied).searchParams.get('p') } } catch { return null }
+    })()`)
+    check('标题下复制 BV 号带 p=2', titleLinkCopied && titleLinkParams?.p === '2')
+
+    const contextOpened = await page.evaluate(`(() => {
+      const player = document.querySelector('[data-watch-player]')
+      if (!player) return false
+      const box = player.getBoundingClientRect()
+      player.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: box.left + 240,
+        clientY: box.top + 160,
+      }))
+      return true
+    })()`)
+    await sleep(300)
+    const contextMenuOpen = await page.evaluate(`!!document.querySelector('[data-shot-menu]')`)
+    const rightLinkClicked = await page.clickExactText('复制视频网址')
+    await sleep(200)
+    const rightLinkParams = await page.evaluate(`(() => {
+      try { return { p: new URL(window.__copied).searchParams.get('p') } } catch { return null }
+    })()`)
+    check(
+      '播放器右键复制网址带 p=2',
+      contextOpened && contextMenuOpen && rightLinkClicked && rightLinkParams?.p === '2',
+    )
+
+    await page.evaluate(`document.querySelector('button[aria-label="选集"]')?.click()`)
+    await sleep(300)
+    const switchedP1 = await page.evaluate(`(() => {
+      const panel = [...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)
+      const first = panel?.querySelector('ol li button')
+      if (!first) return false
+      first.click()
+      return true
+    })()`)
+    await sleep(1600)
+    const p1Copied = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[title="复制 BV 号与链接"]')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(200)
+    const p1Url = await page.evaluate(`(() => {
+      try { const url = new URL(window.__copied); return { path: url.pathname, p: url.searchParams.get('p') } } catch { return null }
+    })()`)
+    check('P1 复制保持不带 p', switchedP1 && p1Copied && p1Url !== null && p1Url.p === null && p1Url.path.startsWith('/video/'))
 
     // 长分 P 预览：找分集只筛选列表，选中才切 P，清空后完整列表和当前项都回来。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?manyPages=1`)}`)
