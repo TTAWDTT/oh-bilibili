@@ -182,6 +182,7 @@ async function controlFit(page) {
     if (!frame || !row) return null
     const frameBox = frame.getBoundingClientRect()
     const buttons = [...row.querySelectorAll('button')].filter((b) => {
+      if (b.parentElement !== row && b.parentElement?.parentElement !== row) return false
       const style = getComputedStyle(b)
       return style.display !== 'none' && style.visibility !== 'hidden' && b.getBoundingClientRect().width > 0
     })
