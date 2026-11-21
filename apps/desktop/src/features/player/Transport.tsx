@@ -7,12 +7,14 @@ function TransportButton({
   active = false,
   disabled = false,
   onClick,
+  className = '',
   children,
 }: {
   label: string
   active?: boolean
   disabled?: boolean
   onClick: () => void
+  className?: string
   children: ReactNode
 }) {
   return (
@@ -27,6 +29,7 @@ function TransportButton({
         't press flex h-8 w-8 items-center justify-center rounded-[4px]',
         active ? 'text-[var(--accent)]' : 'text-[var(--text-2)] hover:text-[var(--text-1)]',
         disabled ? 'cursor-default opacity-30' : '',
+        className,
       ].join(' ')}
     >
       {children}
@@ -50,10 +53,15 @@ export function Transport() {
 
   return (
     <div className="flex items-center gap-2">
-      <TransportButton label={shuffle ? '关闭随机播放' : '随机播放'} active={shuffle} onClick={() => setShuffle(!shuffle)}>
+      <TransportButton
+        label={shuffle ? '关闭随机播放' : '随机播放'}
+        active={shuffle}
+        onClick={() => setShuffle(!shuffle)}
+        className="hidden md:flex"
+      >
         <Icon name="shuffle" size={16} />
       </TransportButton>
-      <TransportButton label="上一首" disabled={!hasTrack} onClick={() => void prev()}>
+      <TransportButton label="上一首" disabled={!hasTrack} onClick={() => void prev()} className="hidden md:flex">
         <Icon name="prev" size={18} />
       </TransportButton>
       <button
@@ -75,13 +83,14 @@ export function Transport() {
           <Icon name={playing ? 'pause' : 'play'} size={18} />
         )}
       </button>
-      <TransportButton label="下一首" disabled={!hasTrack} onClick={() => void next()}>
+      <TransportButton label="下一首" disabled={!hasTrack} onClick={() => void next()} className="hidden md:flex">
         <Icon name="next" size={18} />
       </TransportButton>
       <TransportButton
         label={repeat === 'off' ? '循环：关' : repeat === 'all' ? '循环：列表' : '循环：单曲'}
         active={repeat !== 'off'}
         onClick={() => void cycleRepeat()}
+        className="hidden md:flex"
       >
         <Icon name={repeat === 'one' ? 'repeatOne' : 'repeat'} size={16} />
       </TransportButton>

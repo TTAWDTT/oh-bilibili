@@ -1562,6 +1562,49 @@ async function main() {
         ),
     )
     await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
+
+    await page.viewport(380, 560)
+    const narrowPlayer = await page.evaluate(`(() => {
+      const bar = document.querySelector('button[aria-label="打开播放舞台"]')?.closest('section')
+      const title = bar?.querySelector('.bili-marquee')
+      const queue = bar?.querySelector('button[aria-label="播放队列"]')
+      if (!bar || !title || !queue) return null
+      const barBox = bar.getBoundingClientRect()
+      const titleBox = title.getBoundingClientRect()
+      const queueBox = queue.getBoundingClientRect()
+      queue.focus()
+      return {
+        overflow: bar.scrollWidth - bar.clientWidth,
+        titleWidth: titleBox.width,
+        queueInside: queueBox.left >= barBox.left && queueBox.right <= barBox.right,
+        queueFocused: document.activeElement === queue,
+      }
+    })()`)
+    await page.pressSpace()
+    await sleep(400)
+    const narrowQueueOpened = await page.evaluate(
+      `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
+    )
+    await page.evaluate(
+      `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
+    )
+    await sleep(300)
+    check(
+      '380 宽播放条保留曲名和队列，键盘可打开队列',
+      narrowPlayer &&
+        narrowPlayer.overflow === 0 &&
+        narrowPlayer.titleWidth >= 120 &&
+        narrowPlayer.queueInside &&
+        narrowPlayer.queueFocused &&
+        narrowQueueOpened &&
+        !(await page.evaluate(`!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`)),
+    )
+    await page.viewport(1320, 900)
+    await page.evaluate(`(() => {
+      if (document.querySelector('.rail-slot')?.dataset.open === 'false') {
+        document.querySelector('button[aria-label="歌词栏"]')?.click()
+      }
+    })()`)
     await sleep(300)
 
     const loginFocused = await page.evaluate(`(() => {

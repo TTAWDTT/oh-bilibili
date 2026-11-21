@@ -70,7 +70,7 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <button
         type="button"
         onClick={() => setStage(true)}
@@ -92,7 +92,7 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
         <div className="bili-marquee truncate text-[14px] font-medium leading-tight text-[var(--text-1)]" title={track.title}>
           {track.title}
         </div>
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1 hidden items-center gap-2 md:flex">
           <span className="truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
             {track.artist}
           </span>
@@ -153,22 +153,24 @@ export function PlayerBar() {
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
-    <section className="relative z-20 grid h-14 shrink-0 overflow-hidden grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] items-center gap-6 border-t border-hairline bg-[var(--panel)] px-3">
+    <section className="relative z-20 flex h-14 shrink-0 items-center gap-2 overflow-hidden border-t border-hairline bg-[var(--panel)] px-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] md:gap-6">
       <AddToPlaylistModal track={track} open={adding} onClose={() => setAdding(false)} />
       <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
 
       <div className="flex min-w-0 flex-col items-center gap-0">
         <Transport />
-        <PlaybackProgress />
+        <div className="hidden w-full md:block">
+          <PlaybackProgress />
+        </div>
       </div>
 
-      <div className="flex min-w-0 items-center justify-end gap-2">
+      <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
         {track ? <ReactionButtons track={track} size={15} className="hidden 2xl:flex" /> : null}
         <span className="hidden items-center gap-2 md:flex">
           <SpeedButton />
           <VolumeControl />
         </span>
-        <span className="h-5 w-px bg-[var(--line)]" />
+        <span className="hidden h-5 w-px bg-[var(--line)] md:block" />
         <button
           type="button"
           aria-label="加入歌单"
@@ -176,13 +178,15 @@ export function PlayerBar() {
           disabled={!track}
           onClick={() => setAdding(true)}
           className={[
-            't press flex h-8 w-8 items-center justify-center rounded-[4px]',
+            't press hidden h-8 w-8 items-center justify-center rounded-[4px] md:flex',
             track ? 'text-[var(--text-2)] hover:text-[var(--accent)]' : 'cursor-default text-[var(--text-2)]',
           ].join(' ')}
         >
           <Icon name="plus" size={16} />
         </button>
-        <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
+        <span className="hidden md:block">
+          <RailToggle tab="lyrics" active={rail === 'lyrics'} enabled={track !== null} />
+        </span>
         <RailToggle tab="queue" active={rail === 'queue'} count={queued} enabled={queued > 0} />
       </div>
     </section>
