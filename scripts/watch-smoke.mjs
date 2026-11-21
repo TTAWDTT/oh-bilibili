@@ -145,6 +145,41 @@ function check(name, ok) {
   console.log(`${ok ? '✓' : '✗'} ${name}`)
 }
 
+async function controlFit(page) {
+  return page.evaluate(`(() => {
+    const frame = document.querySelector('[data-watch-player]')
+    const row = document.querySelector('[data-watch-controls]')
+    const rail = document.querySelector('[data-watch-rail]')
+    const visible = (selector) => {
+      const el = document.querySelector(selector)
+      if (!el) return false
+      const style = getComputedStyle(el)
+      return style.display !== 'none' && style.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    }
+    if (!frame || !row) return null
+    const frameBox = frame.getBoundingClientRect()
+    const buttons = [...row.querySelectorAll('button')].filter((b) => {
+      const style = getComputedStyle(b)
+      return style.display !== 'none' && style.visibility !== 'hidden' && b.getBoundingClientRect().width > 0
+    })
+    const outside = buttons.filter((b) => {
+      const box = b.getBoundingClientRect()
+      return box.right > frameBox.right + 0.5 || box.left < frameBox.left - 0.5
+    })
+    return {
+      overflow: row.scrollWidth - row.clientWidth,
+      outside: outside.length,
+      rail: !!rail && getComputedStyle(rail).display !== 'none',
+      inline: visible('[data-watch-inline]'),
+      shot: visible('button[aria-label="截图"]'),
+      pip: visible('button[aria-label="画中画"]'),
+      volume: visible('button[aria-label="静音"], button[aria-label="取消静音"]'),
+      web: visible('button[aria-label="网页全屏"], button[aria-label="退出网页全屏"]'),
+      full: visible('button[aria-label="全屏"], button[aria-label="退出全屏"]'),
+    }
+  })()`)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     console.log('没装 Chrome，跳过')
@@ -282,6 +317,44 @@ async function main() {
       check('支持画中画时桌面控制条有入口', !pipAt1320.enabled || pipAt1320.visible)
     }
 
+    const fit1320 = await controlFit(page)
+    check('1320 宽右栏出现', !!fit1320?.rail)
+    check('1320 宽正文不重复右栏内容', !!fit1320 && !fit1320.inline)
+    check('1320 宽控制条没有被裁切', !!fit1320 && fit1320.overflow <= 1 && fit1320.outside === 0)
+    check('1320 宽保留截图入口', !!fit1320?.shot)
+
+    for (const width of [768, 980]) {
+      await page.viewport(width, 860)
+      await sleep(700)
+      const fit = await controlFit(page)
+      check(`${width} 宽控制条没有被裁切`, !!fit && fit.overflow <= 1 && fit.outside === 0)
+      check(`${width} 宽不出双栏`, !!fit && !fit.rail)
+      check(`${width} 宽右栏内容留在正文`, !!fit && fit.inline)
+      check(`${width} 宽保留画中画、音量、网页全屏、全屏`, !!fit && fit.pip && fit.volume && fit.web && fit.full)
+      check(`${width} 宽截图入口按空间收起`, !!fit && !fit.shot)
+
+      const mute = await page.evaluate(`(() => {
+        const btn = document.querySelector('button[aria-label="静音"], button[aria-label="取消静音"]')
+        if (!btn) return null
+        const box = btn.getBoundingClientRect()
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+      })()`)
+      check(`${width} 宽有音量按钮`, !!mute)
+      if (!mute) continue
+      const volumeWidth = () => page.evaluate(`(() => {
+        const slider = document.querySelector('[role="slider"][aria-label="音量"]')
+        return slider?.parentElement?.getBoundingClientRect().width ?? 0
+      })()`)
+      const before = await volumeWidth()
+      await page.mouseEvent({ type: 'mouseMoved', x: mute.x, y: mute.y })
+      await sleep(300)
+      const after = await volumeWidth()
+      const expanded = await controlFit(page)
+      check(`${width} 宽音量滑杆真的展开`, after > before + 40)
+      check(`${width} 宽音量展开后控制条仍完整`, !!expanded && expanded.overflow <= 1 && expanded.outside === 0)
+      await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
+    }
+
     await page.viewport(700, 860)
     await sleep(600)
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
@@ -292,6 +365,8 @@ async function main() {
       return { visible: box.width > 0 && getComputedStyle(btn).display !== 'none' }
     })()`)
     check('700 宽仍能改播放倍速', !!speedAt700?.visible)
+    const fit700 = await controlFit(page)
+    check('700 宽保留截图入口', !!fit700?.shot)
     if (speedAt700?.visible) {
       await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
       await sleep(200)

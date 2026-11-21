@@ -373,7 +373,7 @@ export function WatchView({ track }: { track: Track }) {
     : nextSeasonEp
       ? {
           title: nextSeasonEp.title,
-          owner: '',
+          owner: data?.owner ?? track.artist,
           cover: nextSeasonEp.cover,
           views: nextSeasonEp.views ?? null,
           durationMs: nextSeasonEp.duration_ms || null,
@@ -514,7 +514,7 @@ export function WatchView({ track }: { track: Track }) {
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       {/* 返回在顶栏（TitleBar），不在画面上：浮在视频角上会挡住画面内容。 */}
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         {/* 整页一起滚：播放器、信息、评论是一条纵向流。
             之前把评论塞进「播放器之后剩下的高度」，一屏不够高时评论区直接被压成 0。 */}
         <div
@@ -591,7 +591,7 @@ export function WatchView({ track }: { track: Track }) {
               onTriple={triple}
               onSeek={seekTo}
               ownerRow={
-                <div className="md:hidden">
+                <div className="xl:hidden">
                   <OwnerCard
                     data={data}
                     card={card}
@@ -605,17 +605,17 @@ export function WatchView({ track }: { track: Track }) {
             />
           ) : null}
           {!cinema && danmaku.length > 0 ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <DanmakuList items={danmaku} />
             </div>
           ) : null}
           {!cinema && data ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} />
             </div>
           ) : null}
           {!cinema && data && data.pages.length > 1 ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <PageList
                 pages={data.pages}
                 current={page ?? data.current_page}
@@ -626,12 +626,12 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           {!cinema && data?.season ? (
-            <div className="border-t border-hairline md:hidden">
+            <div className="border-t border-hairline xl:hidden">
               <SeasonList season={data.season} />
             </div>
           ) : null}
           {!cinema ? (
-            <div className="border-t border-hairline md:hidden">
+            <div data-watch-inline className="border-t border-hairline xl:hidden">
               <RelatedAside items={related} />
             </div>
           ) : null}
@@ -643,7 +643,10 @@ export function WatchView({ track }: { track: Track }) {
         </div>
 
         {!cinema ? (
-          <aside className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline md:block">
+          <aside
+            data-watch-rail
+            className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline xl:block"
+          >
             {data ? (
               <OwnerCard
                 data={data}

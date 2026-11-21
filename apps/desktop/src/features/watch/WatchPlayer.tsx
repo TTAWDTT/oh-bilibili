@@ -1089,6 +1089,7 @@ export function WatchPlayer({
         })
         poke()
       }}
+      data-watch-player
       className={
         cinema
           ? 'relative flex h-full w-full flex-col justify-center bg-black'
@@ -1711,7 +1712,7 @@ export function WatchPlayer({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div data-watch-controls className="flex items-center gap-2">
           <button
             type="button"
             onClick={togglePlay}
@@ -1747,7 +1748,7 @@ export function WatchPlayer({
             onClick={captureShot}
             aria-label="截图"
             title="截图"
-            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15"
+            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 md:hidden xl:flex"
           >
             <Icon name="camera" size={16} />
           </button>
@@ -1759,7 +1760,7 @@ export function WatchPlayer({
               aria-pressed={pip}
               aria-label={pip ? '退出画中画' : '画中画'}
               title={pip ? '退出画中画' : '画中画'}
-              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
+              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] md:flex ${
                 pip ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
@@ -2025,7 +2026,7 @@ export function WatchPlayer({
           </div>
 
           {data.pages.length > 1 ? (
-            <div className="relative shrink-0">
+            <div className="relative flex shrink-0 md:hidden xl:flex">
               <button
                 type="button"
                 onClick={() => {
@@ -2116,7 +2117,9 @@ export function WatchPlayer({
                         setQualityOpen(false)
                       }}
                       className={`t press px-2 py-1 text-left text-[12px] ${
-                        activeId === q.id ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
+                        !qualityAuto && activeId === q.id
+                          ? 'text-[var(--accent)]'
+                          : 'text-white/85 hover:bg-white/10'
                       }`}
                     >
                       {q.label}
@@ -2181,12 +2184,11 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          {/* 音量在窄屏交给系统；倍速是播放器状态，任何宽度都得留着。 */}
           <span
-            className="hidden shrink-0 items-center xl:flex"
+            className="hidden shrink-0 items-center md:flex"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
           >
-            <VolumeControl />
+            <VolumeControl compact />
           </span>
 
           {/* B 站播放器在这两个位置摆的是「网页全屏」和「全屏」。
@@ -2196,7 +2198,7 @@ export function WatchPlayer({
             onClick={() => setStageMode(!cinema, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] lg:flex ${
+            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] md:flex ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >
