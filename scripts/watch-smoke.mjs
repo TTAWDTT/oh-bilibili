@@ -287,6 +287,101 @@ async function checkLibraryPartial(page) {
   check(`曲库没有控制台错误或未处理异常（${page.errors.length} 条）`, page.errors.length === 0)
 }
 
+async function checkHeroAllocation(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('heroAllocation', '1')
+  await page.viewport(1024, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+  let ready = false
+  for (let i = 0; i < 40 && !ready; i += 1) {
+    await sleep(250)
+    ready = await page.evaluate(
+      `document.querySelectorAll('[data-home-hero-grid] > button').length === 6 &&
+       document.querySelectorAll('[data-home-feed] [data-track-card]').length >= 5`,
+    )
+  }
+  const read = () =>
+    page.evaluate(`(() => {
+      const carousel = [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+        .map((image) => image.dataset.trackTitle ?? '')
+      const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
+        .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
+      const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
+        .map((card) => card.dataset.trackTitle ?? '')
+      return { carousel, grid, feed }
+    })()`)
+  const wide = await read()
+  await page.viewport(1023, 900)
+  await sleep(500)
+  const narrow = await page.evaluate(`(() => ({
+    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+      .map((image) => image.dataset.trackTitle ?? ''),
+    grid: document.querySelector('[data-home-hero-grid]') !== null,
+    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
+  }))()`)
+  await page.viewport(1024, 900)
+  await sleep(500)
+  const restored = await read()
+  const initialTitles = Array.from({ length: 16 }, (_, index) => `首页分配 ${index + 1}`)
+  const placedOnce = (expected, titles) =>
+    expected.every((title) => titles.filter((entry) => entry === title).length === 1) &&
+    new Set(titles).size === titles.length
+  check(
+    '首屏推荐在 1024 与 1023 两侧各有一次入口',
+    ready &&
+      wide.carousel.length === 5 &&
+      wide.grid.length === 6 &&
+      placedOnce(initialTitles, [...wide.carousel, ...wide.grid, ...wide.feed]) &&
+      placedOnce(initialTitles, [...narrow.carousel, ...narrow.feed]) &&
+      !narrow.grid &&
+      restored.grid.length === 6 &&
+      placedOnce(initialTitles, [...restored.carousel, ...restored.grid, ...restored.feed]),
+  )
+  const refreshedButton = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '换一换')
+    hit?.click()
+    return !!hit
+  })()`)
+  let refreshedReady = false
+  for (let i = 0; i < 20 && !refreshedReady; i += 1) {
+    await sleep(200)
+    refreshedReady = await page.evaluate(
+      `[...document.querySelectorAll('[data-home-hero-grid] > button')].some((card) =>
+        card.textContent.includes('首页分配 12'))`,
+    )
+  }
+  const refreshed = await read()
+  await page.viewport(1023, 900)
+  await sleep(500)
+  const refreshedNarrow = await page.evaluate(`(() => ({
+    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
+      .map((image) => image.dataset.trackTitle ?? ''),
+    grid: document.querySelector('[data-home-hero-grid]') !== null,
+    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
+  }))()`)
+  const refreshedTitles = [
+    ...Array.from({ length: 6 }, (_, index) => `换一换 ${index + 1}`),
+    ...Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`),
+  ]
+  const refreshedOnce = (titles) => placedOnce(refreshedTitles, titles)
+  check(
+    '换一换后首屏和推荐流仍不重复、不丢项',
+    refreshedButton &&
+      refreshedReady &&
+      refreshed.grid.length === 6 &&
+      refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) &&
+      !refreshedNarrow.grid &&
+      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed]),
+  )
+  if (
+    !refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) ||
+    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed])
+  ) {
+    console.log(JSON.stringify({ refreshed, refreshedNarrow, refreshedTitles }))
+  }
+  await page.viewport(1320, 900)
+}
+
 async function controlFit(page) {
   return page.evaluate(`(() => {
     const frame = document.querySelector('[data-watch-player]')
@@ -482,6 +577,7 @@ async function main() {
   try {
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkHeroAllocation(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     if (DYNAMIC_RETURN) {
       await dynamicReturn(page)

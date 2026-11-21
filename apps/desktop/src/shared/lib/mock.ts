@@ -420,6 +420,28 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return snapshot()
     }
     case 'home_feed': {
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('heroAllocation')) {
+        const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
+        const original = CATALOG.slice(0, 16).map((track, index) => ({
+          ...track,
+          key: `allocation-${index}`,
+          title: `首页分配 ${index + 1}`,
+        }))
+        if (fresh === 1) return original
+        return [
+          ...Array.from({ length: 5 }, (_, index) => ({
+            ...original[index],
+            key: `swap-${index}`,
+            title: `换一换 ${index + 1}`,
+          })),
+          ...original.slice(11),
+          ...Array.from({ length: 5 }, (_, index) => ({
+            ...original[index + 5],
+            key: `swap-${index + 5}`,
+            title: `换一换 ${index + 6}`,
+          })),
+        ]
+      }
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('failHome')) {
         await sleep(120)
         throw Object.assign(new Error('连不上 B 站，检查一下网络。'), { class: 'retryable' })

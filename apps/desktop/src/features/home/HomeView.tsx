@@ -56,6 +56,7 @@ export function HomeView() {
   const [hoverPart, setHoverPart] = useState<{ name: string; left: number; top: number } | null>(null)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
+  const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
   const itemsRef = useRef<Track[]>(feedMemory.items)
@@ -84,6 +85,13 @@ export function HomeView() {
   const [channelFade, setChannelFade] = useState({ left: false, right: false })
 
   useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)')
+    const sync = (): void => setWideHero(media.matches)
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
     const el = channelRef.current
     if (!el) return
     const update = (): void => {
@@ -100,6 +108,12 @@ export function HomeView() {
       el.removeEventListener('scroll', update)
     }
   }, [])
+
+  const heroKeys = new Set(hero.map((track) => track.key))
+  const feedRemainder = items.filter((track) => !heroKeys.has(track.key))
+  const feedTracks = wideHero
+    ? feedRemainder
+    : [...new Map([...hero.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
@@ -436,9 +450,9 @@ export function HomeView() {
            */}
           <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
           <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
-          {hero.length > 5 ? (
+          {hero.length > 5 && wideHero ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
-            <div key={hero[0]?.key} className="bili-hero-swap hidden grid-cols-3 gap-3 lg:grid">
+            <div key={hero[0]?.key} data-home-hero-grid className="bili-hero-swap grid grid-cols-3 gap-3">
               {hero.slice(5, 11).map((track) => (
                 <button
                   key={track.key}
@@ -495,9 +509,9 @@ export function HomeView() {
       ))}
 
       {items.length > 0 ? (
-        <div className="px-4 md:px-8">
+        <div data-home-feed className="px-4 md:px-8">
           <ContentGrid
-            tracks={items.slice(11)}
+            tracks={feedTracks}
             activeKey={activeKey}
             playing={playing}
             onNeedMore={more}
