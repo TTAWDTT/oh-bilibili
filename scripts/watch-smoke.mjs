@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const WEB = 'http://127.0.0.1:1420/'
+const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
 const PORT = 9224
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
@@ -125,10 +125,33 @@ async function connect() {
     }
   }
 
+  /** 真实空格：keydown 会经过全局快捷键，keyup 才触发按钮的原生 click。 */
+  const pressSpace = async () => {
+    await send(
+      'Input.dispatchKeyEvent',
+      {
+        type: 'keyDown',
+        key: ' ',
+        code: 'Space',
+        text: ' ',
+        unmodifiedText: ' ',
+        windowsVirtualKeyCode: 32,
+        nativeVirtualKeyCode: 32,
+      },
+      sid,
+    )
+    await send(
+      'Input.dispatchKeyEvent',
+      { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 },
+      sid,
+    )
+  }
+
   return {
     evaluate,
     viewport,
     doubleClick,
+    pressSpace,
     mouseEvent: (params) => send('Input.dispatchMouseEvent', params, sid),
     clickText,
     clickExactText,
@@ -688,6 +711,86 @@ async function main() {
       '清除筛选恢复 80 集并保留当前项标记',
       cleared.count === 80 && cleared.active.includes('P62'),
     )
+
+    // 快捷键：空格要留给聚焦的按钮，Ctrl+K 不能穿过模态去聚焦背景搜索框。
+    await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    await sleep(5000)
+    const playLabel = () =>
+      page.evaluate(
+        `document.querySelector('button[aria-label="播放"],button[aria-label="暂停"]')?.getAttribute('aria-label') ?? null`,
+      )
+    const listenStarted = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label^="听 "]')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    let playBefore = null
+    for (let i = 0; i < 20 && !playBefore; i += 1) {
+      await sleep(300)
+      playBefore = await playLabel()
+    }
+    check('点「听」后播放条出现', listenStarted && playBefore !== null)
+
+    const loginFocused = await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '登录')
+      if (!hit) return false
+      hit.focus()
+      return document.activeElement === hit
+    })()`)
+    await page.pressSpace()
+    await sleep(600)
+    check(
+      '聚焦按钮时空格走原生激活（登录弹窗打开）',
+      loginFocused &&
+        (await page.evaluate(
+          `[...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some((el) => el.getClientRects().length > 0)`,
+        )),
+    )
+    check('聚焦按钮时空格不触发播放/暂停', (await playLabel()) === playBefore)
+
+    const modalKey = await page.evaluate(`(() => {
+      const dialog = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
+        .find((el) => el.getClientRects().length > 0)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true }))
+      return {
+        inDialog: !!dialog && dialog.contains(document.activeElement),
+        onSearch: document.activeElement?.getAttribute('aria-label') === '顶栏搜索',
+      }
+    })()`)
+    check('模态打开时 Ctrl+K 不把焦点移到背景搜索框', modalKey.inDialog && !modalKey.onSearch)
+
+    await page.evaluate(
+      `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
+    )
+    await sleep(500)
+    check(
+      'Esc 关闭登录弹窗',
+      !(await page.evaluate(
+        `[...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some((el) => el.getClientRects().length > 0)`,
+      )),
+    )
+
+    await page.evaluate(
+      `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true }))`,
+    )
+    await sleep(300)
+    check(
+      '关闭弹窗后 Ctrl+K 恢复聚焦顶栏搜索',
+      await page.evaluate(`document.activeElement?.getAttribute('aria-label') === '顶栏搜索'`),
+    )
+
+    const blankFocused = await page.evaluate(`(() => {
+      document.activeElement?.blur()
+      const main = document.getElementById('main-content')
+      if (!main) return false
+      main.focus()
+      return document.activeElement === main
+    })()`)
+    const beforeBlank = await playLabel()
+    await page.pressSpace()
+    await sleep(400)
+    check('焦点在页面空白时空格控制播放', blankFocused && (await playLabel()) !== beforeBlank)
 
   } finally {
     page.close()
