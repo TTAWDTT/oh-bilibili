@@ -1486,8 +1486,8 @@ impl Engine {
     }
 
     /// 带播放时间的历史，用于按日期分组。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>, WireError> {
-        Ok(self.library.history_with_time(limit)?)
+    pub fn history_with_time(&self, limit: u32, offset: u32) -> Result<Vec<(Track, i64, u64)>, WireError> {
+        Ok(self.library.history_with_time(limit, offset)?)
     }
 
     /// 某条视频上次看到的位置，观看页打开时用来定位。

@@ -468,6 +468,53 @@ async function main() {
     }
     check('顶栏搜索提交后出结果', submitted && searched)
 
+    // 历史：翻到第 61 条，并把不同年份的同月同日分成两组。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?historyLong=1`)}`)
+    await sleep(5000)
+    const openedHistory = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '历史') : null
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    let historyReady = false
+    for (let i = 0; i < 20 && !historyReady; i += 1) {
+      await sleep(400)
+      historyReady = await page.evaluate(`document.querySelectorAll('[data-track-card]').length > 0`)
+    }
+    const firstPage = await page.evaluate(`(() => ({
+      cards: document.querySelectorAll('[data-track-card]').length,
+      loadMore: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
+    }))()`)
+    check(
+      '历史首屏 60 条并给出加载更早',
+      openedHistory && historyReady && firstPage.cards === 60 && firstPage.loadMore,
+    )
+    await page.clickExactText('加载更早记录')
+    let loadedAll = false
+    for (let i = 0; i < 20 && !loadedAll; i += 1) {
+      await sleep(300)
+      loadedAll = await page.evaluate(`document.querySelectorAll('[data-track-card]').length === 100`)
+    }
+    const afterLoad = await page.evaluate(`(() => {
+      const text = document.body.innerText
+      const heads = [...document.querySelectorAll('h2')].map((h) => (h.textContent || '').trim())
+      return {
+        has61: text.includes('历史记录 61'),
+        groups: heads.filter((h) => h.includes('4 月 10 日')),
+        more: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
+      }
+    })()`)
+    check('加载更早记录能找回第 61 条', loadedAll && afterLoad.has61)
+    check(
+      '同月同日不同年份分成两组',
+      afterLoad.groups.length === 2 &&
+        afterLoad.groups.some((g) => g.startsWith('2025')) &&
+        afterLoad.groups.some((g) => g.startsWith('2024')),
+    )
+    check('取完 100 条后按钮收起', !afterLoad.more)
+
   } finally {
     page.close()
   }

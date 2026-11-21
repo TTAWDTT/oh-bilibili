@@ -150,9 +150,9 @@ export function libraryAdd(playlistId: number, key: string): Promise<null> {
 
 export type HistoryEntry = { track: Track; played_at: number; position_ms: number }
 
-/** 带播放时间的历史，用于按日期分组。 */
-export function libraryHistoryTimed(limit: number): Promise<HistoryEntry[]> {
-  return call<HistoryEntry[]>('library_history_timed', { limit })
+/** 带播放时间的历史，用于按日期分组。offset 从已加载条数往后翻。 */
+export function libraryHistoryTimed(limit: number, offset = 0): Promise<HistoryEntry[]> {
+  return call<HistoryEntry[]>('library_history_timed', { limit, offset })
 }
 
 /** 某条视频上次看到的位置。没看过返回 null，和「看过但从 0 开始」区分开。 */
