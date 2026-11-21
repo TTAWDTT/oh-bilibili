@@ -382,6 +382,97 @@ async function checkHeroAllocation(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkShellBreakpoints(page) {
+  await page.viewport(768, 800)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(5000)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '曲库')
+    hit?.click()
+  })()`)
+  await sleep(800)
+  await page.evaluate(`(() => {
+    const title = document.querySelector('#scroll-main button [title="深夜循环"]')
+    title?.closest('button')?.click()
+  })()`)
+  await sleep(700)
+  const played = await page.evaluate(`(() => {
+    const row = document.querySelector('#scroll-main button[aria-label="播放 晴天"]')
+    row?.click()
+    return !!row
+  })()`)
+  await sleep(800)
+  const measure = () =>
+    page.evaluate(`(() => {
+      const width = (selector) => document.querySelector(selector)?.getBoundingClientRect().width ?? 0
+      return {
+        viewport: innerWidth,
+        main: width('#main-content'),
+        sidebar: width('nav[aria-label="主导航"]'),
+        rail: width('.rail-slot'),
+        mobileNav: width('nav[aria-label="主要导航"]'),
+        row: width('#scroll-main [data-row="track"] button.min-w-0.flex-1'),
+        sheet: !!document.querySelector('[role="dialog"][aria-label="播放详情"]')?.getClientRects().length,
+        sheetBody: width('[role="dialog"][aria-label="播放详情"] aside[aria-label="播放右栏"]'),
+      }
+    })()`)
+  const middle = await measure()
+  await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+  await sleep(400)
+  const middleOpen = await measure()
+  await page.evaluate(
+    `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+  )
+  await sleep(300)
+  await page.viewport(820, 800)
+  await sleep(500)
+  const narrowerMiddle = await measure()
+  await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+  await sleep(400)
+  const narrowerOpen = await measure()
+  await page.evaluate(
+    `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+  )
+  await sleep(300)
+  await page.viewport(1024, 800)
+  await sleep(500)
+  const wideMiddle = await measure()
+  await page.viewport(767, 800)
+  await sleep(500)
+  const narrow = await measure()
+  await page.viewport(1280, 800)
+  await sleep(500)
+  await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+  await sleep(500)
+  const wide = await measure()
+  await page.viewport(1024, 800)
+  await sleep(500)
+  const shrunk = await measure()
+  check(
+    '768 到 1279 收起右栏，播放列表保持可读',
+    played &&
+      middle.main >= 500 &&
+      middle.row >= 160 &&
+      !middle.sheet &&
+      middleOpen.sheet &&
+      middleOpen.sheetBody >= 760 &&
+      narrowerMiddle.main >= 560 &&
+      narrowerMiddle.row >= 220 &&
+      narrowerOpen.sheetBody >= 800 &&
+      wideMiddle.main >= 760 &&
+      narrow.main >= 760 &&
+      narrow.mobileNav >= 760 &&
+      narrow.sidebar === 0 &&
+      wide.rail === 320 &&
+      wide.main < wideMiddle.main &&
+      !wide.sheet &&
+      shrunk.rail === 0 &&
+      shrunk.main >= 760 &&
+      !shrunk.sheet,
+  )
+  await page.viewport(1320, 900)
+}
+
 async function controlFit(page) {
   return page.evaluate(`(() => {
     const frame = document.querySelector('[data-watch-player]')
@@ -578,6 +669,7 @@ async function main() {
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
     await checkHeroAllocation(page)
+    await checkShellBreakpoints(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     if (DYNAMIC_RETURN) {
       await dynamicReturn(page)
@@ -1686,15 +1778,19 @@ async function main() {
       }
     })()`)
     await page.pressSpace()
-    await sleep(400)
-    const narrowQueueOpened = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
-      return {
-        open: !!dialog,
-        focusInside: !!dialog && dialog.contains(document.activeElement),
-        initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
-      }
-    })()`)
+    let narrowQueueOpened = null
+    for (let i = 0; i < 20; i += 1) {
+      await sleep(100)
+      narrowQueueOpened = await page.evaluate(`(() => {
+        const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+        return {
+          open: !!dialog,
+          focusInside: !!dialog && dialog.contains(document.activeElement),
+          initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
+        }
+      })()`)
+      if (narrowQueueOpened.open && narrowQueueOpened.focusInside) break
+    }
     const focusWraps = await page.evaluate(`(() => {
       const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
       if (!dialog) return false
