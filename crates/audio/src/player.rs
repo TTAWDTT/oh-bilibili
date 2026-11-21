@@ -464,9 +464,7 @@ fn run_engine(
                 }
                 Cmd::Play => {
                     lifecycle.set_paused(false);
-                    if at_eof {
-                        clock.set_playing(false);
-                    } else {
+                    if !lifecycle.peek_ended() {
                         clock.set_playing(true);
                     }
                 }

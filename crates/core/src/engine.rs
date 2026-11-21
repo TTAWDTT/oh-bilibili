@@ -1004,6 +1004,9 @@ impl Engine {
     }
 
     pub fn seek(&self, position_ms: u64) -> PlayerSnapshot {
+        if lock(&self.state).phase() == "ended" {
+            return self.snapshot();
+        }
         *lock(&self.last_transport_at) = std::time::Instant::now();
         // 正好落在曲目时长上的 seek 会被解码器拒掉（实测按 End 之后位置不动、
         // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
@@ -1219,6 +1222,7 @@ impl Engine {
                         // 引擎自己跳下一首会让画面停在旧视频、声音换成另一条，
                         // 结束面板也永远等不到 ended。
                         if *lock(&engine.mode) == crate::wire::PlayMode::Watch {
+                            lock(&engine.player).pause();
                             let mut st = lock(&engine.state);
                             let current = std::mem::replace(&mut *st, PlayerState::Idle);
                             *st = current.ended();
@@ -1344,6 +1348,7 @@ impl Engine {
         };
         drop(st);
         if ended && watch_mode {
+            lock(&self.player).pause();
             let _ = lock(&self.player).take_ended();
         }
         if let Ok(track) = self.track_of(&track_key) {
