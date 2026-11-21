@@ -582,6 +582,7 @@ export function WatchView({ track }: { track: Track }) {
             <WatchInfo
               track={track}
               data={data}
+              currentPage={currentPageNo}
               likeDelta={likeDelta}
               favDelta={favDelta}
               coinDelta={coinDelta}
