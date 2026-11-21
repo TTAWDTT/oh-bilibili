@@ -2231,8 +2231,10 @@ mod offline_boot_tests {
         let db = temp_db();
         let started = Instant::now();
         let engine = Engine::new(&db).expect("断网不该挡住启动");
+        // 这条守的是「不要等 20 秒的 HTTP 超时」，不是启动性能指标：
+        // 声卡初始化在慢机器或设备繁忙时本身就要几秒。
         assert!(
-            started.elapsed() < Duration::from_secs(5),
+            started.elapsed() < Duration::from_secs(15),
             "Engine::new 不该等网络，实际 {:?}",
             started.elapsed()
         );
