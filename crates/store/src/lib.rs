@@ -1040,6 +1040,33 @@ mod tests {
     }
 
     #[test]
+    fn 旧同步回执保留最新取消意图() {
+        let dir = temp_dir("stale-reaction-receipt");
+        let l = Library::open(&dir.join("library.sqlite")).unwrap();
+        let id = l.upsert_track(&track("BVstale")).unwrap();
+        l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+        let sent = l.pending_reactions(42, 10).unwrap().remove(0);
+
+        l.set_reaction(id, 42, ReactionKind::Like, false).unwrap();
+        l.mark_reaction(&sent, ReactionState::Synced).unwrap();
+        let pending = l.pending_reactions(42, 10).unwrap();
+        let stored = l
+            .with(|conn| {
+                conn.query_row(
+                    "SELECT want, state FROM reactions WHERE track_id = ?1",
+                    [id.0],
+                    |row| Ok((row.get::<_, bool>(0)?, row.get::<_, String>(1)?)),
+                )
+            })
+            .unwrap();
+
+        drop(l);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(stored, (false, "pending".into()));
+        assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
     fn 可重试失败留在待办_永久拒绝才移除() {
         let l = lib();
         let id = l.upsert_track(&track("BVretry")).unwrap();
