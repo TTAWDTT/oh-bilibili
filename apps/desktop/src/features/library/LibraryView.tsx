@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
-import type { Track } from '../../shared/lib/contract'
+import type { Playlist, Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
@@ -14,34 +14,7 @@ import { usePlayerStore } from '../player/playerStore'
 export function LibraryView() {
   const playlists = useLibraryStore((state) => state.playlists)
   const revision = useLibraryStore((state) => state.revision)
-  const navigate = useAppStore((state) => state.navigate)
-  const [tracksByList, setTracksByList] = useState<Record<number, readonly Track[]>>({})
   const [creating, setCreating] = useState(false)
-  const playContext = usePlayerStore((state) => state.playContext)
-
-  /** 从卡片直接整单播放：已经读过曲目就直接排，没读到再拉一次。 */
-  const playPlaylist = async (id: number): Promise<void> => {
-    const list = tracksByList[id] ?? (await ipc.libraryTracks(id).catch(() => []))
-    if (list.length === 0) return
-    await playContext(
-      list.map((t) => t.key),
-      0,
-    )
-  }
-
-  // 曲目数是列表行的第二列，逐张读一次；读失败只影响这一列，不挡住整页。
-  useEffect(() => {
-    if (!playlists) return
-    let alive = true
-    Promise.all(playlists.map(async (playlist) => [playlist.id, await ipc.libraryTracks(playlist.id)] as const))
-      .then((entries) => {
-        if (alive) setTracksByList(Object.fromEntries(entries))
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [playlists, revision])
 
   return (
     <div className="flex h-full flex-col">
@@ -80,69 +53,114 @@ export function LibraryView() {
           </div>
         ) : (
           <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-            {playlists.map((playlist) => {
-              const tracks = tracksByList[playlist.id]
-              const count = tracks ? tracks.length : 0
-              return (
-                <div
-                  key={playlist.id}
-                  className="bili-card bili-card-enter group relative overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)]"
-                >
-                <button
-                  type="button"
-                  onClick={() => navigate({ kind: 'playlist', id: playlist.id, name: playlist.name })}
-                  className="block w-full text-left"
-                >
-                  {/* 封面拼图区：四宫格铺满卡片上半部 */}
-                  <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
-                    {Array.from({ length: 4 }, (_, i) => {
-                      const cover = tracks?.[i]?.cover
-                      return (
-                        <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
-                          {cover ? (
-                            <img
-                              src={thumbUrl(cover, 320, 180) ?? cover}
-                              alt=""
-                              aria-hidden
-                              referrerPolicy="no-referrer"
-                              loading="lazy"
-                              decoding="async"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : null}
-                        </span>
-                      )
-                    })}
-                  </span>
-                  <span className="block px-3 py-2">
-                    <span className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]" title={playlist.name}>
-                      {playlist.name}
-                    </span>
-                    <span className="num mt-0.5 block text-[12px] text-[var(--text-3)]">
-                      {count > 0 ? `${count} 首` : '空歌单'}
-                    </span>
-                  </span>
-                </button>
-                {/* B 站歌单卡右上角也是就近播放：整单排进队列，不用先进详情页。 */}
-                <span className="pointer-events-none absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                  <button
-                    type="button"
-                    aria-label={`播放歌单 ${playlist.name}`}
-                    title="播放全部"
-                    onClick={() => void playPlaylist(playlist.id)}
-                    className="bili-press flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] hover:opacity-90"
-                  >
-                    <Icon name="play" size={16} />
-                  </button>
-                </span>
-                </div>
-              )
-            })}
+            {playlists.map((playlist) => (
+              <PlaylistCard key={playlist.id} playlist={playlist} revision={revision} />
+            ))}
           </section>
         )}
 
         <CreatePlaylistModal open={creating} onClose={() => setCreating(false)} />
       </div>
+    </div>
+  )
+}
+
+function PlaylistCard({ playlist, revision }: { playlist: Playlist; revision: number }) {
+  const { id, name } = playlist
+  const navigate = useAppStore((state) => state.navigate)
+  const playContext = usePlayerStore((state) => state.playContext)
+  const [trackRead, setTrackRead] = useState<readonly Track[] | 'failed'>()
+  const [retryCount, setRetryCount] = useState(0)
+  const failed = trackRead === 'failed'
+  const tracks = failed ? undefined : trackRead
+
+  useEffect(() => {
+    let alive = true
+    void ipc.libraryTracks(id).then(
+      (next) => {
+        if (alive) setTrackRead(next)
+      },
+      () => {
+        if (alive) setTrackRead('failed')
+      },
+    )
+    return () => {
+      alive = false
+    }
+  }, [id, revision, retryCount])
+
+  const playPlaylist = async (): Promise<void> => {
+    const list = tracks ?? (await ipc.libraryTracks(id).catch(() => []))
+    if (list.length === 0) return
+    await playContext(
+      list.map((t) => t.key),
+      0,
+    )
+  }
+
+  return (
+    <div
+      className="bili-card bili-card-enter group relative overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)]"
+    >
+      <button
+        type="button"
+        onClick={() => navigate({ kind: 'playlist', id, name })}
+        className="block w-full text-left"
+      >
+        <span className="grid aspect-[16/10] w-full grid-cols-2 gap-px bg-[var(--ga2)]">
+          {Array.from({ length: 4 }, (_, i) => {
+            const cover = tracks?.[i]?.cover
+            return (
+              <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
+                {cover ? (
+                  <img
+                    src={thumbUrl(cover, 320, 180) ?? cover}
+                    alt=""
+                    aria-hidden
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </span>
+            )
+          })}
+        </span>
+        <span className="block px-3 py-2">
+          <span className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]" title={name}>
+            {name}
+          </span>
+          <span className="num mt-0.5 block min-h-[1.5em] text-[12px] text-[var(--text-3)]">
+            {failed ? '曲目数未取到' : tracks && (tracks.length > 0 ? `${tracks.length} 首` : '空歌单')}
+          </span>
+        </span>
+      </button>
+      {failed ? (
+        <button
+          type="button"
+          aria-label={`重试读取 ${name} 的曲目数`}
+          onClick={() => {
+            setTrackRead(undefined)
+            setRetryCount((current) => current + 1)
+          }}
+          className="t absolute bottom-2 right-3 rounded-[4px] text-[12px] text-[var(--accent)] hover:underline"
+        >
+          重试
+        </button>
+      ) : null}
+      {/* B 站歌单卡右上角也是就近播放：整单排进队列，不用先进详情页。 */}
+      <span className="pointer-events-none absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <button
+          type="button"
+          aria-label={`播放歌单 ${name}`}
+          title="播放全部"
+          onClick={() => void playPlaylist()}
+          className="bili-press flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] hover:opacity-90"
+        >
+          <Icon name="play" size={16} />
+        </button>
+      </span>
     </div>
   )
 }
