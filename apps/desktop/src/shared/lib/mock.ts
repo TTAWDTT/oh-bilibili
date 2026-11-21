@@ -40,6 +40,7 @@ const FOLLOW_SEEDS: {
 
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
+let dynamicLoaded = false
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
@@ -447,7 +448,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'dynamic_feed': {
       const now = Math.floor(Date.now() / 1000)
-      return {
+      const page = {
         items: [
           {
             id: '{{SECRET_8pepx2sb}}',
@@ -610,6 +611,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         offset: '',
         has_more: false,
       }
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('removeDynamicOnReturn')) {
+        if (dynamicLoaded) page.items.splice(1, 1)
+        dynamicLoaded = true
+      }
+      return page
     }
     case 'watch_dialog': {
       return {
