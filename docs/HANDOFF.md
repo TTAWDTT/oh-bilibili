@@ -250,9 +250,10 @@ cargo test --workspace                                    # 18 个测试二进�
 npm run typecheck -w @bilimusic/desktop
 
 # 真实接口（需要网络与声卡）
-cargo test -p bilimusic-bili --test live -- --ignored
-cargo test -p bilimusic-core --test live_engine -- --ignored
+BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json ./scripts/live-test.sh
 ```
+
+`live-test.sh` 未配置凭据时打印 `SKIPPED` 并以 77 退出，不能当成线上通过；配置后先只读验证登录，两套用例全部通过才打印 `VERIFIED`。直接跑 `cargo test --ignored` 时，凭据用例在未配置时会失败，不会把跳过计成 passed。
 
 ## 架构要点
 
@@ -364,7 +365,7 @@ model  ← bili / store / audio
 | 发现轮播 | 首屏 16:6 大图，6 秒自动翻页；悬停暂停、点圆点切换、换一批后回到第一张，点图进观看页 |
 | 看转听 | 观看页播放中点「听视频」→ 回列表，底部播放条出现，进度 0:16/2:58、192K，右栏歌词与队列同时恢复 |
 | 消息中心 | 真机验证了三分类入口、获赞头像叠放、消息中的视频进入观看页及发送者空间跳转。游标修复后，回复列表从首屏 20 条续到 40 条，末条时间从 2025-11-12 推进到 2025-06-27；获赞文案显示「赞了你」或「等 N 人赞了你」。旧记录里仅凭列表条数从 20 增到 60 判断续页的结论已撤回 |
-| 消息游标分页接口 | 使用应用保存的登录态运行真实 `Source::messages`：回复两页各 20 条、ID 重叠 0；获赞两页各 20 条、ID 重叠 0；@ 首屏 12 条且 `is_end=true`、无续页游标。回归命令为 `cargo test -p bilimusic-bili --test live messages_live_cursor_pages_are_disjoint -- --ignored --exact --nocapture`，缺少登录态、空页或重复 ID 都会失败；当前账号没有 @ 第二页，未声称验证其真实续页 |
+| 消息游标分页接口 | 使用 `BILIMUSIC_LIVE_COOKIES` 指定的专用测试账号运行真实 `Source::messages`：回复两页各 20 条、ID 重叠 0；获赞两页各 20 条、ID 重叠 0；@ 首屏 12 条且 `is_end=true`、无续页游标。回归命令为 `BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json cargo test -p bilimusic-bili --test live messages_live_cursor_pages_are_disjoint -- --ignored --exact --nocapture`，缺少凭据时会打印跳过原因；当前账号没有 @ 第二页，未声称验证其真实续页 |
 | 舞台进度 | 整屏舞台加入带弹幕密度的进度条；内容区按底部相关推荐让位，详情卡不再被遮挡 |
 | 高能进度条 | 观看页进度条上方按 120 段铺弹幕密度（2–8px 柱高、主色），数据直接取已经载入的弹幕列表，不额外发请求。实测 1800w Q&A（5.8 万弹幕）：点进度条 51% 处跳到 9:46，密度条不挡点击；舞台版仍是 3px 贴条，走 `danmaku_heat`，因为那里没有本地弹幕列表 |
 | 喜欢页 | `x/space/like/video` 返回 19 条真实点赞，首条时长 21563s、分区「单机游戏」；页面按真实列表渲染 |
@@ -442,7 +443,7 @@ B 站化之后的色值：底 `#f6f7f8`、面板 `#fff`、线 `#e3e5e7`、主色
 
 网页端还会带 `eab_x=1`、`ramval=9`、`source=web_normal`、`ga=1`，现在一并带上。
 
-`crates/core/tests/live_engine.rs` 的 `点赞能写入也能取消` 做往返验证，顺序是「读原状 → 改成反面 → 校验 → 改回原状 → 校验」，跑完不留痕迹。
+`crates/core/tests/live_engine.rs` 的 `点赞能写入也能取消` 用 `BILIMUSIC_LIVE_COOKIES` 指定的专用测试账号做往返验证，顺序是「读原状 → 改成反面 → 校验 → 改回原状 → 校验」，跑完不留痕迹。
 
 ## 写操作可用性
 
