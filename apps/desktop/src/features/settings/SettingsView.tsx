@@ -182,7 +182,7 @@ export function SettingsView() {
           </div>
 
           <Section title="播放">
-            <div className="divide-y divide-[var(--hairline)]">
+            <div className="divide-y divide-[var(--color-hairline)]">
               <SwitchRow label="自动连播" on={autoplay} onChange={setAutoplay} />
               <SwitchRow label="弹幕" on={danmakuOn} onChange={setDanmakuEnabled} />
             </div>

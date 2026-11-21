@@ -490,6 +490,65 @@ async function main() {
     }
     await sleep(6000)
 
+    const heroAuthor = await page.evaluate(`(() => {
+      const card = document.querySelector('[data-home-recommend] div.bili-hero-swap button')
+      const authorRow = card
+        ? [...card.querySelectorAll(':scope > span')].find((row) => row.textContent.includes('UP'))
+        : null
+      const coverStats = card
+        ? [...card.querySelectorAll(':scope > span')].find((row) => row.querySelector('svg'))
+        : null
+      const statsOverlay = coverStats?.lastElementChild
+      const countText = statsOverlay?.firstElementChild?.textContent?.trim() ?? ''
+      const durationText = statsOverlay?.lastElementChild?.textContent?.trim() ?? ''
+      const counts = countText.match(/\\d+(?:\\.\\d+)?万?/g) ?? []
+      return {
+        text: authorRow?.textContent?.trim() ?? '',
+        name: authorRow?.lastElementChild?.textContent?.trim() ?? '',
+        authorParts: authorRow?.children.length ?? 0,
+        firstAuthorPart: authorRow?.firstElementChild?.textContent?.trim() ?? '',
+        coverStats: countText + ' ' + durationText,
+        coverCounts: counts.length,
+      }
+    })()`)
+    check(
+      '首页小卡作者行只留作者，播放量仍压在封面',
+      heroAuthor.text.startsWith('UP') &&
+        heroAuthor.authorParts === 2 &&
+        heroAuthor.firstAuthorPart === 'UP' &&
+        heroAuthor.name.length > 0 &&
+        !heroAuthor.text.includes('播放') &&
+        heroAuthor.coverStats.includes(':') &&
+        heroAuthor.coverCounts >= 2,
+    )
+
+    await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '设置')
+      hit?.click()
+    })()`)
+    await sleep(700)
+    const playbackDividerColors = await page.evaluate(`(() => {
+      const section = [...document.querySelectorAll('section')]
+        .find((node) => node.querySelector('h2')?.textContent === '播放')
+      const rows = [...(section?.querySelector('div.divide-y')?.children ?? [])]
+      return rows.flatMap((row) => {
+        const style = getComputedStyle(row)
+        return [
+          [style.borderTopColor, style.borderTopWidth],
+          [style.borderBottomColor, style.borderBottomWidth],
+        ]
+      }).filter(([, width]) => width !== '0px').map(([color]) => color)
+    })()`)
+    check(
+      '设置页播放项使用同级浅色分隔线',
+      playbackDividerColors.length > 0 && playbackDividerColors.every((color) => color === 'rgb(227, 229, 231)'),
+    )
+    await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '发现')
+      hit?.click()
+    })()`)
+    await sleep(1000)
+
     // 首页卡片：hover 只露出听、稍后再看和更多；低频动作收进更多。
     await page.evaluate(`document.querySelector('[data-track-card]')?.scrollIntoView({ block: 'center' })`)
     await sleep(500)
@@ -1429,6 +1488,50 @@ async function main() {
       playBefore = await playLabel()
     }
     check('点「听」后播放条出现', listenStarted && playBefore !== null)
+
+    const readTransportDirection = (scope) =>
+      page.evaluate(`(() => {
+        const root = ${scope}
+        const read = (label) => {
+          const button = root?.querySelector('button[aria-label=' + JSON.stringify(label) + ']')
+          const paths = button ? [...button.querySelectorAll('svg path')] : []
+          if (paths.length !== 2) return null
+          const bar = paths[0].getBBox()
+          const triangle = paths[1].getBBox()
+          const apex = paths[1].getPointAtLength(0)
+          return {
+            label,
+            lineLeft: bar.x < triangle.x,
+            lineRight: bar.x > triangle.x + triangle.width,
+            apexLeft: Math.abs(apex.x - triangle.x) < 0.5,
+            apexRight: Math.abs(apex.x - (triangle.x + triangle.width)) < 0.5,
+          }
+        }
+        return [read('上一首'), read('下一首')]
+      })()`)
+    const barDirection = await readTransportDirection(
+      `document.querySelector('button[aria-label="打开播放舞台"]')?.closest('section')`,
+    )
+    const openedStage = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label="打开播放舞台"]')
+      hit?.click()
+      return !!hit
+    })()`)
+    await sleep(500)
+    const stageDirection = await readTransportDirection(`document.querySelector('.stage')`)
+    check(
+      '底栏和舞台的上一首、下一首图标方向一致',
+      openedStage &&
+        barDirection.every(Boolean) &&
+        stageDirection.every(Boolean) &&
+        [...barDirection, ...stageDirection].every(({ label, lineLeft, lineRight, apexLeft, apexRight }) =>
+          label === '上一首'
+            ? lineLeft && !lineRight && apexLeft && !apexRight
+            : lineRight && !lineLeft && apexRight && !apexLeft,
+        ),
+    )
+    await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
+    await sleep(300)
 
     const loginFocused = await page.evaluate(`(() => {
       const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '登录')

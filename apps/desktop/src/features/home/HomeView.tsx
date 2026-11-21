@@ -478,7 +478,6 @@ export function HomeView() {
                       UP
                     </span>
                     <span className="truncate">{track.artist}</span>
-                    {track.views ? <span className="num shrink-0">· {formatCount(track.views)} 播放</span> : null}
                   </span>
                 </button>
               ))}
