@@ -30,6 +30,7 @@ type PlayerStore = {
   moveInQueue: (from: string, to: string) => Promise<void>
   removeFromQueue: (key: string) => Promise<void>
   clearQueue: () => Promise<void>
+  undoClearQueue: () => Promise<void>
   applyProgress: (positionMs: number, durationMs: number, level?: number, sentAtMs?: number) => void
   applySnapshot: (snapshot: PlayerSnapshot) => void
   applyTrack: (track: Track) => void
@@ -207,6 +208,13 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
         set({ queue: await ipc.queueClear() })
       } catch {
         // 同上
+      }
+    },
+    undoClearQueue: async () => {
+      try {
+        set({ queue: await ipc.queueUndoClear() })
+      } catch (cause) {
+        toastFailure('撤销清空', cause)
       }
     },
     applyProgress: (positionMs, durationMs, level = 0, sentAtMs) => {

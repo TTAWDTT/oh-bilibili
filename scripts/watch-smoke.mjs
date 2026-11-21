@@ -468,6 +468,69 @@ async function main() {
     }
     check('顶栏搜索提交后出结果', submitted && searched)
 
+    // 播放队列：清空仍是一次点击，随后给出带数量的撤销。
+    await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    await sleep(5000)
+    const startedListen = await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '') === '听 红豆')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(2500)
+    const openedQueue = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const tab = rail
+        ? [...rail.querySelectorAll('button')].find((b) => (b.textContent || '').trim().startsWith('队列'))
+        : null
+      if (!tab) return false
+      tab.click()
+      return true
+    })()`)
+    await sleep(500)
+    const queueBefore = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const text = rail?.textContent || ''
+      const match = /接下来 · (\\d+) 首/.exec(text)
+      const rows = rail ? rail.querySelectorAll('[role="button"][title="拖动可以调整顺序"]') : []
+      return { count: match ? Number(match[1]) : 0, rows: rows.length }
+    })()`)
+    check('播放页队列有曲目', startedListen && openedQueue && queueBefore.count > 0 && queueBefore.rows === queueBefore.count)
+    await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const clear = [...(rail?.querySelectorAll('button') ?? [])].find((b) => (b.textContent || '').trim() === '清空')
+      clear?.click()
+    })()`)
+    await sleep(500)
+    const afterClear = await page.evaluate(`(() => {
+      const strip = document.querySelector('[data-queue-undo]')
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      return {
+        strip: strip?.textContent?.trim() ?? '',
+        rows: rail ? rail.querySelectorAll('[role="button"][title="拖动可以调整顺序"]').length : -1,
+      }
+    })()`)
+    check(
+      '清空后显示数量和撤销',
+      afterClear.rows === 0 && afterClear.strip.includes(`已清空 ${queueBefore.count} 首`) && afterClear.strip.includes('撤销'),
+    )
+    await page.evaluate(`document.querySelector('[data-queue-undo] button')?.click()`)
+    await sleep(800)
+    const afterUndo = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = rail ? [...rail.querySelectorAll('[role="button"][title="拖动可以调整顺序"]')] : []
+      return {
+        rows: rows.length,
+        active: rows.some((row) => row.getAttribute('aria-current') === 'true'),
+        strip: !!document.querySelector('[data-queue-undo]'),
+      }
+    })()`)
+    check(
+      '撤销恢复曲目和当前项',
+      afterUndo.rows === queueBefore.count && afterUndo.active && !afterUndo.strip,
+    )
+
   } finally {
     page.close()
   }

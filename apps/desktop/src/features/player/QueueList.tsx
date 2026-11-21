@@ -1,6 +1,6 @@
 import * as ipc from '../../shared/lib/ipc'
 import { Icon } from '../../shared/ui/Icon'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { formatDuration } from '../../shared/lib/format'
 import type { Track } from '../../shared/lib/contract'
@@ -116,7 +116,17 @@ export function QueueList() {
   const moveInQueue = usePlayerStore((state) => state.moveInQueue)
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue)
   const clearQueue = usePlayerStore((state) => state.clearQueue)
+  const undoClearQueue = usePlayerStore((state) => state.undoClearQueue)
   const [restore, setRestore] = useState<[number, number] | null>(null)
+  const [clearedCount, setClearedCount] = useState<number | null>(null)
+  const undoTimer = useRef<number | null>(null)
+
+  useEffect(
+    () => () => {
+      if (undoTimer.current !== null) window.clearTimeout(undoTimer.current)
+    },
+    [],
+  )
 
   // 队列在后台补齐时每两秒问一次进度，补完就停。
   useEffect(() => {
@@ -140,15 +150,51 @@ export function QueueList() {
 
   if (!queue) return <BiliLoader compact label="正在取队列…" />
 
+  const clear = async (): Promise<void> => {
+    const count = queue.items.length
+    await clearQueue()
+    if (usePlayerStore.getState().queue?.items.length !== 0) return
+    setClearedCount(count)
+    if (undoTimer.current !== null) window.clearTimeout(undoTimer.current)
+    undoTimer.current = window.setTimeout(() => setClearedCount(null), 6000)
+  }
+
+  const undo = async (): Promise<void> => {
+    if (undoTimer.current !== null) {
+      window.clearTimeout(undoTimer.current)
+      undoTimer.current = null
+    }
+    await undoClearQueue()
+    if (usePlayerStore.getState().queue?.items.length) setClearedCount(null)
+  }
+
   if (queue.items.length === 0) {
     return (
-      <EmptyState
-        icon="biliTv"
-        title="前方高能，队列还是空的"
-        detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
-        action={{ label: '去搜索', onClick: () => focusSearch() }}
-        compact
-      />
+      <div className="flex h-full min-h-0 flex-col">
+        {clearedCount !== null ? (
+          <div
+            data-queue-undo
+            role="status"
+            className="flex items-center justify-between border-b border-hairline px-5 py-2.5 text-[12px] text-[var(--text-2)]"
+          >
+            <span>已清空 {clearedCount} 首</span>
+            <button
+              type="button"
+              onClick={() => void undo()}
+              className="t press font-medium text-[var(--accent)] hover:opacity-80"
+            >
+              撤销
+            </button>
+          </div>
+        ) : null}
+        <EmptyState
+          icon="biliTv"
+          title="前方高能，队列还是空的"
+          detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
+          action={{ label: '去搜索', onClick: () => focusSearch() }}
+          compact
+        />
+      </div>
     )
   }
 
@@ -171,7 +217,7 @@ export function QueueList() {
           接下来 · {queue.items.length} 首
           <button
             type="button"
-            onClick={() => void clearQueue()}
+            onClick={() => void clear()}
             title="清空队列"
             className="text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
           >
