@@ -639,6 +639,36 @@ impl LinearResampler {
 }
 
 #[cfg(test)]
+mod resampler_tests {
+    use super::{Consumer, HeapRb, LinearResampler, Split};
+
+    #[test]
+    fn 单声道每帧应写入双声道() {
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(8).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+
+        resampler.push(&[0.25, -0.5, 0.75], &mut producer);
+
+        let mut output = [0.0; 8];
+        assert_eq!(consumer.pop_slice(&mut output), 6);
+        assert_eq!(output[..6], [0.25, 0.25, -0.5, -0.5, 0.75, 0.75]);
+    }
+
+    #[test]
+    fn 双声道保持每帧的左右样本() {
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(8).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+        let input = [0.25, -0.5, 0.75, -1.0];
+
+        resampler.push(&input, &mut producer);
+
+        let mut output = [0.0; 8];
+        assert_eq!(consumer.pop_slice(&mut output), 4);
+        assert_eq!(output[..4], input);
+    }
+}
+
+#[cfg(test)]
 mod advance_played_tests {
     use super::advance_played;
     use crate::Clock;
