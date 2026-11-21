@@ -7,11 +7,12 @@ import type { IconName } from '../shared/ui/Icon'
 /**
  * 移动端底部标签栏。
  *
- * 桌面端靠左侧栏切换视图；窄屏放不下，收成底部四个标签，
- * 和 B 站 App 的「首页 / 频道 / 动态 / 我的」是同一个信息层次。
+ * 桌面端靠左侧栏切换视图；窄屏放不下，收成底部标签栏，
+ * 和 B 站 App 的「首页 / 动态 / 我的」是同一个信息层次。
  */
 const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
   { kind: 'home', label: '发现', icon: 'biliTv' },
+  { kind: 'dynamic', label: '动态', icon: 'dynamic' },
   { kind: 'library', label: '曲库', icon: 'library' },
   { kind: 'liked', label: '喜欢', icon: 'heart' },
   { kind: 'settings', label: '我的', icon: 'user' },

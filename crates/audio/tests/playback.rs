@@ -17,6 +17,137 @@ fn audio_tests_enabled() -> bool {
 }
 
 #[test]
+fn 解码结束后时钟仍播完缓冲() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
+    let path = std::path::Path::new("../../testdata/sample.m4s");
+    if !path.exists() {
+        eprintln!("跳过：没有 testdata/sample.m4s");
+        return;
+    }
+    let Ok(player) = Player::start() else {
+        eprintln!("跳过：当前环境打不开输出设备");
+        return;
+    };
+
+    player.set_volume(0.0);
+    let file = std::fs::File::open(path).expect("fixture 可读");
+    player.load(Media::new(file)).expect("加载成功");
+
+    let started = std::time::Instant::now();
+    while !player.is_started() && started.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(player.is_started(), "声卡应该先输出首批样本");
+
+    player.seek(315_000);
+    let seeked = std::time::Instant::now();
+    while player.clock().position_ms() < 314_000 && seeked.elapsed() < Duration::from_secs(3) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    let deadline = std::time::Instant::now();
+    let mut ended = false;
+    while deadline.elapsed() < Duration::from_secs(8) {
+        if player.take_ended() {
+            ended = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let at_end = player.clock().position_ms();
+    println!("自然结束后位置：{at_end}ms");
+    assert!(ended, "应该报自然结束");
+    assert!(
+        at_end > 316_000,
+        "结束必须等缓冲播完，不能在解码 EOF 处丢尾巴，实际 {at_end}ms"
+    );
+}
+
+#[test]
+fn 加载前暂停不会在加载后自己起播() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
+    let path = std::path::Path::new("../../testdata/sample.m4s");
+    if !path.exists() {
+        eprintln!("跳过：没有 testdata/sample.m4s");
+        return;
+    }
+    let Ok(player) = Player::start() else {
+        eprintln!("跳过：当前环境打不开输出设备");
+        return;
+    };
+
+    player.set_volume(0.0);
+    player.pause();
+    let file = std::fs::File::open(path).expect("fixture 可读");
+    player.load(Media::new(file)).expect("加载成功");
+    std::thread::sleep(Duration::from_millis(700));
+
+    assert!(!player.clock().is_playing(), "加载后不应自动解除暂停");
+    assert!(!player.is_started(), "暂停时不应消费首批样本");
+    assert_eq!(player.clock().position_ms(), 0);
+
+    player.play();
+    let deadline = std::time::Instant::now();
+    while !player.is_started() && deadline.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(player.is_started(), "恢复后应该开始输出样本");
+}
+
+#[test]
+fn 尾部缓冲暂停后仍能继续播完() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
+    let path = std::path::Path::new("../../testdata/sample.m4s");
+    if !path.exists() {
+        eprintln!("跳过：没有 testdata/sample.m4s");
+        return;
+    }
+    let Ok(player) = Player::start() else {
+        eprintln!("跳过：当前环境打不开输出设备");
+        return;
+    };
+
+    player.set_volume(0.0);
+    let file = std::fs::File::open(path).expect("fixture 可读");
+    player.load(Media::new(file)).expect("加载成功");
+    let started = std::time::Instant::now();
+    while !player.is_started() && started.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(player.is_started(), "声卡应该先输出首批样本");
+
+    player.seek(315_000);
+    std::thread::sleep(Duration::from_millis(100));
+    player.pause();
+    assert!(!player.peek_ended(), "尾部缓冲还没排空时不能报结束");
+
+    std::thread::sleep(Duration::from_millis(300));
+    player.play();
+    let deadline = std::time::Instant::now();
+    let mut ended = false;
+    while deadline.elapsed() < Duration::from_secs(8) {
+        if player.take_ended() {
+            ended = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let at_end = player.clock().position_ms();
+    println!("尾部暂停恢复后结束位置：{at_end}ms");
+    assert!(ended, "恢复后应该播完尾部并报结束");
+    assert!(at_end > 316_000, "尾部暂停不能丢缓冲，实际 {at_end}ms");
+}
+
+#[test]
 fn 播放时位置由声卡推进() {
     if !audio_tests_enabled() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
