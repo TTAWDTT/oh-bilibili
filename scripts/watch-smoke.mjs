@@ -256,6 +256,32 @@ async function main() {
     }))()`)
     check('Esc 关闭更多并把焦点还给触发按钮', !keyboardClosed.menu && keyboardClosed.focused === '更多')
 
+    // 焦点离开菜单和触发器时也要收起，不能两张卡的菜单同时挂着。
+    await page.evaluate(`document.querySelectorAll('[data-track-card] button[aria-label="更多"]')[0]?.focus()`)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+    await sleep(200)
+    await page.evaluate(`document.querySelectorAll('[data-track-card] button[aria-label="更多"]')[1]?.focus()`)
+    await sleep(200)
+    const afterBlur = await page.evaluate(`document.querySelectorAll('[data-track-card] [role="menu"]').length`)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))`)
+    await sleep(200)
+    const afterSecond = await page.evaluate(`(() => {
+      const menus = [...document.querySelectorAll('[data-track-card] [role="menu"]')]
+      return {
+        count: menus.length,
+        second: menus[0]?.closest('[data-track-card]') === document.querySelectorAll('[data-track-card]')[1],
+      }
+    })()`)
+    check('焦点移到第二张卡后第一张菜单收起', afterBlur === 0)
+    check('第二张卡只开一个菜单', afterSecond.count === 1 && afterSecond.second)
+    await page.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await sleep(200)
+    check(
+      '第二张卡 Esc 关闭并回到触发按钮',
+      (await page.evaluate(`document.querySelectorAll('[data-track-card] [role="menu"]').length`)) === 0 &&
+        (await page.evaluate(`document.activeElement?.getAttribute('aria-label')`)) === '更多',
+    )
+
     await page.evaluate(`(() => {
       const card = [...document.querySelectorAll('button')].find((b) =>
         (b.getAttribute('aria-label') || '').startsWith('观看'))

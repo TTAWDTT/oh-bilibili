@@ -108,6 +108,11 @@ export function CardActions({
       <div
         ref={moreRef}
         className="relative"
+        onBlur={(event) => {
+          const next = event.relatedTarget
+          if (next instanceof Node && moreRef.current?.contains(next)) return
+          setMoreOpen(false)
+        }}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return
           event.preventDefault()
