@@ -338,6 +338,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return snapshot()
     }
     case 'home_feed': {
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('slowHome')) {
+        await sleep(10_000)
+      }
       const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
       const size = 30
       const start = (fresh * size) % CATALOG.length
