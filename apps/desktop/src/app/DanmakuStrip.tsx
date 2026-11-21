@@ -21,9 +21,13 @@ const LANES = 8
  * 早先每次位置变化都重算 animationDelay，等于每秒重启动画 5 次，肉眼就是一格一格。
  */
 export function DanmakuStrip() {
-  const trackKey = usePlayerStore((state) => state.snapshot?.track?.key ?? null)
-  const playing = useIsPlaying()
   const enabled = useDanmakuSettings((s) => s.enabled)
+  const trackKey = usePlayerStore(({ snapshot }) =>
+    enabled && snapshot && !snapshot.local && snapshot.phase !== 'idle'
+      ? (snapshot.track?.key ?? null)
+      : null,
+  )
+  const playing = useIsPlaying()
   const opacity = useDanmakuSettings((s) => s.opacity)
   const speed = useDanmakuSettings((s) => s.speed)
   const [items, setItems] = useState<Item[]>([])
@@ -38,6 +42,7 @@ export function DanmakuStrip() {
       return
     }
     let cancelled = false
+    setItems([])
     setFlights([])
     void ipc
       .danmakuColored(trackKey)
@@ -57,7 +62,7 @@ export function DanmakuStrip() {
             .sort((a, b) => a.at - b.at),
         )
       })
-      .catch(() => setItems([]))
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -71,7 +76,7 @@ export function DanmakuStrip() {
   )
 
   useEffect(() => {
-    if (!enabled) return
+    if (!trackKey) return
     const timer = window.setInterval(() => {
       const pos = readPlayhead()
       setFlights((prev) => {
@@ -100,9 +105,9 @@ export function DanmakuStrip() {
       })
     }, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
-  }, [all, enabled, playing])
+  }, [all, playing, trackKey])
 
-  if (!enabled || !playing || flights.length === 0) return null
+  if (!trackKey || !playing || flights.length === 0) return null
 
   return (
     <div

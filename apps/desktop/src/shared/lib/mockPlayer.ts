@@ -32,14 +32,17 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
     }
     case 'player_play_local': {
       const key = str(args, 'key')
-      const download = state.downloads.find((item) => item.key === key)
-      if (download?.state !== 'done' || !download.path) {
-        throw fail('input', '本地音频无法读取，请重试下载')
+      const loaded = state.localKey === key && (state.phase === 'playing' || state.phase === 'paused')
+      if (!loaded) {
+        const download = state.downloads.find((item) => item.key === key)
+        if (download?.state !== 'done' || !download.path) {
+          throw fail('input', '本地音频无法读取，请重试下载')
+        }
+        state.localKey = key
+        state.mode = 'listen'
+        state.position = 0
+        state.duration = trackOf(key).duration_ms ?? 30_000
       }
-      state.localKey = key
-      state.mode = 'listen'
-      state.position = 0
-      state.duration = trackOf(key).duration_ms ?? 30_000
       state.phase = 'playing'
       const playing = snapshot()
       emit({ type: 'state', snapshot: playing })

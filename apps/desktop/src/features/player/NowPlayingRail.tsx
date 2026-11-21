@@ -69,7 +69,7 @@ export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hide
   const focusSearch = useAppStore((state) => state.focusSearch)
   const toggleRail = useAppStore((state) => state.toggleRail)
   const closeRail = useAppStore((state) => state.closeRail)
-  const track = snapshot?.track ?? null
+  const track = snapshot?.phase === 'idle' ? null : (snapshot?.track ?? null)
   const queued = queue?.items.length ?? 0
 
   return (
@@ -104,9 +104,11 @@ export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hide
             <div className="min-h-0 flex-1">
               <LyricsView track={track} />
             </div>
-            <div className="shrink-0 overflow-y-auto" style={{ maxHeight: '46%' }}>
-              <RelatedList trackKey={track.key} />
-            </div>
+            {snapshot?.local ? null : (
+              <div className="shrink-0 overflow-y-auto" style={{ maxHeight: '46%' }}>
+                <RelatedList trackKey={track.key} />
+              </div>
+            )}
           </>
         ) : (
           <EmptyState

@@ -214,48 +214,128 @@ mod download_restore_tests {
         let db = dir.join("library.sqlite");
         let path = dir.join("本地音频.m4a");
         std::fs::write(&path, include_bytes!("../tests/fixtures/local-playback.m4a")).unwrap();
-        let mut local = track("BV1LOCAL");
-        local.duration = Some(bilimusic_model::Millis(4_000));
+        let local = track("BV1LOCAL");
+        let queued = [local.clone(), track("BV2QUEUE")];
+        let saved_position = 123_000;
         {
             let library = Library::open(&db).unwrap();
             library
                 .save_download(&local, Some(path.to_str().unwrap()), "done", None)
                 .unwrap();
+            let id = library.upsert_track(&local).unwrap();
+            library.push_history(id, saved_position).unwrap();
+            library
+                .save_queue(
+                    &serde_json::json!({
+                        "tracks": queued,
+                        "index": 0,
+                        "position_ms": saved_position,
+                    })
+                    .to_string(),
+                )
+                .unwrap();
         }
         let engine = Engine::open(&db).unwrap();
+        engine.restore_queue();
         engine.restore_downloads();
         engine.set_volume(0.0);
-        let queued = [track("BV1QUEUE"), track("BV2QUEUE")];
-        lock(&engine.queue).replace_from_tracks(&queued, 0);
 
         assert_eq!(engine.downloads()[0].state, "done");
         let loading = engine.play_local(&local.key).unwrap();
         assert_eq!(loading.phase, "loading");
+        assert!(loading.local);
         assert_eq!(loading.track.as_ref().unwrap().key, local.key);
         wait_for(|| engine.promote_loading()).await;
         let playing = engine.snapshot();
+        assert!(engine.lyrics_get(&local.key).await.is_ok());
         assert_eq!(playing.phase, "playing");
         assert!(lock(&engine.player).is_started());
-        assert!(playing.duration_ms >= 4_000);
+        assert!((4_000..=4_200).contains(&playing.duration_ms));
+        assert_eq!(playing.track.unwrap().duration, None);
         assert_eq!(engine.history(1).unwrap()[0].key, local.key);
+        assert_eq!(
+            engine.history_position(local.key.as_opaque()).unwrap(),
+            Some(saved_position)
+        );
 
         assert_eq!(engine.pause().phase, "paused");
+        let at_end = engine.seek(playing.duration_ms);
+        assert_eq!(at_end.phase, "paused");
+        assert_eq!(at_end.position_ms, playing.duration_ms - 1);
+        let sought = engine.seek(2_200);
+        assert_eq!(sought.phase, "paused");
+        assert_eq!(sought.position_ms, 2_200);
+        assert_eq!(engine.snapshot().position_ms, 2_200);
+
+        let resumed = engine.play_local(&local.key).unwrap();
+        assert_eq!(resumed.phase, "playing");
+        assert!((2_200..2_450).contains(&resumed.position_ms));
+        wait_for(|| engine.snapshot().position_ms > 2_400).await;
+        let repeated = engine.play_local(&local.key).unwrap();
+        assert_eq!(repeated.phase, "playing");
+        assert!(repeated.position_ms > 2_400);
+
+        let sought = engine.seek(1_200);
+        assert_eq!(sought.phase, "playing");
+        assert!((1_200..1_450).contains(&sought.position_ms));
+        wait_for(|| engine.snapshot().position_ms > 1_400).await;
+        assert_eq!(engine.pause().phase, "paused");
         wait_for(|| !lock(&engine.player).clock().is_playing()).await;
-        engine.seek(2_200);
-        wait_for(|| engine.snapshot().position_ms == 2_200).await;
-        assert_eq!(engine.snapshot().phase, "paused");
         assert_eq!(engine.toggle_or_load().await.unwrap().phase, "playing");
-        wait_for(|| engine.snapshot().position_ms > 2_300).await;
+
+        engine.persist_history_progress();
+        engine
+            .queue_move(queued[1].key.as_opaque(), local.key.as_opaque())
+            .unwrap();
+        let saved_queue: serde_json::Value =
+            serde_json::from_str(&engine.library.load_queue().unwrap().unwrap()).unwrap();
+        assert_eq!(saved_queue["position_ms"], saved_position);
+        assert_eq!(saved_queue["index"], 1);
+        assert_eq!(
+            engine.history_position(local.key.as_opaque()).unwrap(),
+            Some(saved_position)
+        );
+
         wait_for(|| engine.reached_track_end()).await;
         engine.finish_track().await;
         assert_eq!(engine.snapshot().phase, "ended");
-        assert_eq!(engine.queue_view().items, queued);
-        assert_eq!(engine.queue_view().index, Some(0));
+        assert_eq!(engine.queue_view().items, [queued[1].clone(), local.clone()]);
+        assert_eq!(engine.queue_view().index, Some(1));
 
         std::fs::rename(&path, dir.join("移走.m4a")).unwrap();
         assert_eq!(engine.downloads()[0].state, "missing");
         assert!(engine.play_local(&local.key).is_err());
         assert_eq!(engine.snapshot().phase, "ended");
+        drop(engine);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "需要声卡输出"]
+    async fn 本地下载无法解码时通知界面重试() {
+        let dir = temp_dir("local-playback-bad-file");
+        let db = dir.join("library.sqlite");
+        let path = dir.join("本地音频.m4a");
+        std::fs::write(&path, b"not an audio file").unwrap();
+        let local = track("BV1LOCAL");
+        Library::open(&db)
+            .unwrap()
+            .save_download(&local, Some(path.to_str().unwrap()), "done", None)
+            .unwrap();
+
+        let engine = Engine::open(&db).unwrap();
+        engine.restore_downloads();
+        let mut events = engine.subscribe();
+        assert_eq!(engine.downloads()[0].state, "done");
+
+        engine.play_local(&local.key).unwrap();
+        wait_for(|| engine.promote_loading()).await;
+        assert_eq!(engine.snapshot().phase, "faulted");
+        assert_eq!(engine.downloads()[0].state, "failed");
+        assert_eq!(engine.library.downloads().unwrap()[0].state, "failed");
+        assert!(std::iter::from_fn(|| events.try_recv().ok()).any(|event| {
+            matches!(event, crate::wire::AppEvent::Download { view } if view["state"] == "failed")
+        }));
         drop(engine);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -926,6 +1006,27 @@ impl Engine {
     }
 
     pub fn play_local(&self, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        if self.is_local_track(key) && !lock(&self.player).peek_ended() {
+            let mut state = lock(&self.state);
+            match *state {
+                PlayerState::Loading { .. } | PlayerState::Playing { .. } => {
+                    drop(state);
+                    return Ok(self.snapshot());
+                }
+                PlayerState::Paused { .. } => {
+                    lock(&self.player).play();
+                    *state = std::mem::replace(&mut *state, PlayerState::Idle).play();
+                    drop(state);
+                    self.emit_state();
+                    return Ok(self.snapshot());
+                }
+                _ => {}
+            }
+        }
+        self.start_local(key)
+    }
+
+    fn start_local(&self, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         let download = lock(&self.downloads)
             .iter()
             .find(|d| d.key == key.as_opaque() && matches!(d.state.as_str(), "done" | "missing"))
@@ -935,11 +1036,12 @@ impl Engine {
             .ok_or_else(|| WireError::input("key", "本地音频无法读取，请重试下载"))?;
         let track = self.track_of(key)?;
         self.remember(&track);
+        self.save_queue_resume_before_local();
         self.watch_gate.cancel();
         *lock(&self.mode) = crate::wire::PlayMode::Listen;
         *lock(&self.watch_cid) = None;
         let token = self.begin_load(&track, true);
-        if let Err(err) = self.load_media(Media::new(file)) {
+        if let Err(err) = self.load_media(Media::new(file), true) {
             let mut st = lock(&self.state);
             *st = std::mem::replace(&mut *st, PlayerState::Idle)
                 .fail(crate::state::Fault::Decode(err.message().to_string()));
@@ -956,6 +1058,19 @@ impl Engine {
         ));
         self.emit_state();
         Ok(self.snapshot())
+    }
+
+    fn save_queue_resume_before_local(&self) {
+        if lock(&self.local_track).is_some() {
+            return;
+        }
+        let current = lock(&self.queue).current().map(|entry| entry.track.key.clone());
+        let state = lock(&self.state).clone();
+        if let Some(key) = current.filter(|key| state.track() == Some(key)) {
+            let position = self.position_for(&key, state.track());
+            *lock(&self.pending_resume) = Some((key, position));
+            self.persist_queue();
+        }
     }
 
     fn is_local_track(&self, key: &TrackKey) -> bool {
@@ -1395,7 +1510,7 @@ impl Engine {
         if !self.load_is_current(token) {
             return Err(WireError::internal("加载已过期，用户点了别的"));
         }
-        self.load_media(Media::new(media))?;
+        self.load_media(Media::new(media), false)?;
         // load 之后再过一次：spawn_blocking 期间仍可能有新的打开插进来。
         // 这一拍已经写了写指针，用 stop 把声卡停住，别让旧音轨继续发声。
         if !self.load_is_current(token) {
@@ -1409,9 +1524,14 @@ impl Engine {
         })
     }
 
-    fn load_media(&self, media: Media) -> Result<(), WireError> {
+    fn load_media(&self, media: Media, local: bool) -> Result<(), WireError> {
         let player = lock(&self.player);
-        player.load(media).map_err(|e| WireError::internal(e.to_string()))?;
+        if local {
+            player.load_local(media)
+        } else {
+            player.load(media)
+        }
+        .map_err(|e| WireError::internal(e.to_string()))?;
         player.set_volume(*lock(&self.volume));
         let speed = *lock(&self.speed) as f64;
         player.set_speed(speed);
@@ -1569,8 +1689,11 @@ impl Engine {
         // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
         // 播完该切歌仍由 reached_track_end 负责。
         let track = self.snapshot_track(&state);
-        let duration = track.as_ref().and_then(|t| t.duration).map_or(0, |d| d.0);
-        let target = if duration > 1000 && position_ms >= duration - 1000 {
+        let local = lock(&self.local_track).is_some();
+        let duration = self.playback_duration(track.as_ref(), local);
+        let target = if local && duration > 0 {
+            position_ms.min(duration - 1)
+        } else if duration > 1000 && position_ms >= duration - 1000 {
             duration - 1000
         } else {
             position_ms
@@ -1579,8 +1702,7 @@ impl Engine {
             let mut pending = lock(&self.pending_resume);
             match pending.as_mut() {
                 Some((key, at))
-                    if track.as_ref().is_some_and(|track| &track.key == key)
-                        && !self.is_local_track(key) =>
+                    if !local && track.as_ref().is_some_and(|track| &track.key == key) =>
                 {
                     *at = target;
                     true
@@ -1588,7 +1710,11 @@ impl Engine {
                 _ => false,
             }
         };
-        lock(&self.player).seek(target);
+        if local {
+            lock(&self.player).seek_local(target);
+        } else {
+            lock(&self.player).seek(target);
+        }
         if updated_resume {
             self.persist_queue();
         }
@@ -1600,7 +1726,7 @@ impl Engine {
     pub async fn replay(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
         let local = lock(&self.local_track).clone();
         if let Some(key) = local {
-            return self.play_local(&key);
+            return self.start_local(&key);
         }
         let key = lock(&self.queue).current().map(|e| e.track.key.clone());
         match key {
@@ -1663,8 +1789,9 @@ impl Engine {
         }
         PlayerSnapshot {
             phase: state.phase().to_string(),
-            duration_ms: track.as_ref().and_then(|t| t.duration).map(|d| d.0).unwrap_or(0),
+            duration_ms: self.playback_duration(track.as_ref(), local),
             track,
+            local,
             position_ms,
             volume: *lock(&self.volume),
             speed: *lock(&self.speed),
@@ -1673,6 +1800,16 @@ impl Engine {
             quality_kbps: quality,
             mode: *lock(&self.mode),
         }
+    }
+
+    fn playback_duration(&self, track: Option<&Track>, local: bool) -> u64 {
+        if local {
+            let decoded_duration = lock(&self.player).duration_ms();
+            if decoded_duration > 0 {
+                return decoded_duration;
+            }
+        }
+        track.and_then(|t| t.duration).map_or(0, |d| d.0)
     }
 
     fn snapshot_track(&self, state: &PlayerState) -> Option<Track> {
@@ -1713,7 +1850,7 @@ impl Engine {
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(5));
             let snapshot = engine.snapshot();
-            if snapshot.phase == "playing" && lock(&engine.local_track).is_none() {
+            if snapshot.phase == "playing" && !snapshot.local {
                 engine.persist_queue();
             }
         });
@@ -1803,16 +1940,7 @@ impl Engine {
                         if lock(&engine.last_transport_at).elapsed()
                             >= std::time::Duration::from_secs(5)
                         {
-                            let snap = engine.snapshot();
-                            // 切歌加载期间状态已经指向新曲，但音频时钟还停在上一首，
-                            // 这时候回写会把旧位置记到新曲头上，顺带清掉续播点。
-                            if snap.phase == "playing" || snap.phase == "paused" {
-                                if let Some(t) = snap.track {
-                                    let _ = engine
-                                        .library
-                                        .set_history_position(t.key.as_opaque(), snap.position_ms);
-                                }
-                            }
+                            engine.persist_history_progress();
                         }
                     }
                     if engine.promote_loading() {
@@ -1853,11 +1981,23 @@ impl Engine {
         }
     }
 
+    fn persist_history_progress(&self) {
+        let snapshot = self.snapshot();
+        if snapshot.local || !matches!(snapshot.phase.as_str(), "playing" | "paused") {
+            return;
+        }
+        if let Some(track) = snapshot.track {
+            let _ = self
+                .library
+                .set_history_position(track.key.as_opaque(), snapshot.position_ms);
+        }
+    }
+
     async fn finish_track(self: &Arc<Self>) {
         let local = lock(&self.local_track).clone();
         let repeat_one = *lock(&self.repeat) == "one";
         if let Some(key) = local.as_ref() {
-            if repeat_one && self.play_local(key).is_ok() {
+            if repeat_one && self.start_local(key).is_ok() {
                 return;
             }
         }
@@ -1891,9 +2031,12 @@ impl Engine {
             PlayerState::Loading { token, track } => (*token, track.clone()),
             _ => return false,
         };
+        let local = self.is_local_track(&track_key);
         let (clock_playing, ended) = {
             let player = lock(&self.player);
-            if player.load_failed() {
+            let ended = player.peek_ended();
+            let started = player.is_started();
+            if player.load_failed() || (local && ended && !started) {
                 drop(player);
                 if !self.load_is_current(token) {
                     return false;
@@ -1903,15 +2046,19 @@ impl Engine {
                 *st = std::mem::replace(&mut *st, PlayerState::Idle)
                     .fail(crate::state::Fault::Decode("音轨打不开".into()));
                 drop(st);
+                let error = if local {
+                    self.fail_local_download(&track_key)
+                } else {
+                    WireError::internal("音轨打不开，换一条或稍后重试")
+                };
                 self.emit(AppEvent::Notice {
-                    error: WireError::internal("音轨打不开，换一条或稍后重试"),
+                    error,
                     op: "播放".into(),
                 });
                 self.emit_state();
                 return true;
             }
-            let ended = player.peek_ended();
-            if !player.is_started() && !ended {
+            if !started && !ended {
                 return false;
             }
             (player.clock().is_playing(), ended)
@@ -1937,9 +2084,7 @@ impl Engine {
         };
         {
             let mut pending = lock(&self.pending_resume);
-            if !self.is_local_track(&track_key)
-                && pending.as_ref().is_some_and(|(key, _)| key == &track_key)
-            {
+            if !local && pending.as_ref().is_some_and(|(key, _)| key == &track_key) {
                 *pending = None;
             }
         }
@@ -1965,12 +2110,36 @@ impl Engine {
         }
         if let Ok(track) = self.track_of(&track_key) {
             if let Ok(track_id) = self.library.upsert_track(&track) {
-                let at = lock(&self.player).clock().position_ms();
+                let at = if local {
+                    0
+                } else {
+                    lock(&self.player).clock().position_ms()
+                };
                 let _ = self.library.push_history(track_id, at);
             }
         }
         self.emit_state();
         true
+    }
+
+    fn fail_local_download(&self, key: &TrackKey) -> WireError {
+        let error = WireError::input("key", "本地音频无法解码，请重试下载");
+        let mut downloads = lock(&self.downloads);
+        if let Some(view) = downloads.iter_mut().find(|view| view.key == key.as_opaque()) {
+            view.state = "failed".into();
+            view.progress = 0.0;
+            view.error = Some(error.message().into());
+            let _ = self.library.update_download(
+                &view.key,
+                view.path.as_deref(),
+                &view.state,
+                view.error.as_deref(),
+            );
+            self.emit(AppEvent::Download {
+                view: serde_json::to_value(view).unwrap_or(serde_json::Value::Null),
+            });
+        }
+        error
     }
 
     /// 状态说在播、时钟却停了，而且离末尾还远——这是卡住，不是播完。
@@ -1990,9 +2159,14 @@ impl Engine {
             (queue.items(), queue.index(), current)
         };
         let state_track = lock(&self.state).track().cloned();
-        let position_ms = current
-            .as_ref()
-            .map_or(0, |key| self.position_for(key, state_track.as_ref()));
+        let local = lock(&self.local_track).is_some();
+        let position_ms = current.as_ref().map_or(0, |key| {
+            if local {
+                self.pending_resume_for(key).unwrap_or(0)
+            } else {
+                self.position_for(key, state_track.as_ref())
+            }
+        });
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
         // 进度也一起存，否则用户还得自己拖回去。
         let snapshot = serde_json::json!({

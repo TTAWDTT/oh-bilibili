@@ -142,7 +142,8 @@ export function snapshot(): PlayerSnapshot {
   const track = currentTrack()
   return {
     phase: state.phase,
-    track,
+    track: track && state.localKey ? { ...track, cover: null } : track,
+    local: state.localKey !== null,
     mode: state.mode,
     position_ms: Math.round(state.position),
     duration_ms: state.duration,
