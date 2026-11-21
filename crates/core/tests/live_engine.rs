@@ -13,6 +13,7 @@ async fn 引擎能搜到歌并真的开始播放() {
     std::fs::create_dir_all(&dir).expect("临时目录");
 
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎应该能起来");
+    engine.set_volume(0.0);
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
     assert!(!tracks.is_empty(), "应该有搜索结果");
@@ -23,8 +24,26 @@ async fn 引擎能搜到歌并真的开始播放() {
         "相位={} 曲目={:?} 码率={:?}",
         snapshot.phase, snapshot.track.as_ref().map(|t| &t.title), snapshot.quality_kbps
     );
-    assert_eq!(snapshot.phase, "playing", "应该进入播放态");
-    assert!(snapshot.quality_kbps.unwrap_or(0) >= 64, "应该拿到音轨档位");
+    // 取流完成时声卡可能还没输出首批样本，状态会先停在 loading。
+    // 这里等到真的 playing，而不是要求命令返回的瞬间就已经在播。
+    let phase_deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+    loop {
+        let phase = engine.snapshot().phase;
+        if phase == "playing" {
+            break;
+        }
+        assert_ne!(phase, "faulted", "不应落到播放失败");
+        assert!(
+            tokio::time::Instant::now() < phase_deadline,
+            "8 秒内没有进入 playing，实际 {phase}"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let playing_snapshot = engine.snapshot();
+    assert!(
+        playing_snapshot.quality_kbps.unwrap_or(0) >= 64,
+        "应该拿到音轨档位"
+    );
 
     let wait_for_position = |minimum| {
         let engine = &engine;
@@ -60,10 +79,49 @@ async fn 引擎能搜到歌并真的开始播放() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
+async fn 起播等待期可以暂停且位置不前进() {
+    let dir = std::env::temp_dir().join(format!("bilimusic-pause-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("临时目录");
+    let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    engine.set_volume(0.0);
+
+    let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
+    let track = tracks.first().cloned().expect("至少一条结果");
+    let first = engine.play_key(&track.key).await.expect("播放命令");
+    println!("命令返回相位={} 位置={}ms", first.phase, first.position_ms);
+
+    engine.pause();
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    let paused = engine.snapshot();
+    println!("暂停后相位={} 位置={}ms", paused.phase, paused.position_ms);
+    assert_ne!(paused.phase, "playing", "暂停后不能还报 playing");
+    assert!(
+        paused.position_ms < first.position_ms + 200,
+        "暂停后位置不该继续前进：{} -> {}",
+        first.position_ms,
+        paused.position_ms
+    );
+
+    engine.toggle();
+    let mut resumed = false;
+    for _ in 0..40 {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let snap = engine.snapshot();
+        if snap.phase == "playing" && snap.position_ms > 200 {
+            resumed = true;
+            break;
+        }
+    }
+    assert!(resumed, "恢复后应该进入 playing 并开始推进");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
 async fn 打开观看页会让音频引擎自己起播() {
     let dir = std::env::temp_dir().join(format!("bilimusic-watch-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("临时目录");
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
+    engine.set_volume(0.0);
 
     let tracks = engine.search("周杰伦 晴天", 1).await.expect("搜索成功");
     let track = tracks.first().cloned().expect("至少一条结果");
