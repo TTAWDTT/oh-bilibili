@@ -153,7 +153,7 @@ const TrackCard = memo(function TrackCard({
   onCancelCoin,
 }: CardProps) {
   return (
-    <article data-track-card data-index={index} className="bili-card group">
+    <article data-track-card data-track-title={track.title} data-index={index} className="bili-card group">
       <div className="relative">
         <button
           type="button"

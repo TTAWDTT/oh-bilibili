@@ -305,7 +305,7 @@ async function checkHeroAllocation(page) {
       const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
         .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
       const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
-        .map((card) => card.textContent.trim())
+        .map((card) => card.dataset.trackTitle ?? '')
       return { grid, feed }
     })()`)
   const wide = await read()
@@ -313,19 +313,53 @@ async function checkHeroAllocation(page) {
   await sleep(500)
   const narrow = await page.evaluate(`(() => ({
     grid: document.querySelector('[data-home-hero-grid]') !== null,
-    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.textContent.trim()),
+    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
   }))()`)
   await page.viewport(1024, 900)
   await sleep(500)
   const restored = await read()
   check(
-    '首屏推荐在 1024 与 1023 两侧都有入口',
+    '首屏推荐在 1024 与 1023 两侧都有入口且不重复',
     ready &&
       wide.grid.length === 6 &&
-      wide.grid.every((title) => narrow.feed.some((text) => text.includes(title))) &&
+      new Set(wide.grid).size === wide.grid.length &&
+      wide.grid.every((title) => narrow.feed.filter((text) => text === title).length === 1) &&
       !narrow.grid &&
       restored.grid.length === 6 &&
-      restored.feed.every((text) => !restored.grid.some((title) => text.includes(title))),
+      restored.feed.every((title) => !restored.grid.includes(title)),
+  )
+  const refreshedButton = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '换一换')
+    hit?.click()
+    return !!hit
+  })()`)
+  let refreshedReady = false
+  for (let i = 0; i < 20 && !refreshedReady; i += 1) {
+    await sleep(200)
+    refreshedReady = await page.evaluate(
+      `[...document.querySelectorAll('[data-home-hero-grid] > button')].some((card) =>
+        card.textContent.includes('首页分配 12'))`,
+    )
+  }
+  const refreshed = await read()
+  await page.viewport(1023, 900)
+  await sleep(500)
+  const refreshedNarrow = await page.evaluate(`(() => ({
+    grid: document.querySelector('[data-home-hero-grid]') !== null,
+    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
+  }))()`)
+  check(
+    '换一换后首屏和推荐流仍不重复、不丢项',
+    refreshedButton &&
+      refreshedReady &&
+      refreshed.grid.length === 6 &&
+      refreshed.feed.every((title) => !refreshed.grid.includes(title)) &&
+      Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`).every((title) =>
+        [...refreshed.grid, ...refreshed.feed].includes(title),
+      ) &&
+      !refreshedNarrow.grid &&
+      new Set(refreshedNarrow.feed).size === refreshedNarrow.feed.length &&
+      refreshedNarrow.feed.filter((title) => refreshed.grid.includes(title)).length === refreshed.grid.length,
   )
   await page.viewport(1320, 900)
 }

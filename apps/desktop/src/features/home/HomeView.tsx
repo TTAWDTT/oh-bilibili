@@ -109,6 +109,12 @@ export function HomeView() {
     }
   }, [])
 
+  const heroKeys = new Set(hero.map((track) => track.key))
+  const feedRemainder = items.filter((track) => !heroKeys.has(track.key))
+  const feedTracks = wideHero
+    ? feedRemainder
+    : [...new Map([...hero.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
+
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
     const ticket = ++requestSeq.current
@@ -505,7 +511,7 @@ export function HomeView() {
       {items.length > 0 ? (
         <div data-home-feed className="px-4 md:px-8">
           <ContentGrid
-            tracks={items.slice(wideHero ? 11 : 5)}
+            tracks={feedTracks}
             activeKey={activeKey}
             playing={playing}
             onNeedMore={more}
