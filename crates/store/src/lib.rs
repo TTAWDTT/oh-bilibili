@@ -711,6 +711,54 @@ impl Library {
         })
     }
 
+    pub fn rekey_download(&self, from: &str, to: &str) -> Result<()> {
+        let mut conn = self.conn.lock().expect("数据库连接被毒化");
+        let tx = conn.transaction()?;
+        let source: i64 = tx.query_row(
+            "SELECT id FROM tracks WHERE provider_key = ?1",
+            [from],
+            |row| row.get(0),
+        )?;
+        let target: Option<i64> = tx
+            .query_row(
+                "SELECT id FROM tracks WHERE provider_key = ?1",
+                [to],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(target) = target {
+            let download_path = |id| {
+                tx.query_row(
+                    "SELECT path FROM downloads WHERE track_id = ?1",
+                    [id],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()
+            };
+            let on_disk =
+                |path: Option<String>| path.is_some_and(|path| Path::new(&path).is_file());
+            let target_path = download_path(target)?;
+            let keep_source = target_path.is_none()
+                || (on_disk(download_path(source)?.flatten()) && !on_disk(target_path.flatten()));
+            if keep_source {
+                tx.execute("DELETE FROM downloads WHERE track_id = ?1", [target])?;
+                tx.execute(
+                    "UPDATE downloads SET track_id = ?2 WHERE track_id = ?1",
+                    params![source, target],
+                )?;
+            } else {
+                tx.execute("DELETE FROM downloads WHERE track_id = ?1", [source])?;
+            }
+        } else {
+            tx.execute(
+                "UPDATE tracks SET provider_key = ?2 WHERE id = ?1",
+                params![source, to],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn delete_download(&self, key: &str) -> Result<()> {
         self.with(|conn| {
             conn.execute(
