@@ -109,7 +109,7 @@ function mentionLinks(
     .sort((a, b) => b[0].length - a[0].length)
     .map(([name]) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const pattern = new RegExp(
-    `(^|[^/\\s@])@(${names.join('|')})(?![\\p{L}\\p{N}_])`,
+    `(^|[^/@])@(${names.join('|')})(?![\\p{L}\\p{N}_])`,
     'gu',
   )
   const nodes: ReactNode[] = []

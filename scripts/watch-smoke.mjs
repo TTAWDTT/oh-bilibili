@@ -438,6 +438,12 @@ async function main() {
     }
     check('评论列表渲染出多条', before > 0)
     check(
+      '空格后的评论提及可点击',
+      (await page.evaluate(
+        `[...document.querySelectorAll('button')].filter((b) => (b.textContent || '').trim() === '@阿明').length`,
+      )) === 2,
+    )
+    check(
       '评论图片缩略图放大到 88px',
       (await page.evaluate(
         `document.querySelector('button[aria-label^="查看第"] img')?.getBoundingClientRect().width ?? 0`,
@@ -542,6 +548,54 @@ async function main() {
       searched = await page.evaluate(`document.body.innerText.includes('综合') && document.querySelectorAll('[data-track-card]').length > 0`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
+
+    // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let multiVideo = false
+    for (let i = 0; i < 30 && !multiVideo; i += 1) {
+      await sleep(500)
+      multiVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    const switchedP2 = await page.evaluate(`(() => {
+      const picker = document.querySelector('button[aria-label="选集"]')
+      if (!picker) return false
+      picker.click()
+      const p2 = [...document.querySelectorAll('button')].find((b) =>
+        (b.textContent || '').includes('第二 P · 预览'))
+      if (!p2) return false
+      p2.click()
+      return true
+    })()`)
+    await sleep(1600)
+    check('多 P 预览切到 P2', multiVideo && switchedP2)
+    await page.clickText('分享')
+    await sleep(700)
+    const withTimeToggled = await page.evaluate(`(() => {
+      const input = [...document.querySelectorAll('input[type="checkbox"]')].find((el) =>
+        (el.closest('label')?.textContent || '').includes('开始分享'))
+      if (!input) return false
+      input.click()
+      return true
+    })()`)
+    await sleep(150)
+    check('点「嵌入代码」', await page.clickExactText('嵌入代码'))
+    await sleep(200)
+    const embedParams = await page.evaluate(`(() => {
+      const value = document.querySelector('textarea[readonly]')?.value ?? ''
+      const src = value.split('src="')[1]?.split('"')[0] ?? ''
+      const url = new URL(src.startsWith('//') ? 'https:' + src : src)
+      return { p: url.searchParams.get('p'), t: url.searchParams.get('t') }
+    })()`)
+    check(
+      '分享当前分 P 带 p=2 和时间',
+      withTimeToggled && embedParams?.p === '2' && embedParams?.t !== null,
+    )
 
   } finally {
     page.close()
