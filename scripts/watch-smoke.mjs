@@ -1778,15 +1778,19 @@ async function main() {
       }
     })()`)
     await page.pressSpace()
-    await sleep(400)
-    const narrowQueueOpened = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
-      return {
-        open: !!dialog,
-        focusInside: !!dialog && dialog.contains(document.activeElement),
-        initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
-      }
-    })()`)
+    let narrowQueueOpened = null
+    for (let i = 0; i < 20; i += 1) {
+      await sleep(100)
+      narrowQueueOpened = await page.evaluate(`(() => {
+        const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+        return {
+          open: !!dialog,
+          focusInside: !!dialog && dialog.contains(document.activeElement),
+          initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
+        }
+      })()`)
+      if (narrowQueueOpened.open && narrowQueueOpened.focusInside) break
+    }
     const focusWraps = await page.evaluate(`(() => {
       const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
       if (!dialog) return false
