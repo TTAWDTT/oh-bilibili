@@ -73,3 +73,56 @@ pub fn audio(helper: &Path, dir: &Path, url: &str) -> io::Result<PathBuf> {
         });
     output_path.ok_or_else(|| io::Error::other("yt-dlp 未返回下载文件"))
 }
+
+#[cfg(all(test, unix))]
+mod helper_tests {
+    use super::audio;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "bilimusic-download-{tag}-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn fake_helper(dir: &Path, body: &str) -> PathBuf {
+        let path = dir.join("yt-dlp");
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn 下载助手返回的文件路径能被认出来() {
+        let dir = temp_dir("ok");
+        let helper = fake_helper(
+            &dir,
+            "printf 'audio' > '晴天 [BV1xx411c7mD].m4a'\nprintf '%s\\n' '\"晴天 [BV1xx411c7mD].m4a\"'",
+        );
+        let path = audio(&helper, &dir, "https://example.com/BV1xx411c7mD").unwrap();
+        assert_eq!(
+            path.file_name().and_then(|n| n.to_str()),
+            Some("晴天 [BV1xx411c7mD].m4a")
+        );
+        assert!(path.is_file());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 下载失败会带上助手输出() {
+        let dir = temp_dir("fail");
+        let helper = fake_helper(&dir, "echo 'HTTP 403' >&2\nexit 1");
+        let err = audio(&helper, &dir, "https://example.com/BV1xx411c7mD").unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("HTTP 403"), "失败原因要可读：{message}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
