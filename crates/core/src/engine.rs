@@ -314,6 +314,65 @@ mod download_restore_tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 旧首集键从曲库入队时只写一条裸键记录() {
+        use super::Engine;
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+
+        let dir = temp_dir("download-legacy-p1-metadata");
+        let helper = dir.join("yt-dlp");
+        std::fs::write(&helper, "#!/bin/sh\nprintf '\"audio.m4a\"\\n'\n").unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(dir.join("audio.m4a"), b"audio").unwrap();
+
+        let video = track("BV1vs411n7TH");
+        let legacy = track("BV1vs411n7TH_p1");
+        let startup_download = track("BV1xx411c7mD");
+        for (case, tracks, expected) in [
+            ("legacy", [&legacy].as_slice(), &legacy),
+            ("canonical", [&video].as_slice(), &video),
+            ("both", [&video, &legacy].as_slice(), &video),
+        ] {
+            let db = dir.join(format!("{case}.sqlite"));
+            let library = Library::open(&db).unwrap();
+            for track in tracks {
+                library.upsert_track(track).unwrap();
+            }
+            library
+                .save_download(&startup_download, None, "failed", None)
+                .unwrap();
+            let engine = Engine::new(&db).unwrap();
+            engine
+                .download_remove_record(startup_download.key.as_opaque())
+                .unwrap();
+
+            let view = engine
+                .enqueue_download_in(&legacy.key, helper.clone(), dir.clone())
+                .unwrap();
+            assert_eq!(view.key, video.key.as_opaque(), "{case}");
+            assert_eq!(view.title, expected.title, "{case}");
+            let items = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let items = engine.downloads();
+                    if items.iter().all(|item| item.state != "running") {
+                        break items;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(items.len(), 1, "{case}");
+            assert_eq!(items[0].state, "done", "{case}: {:?}", items[0].error);
+            let rows = library.downloads().unwrap();
+            assert_eq!(rows.len(), 1, "{case}");
+            assert_eq!(rows[0].key, video.key, "{case}");
+        }
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     #[test]
     fn 首集旧键与裸键同时存在时保留现有文件() {
         use super::Engine;
@@ -934,14 +993,16 @@ impl Engine {
         lock(&self.known).insert(track.key.as_opaque().to_string(), track.clone());
     }
 
-    fn track_of(&self, key: &TrackKey) -> Result<Track, WireError> {
+    fn find_track(&self, key: &TrackKey) -> Result<Option<Track>, WireError> {
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
-            return Ok(t);
+            return Ok(Some(t));
         }
-        if let Some(t) = self.library.track_by_key(key)? {
-            return Ok(t);
-        }
-        Err(WireError::input("key", "这个键还没有对应的曲目"))
+        Ok(self.library.track_by_key(key)?)
+    }
+
+    fn track_of(&self, key: &TrackKey) -> Result<Track, WireError> {
+        self.find_track(key)?
+            .ok_or_else(|| WireError::input("key", "这个键还没有对应的曲目"))
     }
 
     fn next_token(&self) -> LoadToken {
@@ -3005,13 +3066,12 @@ impl Engine {
         helper: std::path::PathBuf,
         dir: std::path::PathBuf,
     ) -> Result<DownloadView, WireError> {
-        let key = TrackKey::from_provider(canonical_download_key(key.as_opaque()));
-        let (track, url) = self.download_target(&key)?;
+        let (track, url) = self.download_target(key)?;
         std::fs::create_dir_all(&dir)
             .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
         let view = DownloadView {
-            key: key.as_opaque().to_string(),
+            key: track.key.as_opaque().to_string(),
             title: track.title.clone(),
             state: "running".into(),
             progress: 0.0,
@@ -3082,6 +3142,15 @@ impl Engine {
         let Some((bvid, page)) = download_part(id) else {
             return Ok((self.track_of(key)?, format!("{root}/{id}")));
         };
+        if page == 1 {
+            let canonical_key = TrackKey::from_provider(bvid);
+            let mut track = match self.find_track(&canonical_key)? {
+                Some(track) => track,
+                None => self.track_of(key)?,
+            };
+            track.key = canonical_key;
+            return Ok((track, format!("{root}/{bvid}")));
+        }
         let track = match self.library.track_by_key(key)? {
             Some(track) => track,
             None => {
