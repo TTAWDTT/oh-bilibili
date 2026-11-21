@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
+const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const PORT = 9224
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
@@ -33,6 +34,9 @@ async function connect() {
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
+      ...(DYNAMIC_RETURN
+        ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1']
+        : []),
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
       `--user-data-dir=${join(tmpdir(), 'oh-bilibili-smoke')}`,
@@ -57,12 +61,20 @@ async function connect() {
   const ws = new WebSocket(version.webSocketDebuggerUrl)
   let id = 0
   const pending = new Map()
+  const runtimeErrors = []
   await new Promise((res, rej) => {
     ws.onopen = res
     ws.onerror = rej
   })
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data)
+    if (msg.method === 'Runtime.exceptionThrown') {
+      const detail = msg.params.exceptionDetails
+      runtimeErrors.push(detail.exception?.description ?? detail.text)
+    }
+    if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+      runtimeErrors.push(msg.params.args.map((arg) => arg.description ?? arg.value).join(' '))
+    }
     const done = msg.id ? pending.get(msg.id) : null
     if (done) {
       pending.delete(msg.id)
@@ -150,6 +162,7 @@ async function connect() {
   return {
     evaluate,
     viewport,
+    runtimeErrors,
     doubleClick,
     pressSpace,
     mouseEvent: (params) => send('Input.dispatchMouseEvent', params, sid),
@@ -203,9 +216,64 @@ async function controlFit(page) {
   })()`)
 }
 
+async function dynamicReturn(page) {
+  const title = '起风了｜深夜卧室版'
+  const cardState = `(() => {
+    const scroller = document.querySelector('#scroll-main')
+    const card = [...document.querySelectorAll('article [role="button"]')].find(
+      (button) => button.textContent.includes(${JSON.stringify(title)}),
+    )
+    if (!scroller || !card) return null
+    const rect = card.getBoundingClientRect()
+    const viewport = scroller.getBoundingClientRect()
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      top: rect.top - viewport.top,
+      scroll: scroller.scrollTop,
+      videoOnly: !scroller.innerText.includes('点歌台｜今晚只放你点的歌'),
+    }
+  })()`
+  const waitForCard = async () => {
+    for (let i = 0; i < 30; i += 1) {
+      const card = await page.evaluate(cardState)
+      if (card) return card
+      await sleep(100)
+    }
+    return null
+  }
+
+  await page.viewport(640, 560)
+  for (let i = 0; i < 30; i += 1) {
+    if (await page.clickExactText('动态')) break
+    await sleep(100)
+  }
+  if (!(await waitForCard()) || !(await page.clickExactText('视频投稿'))) {
+    throw new Error('640×560 预览未载入视频投稿')
+  }
+  await page.evaluate("document.querySelector('#scroll-main').scrollTop = 483")
+  const before = await page.evaluate(cardState)
+  check('640×560 视频投稿已滚到第二条', before?.videoOnly && before.scroll > 0 && before.y < 560)
+  if (!before) return
+
+  const { x, y } = before
+  await page.mouseEvent({ type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 })
+  await page.mouseEvent({ type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 })
+  check('通过顶栏从第二条视频详情返回', await page.clickExactText('返回'))
+  const after = await waitForCard()
+  check('返回后保留视频投稿筛选', after?.videoOnly)
+  check(
+    `返回后第二条视频恢复位置，scrollTop ${before.scroll} → ${after?.scroll}`,
+    !!after && Math.abs(after.top - before.top) <= 1,
+  )
+  check('动态返回没有控制台错误或未处理异常', page.runtimeErrors.length === 0)
+  if (page.runtimeErrors.length) console.error(page.runtimeErrors)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     console.log('没装 Chrome，跳过')
+    if (DYNAMIC_RETURN) process.exitCode = 1
     return
   }
   if (!(await reachable(WEB))) {
@@ -217,6 +285,11 @@ async function main() {
   const page = await connect()
   try {
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    if (DYNAMIC_RETURN) {
+      await dynamicReturn(page)
+      if (checks.some((c) => !c.ok)) process.exitCode = 1
+      return
+    }
     await sleep(6000)
 
     // 首页卡片：hover 只露出听、稍后再看和更多；低频动作收进更多。
