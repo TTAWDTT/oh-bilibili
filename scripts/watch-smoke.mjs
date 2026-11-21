@@ -1643,9 +1643,9 @@ async function main() {
     })()`)
     await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
     await sleep(300)
-    check(
-      '380 宽播放条保留曲名和队列，键盘可打开队列',
-      narrowPlayer &&
+    const narrowResult = {
+      layout:
+        narrowPlayer &&
         narrowPlayer.overflow === 0 &&
         narrowPlayer.barInside &&
         narrowPlayer.titleWidth >= 120 &&
@@ -1653,18 +1653,25 @@ async function main() {
         narrowPlayer.queueInside &&
         narrowPlayer.queueTabIndex === 0 &&
         !narrowPlayer.queueDisabled &&
-        narrowPlayer.queueFocused &&
+        narrowPlayer.queueFocused,
+      keyboard:
         narrowQueueOpened.open &&
         narrowQueueOpened.focusInside &&
         narrowQueueOpened.initialFocus === '关闭详情' &&
         focusWraps &&
         queueClosedByKey.closed &&
-        queueClosedByKey.focusReturned &&
-        queueOpenedByMouse &&
-        openedNarrowStage &&
-        narrowStageControls &&
-        !(await page.evaluate(`!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`)),
+        queueClosedByKey.focusReturned,
+      mouse: queueOpenedByMouse,
+      stage: openedNarrowStage && narrowStageControls,
+      closed: !(await page.evaluate(
+        `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
+      )),
+    }
+    check(
+      '380 宽播放条保留曲名和队列，键盘可打开队列',
+      Object.values(narrowResult).every(Boolean),
     )
+    if (!Object.values(narrowResult).every(Boolean)) console.log(JSON.stringify({ narrowPlayer, narrowQueueOpened, narrowResult }))
     await page.viewport(1320, 900)
     await page.evaluate(`(() => {
       if (document.querySelector('.rail-slot')?.dataset.open === 'false') {
@@ -1674,6 +1681,9 @@ async function main() {
     await sleep(300)
     await page.evaluate(`document.querySelector('button[aria-label="播放队列"]')?.click()`)
     await sleep(300)
+    const desktopQueueOpened = await page.evaluate(
+      `document.querySelector('.rail-slot')?.dataset.open === 'true'`,
+    )
     const desktopFocusKept = await page.evaluate(`(() => {
       const stageButton = document.querySelector('button[aria-label="打开播放舞台"]')
       stageButton?.focus()
@@ -1683,11 +1693,14 @@ async function main() {
     await sleep(300)
     check(
       '桌面关闭队列不抢走播放舞台的焦点',
-      desktopFocusKept &&
+      desktopQueueOpened &&
+        desktopFocusKept &&
+        (await page.evaluate(`document.querySelector('.rail-slot')?.dataset.open === 'false'`)) &&
         (await page.evaluate(
           `document.activeElement === document.querySelector('button[aria-label="打开播放舞台"]')`,
         )),
     )
+    if (!desktopQueueOpened || !desktopFocusKept) console.log(JSON.stringify({ desktopQueueOpened, desktopFocusKept }))
     await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
     await sleep(300)
 
