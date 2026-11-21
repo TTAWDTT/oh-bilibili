@@ -21,6 +21,9 @@ const PARTITION_FLOORS = [
   { rid: 4, title: '游戏' },
 ]
 
+/** 首页推荐等这么久还没回来就按断网处理：DNS 卡住时后端可能很久才返回。 */
+const FEED_TIMEOUT_MS = 8000
+
 /**
  * 发现页。
  *
@@ -97,7 +100,15 @@ export function HomeView() {
     else setLoading(true)
     setError(null)
     try {
-      const list = await ipc.homeFeed(next)
+      const list = await Promise.race([
+        ipc.homeFeed(next),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(
+            () => reject({ class: 'retryable', message: '连不上 B 站，检查一下网络。' }),
+            FEED_TIMEOUT_MS,
+          )
+        }),
+      ])
       // 成功才推进：失败就留在这一页，重试时不会再跳过一个 fresh_idx。
       if (append) {
         nextFresh.current = next + 1
