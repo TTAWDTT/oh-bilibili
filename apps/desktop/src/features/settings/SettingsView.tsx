@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { useAuthStore } from '../auth/authStore'
-import { toastDone, toastFailure } from '../../app/notice'
+import { toastDone, toastFailure, toastWarn } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import type { Health } from '../../shared/lib/ipc'
@@ -134,8 +134,20 @@ export function SettingsView() {
     if (syncing) return
     setSyncing(true)
     try {
-      await ipc.syncNow()
-      toastDone('同步完成', '喜欢与收藏已经推给 B 站。')
+      const outcome = await ipc.syncNow()
+      if (outcome.rejected > 0) {
+        toastWarn(
+          '部分同步失败',
+          `${outcome.rejected} 条被拒绝${outcome.detail ? `：${outcome.detail}` : ''}；已推送 ${outcome.synced} 条。`,
+        )
+      } else if (outcome.deferred > 0) {
+        toastWarn(
+          '同步稍后重试',
+          `${outcome.deferred} 条暂时失败，下次同步会重试${outcome.detail ? `：${outcome.detail}` : ''}；已推送 ${outcome.synced} 条。`,
+        )
+      } else {
+        toastDone('同步完成', '喜欢与收藏已经推给 B 站。')
+      }
     } catch (cause) {
       toastFailure('同步', cause)
     } finally {
