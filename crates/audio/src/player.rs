@@ -71,6 +71,7 @@ struct Lifecycle {
     eof_pending: AtomicBool,
     ended: AtomicBool,
     failed: AtomicBool,
+    paused: AtomicBool,
 }
 
 impl Lifecycle {
@@ -87,8 +88,16 @@ impl Lifecycle {
         self.ended.store(false, Ordering::Release);
     }
 
+    fn set_paused(&self, paused: bool) {
+        self.paused.store(paused, Ordering::Release);
+    }
+
+    fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::Acquire)
+    }
+
     fn mark_started(&self, written: usize) {
-        if written > 0 && self.armed.load(Ordering::Acquire) {
+        if written > 0 && self.armed.load(Ordering::Acquire) && !self.is_paused() {
             self.started.store(true, Ordering::Release);
         }
     }
@@ -234,12 +243,15 @@ impl Player {
             .map_err(|_| AudioError::Device("音频线程已退出".into()))
     }
     pub fn play(&self) {
+        self.lifecycle.set_paused(false);
         let _ = self.tx.send(Cmd::Play);
     }
     pub fn pause(&self) {
+        self.lifecycle.set_paused(true);
         let _ = self.tx.send(Cmd::Pause);
     }
     pub fn stop(&self) {
+        self.lifecycle.set_paused(false);
         self.lifecycle.reset_load();
         let _ = self.tx.send(Cmd::Stop);
     }
@@ -406,6 +418,7 @@ fn run_engine(
     let _ = ready_tx.send(Ok(device_rate));
 
     let mut decoder: Option<Session> = None;
+    let mut at_eof = false;
     let mut resampler = LinearResampler::new(device_rate as f64, channels);
     // 倍速通过缩放重采样率实现：1.5 倍速就是让解码输出按 1.5 倍速被消费。
     let mut base_rate: f64 = device_rate as f64;
@@ -418,6 +431,7 @@ fn run_engine(
                     // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.reset_load();
+                    at_eof = false;
                     match open_decoder(media) {
                         Ok(d) => {
                             let rate = d
@@ -431,7 +445,7 @@ fn run_engine(
                             resampler.set_source_rate(base_rate * speed);
                             lifecycle.arm();
                             clock.reset(device_rate);
-                            clock.set_playing(true);
+                            clock.set_playing(!lifecycle.is_paused());
                             trace("已加载并开始推进");
                             decoder = Some(d);
                         }
@@ -448,10 +462,21 @@ fn run_engine(
                     speed = next.clamp(0.5, 2.0);
                     resampler.set_source_rate(base_rate * speed);
                 }
-                Cmd::Play => clock.set_playing(true),
-                Cmd::Pause => clock.set_playing(false),
+                Cmd::Play => {
+                    lifecycle.set_paused(false);
+                    if at_eof {
+                        clock.set_playing(false);
+                    } else {
+                        clock.set_playing(true);
+                    }
+                }
+                Cmd::Pause => {
+                    lifecycle.set_paused(true);
+                    clock.set_playing(false);
+                }
                 Cmd::Seek(ms) => {
                     if let Some(d) = decoder.as_mut() {
+                        at_eof = false;
                         lifecycle.clear_eof();
                         request_flush(&flush_requested, &flush_done);
                         let target = SeekTo::Time {
@@ -462,6 +487,9 @@ fn run_engine(
                             Ok(_) => {
                                 clock.seek_to_ms(ms);
                                 resampler.set_source_rate(base_rate * speed);
+                                if !lifecycle.is_paused() {
+                                    clock.set_playing(true);
+                                }
                             }
                             Err(e) => eprintln!("seek 失败: {e}"),
                         }
@@ -469,8 +497,10 @@ fn run_engine(
                 }
                 Cmd::Stop => {
                     request_flush(&flush_requested, &flush_done);
+                    lifecycle.set_paused(false);
                     lifecycle.reset_load();
                     decoder = None;
+                    at_eof = false;
                     clock.set_playing(false);
                     clock.reset(device_rate);
                 }
@@ -488,6 +518,11 @@ fn run_engine(
             continue;
         };
 
+        if at_eof {
+            std::thread::sleep(Duration::from_millis(8));
+            continue;
+        }
+
         // 缓冲够满就歇一会儿，别把 CPU 烧了。
         if producer.vacant_len() < 4096 {
             std::thread::sleep(Duration::from_millis(4));
@@ -502,14 +537,19 @@ fn run_engine(
                 // 自然播到末尾：这是「该切歌」的信号
                 trace(&format!("EOF，位置 {}ms", clock.position_ms()));
                 lifecycle.mark_eof();
-                decoder = None;
+                at_eof = true;
                 continue;
             }
             Err(err) => {
-                // 解码出错：不置 ended，上层会当作卡住并原地续播
+                // 已起播的读错误交给看门狗续播；首批样本前失败则直接报错，
+                // 否则引擎会永远停在 loading。
                 trace(&format!("解码错误 {err}，位置 {}ms", clock.position_ms()));
+                if !lifecycle.is_started() {
+                    lifecycle.mark_failed();
+                }
                 clock.set_playing(false);
                 decoder = None;
+                at_eof = false;
                 continue;
             }
         };
@@ -529,8 +569,12 @@ fn run_engine(
             }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
             Err(_) => {
+                if !lifecycle.is_started() {
+                    lifecycle.mark_failed();
+                }
                 clock.set_playing(false);
                 decoder = None;
+                at_eof = false;
             }
         }
     }
@@ -686,5 +730,18 @@ mod lifecycle_tests {
         assert!(!lifecycle.is_started());
         assert!(!lifecycle.peek_ended());
         assert!(!lifecycle.failed());
+    }
+
+    #[test]
+    fn 暂停时取走样本也不算起播() {
+        let lifecycle = Lifecycle::default();
+        lifecycle.reset_load();
+        lifecycle.arm();
+        lifecycle.set_paused(true);
+        lifecycle.on_output(960);
+        assert!(!lifecycle.is_started());
+        lifecycle.set_paused(false);
+        lifecycle.on_output(960);
+        assert!(lifecycle.is_started());
     }
 }

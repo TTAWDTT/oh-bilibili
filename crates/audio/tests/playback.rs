@@ -67,6 +67,40 @@ fn 解码结束后时钟仍播完缓冲() {
 }
 
 #[test]
+fn 加载前暂停不会在加载后自己起播() {
+    if !audio_tests_enabled() {
+        eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");
+        return;
+    }
+    let path = std::path::Path::new("../../testdata/sample.m4s");
+    if !path.exists() {
+        eprintln!("跳过：没有 testdata/sample.m4s");
+        return;
+    }
+    let Ok(player) = Player::start() else {
+        eprintln!("跳过：当前环境打不开输出设备");
+        return;
+    };
+
+    player.set_volume(0.0);
+    player.pause();
+    let file = std::fs::File::open(path).expect("fixture 可读");
+    player.load(Media::new(file)).expect("加载成功");
+    std::thread::sleep(Duration::from_millis(700));
+
+    assert!(!player.clock().is_playing(), "加载后不应自动解除暂停");
+    assert!(!player.is_started(), "暂停时不应消费首批样本");
+    assert_eq!(player.clock().position_ms(), 0);
+
+    player.play();
+    let deadline = std::time::Instant::now();
+    while !player.is_started() && deadline.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(player.is_started(), "恢复后应该开始输出样本");
+}
+
+#[test]
 fn 播放时位置由声卡推进() {
     if !audio_tests_enabled() {
         eprintln!("跳过：未设置 BILIMUSIC_AUDIO_TESTS=1（这个测试会出声）");

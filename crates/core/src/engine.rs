@@ -387,15 +387,6 @@ impl Engine {
                         let _ = engine.lyrics_get(&k).await;
                     });
                 }
-                let storing = self.track_of(key)?;
-                let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
-                // 取流成功就记一条历史；取流失败不记。
-                // 位置写这次实际开播的起点：刚 load 的音频时钟可能还没重置，
-                // 读 snapshot 会把上一首的位置记到这一条上。
-                let at = bounded;
-                self.library
-                    .push_history(track_id, at)
-                    .map_err(WireError::from)?;
                 self.emit(AppEvent::NowPlaying {
                     track: self.track_of(key)?,
                     index: self.queue.lock().ok().and_then(|q| q.index()),
@@ -952,8 +943,10 @@ impl Engine {
     /// 而那时连播放条都不显示，等于声音失去控制。
     pub fn pause(&self) -> PlayerSnapshot {
         let playing = lock(&self.player).clock().is_playing();
+        // 取流期时钟还没开始，也要记住用户的暂停意图。否则 load 完成后
+        // 会把音轨直接放出来，退出观看页时尤其明显。
+        lock(&self.player).pause();
         if playing {
-            lock(&self.player).pause();
             {
                 let mut st = lock(&self.state);
                 let current = std::mem::replace(&mut *st, PlayerState::Idle);
@@ -1286,8 +1279,8 @@ impl Engine {
 
     /// 取流完成、且声卡已经输出首批样本后，才把 loading 迁到 playing。
     fn promote_loading(&self) -> bool {
-        let token = match &*lock(&self.state) {
-            PlayerState::Loading { token, .. } => *token,
+        let (token, track_key) = match &*lock(&self.state) {
+            PlayerState::Loading { token, track } => (*token, track.clone()),
             _ => return false,
         };
         let (clock_playing, ended) = {
@@ -1352,6 +1345,12 @@ impl Engine {
         drop(st);
         if ended && watch_mode {
             let _ = lock(&self.player).take_ended();
+        }
+        if let Ok(track) = self.track_of(&track_key) {
+            if let Ok(track_id) = self.library.upsert_track(&track) {
+                let at = lock(&self.player).clock().position_ms();
+                let _ = self.library.push_history(track_id, at);
+            }
         }
         self.emit_state();
         true
