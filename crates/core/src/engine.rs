@@ -122,6 +122,9 @@ pub struct Engine {
     known: Mutex<HashMap<String, Track>>,
     lyrics_cache: Mutex<HashMap<String, LyricDoc>>,
     token: AtomicU64,
+    /// 已经取到、但还没等到声卡首批样本的这一次加载。
+    /// 音轨就绪前状态保持 loading，看门狗看到 `is_started()` 后才迁到 playing。
+    pending_prepared: Mutex<Option<(LoadToken, Prepared)>>,
     volume: Mutex<f32>,
     speed: Mutex<f32>,
     /// 恢复队列时要跳回的位置（毫秒）。0 表示从头开始。
@@ -171,6 +174,7 @@ impl Engine {
             known: Mutex::new(HashMap::new()),
             lyrics_cache: Mutex::new(HashMap::new()),
             token: AtomicU64::new(0),
+            pending_prepared: Mutex::new(None),
             volume: Mutex::new(0.7),
             speed: Mutex::new(1.0),
             resume_at_ms: Mutex::new(0),
@@ -332,6 +336,7 @@ impl Engine {
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         *lock(&self.last_transport_at) = std::time::Instant::now();
+        *lock(&self.pending_prepared) = None;
         {
             let player = lock(&self.player);
             // 换曲先停掉旧音轨并清零时钟。新流要等网络，期间 snapshot()
@@ -369,9 +374,10 @@ impl Engine {
                     lock(&self.player).seek(bounded);
                 }
                 *lock(&self.last_transport_at) = std::time::Instant::now();
-                let mut st = lock(&self.state);
-                *st = std::mem::replace(&mut *st, PlayerState::Idle).stream_ready(token, prepared);
-                drop(st);
+                // 取流完成不等于声卡已经出声。状态先留在 loading，看门狗看到
+                // `Player::is_started()` 后才迁到 playing；否则首段等待期间
+                // 就会显示「正在播放」而位置一直是 0。
+                *lock(&self.pending_prepared) = Some((token, prepared));
                 // 开播就在后台把歌词取好：用户打开右栏时通常已经在了，
                 // 不用等 lrclib 那几秒。
                 {
@@ -383,7 +389,7 @@ impl Engine {
                 }
                 let storing = self.track_of(key)?;
                 let track_id = self.library.upsert_track(&storing).map_err(WireError::from)?;
-                // 每次真正进入播放才记一条历史，切歌失败不记。
+                // 取流成功就记一条历史；取流失败不记。
                 // 位置写这次实际开播的起点：刚 load 的音频时钟可能还没重置，
                 // 读 snapshot 会把上一首的位置记到这一条上。
                 let at = bounded;
@@ -579,6 +585,7 @@ impl Engine {
         } else {
             self.watch_gate.cancel();
         }
+        *lock(&self.pending_prepared) = None;
         lock(&self.player).stop();
         {
             let mut st = lock(&self.state);
@@ -1211,6 +1218,9 @@ impl Engine {
                             }
                         }
                     }
+                    if engine.promote_loading() {
+                        continue;
+                    }
                     if engine.reached_track_end() {
                         // 看模式下放完由观看页决定（重播 / 下一个 / 自动连播）。
                         // 引擎自己跳下一首会让画面停在旧视频、声音换成另一条，
@@ -1272,6 +1282,79 @@ impl Engine {
         // 差 4 秒会被误判成「卡住」然后重播同一首。
         let ended = lock(&self.player).take_ended();
         ended
+    }
+
+    /// 取流完成、且声卡已经输出首批样本后，才把 loading 迁到 playing。
+    fn promote_loading(&self) -> bool {
+        let token = match &*lock(&self.state) {
+            PlayerState::Loading { token, .. } => *token,
+            _ => return false,
+        };
+        let (clock_playing, ended) = {
+            let player = lock(&self.player);
+            if player.load_failed() {
+                drop(player);
+                if !self.load_is_current(token) {
+                    return false;
+                }
+                *lock(&self.pending_prepared) = None;
+                let mut st = lock(&self.state);
+                *st = std::mem::replace(&mut *st, PlayerState::Idle)
+                    .fail(crate::state::Fault::Decode("音轨打不开".into()));
+                drop(st);
+                self.emit(AppEvent::Notice {
+                    error: WireError::internal("音轨打不开，换一条或稍后重试"),
+                    op: "播放".into(),
+                });
+                self.emit_state();
+                return true;
+            }
+            let ended = player.peek_ended();
+            if !player.is_started() && !ended {
+                return false;
+            }
+            (player.clock().is_playing(), ended)
+        };
+        let prepared = {
+            let mut pending = lock(&self.pending_prepared);
+            match pending.as_ref() {
+                Some((pending_token, _)) if *pending_token == token => {
+                    pending.take().map(|(_, prepared)| prepared)
+                }
+                _ => None,
+            }
+        };
+        let Some(prepared) = prepared else {
+            return false;
+        };
+        let mut st = lock(&self.state);
+        let current = match &*st {
+            PlayerState::Loading { token: current, .. } if *current == token => {
+                std::mem::replace(&mut *st, PlayerState::Idle)
+            }
+            _ => return false,
+        };
+        let next = current.stream_ready(token, prepared);
+        let watch_mode = *lock(&self.mode) == crate::wire::PlayMode::Watch;
+        *st = if ended {
+            // 极短音频可能在状态迁到 playing 之前就播完了。看模式下直接给
+            // 结束面板；听模式留在 playing，让下一拍看门狗走正常的自动下一首。
+            if watch_mode {
+                next.ended()
+            } else {
+                next
+            }
+        } else if clock_playing {
+            next
+        } else {
+            next.pause()
+        };
+        drop(st);
+        if ended && watch_mode {
+            let _ = lock(&self.player).take_ended();
+        }
+        self.emit_state();
+        true
     }
 
     /// 状态说在播、时钟却停了，而且离末尾还远——这是卡住，不是播完。

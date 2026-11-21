@@ -3,7 +3,7 @@
 //! 声卡回调在自己的线程上，解码在另一个线程上，中间是一个无锁环形缓冲。
 //! 位置由回调按帧数推进，是全应用唯一的时间真值。
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -60,6 +60,81 @@ fn advance_played(clock: &Clock, written_samples: usize, channels: usize) {
     }
 }
 
+/// 当前这一次加载的播放生命周期。
+///
+/// `started` 只有在声卡真的取走第一批样本后才成立；`ended` 只有在解码器
+/// 已经读完、环形缓冲也排空后才成立。两个条件都不看墙钟或位置数字。
+#[derive(Default)]
+struct Lifecycle {
+    armed: AtomicBool,
+    started: AtomicBool,
+    eof_pending: AtomicBool,
+    ended: AtomicBool,
+    failed: AtomicBool,
+}
+
+impl Lifecycle {
+    fn reset_load(&self) {
+        self.armed.store(false, Ordering::Release);
+        self.started.store(false, Ordering::Release);
+        self.eof_pending.store(false, Ordering::Release);
+        self.ended.store(false, Ordering::Release);
+        self.failed.store(false, Ordering::Release);
+    }
+
+    fn clear_eof(&self) {
+        self.eof_pending.store(false, Ordering::Release);
+        self.ended.store(false, Ordering::Release);
+    }
+
+    fn mark_started(&self, written: usize) {
+        if written > 0 && self.armed.load(Ordering::Acquire) {
+            self.started.store(true, Ordering::Release);
+        }
+    }
+
+    fn arm(&self) {
+        self.armed.store(true, Ordering::Release);
+    }
+
+    fn mark_eof(&self) {
+        self.eof_pending.store(true, Ordering::Release);
+    }
+
+    /// 声卡回调在每次 pop 之后调用。返回值表示这一次真的播完了。
+    fn on_output(&self, written: usize) -> bool {
+        if written > 0 {
+            self.mark_started(written);
+            return false;
+        }
+        if self.eof_pending.swap(false, Ordering::AcqRel) {
+            self.ended.store(true, Ordering::Release);
+            return true;
+        }
+        false
+    }
+
+    fn mark_failed(&self) {
+        self.failed.store(true, Ordering::Release);
+    }
+
+    fn is_started(&self) -> bool {
+        self.started.load(Ordering::Acquire)
+    }
+
+    fn failed(&self) -> bool {
+        self.failed.load(Ordering::Acquire)
+    }
+
+    fn peek_ended(&self) -> bool {
+        self.ended.load(Ordering::Acquire)
+    }
+
+    fn take_ended(&self) -> bool {
+        self.ended.swap(false, Ordering::AcqRel)
+    }
+}
+
 /// 让声卡回调丢弃环形缓冲里还没播的旧样本。
 ///
 /// 回调线程是唯一持有消费者的一端，所以用代际号握手：解码线程先请求、
@@ -81,12 +156,7 @@ pub struct Player {
     tx: Sender<Cmd>,
     clock: SharedClock,
     volume_bits: Arc<AtomicU32>,
-    /// 解码器是否真的走到了音频末尾。
-    ///
-    /// 「时钟停了」有三种原因：播完、网络断、解码出错。位置数字不可靠
-    /// （实测播到 5:13 时长 5:17 就 EOF 了），所以让解码线程直接记下
-    /// 「这是自然结束」，上层据此决定切歌还是原地续播。
-    ended: Arc<std::sync::atomic::AtomicBool>,
+    lifecycle: Arc<Lifecycle>,
     device_rate: u32,
     _thread: JoinHandle<()>,
 }
@@ -95,17 +165,17 @@ impl Player {
     pub fn start() -> Result<Player, AudioError> {
         let clock: SharedClock = Arc::new(Clock::default());
         let volume_bits = Arc::new(AtomicU32::new(0.7f32.to_bits()));
-        let ended = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let lifecycle = Arc::new(Lifecycle::default());
         let (tx, rx) = channel();
         let (ready_tx, ready_rx) = channel::<Result<u32, AudioError>>();
 
         let thread_clock = clock.clone();
-        let thread_ended = ended.clone();
+        let thread_lifecycle = lifecycle.clone();
         let thread_volume = volume_bits.clone();
         let handle = std::thread::Builder::new()
             .name("bilimusic-audio".into())
             .spawn(move || {
-                run_engine(rx, thread_clock, thread_volume, thread_ended, ready_tx);
+                run_engine(rx, thread_clock, thread_volume, thread_lifecycle, ready_tx);
             })
             .map_err(|e| AudioError::Device(e.to_string()))?;
 
@@ -117,7 +187,7 @@ impl Player {
             tx,
             clock,
             volume_bits,
-            ended,
+            lifecycle,
             device_rate,
             _thread: handle,
         })
@@ -135,12 +205,22 @@ impl Player {
 
     /// 取走「自然播放到结尾」标记。
     pub fn take_ended(&self) -> bool {
-        self.ended.swap(false, Ordering::Relaxed)
+        self.lifecycle.take_ended()
     }
 
     /// 只看不清，供「是不是卡住」的判断用。
     pub fn peek_ended(&self) -> bool {
-        self.ended.load(Ordering::Relaxed)
+        self.lifecycle.peek_ended()
+    }
+
+    /// 当前这一次加载是否已经开始向声卡输出样本。
+    pub fn is_started(&self) -> bool {
+        self.lifecycle.is_started()
+    }
+
+    /// 解码器是否没打开成功。用于把 loading 从永久等待里救出来。
+    pub fn load_failed(&self) -> bool {
+        self.lifecycle.failed()
     }
 
     pub fn device_rate(&self) -> u32 {
@@ -148,6 +228,7 @@ impl Player {
     }
 
     pub fn load(&self, media: Media) -> Result<(), AudioError> {
+        self.lifecycle.reset_load();
         self.tx
             .send(Cmd::Load(media))
             .map_err(|_| AudioError::Device("音频线程已退出".into()))
@@ -159,6 +240,7 @@ impl Player {
         let _ = self.tx.send(Cmd::Pause);
     }
     pub fn stop(&self) {
+        self.lifecycle.reset_load();
         let _ = self.tx.send(Cmd::Stop);
     }
     pub fn seek(&self, position_ms: u64) {
@@ -235,7 +317,7 @@ fn run_engine(
     rx: Receiver<Cmd>,
     clock: SharedClock,
     volume_bits: Arc<AtomicU32>,
-    ended: Arc<std::sync::atomic::AtomicBool>,
+    lifecycle: Arc<Lifecycle>,
     ready_tx: Sender<Result<u32, AudioError>>,
 ) {
     let host = cpal::default_host();
@@ -264,6 +346,7 @@ fn run_engine(
 
     let cb_clock = clock.clone();
     let cb_volume = volume_bits.clone();
+    let cb_lifecycle = lifecycle.clone();
     let cb_flush_requested = flush_requested.clone();
     let cb_flush_done = flush_done.clone();
     let stream = device.build_output_stream(
@@ -284,6 +367,9 @@ fn run_engine(
                 return;
             }
             let written = consumer.pop_slice(out);
+            if cb_lifecycle.on_output(written) {
+                cb_clock.set_playing(false);
+            }
             for s in out.iter_mut().take(written) {
                 *s *= gain;
             }
@@ -331,6 +417,7 @@ fn run_engine(
                 Cmd::Load(media) => {
                     // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
                     request_flush(&flush_requested, &flush_done);
+                    lifecycle.reset_load();
                     match open_decoder(media) {
                         Ok(d) => {
                             let rate = d
@@ -342,14 +429,15 @@ fn run_engine(
                                 .unwrap_or(48_000);
                             base_rate = rate as f64;
                             resampler.set_source_rate(base_rate * speed);
+                            lifecycle.arm();
                             clock.reset(device_rate);
                             clock.set_playing(true);
                             trace("已加载并开始推进");
-                            ended.store(false, Ordering::Relaxed);
                             decoder = Some(d);
                         }
                         Err(e) => {
                             eprintln!("打开媒体失败: {e}");
+                            lifecycle.mark_failed();
                             clock.set_playing(false);
                             decoder = None;
                         }
@@ -364,6 +452,7 @@ fn run_engine(
                 Cmd::Pause => clock.set_playing(false),
                 Cmd::Seek(ms) => {
                     if let Some(d) = decoder.as_mut() {
+                        lifecycle.clear_eof();
                         request_flush(&flush_requested, &flush_done);
                         let target = SeekTo::Time {
                             time: Time::from(ms as f64 / 1000.0),
@@ -380,6 +469,7 @@ fn run_engine(
                 }
                 Cmd::Stop => {
                     request_flush(&flush_requested, &flush_done);
+                    lifecycle.reset_load();
                     decoder = None;
                     clock.set_playing(false);
                     clock.reset(device_rate);
@@ -411,8 +501,7 @@ fn run_engine(
             {
                 // 自然播到末尾：这是「该切歌」的信号
                 trace(&format!("EOF，位置 {}ms", clock.position_ms()));
-                ended.store(true, Ordering::Relaxed);
-                clock.set_playing(false);
+                lifecycle.mark_eof();
                 decoder = None;
                 continue;
             }
@@ -540,5 +629,62 @@ mod advance_played_tests {
         clock.reset(48_000);
         advance_played(&clock, 1000, 0);
         assert_eq!(clock.position_ms(), 0);
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::Lifecycle;
+
+    #[test]
+    fn 首批样本前不算起播() {
+        let lifecycle = Lifecycle::default();
+        lifecycle.reset_load();
+        lifecycle.arm();
+        assert!(!lifecycle.is_started());
+        assert!(!lifecycle.on_output(0));
+        assert!(!lifecycle.is_started());
+        lifecycle.on_output(960);
+        assert!(lifecycle.is_started());
+    }
+
+    #[test]
+    fn 换曲过程中旧缓冲不算新曲起播() {
+        let lifecycle = Lifecycle::default();
+        lifecycle.reset_load();
+        lifecycle.on_output(960);
+        assert!(!lifecycle.is_started(), "新曲还没 arm，旧样本不能起播");
+        lifecycle.arm();
+        lifecycle.on_output(960);
+        assert!(lifecycle.is_started());
+    }
+
+    #[test]
+    fn 解码结束后要等缓冲排空() {
+        let lifecycle = Lifecycle::default();
+        lifecycle.reset_load();
+        lifecycle.arm();
+        lifecycle.on_output(960);
+        lifecycle.mark_eof();
+        assert!(!lifecycle.peek_ended(), "还有缓冲时不能报结束");
+        assert!(!lifecycle.on_output(960), "排空缓冲的最后一批仍是播放");
+        assert!(!lifecycle.peek_ended());
+        assert!(lifecycle.on_output(0), "缓冲真正空了才报结束");
+        assert!(lifecycle.peek_ended());
+    }
+
+    #[test]
+    fn 换曲会清掉上一轮的起播与结束() {
+        let lifecycle = Lifecycle::default();
+        lifecycle.reset_load();
+        lifecycle.arm();
+        lifecycle.on_output(960);
+        lifecycle.mark_eof();
+        lifecycle.on_output(0);
+        assert!(lifecycle.peek_ended());
+        lifecycle.reset_load();
+        assert!(!lifecycle.is_started());
+        assert!(!lifecycle.peek_ended());
+        assert!(!lifecycle.failed());
     }
 }
