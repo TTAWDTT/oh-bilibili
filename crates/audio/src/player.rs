@@ -735,11 +735,19 @@ impl LinearResampler {
 mod duration_tests {
     use super::{open_decoder, Media};
 
+    /// fMP4 的 moov 里没有总时长，只能把每个音频包的时长加起来。
+    /// 夹具是从真实 DASH 音频里截出的一段分片，入库以免依赖本地 testdata/。
     #[test]
     fn 分片文件没有容器时长时按音频包计算() {
-        let file = std::fs::File::open("../../testdata/sample.m4s").unwrap();
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fragmented.m4s");
+        let file = std::fs::File::open(path).unwrap();
         let session = open_decoder(Media::new(file), true).unwrap();
-        assert!((315_000..=320_000).contains(&session.duration_ms));
+        assert!(session.duration_ms > 0, "分片时长应由音频包算出");
+        assert!(
+            (4_000..=6_000).contains(&session.duration_ms),
+            "单个分片应在 4 到 6 秒之间，实际 {}",
+            session.duration_ms
+        );
     }
 }
 
