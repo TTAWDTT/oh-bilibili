@@ -430,6 +430,7 @@ fn run_engine(
             match cmd {
                 Cmd::Load(media) => {
                     // 旧曲目还可能在环里，换曲先清掉，别让上一首的尾巴接着响。
+                    resampler.pending.clear();
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.reset_load();
                     at_eof = false;
@@ -477,6 +478,7 @@ fn run_engine(
                     if let Some(d) = decoder.as_mut() {
                         at_eof = false;
                         lifecycle.clear_eof();
+                        resampler.pending.clear();
                         request_flush(&flush_requested, &flush_done);
                         let target = SeekTo::Time {
                             time: Time::from(ms as f64 / 1000.0),
@@ -495,6 +497,7 @@ fn run_engine(
                     }
                 }
                 Cmd::Stop => {
+                    resampler.pending.clear();
                     request_flush(&flush_requested, &flush_done);
                     lifecycle.set_paused(false);
                     lifecycle.reset_load();
@@ -523,7 +526,7 @@ fn run_engine(
         }
 
         // 缓冲够满就歇一会儿，别把 CPU 烧了。
-        if producer.vacant_len() < 4096 {
+        if !resampler.flush_pending(&mut producer) || producer.vacant_len() < 4096 {
             std::thread::sleep(Duration::from_millis(4));
             continue;
         }
@@ -585,6 +588,7 @@ struct LinearResampler {
     device_channels: usize,
     pos: f64,
     tail: Vec<f32>,
+    pending: Vec<f32>,
 }
 
 impl LinearResampler {
@@ -595,6 +599,7 @@ impl LinearResampler {
             device_channels,
             pos: 0.0,
             tail: Vec::new(),
+            pending: Vec::new(),
         }
     }
 
@@ -604,19 +609,32 @@ impl LinearResampler {
         self.tail.clear();
     }
 
+    fn flush_pending(&mut self, producer: &mut impl Producer<Item = f32>) -> bool {
+        if !self.pending.is_empty() {
+            let written = producer.push_slice(&self.pending);
+            self.pending.drain(..written);
+        }
+        self.pending.is_empty()
+    }
+
     fn push(
         &mut self,
         samples: &[f32],
         source_channels: usize,
         producer: &mut impl Producer<Item = f32>,
     ) {
+        let samples = self.resample(samples, source_channels);
+        let written = producer.push_slice(&samples);
+        self.pending.extend_from_slice(&samples[written..]);
+    }
+
+    fn resample<'a>(&mut self, samples: &'a [f32], source_channels: usize) -> Cow<'a, [f32]> {
         if self.source_rate <= 0.0 || self.device_channels == 0 {
-            return;
+            return Cow::Borrowed(&[]);
         }
         let samples = self.map_channels(samples, source_channels);
         if (self.source_rate - self.device_rate).abs() < 0.5 {
-            producer.push_slice(&samples);
-            return;
+            return samples;
         }
         let step = self.source_rate / self.device_rate;
 
@@ -640,7 +658,7 @@ impl LinearResampler {
         let consumed_frames = (pos.floor() as usize).min(total);
         self.tail = combined[consumed_frames * self.device_channels..].to_vec();
         self.pos = pos - consumed_frames as f64;
-        producer.push_slice(&out);
+        Cow::Owned(out)
     }
 
     fn map_channels<'a>(&self, samples: &'a [f32], source_channels: usize) -> Cow<'a, [f32]> {
@@ -704,6 +722,38 @@ mod resampler_tests {
             output[..8],
             [0.25, 0.25, -0.25, -0.25, -0.75, -0.75, 0.0, 0.0]
         );
+    }
+
+    #[test]
+    fn 环形缓冲部分写入后保留重采样余量() {
+        const CAPACITY: usize = 4096;
+        const SAMPLES: usize = 4454;
+        let input: Vec<f32> = (0..1024).map(|sample| sample as f32 / 1024.0).collect();
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(CAPACITY).split();
+        let mut resampler = LinearResampler::new(48_000.0, 2);
+        resampler.set_source_rate(22_050.0);
+        resampler.push(&input, 1, &mut producer);
+
+        let mut output = vec![0.0; SAMPLES];
+        let first = consumer.pop_slice(&mut output[..256]);
+        assert_eq!(first, 256);
+        assert!(
+            !resampler.flush_pending(&mut producer),
+            "重试后仍应保留写不下的样本"
+        );
+        let written = first + consumer.pop_slice(&mut output[first..]);
+        assert!(resampler.flush_pending(&mut producer));
+        assert_eq!(
+            written + consumer.pop_slice(&mut output[written..]),
+            SAMPLES
+        );
+
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(SAMPLES).split();
+        resampler.set_source_rate(22_050.0);
+        resampler.push(&input, 1, &mut producer);
+        let mut expected = vec![0.0; SAMPLES];
+        assert_eq!(consumer.pop_slice(&mut expected), SAMPLES);
+        assert_eq!(output, expected);
     }
 }
 
