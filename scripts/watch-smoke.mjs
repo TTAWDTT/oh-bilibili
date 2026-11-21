@@ -542,6 +542,73 @@ async function checkStageLyrics(page) {
       stage.width >= 450 &&
       stage.columns.split(' ').length === 2,
   )
+  await page.evaluate(`document.querySelector('[data-stage-lyric-scroll]')?.focus()`)
+  const playLabelBefore = await page.evaluate(
+    `document.querySelector('.stage button[aria-label="暂停"], .stage button[aria-label="播放"]')?.getAttribute('aria-label') ?? ''`,
+  )
+  await page.keyEvent({
+    type: 'keyDown',
+    key: ' ',
+    code: 'Space',
+    text: ' ',
+    unmodifiedText: ' ',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32,
+  })
+  await page.keyEvent({
+    type: 'keyUp',
+    key: ' ',
+    code: 'Space',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32,
+  })
+  await sleep(250)
+  const playLabelAfter = await page.evaluate(
+    `document.querySelector('.stage button[aria-label="暂停"], .stage button[aria-label="播放"]')?.getAttribute('aria-label') ?? ''`,
+  )
+  await page.keyEvent({
+    type: 'keyDown',
+    key: ' ',
+    code: 'Space',
+    text: ' ',
+    unmodifiedText: ' ',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32,
+  })
+  await page.keyEvent({
+    type: 'keyUp',
+    key: ' ',
+    code: 'Space',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32,
+  })
+  const progressBeforeShortcut = await page.evaluate(
+    `document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? ''`,
+  )
+  await page.keyEvent({
+    type: 'keyDown',
+    key: 'ArrowRight',
+    code: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+    nativeVirtualKeyCode: 39,
+  })
+  await page.keyEvent({
+    type: 'keyUp',
+    key: 'ArrowRight',
+    code: 'ArrowRight',
+    windowsVirtualKeyCode: 39,
+    nativeVirtualKeyCode: 39,
+  })
+  await sleep(250)
+  const progressAfterShortcut = await page.evaluate(
+    `document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? ''`,
+  )
+  check(
+    '舞台歌词聚焦时空格和方向键仍控制播放',
+    playLabelBefore !== '' &&
+      playLabelAfter !== playLabelBefore &&
+      progressAfterShortcut !== progressBeforeShortcut,
+  )
   await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
   await sleep(150)
   const reducedMotion = await page.evaluate(`(() => {
@@ -613,11 +680,51 @@ async function checkStageLyrics(page) {
       (button) => (button.textContent || '').trim() === '回到当前句',
     ),
   }))()`)
-  const currentBefore = stage?.active ?? ''
-  await page.evaluate(
-    `document.querySelector('.stage button[aria-label="暂停"]')?.click()`,
+  const browsingScroll = await page.evaluate(
+    `document.querySelector('[data-stage-lyric-scroll]')?.scrollTop ?? -1`,
   )
-  await sleep(200)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('.stage button')]
+      .find((button) => (button.textContent || '').trim() === '相关推荐')
+    hit?.click()
+  })()`)
+  await sleep(250)
+  const relatedKept = await page.evaluate(`(() => ({
+    open: !!document.querySelector('[data-stage-related]'),
+    lyricHidden: (document.querySelector('[data-stage-lyric-scroll]')?.clientHeight ?? -1) === 0,
+  }))()`)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('.stage button')]
+      .find((button) => (button.textContent || '').trim() === '相关推荐')
+    hit?.click()
+  })()`)
+  await sleep(250)
+  const restoredBrowsing = await page.evaluate(`(() => ({
+    scrollTop: document.querySelector('[data-stage-lyric-scroll]')?.scrollTop ?? -1,
+    returnVisible: [...document.querySelectorAll('.stage button')].some(
+      (button) => (button.textContent || '').trim() === '回到当前句',
+    ),
+  }))()`)
+  check(
+    '开关相关推荐后保留歌词浏览位置',
+    relatedKept.open &&
+      relatedKept.lyricHidden &&
+      restoredBrowsing.returnVisible &&
+      restoredBrowsing.scrollTop === browsingScroll,
+  )
+  const currentBefore = await page.evaluate(
+    `document.querySelector('button[data-current]')?.textContent?.trim() ?? ''`,
+  )
+  let pausedForReturn = false
+  for (let i = 0; i < 3 && !pausedForReturn; i += 1) {
+    pausedForReturn = await page.evaluate(`(() => {
+      const play = document.querySelector('.stage button[aria-label="播放"]')
+      if (play) return true
+      document.querySelector('.stage button[aria-label="暂停"]')?.click()
+      return false
+    })()`)
+    await sleep(200)
+  }
   const progressBeforeReturn = await page.evaluate(
     `document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? ''`,
   )
@@ -643,6 +750,7 @@ async function checkStageLyrics(page) {
       afterBrowsing.volume === beforeBrowsing.volume &&
       returnClicked &&
       following &&
+      pausedForReturn &&
       progressAfterReturn === progressBeforeReturn &&
       returnFocusInside &&
       currentBefore.length > 0 &&

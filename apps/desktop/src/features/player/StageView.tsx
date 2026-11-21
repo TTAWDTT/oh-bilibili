@@ -141,8 +141,7 @@ export function StageView() {
     <div
       ref={stageRef}
       {...swipe}
-      role="dialog"
-      aria-modal="true"
+      role="region"
       aria-label="听歌舞台"
       onKeyDown={(event) => {
         if (event.key !== 'Tab' || !stageRef.current) return
@@ -244,6 +243,19 @@ export function StageView() {
           </div>
 
           <div className="stage-lyrics-pane h-[min(30vh,320px)] min-h-[170px] w-full lg:h-[min(58vh,520px)]">
+            <div className={relatedOpen ? 'hidden h-full' : 'h-full'}>
+              <StageLyrics
+                lines={lines}
+                synced={Boolean(doc?.synced)}
+                active={active}
+                loading={lyricsLoading}
+                failed={lyricsFailed}
+                source={doc?.source ?? ''}
+                trackKey={track.key}
+                onSeek={(at) => void usePlayerStore.getState().seek(at)}
+                onRetry={() => setLyricsAttempt((current) => current + 1)}
+              />
+            </div>
             {relatedOpen ? (
               <div data-stage-related className="flex h-full min-h-0 flex-col">
                 <div className="mb-2 flex h-8 shrink-0 items-center px-2 text-[12px] text-[var(--text-3)]">相关推荐</div>
@@ -269,19 +281,7 @@ export function StageView() {
                   ))}
                 </div>
               </div>
-            ) : (
-              <StageLyrics
-                lines={lines}
-                synced={Boolean(doc?.synced)}
-                active={active}
-                loading={lyricsLoading}
-                failed={lyricsFailed}
-                source={doc?.source ?? ''}
-                trackKey={track.key}
-                onSeek={(at) => void usePlayerStore.getState().seek(at)}
-                onRetry={() => setLyricsAttempt((current) => current + 1)}
-              />
-            )}
+            ) : null}
           </div>
         </div>
 
