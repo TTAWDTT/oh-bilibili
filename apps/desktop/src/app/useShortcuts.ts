@@ -64,6 +64,7 @@ export function useShortcuts(): void {
           app.closeSearch()
           return
         }
+        if (app.stage) return
         // 弹窗自己在 Modal 里处理 Esc，这里只负责没有弹窗时的收尾：
         // 先退出全屏，再收右栏。
         if (!dialogOpen) {
