@@ -409,7 +409,7 @@ export function TitleBar() {
           )}
           <button
             type="submit"
-            className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
+            className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent-strong)] px-3 text-[13px] font-medium text-white hover:bg-[var(--accent-strong-hover)]"
           >
             搜索
           </button>
@@ -472,7 +472,7 @@ export function TitleBar() {
           onClick={(event) => openSubmit(event.currentTarget)}
           aria-expanded={submitMenu !== null}
           aria-haspopup="menu"
-          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--accent)] px-3.5 text-[13px] text-white hover:opacity-90 sm:flex"
+          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--accent-strong)] px-3.5 text-[13px] text-white hover:bg-[var(--accent-strong-hover)] sm:flex"
         >
           投稿
         </button>
@@ -491,7 +491,7 @@ export function TitleBar() {
           <button
             type="button"
             onClick={() => setAuthOpen(true)}
-            className="bili-press flex h-7 items-center rounded-[6px] bg-[var(--accent)] px-3 text-[13px] font-medium text-white"
+            className="bili-press flex h-7 items-center rounded-[6px] bg-[var(--accent-strong)] px-3 text-[13px] font-medium text-white hover:bg-[var(--accent-strong-hover)]"
           >
             登录
           </button>
