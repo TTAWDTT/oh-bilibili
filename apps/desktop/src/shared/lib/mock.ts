@@ -41,6 +41,9 @@ const FOLLOW_SEEDS: {
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
 
+const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
+let libraryPartialRecovered = false
+
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
   // 队列相关命令都在 player 侧实现
@@ -1049,7 +1052,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'library_tracks': {
       const playlist = playlistOf(Math.trunc(num(args, 'playlist_id')))
+      const failing = libraryPartial && playlist.id === 2 && !libraryPartialRecovered
+      if (libraryPartial) performance.mark('library_tracks', { detail: playlist.id })
       await sleep(90)
+      if (failing) {
+        libraryPartialRecovered = true
+        throw Object.assign(new Error('预览：歌单读取失败'), { class: 'retryable' })
+      }
+      if (libraryPartial && playlist.id === 3) return []
       return playlist.keys.flatMap((key) => {
         const track = findTrack(key)
         return track ? [track] : []
