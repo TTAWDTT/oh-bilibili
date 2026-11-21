@@ -1189,6 +1189,38 @@ async function main() {
       '撤销恢复曲目和当前项',
       afterUndo.rows === queueBefore.count && afterUndo.active && !afterUndo.strip,
     )
+    const beforeRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      const target = rows[1]
+      if (!target) return null
+      target.focus()
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        next: rows[2]?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    await page.pressSpace()
+    await sleep(800)
+    const afterRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        focus: document.activeElement?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    check(
+      '键盘移除单曲且不切歌、焦点落到下一项',
+      beforeRemove &&
+        afterRemove.count === beforeRemove.count - 1 &&
+        afterRemove.current === beforeRemove.current &&
+        afterRemove.focus === beforeRemove.next,
+    )
 
     // 首页慢请求：8 秒只提示慢，10 秒成功仍要展示；重试后旧响应按请求 id 丢弃。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?slowHome=1`)}`)
