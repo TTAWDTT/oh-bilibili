@@ -14,6 +14,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { SharePanel } from './SharePanel'
 import { SummaryCard } from './SummaryCard'
+import { watchUrl } from './watchUrl'
 
 /** 状态翻过一次才换 key，让扩散环重播；初次挂载返回 0，进页面时不会三颗一起闪。 */
 function useFlipKey(value: boolean | number): number {
@@ -144,7 +145,7 @@ export function WatchHead({
           type="button"
           title="复制 BV 号与链接"
           onClick={() => {
-            void copyText(`https://www.bilibili.com/video/${track.key}`).then((ok) =>
+            void copyText(watchUrl(track.key, currentPage)).then((ok) =>
               toastDone(ok ? `已复制 ${track.key}` : '复制失败'),
             )
           }}
@@ -589,7 +590,7 @@ export function WatchInfo({
         </div>
       </AnchoredPanel>
       <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={520}>
-        <SharePanel track={track} onClose={() => setShareAt(null)} />
+        <SharePanel track={track} page={data.current_page} onClose={() => setShareAt(null)} />
       </AnchoredPanel>
       <Modal
         open={noteOpen}
