@@ -507,27 +507,20 @@ impl Library {
                 "SELECT track_id, mid, kind, want, state, attempts FROM reactions
                  WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC LIMIT ?2",
             )?;
-            let rows = stmt.query_map(params![mid as i64, limit.clamp(1, 500) as i64], |r| {
-                let kind: String = r.get(2)?;
-                let state: String = r.get(4)?;
-                Ok(Reaction {
-                    track_id: TrackId(r.get(0)?),
-                    mid: r.get::<_, i64>(1)? as u64,
-                    kind: if kind == "like" {
-                        ReactionKind::Like
-                    } else {
-                        ReactionKind::Fav
-                    },
-                    want: r.get::<_, i32>(3)? != 0,
-                    state: match state.as_str() {
-                        "synced" => ReactionState::Synced,
-                        "rejected" => ReactionState::Rejected,
-                        "stale" => ReactionState::Stale,
-                        _ => ReactionState::Pending,
-                    },
-                    attempts: r.get::<_, i64>(5)? as u32,
-                })
-            })?;
+            let rows = stmt.query_map(params![mid as i64, limit.clamp(1, 500) as i64], row_to_reaction)?;
+            rows.collect()
+        })
+    }
+
+    /// 当前账号的全部待办。手动同步要一次处理完，不能因为排在后面的
+    /// 旧条目 attempts 已经累加过就留在下一轮。
+    pub fn pending_reactions_all(&self, mid: u64) -> Result<Vec<Reaction>> {
+        self.with(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT track_id, mid, kind, want, state, attempts FROM reactions
+                 WHERE mid = ?1 AND state = 'pending' ORDER BY attempts ASC",
+            )?;
+            let rows = stmt.query_map(params![mid as i64], row_to_reaction)?;
             rows.collect()
         })
     }
@@ -624,6 +617,28 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         up_mid: row.get::<_, Option<i64>>(6)?.map(|v| v as u64),
         tname: None,
         typeid: None,
+    })
+}
+
+fn row_to_reaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Reaction> {
+    let kind: String = row.get(2)?;
+    let state: String = row.get(4)?;
+    Ok(Reaction {
+        track_id: TrackId(row.get(0)?),
+        mid: row.get::<_, i64>(1)? as u64,
+        kind: if kind == "like" {
+            ReactionKind::Like
+        } else {
+            ReactionKind::Fav
+        },
+        want: row.get::<_, i32>(3)? != 0,
+        state: match state.as_str() {
+            "synced" => ReactionState::Synced,
+            "rejected" => ReactionState::Rejected,
+            "stale" => ReactionState::Stale,
+            _ => ReactionState::Pending,
+        },
+        attempts: row.get::<_, i64>(5)? as u32,
     })
 }
 
@@ -876,6 +891,17 @@ mod tests {
             l.pending_reactions(42, 10).unwrap().is_empty(),
             "永久拒绝不再重试"
         );
+    }
+
+    #[test]
+    fn 全部待办一次取完不受批次上限影响() {
+        let l = lib();
+        for n in 0..21 {
+            let id = l.upsert_track(&track(&n.to_string())).unwrap();
+            l.set_reaction(id, 42, ReactionKind::Like, n % 2 == 0).unwrap();
+        }
+        assert_eq!(l.pending_reactions(42, 20).unwrap().len(), 20);
+        assert_eq!(l.pending_reactions_all(42).unwrap().len(), 21);
     }
 
     #[test]
