@@ -11,6 +11,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { PREFETCH_PX } from '../../shared/lib/prefetch'
+import { useRetryAfterLogin } from './useRetryAfterLogin'
 
 /**
  * 我关注的人。
@@ -31,6 +32,7 @@ export function FollowingView() {
   const [failed, setFailed] = useState(false)
   const authorHover = useAuthorHover()
   const boxRef = useRef<HTMLDivElement | null>(null)
+  const mountedRef = useRef(false)
   const loadingRef = useRef(false)
   const pageRef = useRef(0)
 
@@ -41,6 +43,7 @@ export function FollowingView() {
     setError(null)
     try {
       const [list, count] = await ipc.following(next)
+      if (!mountedRef.current) return
       setItems((prev) => (next === 1 ? list : [...prev, ...list]))
       setTotal(count)
       pageRef.current = next
@@ -49,20 +52,28 @@ export function FollowingView() {
       // 每页 50 条（接口上限），到这里才知道是不是真到底
       if (list.length === 0 || next * 50 >= count) setDone(true)
     } catch (e) {
+      if (!mountedRef.current) return
       // 第一页失败才是「关注列表没取到」；翻页失败只是这一段没取到，
       // 把已经拿到的人留在屏幕上，给个重试，别整页换成错误态。
       if (next === 1) setError(toWireError(e))
       else setFailed(true)
     } finally {
       loadingRef.current = false
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
   useEffect(() => {
+    mountedRef.current = true
     void load(1)
+    return () => {
+      mountedRef.current = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const retry = () => void load(1)
+  useRetryAfterLogin(error, retry)
 
   // 取回一页后缓冲还不够深就继续取。关注列表常一页装不满窗口
   // （328 个关注、一屏能放 20 个），光靠滚动事件永远触发不了。
@@ -78,7 +89,7 @@ export function FollowingView() {
       error.class === 'needs_login'
         ? { label: '去登录', onClick: () => setAuthOpen(true) }
         : error.class === 'retryable'
-          ? { label: '重试', onClick: () => void load(1) }
+          ? { label: '重试', onClick: retry }
           : null
     return (
       <EmptyState

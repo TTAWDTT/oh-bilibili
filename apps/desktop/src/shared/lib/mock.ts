@@ -52,7 +52,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
   }
 
   if (listError && (command === 'watch_later_list' || command === 'following')) {
-    if (listError === 'needs_login') throw fail('needs_login', '需要登录')
+    if (listError === 'needs_login' && !state.auth.logged_in) throw fail('needs_login', '需要登录')
     if (!settledListFailures.has(command) && (listError === 'retryable' || listError === 'input')) {
       await sleep(50)
       settledListFailures.add(command)

@@ -182,8 +182,9 @@ async function checkListErrors(page) {
     { label: '关注', title: '关注列表没取到', entry: '造梦阿瑄' },
   ]
   const dialog = `!!document.querySelector('[role="dialog"][aria-label="扫码登录"]')`
-  const waitFor = async (expression) => {
-    for (let i = 0; i < 30; i += 1) {
+  const waitFor = async (expression, timeout = 3000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
       if (await page.evaluate(expression)) return true
       await sleep(100)
     }
@@ -191,11 +192,12 @@ async function checkListErrors(page) {
   }
   const startErrors = page.runtimeErrors.length
   for (const kind of ['retryable', 'needs_login', 'input']) {
-    const url = new URL(WEB)
-    url.searchParams.set('listError', kind)
-    await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
-    await waitFor(`location.href === ${JSON.stringify(url.href)} && !!document.querySelector('nav[aria-label="主导航"]')`)
     for (const { label, title, entry } of lists) {
+      const url = new URL(WEB)
+      url.searchParams.set('listError', kind)
+      url.searchParams.set('list', label)
+      await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+      await waitFor(`location.href === ${JSON.stringify(url.href)} && !!document.querySelector('nav[aria-label="主导航"]')`)
       const active = `(() => {
         const button = document.querySelector('nav[aria-label="主导航"] button[aria-current="page"]')
         return (button?.getAttribute('aria-label') || button?.textContent.trim()) === ${JSON.stringify(label)}
@@ -203,6 +205,7 @@ async function checkListErrors(page) {
       const error = `document.querySelector('main h2')?.textContent.trim() === ${JSON.stringify(title)}`
       const detail = (text) => `document.querySelector('main p')?.textContent.trim() === ${JSON.stringify(text)}`
       const buttons = `[...document.querySelectorAll('main button')].map((button) => button.textContent.trim()).join(',')`
+      const recovered = `${active} && !(${error}) && !document.querySelector('[role="dialog"]') && document.querySelector('main #scroll-main')?.innerText.includes(${JSON.stringify(entry)})`
       const clicked = await page.clickExactText(label)
       const failed = clicked && await waitFor(`${active} && ${error}`)
       if (kind === 'retryable') {
@@ -210,13 +213,17 @@ async function checkListErrors(page) {
           `${detail('连不上 B 站，检查一下网络。')} && ${buttons} === '重试' && !(${dialog})`,
         ))
         const retried = await page.clickExactText('重试')
-        check(`${label}重试后在原页显示列表`, retried && await waitFor(
-          `${active} && !(${error}) && !(${dialog}) && document.querySelector('main #scroll-main')?.innerText.includes(${JSON.stringify(entry)})`,
-        ))
+        check(`${label}重试后在原页显示列表`, retried && await waitFor(recovered))
       } else if (kind === 'needs_login') {
         const login = failed && await page.evaluate(`${buttons} === '去登录'`) && await page.clickExactText('去登录')
-        check(`${label}需要登录时直接打开登录框`, login && await waitFor(`${active} && ${dialog}`))
-        await page.evaluate(`document.querySelector('[role="dialog"][aria-label="扫码登录"] button[aria-label="关闭"]')?.click()`)
+        const qrOpened = login && await waitFor(`${active} && ${dialog}`)
+        check(`${label}需要登录时直接打开登录框`, qrOpened)
+        const confirmed = qrOpened && await waitFor(
+          `${active} && !!document.querySelector('[role="dialog"][aria-label="账号"]')`,
+          10_000,
+        )
+        check(`${label}模拟扫码登录成功`, confirmed)
+        check(`${label}登录后在原页显示列表`, confirmed && await waitFor(recovered))
       } else {
         await sleep(300)
         check(`${label}保留永久错误`, failed && await page.evaluate(

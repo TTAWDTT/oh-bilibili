@@ -11,6 +11,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
 import { toastDone } from '../../app/notice'
+import { useRetryAfterLogin } from './useRetryAfterLogin'
 
 /**
  * 稍后再看。
@@ -26,6 +27,9 @@ export function WatchLaterView() {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<WireError | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const retry = () => setAttempt((n) => n + 1)
+
+  useRetryAfterLogin(error, retry)
 
   const removeOne = async (key: string): Promise<void> => {
     try {
@@ -59,7 +63,7 @@ export function WatchLaterView() {
       error.class === 'needs_login'
         ? { label: '去登录', onClick: () => setAuthOpen(true) }
         : error.class === 'retryable'
-          ? { label: '重试', onClick: () => setAttempt((n) => n + 1) }
+          ? { label: '重试', onClick: retry }
           : null
     return (
       <EmptyState
