@@ -589,7 +589,7 @@ export function WatchInfo({
         </div>
       </AnchoredPanel>
       <AnchoredPanel anchor={shareAt} onClose={() => setShareAt(null)} label="分享" width={520}>
-        <SharePanel track={track} onClose={() => setShareAt(null)} />
+        <SharePanel track={track} page={data.current_page} onClose={() => setShareAt(null)} />
       </AnchoredPanel>
       <Modal
         open={noteOpen}

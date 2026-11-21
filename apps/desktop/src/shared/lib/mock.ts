@@ -630,6 +630,26 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (!track) throw fail('input', '预览模式没有这条视频')
       // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
       setDuration(track.duration_ms ?? 30_000)
+      const multiP =
+        import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiP')
+      const manyPages =
+        import.meta.env.DEV && new URLSearchParams(window.location.search).has('manyPages')
+      const pages = manyPages
+        ? Array.from({ length: 80 }, (_, index) => ({
+            no: index + 1,
+            cid: 100 + index,
+            title:
+              index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : `第 ${index + 1} 集 · 预览`,
+            duration_ms: 30_000 + index * 1000,
+          }))
+        : multiP
+          ? [
+              { no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 },
+              { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: track.duration_ms ?? 30_000 },
+            ]
+          : [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }]
+      const requestedPage = Number(args.page ?? 1) || 1
+      const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
       return {
         key: track.key,
         desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD 下面的文字用来验证简介超过两行时的展开与收起，以及窄屏下的排版是否会把按钮挤掉。展开之后应该能看到这一段完整的介绍，收起时恢复到两行，按钮本身不遮挡下面的标签。',
@@ -647,8 +667,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         },
         pubdate: Math.floor(Date.now() / 1000) - 86400,
         tname: track.tname ?? null,
-        pages: [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }],
-        current_page: 1,
+        pages,
+        current_page: currentPage,
         // 预览给一个三集合集：换成别的视频时把当前这条换进第一集，右栏合集能验到。
         season: {
           id: 1,
@@ -753,9 +773,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           mid: i === 0 && ownerMid !== null ? ownerMid : seed.mid,
           author: seed.author,
           avatar: null,
-          text: seed.text,
+          text: i === 1 ? '@阿明 谢谢 @阿明，这段前奏我也循环了很久。' : seed.text,
           emotes: [],
-          mentions: [],
+          mentions: i === 1 ? [['阿明', 90002]] : [],
           pictures:
             i === 0
               ? ['七里香', '晴天', '起风了', '江南']

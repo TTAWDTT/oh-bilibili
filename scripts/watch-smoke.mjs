@@ -145,6 +145,41 @@ function check(name, ok) {
   console.log(`${ok ? '✓' : '✗'} ${name}`)
 }
 
+async function controlFit(page) {
+  return page.evaluate(`(() => {
+    const frame = document.querySelector('[data-watch-player]')
+    const row = document.querySelector('[data-watch-controls]')
+    const rail = document.querySelector('[data-watch-rail]')
+    const visible = (selector) => {
+      const el = document.querySelector(selector)
+      if (!el) return false
+      const style = getComputedStyle(el)
+      return style.display !== 'none' && style.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    }
+    if (!frame || !row) return null
+    const frameBox = frame.getBoundingClientRect()
+    const buttons = [...row.querySelectorAll('button')].filter((b) => {
+      const style = getComputedStyle(b)
+      return style.display !== 'none' && style.visibility !== 'hidden' && b.getBoundingClientRect().width > 0
+    })
+    const outside = buttons.filter((b) => {
+      const box = b.getBoundingClientRect()
+      return box.right > frameBox.right + 0.5 || box.left < frameBox.left - 0.5
+    })
+    return {
+      overflow: row.scrollWidth - row.clientWidth,
+      outside: outside.length,
+      rail: !!rail && getComputedStyle(rail).display !== 'none',
+      inline: visible('[data-watch-inline]'),
+      shot: visible('button[aria-label="截图"]'),
+      pip: visible('button[aria-label="画中画"]'),
+      volume: visible('button[aria-label="静音"], button[aria-label="取消静音"]'),
+      web: visible('button[aria-label="网页全屏"], button[aria-label="退出网页全屏"]'),
+      full: visible('button[aria-label="全屏"], button[aria-label="退出全屏"]'),
+    }
+  })()`)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     console.log('没装 Chrome，跳过')
@@ -282,6 +317,44 @@ async function main() {
       check('支持画中画时桌面控制条有入口', !pipAt1320.enabled || pipAt1320.visible)
     }
 
+    const fit1320 = await controlFit(page)
+    check('1320 宽右栏出现', !!fit1320?.rail)
+    check('1320 宽正文不重复右栏内容', !!fit1320 && !fit1320.inline)
+    check('1320 宽控制条没有被裁切', !!fit1320 && fit1320.overflow <= 1 && fit1320.outside === 0)
+    check('1320 宽保留截图入口', !!fit1320?.shot)
+
+    for (const width of [768, 980]) {
+      await page.viewport(width, 860)
+      await sleep(700)
+      const fit = await controlFit(page)
+      check(`${width} 宽控制条没有被裁切`, !!fit && fit.overflow <= 1 && fit.outside === 0)
+      check(`${width} 宽不出双栏`, !!fit && !fit.rail)
+      check(`${width} 宽右栏内容留在正文`, !!fit && fit.inline)
+      check(`${width} 宽保留画中画、音量、网页全屏、全屏`, !!fit && fit.pip && fit.volume && fit.web && fit.full)
+      check(`${width} 宽截图入口按空间收起`, !!fit && !fit.shot)
+
+      const mute = await page.evaluate(`(() => {
+        const btn = document.querySelector('button[aria-label="静音"], button[aria-label="取消静音"]')
+        if (!btn) return null
+        const box = btn.getBoundingClientRect()
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+      })()`)
+      check(`${width} 宽有音量按钮`, !!mute)
+      if (!mute) continue
+      const volumeWidth = () => page.evaluate(`(() => {
+        const slider = document.querySelector('[role="slider"][aria-label="音量"]')
+        return slider?.parentElement?.getBoundingClientRect().width ?? 0
+      })()`)
+      const before = await volumeWidth()
+      await page.mouseEvent({ type: 'mouseMoved', x: mute.x, y: mute.y })
+      await sleep(300)
+      const after = await volumeWidth()
+      const expanded = await controlFit(page)
+      check(`${width} 宽音量滑杆真的展开`, after > before + 40)
+      check(`${width} 宽音量展开后控制条仍完整`, !!expanded && expanded.overflow <= 1 && expanded.outside === 0)
+      await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
+    }
+
     await page.viewport(700, 860)
     await sleep(600)
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
@@ -292,6 +365,8 @@ async function main() {
       return { visible: box.width > 0 && getComputedStyle(btn).display !== 'none' }
     })()`)
     check('700 宽仍能改播放倍速', !!speedAt700?.visible)
+    const fit700 = await controlFit(page)
+    check('700 宽保留截图入口', !!fit700?.shot)
     if (speedAt700?.visible) {
       await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
       await sleep(200)
@@ -362,6 +437,12 @@ async function main() {
       before = await page.evaluate(`document.querySelectorAll('[data-comment-id]').length`)
     }
     check('评论列表渲染出多条', before > 0)
+    check(
+      '空格后的评论提及可点击',
+      (await page.evaluate(
+        `[...document.querySelectorAll('button')].filter((b) => (b.textContent || '').trim() === '@阿明').length`,
+      )) === 2,
+    )
     check(
       '评论图片缩略图放大到 88px',
       (await page.evaluate(
@@ -450,7 +531,7 @@ async function main() {
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       if (!input) return false
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input, '周杰伦')
+      setter?.call(input, '晴天')
       input.dispatchEvent(new Event('input', { bubbles: true }))
       return true
     })()`)
@@ -464,9 +545,149 @@ async function main() {
     let searched = false
     for (let i = 0; i < 20 && !searched; i += 1) {
       await sleep(400)
-      searched = await page.evaluate(`document.body.innerText.includes('综合') && document.querySelectorAll('[data-track-card]').length > 0`)
+      searched = await page.evaluate(`(() => {
+        const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+        return !!dialog && dialog.querySelectorAll('[data-track-card]').length > 0
+      })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
+    await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      dialog?.querySelector('button[aria-label^="观看"]')?.click()
+    })()`)
+    let searchVideo = false
+    for (let i = 0; i < 30 && !searchVideo; i += 1) {
+      await sleep(500)
+      searchVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(900)
+    const returned = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      const active = document.activeElement
+      return {
+        dialog: !!dialog,
+        query: input ? input.value : '',
+        focused: !!active?.closest?.('[data-track-card]'),
+      }
+    })()`)
+    check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
+    check('返回后焦点落回结果卡片', returned.focused)
+
+    // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let multiVideo = false
+    for (let i = 0; i < 30 && !multiVideo; i += 1) {
+      await sleep(500)
+      multiVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    const switchedP2 = await page.evaluate(`(() => {
+      const picker = document.querySelector('button[aria-label="选集"]')
+      if (!picker) return false
+      picker.click()
+      const p2 = [...document.querySelectorAll('button')].find((b) =>
+        (b.textContent || '').includes('第二 P · 预览'))
+      if (!p2) return false
+      p2.click()
+      return true
+    })()`)
+    await sleep(1600)
+    check('多 P 预览切到 P2', multiVideo && switchedP2)
+    await page.clickText('分享')
+    await sleep(700)
+    const withTimeToggled = await page.evaluate(`(() => {
+      const input = [...document.querySelectorAll('input[type="checkbox"]')].find((el) =>
+        (el.closest('label')?.textContent || '').includes('开始分享'))
+      if (!input) return false
+      input.click()
+      return true
+    })()`)
+    await sleep(150)
+    check('点「嵌入代码」', await page.clickExactText('嵌入代码'))
+    await sleep(200)
+    const embedParams = await page.evaluate(`(() => {
+      const value = document.querySelector('textarea[readonly]')?.value ?? ''
+      const src = value.split('src="')[1]?.split('"')[0] ?? ''
+      const url = new URL(src.startsWith('//') ? 'https:' + src : src)
+      return { p: url.searchParams.get('p'), t: url.searchParams.get('t') }
+    })()`)
+    check(
+      '分享当前分 P 带 p=2 和时间',
+      withTimeToggled && embedParams?.p === '2' && embedParams?.t !== null,
+    )
+    check(
+      '短选集不出现找分集',
+      !(await page.evaluate(`!!document.querySelector('input[aria-label="找分集"]')`)),
+    )
+
+    // 长分 P 预览：找分集只筛选列表，选中才切 P，清空后完整列表和当前项都回来。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?manyPages=1`)}`)
+    await sleep(5000)
+    await page.evaluate(`(() => {
+      const card = [...document.querySelectorAll('button')].find((b) =>
+        (b.getAttribute('aria-label') || '').startsWith('观看'))
+      if (card) card.click()
+    })()`)
+    let manyVideo = false
+    for (let i = 0; i < 30 && !manyVideo; i += 1) {
+      await sleep(500)
+      manyVideo = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    const visiblePanel = `[...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)`
+    const pageRows = `(() => {
+      const panel = ${visiblePanel}
+      const list = panel?.querySelector('ol')
+      const rows = list ? [...list.querySelectorAll('li')] : []
+      return {
+        count: rows.length,
+        text: rows.map((row) => row.textContent?.trim() ?? '').join('|'),
+        active: rows.find((row) => row.querySelector('button[aria-pressed="true"]'))?.textContent?.trim() ?? '',
+        header: panel?.querySelector('h3')?.parentElement?.textContent?.trim() ?? '',
+      }
+    })()`
+    const typeIntoFilter = (value) => page.evaluate(`(() => {
+      const input = ${visiblePanel}?.querySelector('input[aria-label="找分集"]')
+      if (!input) return false
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, ${JSON.stringify(value)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    const beforeFilter = await page.evaluate(pageRows)
+    check('长分 P 选集出现找分集', manyVideo && beforeFilter.count === 80)
+    check('找分集输入框可用', await typeIntoFilter('P62'))
+    await sleep(300)
+    const byNumber = await page.evaluate(pageRows)
+    check(
+      '输入 P62 只筛选不切换',
+      byNumber.count === 1 &&
+        byNumber.text.includes('P62') &&
+        byNumber.header === beforeFilter.header,
+    )
+    await typeIntoFilter('现场')
+    await sleep(300)
+    const byTitle = await page.evaluate(pageRows)
+    check('输入标题片段只留下匹配集', byTitle.count === 1 && byTitle.text.includes('晴天 · 现场版'))
+    await typeIntoFilter('P62')
+    await sleep(200)
+    await page.evaluate(`${visiblePanel}?.querySelector('ol li button')?.click()`)
+    await sleep(1500)
+    const picked = await page.evaluate(pageRows)
+    check('选中筛选结果才切到 P62', picked.header.includes('(62/80)'))
+    await page.evaluate(`${visiblePanel}?.querySelector('button[aria-label="清除筛选"]')?.click()`)
+    await sleep(300)
+    const cleared = await page.evaluate(pageRows)
+    check(
+      '清除筛选恢复 80 集并保留当前项标记',
+      cleared.count === 80 && cleared.active.includes('P62'),
+    )
 
     // 历史：翻到第 61 条，并把不同年份的同月同日分成两组。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?historyLong=1`)}`)
