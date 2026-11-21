@@ -859,6 +859,26 @@ mod tests {
     }
 
     #[test]
+    fn 可重试失败留在待办_永久拒绝才移除() {
+        let l = lib();
+        let id = l.upsert_track(&track("BVretry")).unwrap();
+        l.set_reaction(id, 42, ReactionKind::Like, true).unwrap();
+
+        let first = l.pending_reactions(42, 10).unwrap();
+        assert_eq!(first.len(), 1);
+        l.mark_reaction(&first[0], ReactionState::Pending).unwrap();
+        let again = l.pending_reactions(42, 10).unwrap();
+        assert_eq!(again.len(), 1, "可重试失败不能从待办里消失");
+        assert_eq!(again[0].attempts, 1, "重试次数要累加，下一次轮转到后面的待办");
+
+        l.mark_reaction(&again[0], ReactionState::Rejected).unwrap();
+        assert!(
+            l.pending_reactions(42, 10).unwrap().is_empty(),
+            "永久拒绝不再重试"
+        );
+    }
+
+    #[test]
     fn 换号后旧账号的待推项被标成过期() {
         let l = lib();
         let id = l.upsert_track(&track("1")).unwrap();
