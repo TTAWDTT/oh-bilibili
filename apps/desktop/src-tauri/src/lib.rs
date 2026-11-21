@@ -949,6 +949,11 @@ fn auth_status(engine: tauri::State<'_, Arc<Engine>>) -> AuthSnapshot {
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn auth_refresh(engine: tauri::State<'_, Arc<Engine>>) -> Result<AuthSnapshot, WireError> {
+    engine.refresh_session().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn qr_svg(engine: tauri::State<'_, Arc<Engine>>, text: String) -> Result<String, WireError> {
     engine.qr_svg(&text)
 }
@@ -1250,6 +1255,7 @@ pub fn run() {
             fav_set,
             lyrics_get,
             auth_status,
+            auth_refresh,
             auth_qrcode,
             qr_svg,
             auth_poll,

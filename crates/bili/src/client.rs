@@ -44,6 +44,8 @@ pub struct NavState {
 pub struct Client {
     http: reqwest::Client,
     jar: RwLock<HashMap<String, String>>,
+    /// 指纹只取一次。并发请求同时发现罐里没有 buvid3 时，只让一个真的发请求。
+    fingerprint: tokio::sync::Mutex<()>,
     keys: tokio::sync::Mutex<Option<(WbiKeys, Instant)>>,
     gate: tokio::sync::Mutex<Option<Instant>>,
     /// 播放专用的闸门，与通用闸门分开。
@@ -82,6 +84,7 @@ impl Client {
         Ok(Client {
             http,
             jar: RwLock::new(HashMap::new()),
+            fingerprint: tokio::sync::Mutex::new(()),
             keys: tokio::sync::Mutex::new(None),
             gate: tokio::sync::Mutex::new(None),
             play_gate: tokio::sync::Mutex::new(None),
@@ -157,13 +160,22 @@ impl Client {
         }
     }
 
-    /// 首次使用前必须调用：拿设备指纹，否则搜索会被风控挡成 HTML。
+    /// 拿设备指纹。每个业务请求前都会自动走这里，没有指纹时才会真的发请求。
     pub async fn ensure_fingerprint(&self) -> Result<(), BiliError> {
         if self.cookie_value("buvid3").is_some() {
             return Ok(());
         }
+        let _guard = self.fingerprint.lock().await;
+        if self.cookie_value("buvid3").is_some() {
+            return Ok(());
+        }
         let v = self
-            .get_json(&format!("{API}/x/frontend/finger/spi"), Duration::ZERO)
+            .send_json(
+                &format!("{API}/x/frontend/finger/spi"),
+                Duration::ZERO,
+                false,
+                false,
+            )
             .await?;
         if let Some(b3) = v["data"]["b_3"].as_str() {
             self.set_cookie("buvid3", b3);
@@ -182,8 +194,7 @@ impl Client {
                 &format!("{API}/x/web-interface/nav"),
                 Duration::from_millis(200),
             )
-            .await
-            .unwrap_or(Value::Null);
+            .await?;
         let data = &v["data"];
         let nav = NavState {
             is_login: data["isLogin"].as_bool().unwrap_or(false),
@@ -300,6 +311,17 @@ impl Client {
         if !ignore_cooldown {
             self.wait_cooldown().await?;
         }
+        self.ensure_fingerprint().await?;
+        self.send_json(url, min_interval, allow_guest, relation).await
+    }
+
+    async fn send_json(
+        &self,
+        url: &str,
+        min_interval: Duration,
+        allow_guest: bool,
+        relation: bool,
+    ) -> Result<Value, BiliError> {
         if relation {
             Client::wait_slot(&self.relation_gate, min_interval).await;
         } else {
@@ -366,6 +388,7 @@ impl Client {
     /// 取原始字节。弹幕接口给的是压缩流，需要调用方自己解。
     pub async fn get_bytes(&self, url: &str, min_interval: Duration) -> Result<Vec<u8>, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(min_interval).await;
         let req = self
             .session_request(reqwest::Method::GET, url)
@@ -378,6 +401,7 @@ impl Client {
     /// 取原始文本。弹幕接口返回的是 XML，不是 JSON。
     pub async fn get_text(&self, url: &str, min_interval: Duration) -> Result<String, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(min_interval).await;
         let req = self
             .session_request(reqwest::Method::GET, url)
@@ -442,6 +466,7 @@ impl Client {
         form: Vec<(&str, String)>,
     ) -> Result<Value, BiliError> {
         self.wait_cooldown().await?;
+        self.ensure_fingerprint().await?;
         self.gate(Duration::from_millis(400)).await;
 
         let req = self
