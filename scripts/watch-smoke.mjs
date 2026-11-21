@@ -488,6 +488,12 @@ async function checkStageLyrics(page) {
     await sleep(200)
     stageReady = await page.evaluate(`!!document.querySelector('button[aria-label="打开播放舞台"]')`)
   }
+  await page.evaluate(`(() => {
+    if (document.querySelector('.rail-slot')?.dataset.open === 'false') {
+      document.querySelector('button[aria-label="歌词栏"]')?.click()
+    }
+  })()`)
+  await sleep(250)
   await page.evaluate(`document.querySelector('button[aria-label="打开播放舞台"]')?.click()`)
   let lyricsReady = false
   for (let i = 0; i < 30 && !lyricsReady; i += 1) {
@@ -543,6 +549,11 @@ async function checkStageLyrics(page) {
     const box = document.querySelector('[data-stage-lyric-scroll]')?.getBoundingClientRect()
     return box ? [box.left + box.width / 2, box.top + box.height / 2] : null
   })()`)
+  const beforeBrowsing = await page.evaluate(`(() => ({
+    scrollTop: document.querySelector('[data-stage-lyric-scroll]')?.scrollTop ?? -1,
+    volume: document.querySelector('[aria-label="音量"]')?.getAttribute('aria-valuenow') ?? '',
+    progress: document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? '',
+  }))()`)
   if (scrollBox) {
     await page.mouseEvent({ type: 'mouseMoved', x: scrollBox[0], y: scrollBox[1] })
     await page.mouseEvent({
@@ -554,10 +565,33 @@ async function checkStageLyrics(page) {
     })
   }
   await sleep(300)
-  const browsing = await page.evaluate(
-    `[...document.querySelectorAll('.stage button')].some((button) => (button.textContent || '').trim() === '回到当前句')`,
-  )
+  await page.evaluate(`document.querySelector('[data-stage-lyric-scroll]')?.focus()`)
+  await page.keyEvent({
+    type: 'keyDown',
+    key: 'ArrowUp',
+    code: 'ArrowUp',
+    windowsVirtualKeyCode: 38,
+    nativeVirtualKeyCode: 38,
+  })
+  await page.keyEvent({
+    type: 'keyUp',
+    key: 'ArrowUp',
+    code: 'ArrowUp',
+    windowsVirtualKeyCode: 38,
+    nativeVirtualKeyCode: 38,
+  })
+  await sleep(200)
+  const afterBrowsing = await page.evaluate(`(() => ({
+    scrollTop: document.querySelector('[data-stage-lyric-scroll]')?.scrollTop ?? -1,
+    volume: document.querySelector('[aria-label="音量"]')?.getAttribute('aria-valuenow') ?? '',
+    browsing: [...document.querySelectorAll('.stage button')].some(
+      (button) => (button.textContent || '').trim() === '回到当前句',
+    ),
+  }))()`)
   const currentBefore = stage?.active ?? ''
+  const progressBeforeReturn = await page.evaluate(
+    `document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? ''`,
+  )
   const returnClicked = await page.evaluate(`(() => {
     const hit = [...document.querySelectorAll('.stage button')]
       .find((button) => (button.textContent || '').trim() === '回到当前句')
@@ -568,11 +602,16 @@ async function checkStageLyrics(page) {
   const following = await page.evaluate(
     `![...document.querySelectorAll('.stage button')].some((button) => (button.textContent || '').trim() === '回到当前句')`,
   )
+  const progressAfterReturn = await page.evaluate(
+    `document.querySelector('[aria-label="播放进度"]')?.getAttribute('aria-valuenow') ?? ''`,
+  )
   check(
     '滚轮浏览歌词后暂停跟随，回到当前句不跳播',
-    browsing &&
+    afterBrowsing.browsing &&
+      afterBrowsing.volume === beforeBrowsing.volume &&
       returnClicked &&
       following &&
+      Math.abs(Number(progressAfterReturn) - Number(progressBeforeReturn)) <= 4 &&
       currentBefore.length > 0 &&
       (await page.evaluate(
         `document.querySelector('button[data-current]')?.textContent?.trim() === ${JSON.stringify(currentBefore)}`,
@@ -581,41 +620,100 @@ async function checkStageLyrics(page) {
 
   const seeked = await page.evaluate(`(() => {
     const rows = [...document.querySelectorAll('[data-stage-lyric-scroll] button')]
-    const first = rows[0]
-    if (!first) return null
-    const text = first.textContent.trim()
-    first.click()
+    const target = [...rows].reverse().find((row) => row.dataset.current !== 'true')
+    if (!target) return null
+    const text = target.textContent.trim()
+    target.click()
     return text
   })()`)
-  await sleep(700)
+  let seekedReady = false
+  for (let i = 0; i < 20 && !seekedReady; i += 1) {
+    await sleep(150)
+    seekedReady = await page.evaluate(
+      `document.querySelector('button[data-current]')?.textContent?.trim() === ${JSON.stringify(seeked)}`,
+    )
+  }
   check(
     '点击带时间的歌词会跳播',
-    seeked &&
-      (await page.evaluate(
-        `document.querySelector('button[data-current]')?.textContent?.trim() === ${JSON.stringify(seeked)}`,
-      )),
+    seeked && seekedReady,
   )
 
-  await page.viewport(380, 900)
+  await page.evaluate(
+    `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
+  )
+  await sleep(300)
+  const escaped = await page.evaluate(`(() => ({
+    stage: !!document.querySelector('.stage'),
+    rail: document.querySelector('.rail-slot')?.dataset.open,
+    focus: document.activeElement?.getAttribute('aria-label'),
+  }))()`)
+  check(
+    'Esc 只关舞台，保留右栏并把焦点还给舞台入口',
+    !escaped.stage &&
+      escaped.rail === 'true' &&
+      escaped.focus === '打开播放舞台',
+  )
+  await page.evaluate(`document.querySelector('button[aria-label="打开播放舞台"]')?.click()`)
+  await sleep(300)
+  await page.viewport(380, 560)
   await sleep(500)
   const narrow = await page.evaluate(`(() => {
     const lyrics = document.querySelector('[data-stage-lyric-scroll]')
     const box = lyrics?.getBoundingClientRect()
+    const pause = document.querySelector('.stage button[aria-label="暂停"], .stage button[aria-label="播放"]')
+    const pauseBox = pause?.getBoundingClientRect()
+    const hit = pauseBox
+      ? document.elementFromPoint(pauseBox.left + pauseBox.width / 2, pauseBox.top + pauseBox.height / 2)
+      : null
     return {
       width: box?.width ?? 0,
       columns: getComputedStyle(document.querySelector('.stage .grid')).gridTemplateColumns,
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       hasVolume: !!document.querySelector('.stage button[aria-label="静音"], .stage button[aria-label="取消静音"]'),
+      pauseHit: !!hit?.closest('button') && (hit.closest('button') === pause),
     }
   })()`)
+  const narrowBefore = await page.evaluate(`(() => {
+    const scroller = document.querySelector('[data-stage-lyric-scroll]')
+    if (scroller) scroller.scrollTop = 0
+    scroller?.focus()
+    return {
+      scrollTop: scroller?.scrollTop ?? 0,
+      volume: document.querySelector('[aria-label="音量"]')?.getAttribute('aria-valuenow') ?? '',
+    }
+  })()`)
+  await page.keyEvent({
+    type: 'keyDown',
+    key: 'ArrowDown',
+    code: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+    nativeVirtualKeyCode: 40,
+  })
+  await page.keyEvent({
+    type: 'keyUp',
+    key: 'ArrowDown',
+    code: 'ArrowDown',
+    windowsVirtualKeyCode: 40,
+    nativeVirtualKeyCode: 40,
+  })
+  await sleep(200)
+  const narrowAfter = await page.evaluate(`(() => ({
+    scrollTop: document.querySelector('[data-stage-lyric-scroll]')?.scrollTop ?? 0,
+    volume: document.querySelector('[aria-label="音量"]')?.getAttribute('aria-valuenow') ?? '',
+  }))()`)
   check(
     '窄窗舞台按上下布局保留歌词和播放控件',
     narrow.width >= 300 &&
       narrow.columns.trim().split(/\s+/).length === 1 &&
       !narrow.overflow &&
-      narrow.hasVolume,
+      narrow.hasVolume &&
+      narrow.pauseHit &&
+      narrowAfter.scrollTop !== narrowBefore.scrollTop &&
+      narrowAfter.volume === narrowBefore.volume,
   )
   await page.viewport(1320, 900)
+  await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
+  await sleep(200)
 }
 
 async function checkHeroAllocation(page) {

@@ -99,7 +99,10 @@ export function StageView() {
       if (e.key === 'Escape') setStage(false)
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.querySelector<HTMLButtonElement>('button[aria-label="打开播放舞台"]')?.focus()
+    }
   }, [open, setStage])
 
   useEffect(() => {
@@ -206,7 +209,7 @@ export function StageView() {
             )}
           </div>
 
-          <div className="h-[min(36vh,320px)] min-h-[170px] w-full lg:h-[min(58vh,520px)]">
+          <div className="h-[min(30vh,320px)] min-h-[170px] w-full lg:h-[min(58vh,520px)]">
             <StageLyrics
               lines={lines}
               synced={Boolean(doc?.synced)}
@@ -214,6 +217,7 @@ export function StageView() {
               loading={lyricsLoading}
               failed={lyricsFailed}
               source={doc?.source ?? ''}
+              trackKey={track.key}
               onSeek={(at) => void usePlayerStore.getState().seek(at)}
               onRetry={() => setLyricsAttempt((current) => current + 1)}
             />
@@ -227,7 +231,10 @@ export function StageView() {
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => navigate({ kind: 'watch', track: item })}
+                  onClick={() => {
+                    setStage(false)
+                    navigate({ kind: 'watch', track: item })
+                  }}
                   title={item.title}
                   className="group w-[112px] shrink-0 text-left"
                 >

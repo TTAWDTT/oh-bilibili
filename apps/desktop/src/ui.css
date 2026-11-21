@@ -310,6 +310,15 @@
   animation: stage-line-breathe 4.5s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .stage-disc > img,
+  .stage-disc > div,
+  .stage-line,
+  .stage-cover::before {
+    animation: none;
+  }
+}
+
 /* 直播的「LIVE」红点与封面上那三根跳动的电平条：B 站直播卡上最认得出的两处动效。 */
 @keyframes bili-live-pulse {
   0%,

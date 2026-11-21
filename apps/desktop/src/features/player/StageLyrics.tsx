@@ -8,6 +8,7 @@ type StageLyricsProps = {
   loading: boolean
   failed: string | null
   source: string
+  trackKey: string
   onSeek: (atMs: number) => void
   onRetry: () => void
 }
@@ -19,6 +20,7 @@ export function StageLyrics({
   loading,
   failed,
   source,
+  trackKey,
   onSeek,
   onRetry,
 }: StageLyricsProps) {
@@ -26,13 +28,18 @@ export function StageLyrics({
   const rows = useRef<Array<HTMLButtonElement | null>>([])
   const [following, setFollowing] = useState(true)
 
+  useEffect(() => {
+    setFollowing(true)
+    if (scroller.current) scroller.current.scrollTop = 0
+  }, [trackKey])
+
   const followActive = (): void => {
     const root = scroller.current
     const row = rows.current[active]
     if (!root || !row) return
     root.scrollTo({
       top: row.offsetTop - root.clientHeight * 0.38 + row.offsetHeight / 2,
-      behavior: 'smooth',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     })
   }
 
@@ -87,10 +94,23 @@ export function StageLyrics({
         onWheel={() => setFollowing(false)}
         onKeyDown={(event) => {
           if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+            event.preventDefault()
+            event.stopPropagation()
             setFollowing(false)
+            const root = scroller.current
+            if (!root) return
+            if (event.key === 'Home') root.scrollTo({ top: 0 })
+            else if (event.key === 'End') root.scrollTo({ top: root.scrollHeight })
+            else {
+              const step =
+                event.key === 'PageUp' || event.key === 'PageDown'
+                  ? root.clientHeight * 0.8
+                  : 56
+              root.scrollBy({ top: event.key === 'ArrowUp' || event.key === 'PageUp' ? -step : step })
+            }
           }
         }}
-        className="no-scrollbar lyrics-mask relative min-h-0 flex-1 overflow-y-auto px-3 pb-[38%] pt-[32%] outline-none"
+        className="no-scrollbar lyrics-mask relative min-h-0 flex-1 overflow-y-auto px-3 pb-16 pt-12 outline-none"
       >
         {lines.map((line, index) => {
           const current = index === active
