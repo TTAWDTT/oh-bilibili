@@ -1,8 +1,46 @@
 //! 真实接口验证。默认 ignore，因为它依赖网络和 B 站的当前风控状态。
 //!
 //! 运行：cargo test -p bilimusic-bili --test live -- --ignored --nocapture
+//! 需要登录态的用例读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json；
+//! 未设置时打印跳过原因。
 
 use bilimusic_model::{SearchQuery, TrackKey};
+use bilimusic_bili::Source;
+
+const LIVE_COOKIES_ENV: &str = "BILIMUSIC_LIVE_COOKIES";
+
+/// 登录态只来自显式指定的专用测试账号，不读取应用自己的数据目录。
+fn live_cookies() -> Option<Vec<(String, String)>> {
+    let Some(path) = std::env::var_os(LIVE_COOKIES_ENV).map(std::path::PathBuf::from) else {
+        eprintln!("跳过：需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>");
+        return None;
+    };
+    let raw = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "{LIVE_COOKIES_ENV} 指向的凭据文件读不了（{}）：{error}",
+            path.display()
+        )
+    });
+    Some(serde_json::from_str(&raw).unwrap_or_else(|error| {
+        panic!(
+            "{LIVE_COOKIES_ENV} 必须是 cookies.json 的 [(name, value)] 数组（{}）：{error}",
+            path.display()
+        )
+    }))
+}
+
+async fn source_with_live_cookies() -> Option<Source> {
+    let cookies = live_cookies()?;
+    let source = Source::open().await.expect("Source 应该能打开");
+    source.import_cookies(&cookies);
+    source.refresh_session().await.expect("刷新会话");
+    assert!(
+        source.is_logged_in(),
+        "{LIVE_COOKIES_ENV} 指向的账号未登录"
+    );
+    Some(source)
+}
+
 /// 每周必看：期数列表是公开接口，某一期要走 wbi + web_location，缺了就 -352。
 /// 标题在 `data.config` 里（不是 `data` 顶层），片单一次 50 条。
 #[tokio::test(flavor = "multi_thread")]
@@ -31,7 +69,15 @@ async fn 每周必看能取到期数与片单() {
     );
 }
 
-use bilimusic_bili::Source;
+#[tokio::test]
+#[ignore = "真实网络"]
+async fn 游客二维码接口能生成挑战() {
+    let source = Source::open().await.expect("Source 应该能打开");
+    let qr = source.login_qr().await.expect("二维码应该能生成");
+    assert!(!qr.key.is_empty(), "qrcode_key 不能为空");
+    assert!(qr.url.starts_with("http"), "二维码内容应该是一个链接");
+    assert!(qr.svg.starts_with("<svg"), "二维码必须渲染成本地 SVG");
+}
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络"]
@@ -410,18 +456,9 @@ async fn 换歌的三个网络调用各自多久() {
 #[ignore = "真实网络，用来量收藏夹一页的耗时"]
 async fn 收藏夹一页要多久() {
     use std::time::Instant;
-    let source = Source::open().await.expect("Source");
-    // 用应用已保存的登录态；没有就跳过（这条测试只在登录后有意义）
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
     };
-    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-    source.import_cookies(&pairs);
-    source.refresh_session().await.expect("刷新会话");
     let folders = source.fav_folders().await.expect("收藏夹列表");
     let folder = folders
         .iter()
@@ -448,17 +485,9 @@ async fn 收藏夹一页要多久() {
 #[tokio::test]
 #[ignore = "真实网络，用来核对赞过的视频"]
 async fn 赞过的视频带封面和分区() {
-    let source = Source::open().await.expect("Source");
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
     };
-    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-    source.import_cookies(&pairs);
-    source.refresh_session().await.expect("刷新会话");
 
     let list = source.liked_videos().await.expect("赞过的视频");
     println!("赞过 {} 条", list.len());
@@ -548,19 +577,10 @@ async fn 入站必刷带推荐语() {
 #[tokio::test]
 #[ignore = "真实网络，核对 UP 主置顶评论"]
 async fn 置顶评论排在第一页最前() {
-    let source = Source::open().await.expect("Source");
     // 必须带登录态：游客只回 4 条，测不出真实的 20 条分页。
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
-        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-        source.import_cookies(&pairs);
-        let _ = source.refresh_session().await;
-    } else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
-    }
+    };
     // BV1kZWX62ENY（影视飓风）的 UP 主置顶是一条「我在这里」。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let page = source.comments(&key, None, true).await.expect("第一页评论");
@@ -579,18 +599,9 @@ async fn 置顶评论排在第一页最前() {
 #[tokio::test]
 #[ignore = "真实网络"]
 async fn 评论游标能翻到第二页() {
-    let source = Source::open().await.expect("Source");
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
-        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-        source.import_cookies(&pairs);
-        let _ = source.refresh_session().await;
-    } else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
-    }
+    };
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let first = source.comments(&key, None, true).await.expect("第一页评论");
     let next = first.next.clone().expect("第一页应该给下一页游标");
@@ -668,17 +679,11 @@ async fn 合集带全部集数与封面() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 楼中楼能翻页() {
-    let source = Source::open().await.expect("Source");
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
-        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-        source.import_cookies(&pairs);
-        let _ = source.refresh_session().await;
-    }
+    let Some(source) = source_with_live_cookies().await else {
+        return;
+    };
 
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let page = source.comments(&key, None, true).await.expect("第一页评论");
@@ -728,17 +733,11 @@ async fn 楼中楼能翻页() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 查看对话能翻页() {
-    let source = Source::open().await.expect("Source");
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
-        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-        source.import_cookies(&pairs);
-        let _ = source.refresh_session().await;
-    }
+    let Some(source) = source_with_live_cookies().await else {
+        return;
+    };
 
     // BV1GJ411x7h7：已知这条一级评论下有 3442 条回复，取一条二级评论当对话锚点。
     let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
@@ -831,18 +830,14 @@ async fn 番剧时间表能取到一周() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络，需要应用已保存的登录态"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn messages_live_cursor_pages_are_disjoint() {
     use bilimusic_bili::messages::MessageKind;
     use std::collections::HashSet;
 
-    let cookie_path = std::path::PathBuf::from(std::env::var("HOME").expect("HOME"))
-        .join("Library/Application Support/dev.bilimusic.app/cookies.json");
-    let raw = std::fs::read_to_string(cookie_path).expect("需要应用保存的 cookies.json");
-    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-    let source = Source::open().await.expect("Source");
-    source.import_cookies(&pairs);
-    source.refresh_session().await.expect("刷新会话");
+    let Some(source) = source_with_live_cookies().await else {
+        return;
+    };
 
     let mut paginated = 0;
     for kind in [MessageKind::Reply, MessageKind::At, MessageKind::Like] {
@@ -883,21 +878,12 @@ async fn 弹幕正文不带未解开的实体() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络，核对字幕轨与台词"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 有字幕的视频能取到台词() {
-    let source = Source::open().await.expect("Source");
     // 字幕（尤其 AI 字幕）只给登录用户，游客拿到的是空列表。
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    if let Ok(raw) = std::fs::read_to_string(&cookie_path) {
-        let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-        source.import_cookies(&pairs);
-        let _ = source.refresh_session().await;
-    } else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
-    }
+    };
     // BV1GJ411x7h7：这条挂了 12 条字幕轨（含 ai-zh）。
     let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
     let detail = source.detail(&key).await.expect("详情");
@@ -915,19 +901,11 @@ async fn 有字幕的视频能取到台词() {
 /// 字幕挂在每一 P 上。观影页把当前 P 的 cid 传下来时必须按它取；不给 cid
 /// 才退回第一 P——这条约定坏了，多 P 视频的每一集都会显示第一集的台词。
 #[tokio::test]
-#[ignore = "真实网络，核对按 P 取字幕"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 字幕按传入的cid取而不是总拿第一P() {
-    let source = Source::open().await.expect("Source");
-    let cookie_path = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/dev.bilimusic.app/cookies.json"))
-        .expect("HOME");
-    let Ok(raw) = std::fs::read_to_string(&cookie_path) else {
-        println!("没有 cookies.json，跳过");
+    let Some(source) = source_with_live_cookies().await else {
         return;
     };
-    let pairs: Vec<(String, String)> = serde_json::from_str(&raw).expect("cookies.json 格式");
-    source.import_cookies(&pairs);
-    let _ = source.refresh_session().await;
 
     let key = bilimusic_model::TrackKey::from_provider("BV1vs411n7TH");
     let detail = source.detail(&key).await.expect("详情");
