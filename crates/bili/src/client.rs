@@ -71,6 +71,9 @@ impl Client {
         let http = reqwest::Client::builder()
             .user_agent(UA)
             .timeout(Duration::from_secs(20))
+            // DNS 被断网/坏解析器拖住时，20 秒的整请求超时到不了；连接阶段单独兜底，
+            // 页面才能在几秒内进入自己的错误与重试状态。
+            .connect_timeout(Duration::from_secs(5))
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().last().is_some_and(session_origin)
                     && attempt.url().scheme() != "https"
