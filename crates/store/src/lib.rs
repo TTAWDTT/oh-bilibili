@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
 pub const SCHEMA_VERSION: i64 = 6;
 
@@ -109,18 +109,22 @@ impl Library {
     }
 
     fn migrate(&self) -> Result<()> {
-        let conn = self.conn.lock().expect("数据库连接被毒化");
-        let mut version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        while version < SCHEMA_VERSION {
+        let mut conn = self.conn.lock().expect("数据库连接被毒化");
+        loop {
+            let tx = conn.transaction()?;
+            let version: i64 = tx.pragma_query_value(None, "user_version", |row| row.get(0))?;
+            if version >= SCHEMA_VERSION {
+                return Ok(());
+            }
+
             let next = version + 1;
-            let sql = MIGRATIONS
+            let migration = MIGRATIONS
                 .get(next as usize - 1)
                 .ok_or_else(|| StoreError::Invalid(format!("缺少第 {next} 号迁移")))?;
-            conn.execute_batch(sql)?;
-            conn.pragma_update(None, "user_version", next)?;
-            version = next;
+            migration.apply(&tx)?;
+            tx.pragma_update(None, "user_version", next)?;
+            tx.commit()?;
         }
-        Ok(())
     }
 
     fn with<T>(&self, f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T> {
@@ -770,8 +774,24 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
+enum Migration {
+    Sql(&'static str),
+    CompleteV4TrackMetadata,
+}
+
+impl Migration {
+    fn apply(&self, tx: &Transaction<'_>) -> rusqlite::Result<()> {
+        match self {
+            Self::Sql(sql) => tx.execute_batch(sql),
+            Self::CompleteV4TrackMetadata => complete_v4_track_metadata(tx),
+        }
+    }
+}
+
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [&str; 6] = [r#"
+const MIGRATIONS: [Migration; 6] = [
+    Migration::Sql(
+        r#"
 CREATE TABLE tracks (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   provider_key TEXT NOT NULL UNIQUE,
@@ -840,14 +860,20 @@ CREATE TABLE settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-"#, r#"
+"#,
+    ),
+    Migration::Sql(
+        r#"
 -- v2：队列快照。队列本身是上下文，重启恢复到离开时的样子。
 CREATE TABLE queue_snapshot (
   id       INTEGER PRIMARY KEY CHECK (id = 1),
   payload  TEXT NOT NULL,
   saved_at INTEGER NOT NULL
 );
-"#, r#"
+"#,
+    ),
+    Migration::Sql(
+        r#"
 -- v3：同一首歌在历史里只留一条。
 --
 -- 以前每播一次插一行，于是「继续听」里同一个视频能重复四遍。
@@ -856,21 +882,40 @@ DELETE FROM history WHERE id NOT IN (
   SELECT MAX(id) FROM history GROUP BY track_id
 );
 CREATE UNIQUE INDEX idx_history_track ON history(track_id);
-"#, r#"
--- v4：缓存 UP 主头像与 uid。
---
--- 历史页的卡片要从本地库读，但库里只有标题和封面，于是卡片只能显示
--- 首字母圆圈，跟首页的真实头像对不上。这两列由写入方从接口带过来。
-ALTER TABLE tracks ADD COLUMN up_mid INTEGER;
-ALTER TABLE tracks ADD COLUMN up_avatar TEXT;
-"#, r#"
+"#,
+    ),
+    Migration::CompleteV4TrackMetadata,
+    Migration::Sql(
+        r#"
 -- v5：历史要记「看到哪了」。B 站的历史卡片底下有一条播放进度，
 -- 只有时间没有位置的话，卡片永远看起来像没看过。
 ALTER TABLE history ADD COLUMN position_ms INTEGER NOT NULL DEFAULT 0;
-"#, r#"
+"#,
+    ),
+    Migration::Sql(
+        r#"
 -- v6：下载失败要能说明为什么，重启后仍给出同一条信息。
 ALTER TABLE downloads ADD COLUMN error TEXT;
-"#];
+"#,
+    ),
+];
+
+fn complete_v4_track_metadata(tx: &Transaction<'_>) -> rusqlite::Result<()> {
+    for (column, sql) in [
+        ("up_mid", "ALTER TABLE tracks ADD COLUMN up_mid INTEGER"),
+        ("up_avatar", "ALTER TABLE tracks ADD COLUMN up_avatar TEXT"),
+    ] {
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM pragma_table_info('tracks') WHERE name = ?1)",
+            [column],
+            |row| row.get(0),
+        )?;
+        if !exists {
+            tx.execute(sql, [])?;
+        }
+    }
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -1058,6 +1103,154 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    fn migration_fixture(path: &Path, version: i64) -> Connection {
+        let mut conn = Connection::open(path).unwrap();
+        let tx = conn.transaction().unwrap();
+        for migration in &MIGRATIONS[..version as usize] {
+            migration.apply(&tx).unwrap();
+        }
+        insert_migration_fixture_data(&tx).unwrap();
+        tx.pragma_update(None, "user_version", version).unwrap();
+        tx.commit().unwrap();
+        conn
+    }
+
+    fn insert_migration_fixture_data(conn: &Connection) -> rusqlite::Result<()> {
+        conn.execute_batch(
+            "INSERT INTO tracks (id, provider_key, title) VALUES (4, 'BVlegacy', '旧曲目');
+             INSERT INTO playlists (id, name, sort_key) VALUES (7, '旧歌单', 1024);
+             INSERT INTO playlist_tracks (playlist_id, track_id, sort_key) VALUES (7, 4, 1024);
+             INSERT INTO history (id, track_id, played_at) VALUES (9, 4, 1234);",
+        )
+    }
+
+    fn open_and_check_migrated_library(path: &Path) -> Result<()> {
+        let library = Library::open(path)?;
+        assert_eq!(
+            library.with(|conn| {
+                conn.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+            })?,
+            SCHEMA_VERSION
+        );
+        assert_eq!(
+            library.playlists()?,
+            vec![Playlist {
+                id: 7,
+                name: "旧歌单".into(),
+                sort_key: 1024,
+            }]
+        );
+        let tracks = library.playlist_tracks(7)?;
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].key.as_opaque(), "BVlegacy");
+        let history = library.history_with_time(10, None)?;
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].0.key.as_opaque(), "BVlegacy");
+        assert_eq!((history[0].1, history[0].2, history[0].3), (1234, 0, 9));
+        Ok(())
+    }
+
+    #[test]
+    fn 迁移_中断在第四版第一列后仍能重开() {
+        let dir = temp_dir("migrate-v4-interrupted");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = migration_fixture(&db, 3);
+            conn.execute("ALTER TABLE tracks ADD COLUMN up_mid INTEGER", [])
+                .unwrap();
+        }
+
+        let first = open_and_check_migrated_library(&db);
+        let second = open_and_check_migrated_library(&db);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(
+            first.is_ok() && second.is_ok(),
+            "两次打开都应成功。第一次 {first:?}，第二次 {second:?}"
+        );
+    }
+
+    #[test]
+    fn 迁移_正常第三版升级保留歌单和历史() {
+        let dir = temp_dir("migrate-v3");
+        let db = dir.join("library.sqlite");
+        drop(migration_fixture(&db, 3));
+
+        open_and_check_migrated_library(&db).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn 迁移_第四版已加两列但版本未更新仍能重开() {
+        let dir = temp_dir("migrate-v4-before-version");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = migration_fixture(&db, 3);
+            conn.execute_batch(
+                "ALTER TABLE tracks ADD COLUMN up_mid INTEGER;
+                 ALTER TABLE tracks ADD COLUMN up_avatar TEXT;",
+            )
+            .unwrap();
+        }
+
+        open_and_check_migrated_library(&db).unwrap();
+        open_and_check_migrated_library(&db).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn 迁移_当前版重开保留结构及数据() {
+        let dir = temp_dir("migrate-current");
+        let db = dir.join("library.sqlite");
+        let schema_version: i64 = {
+            let library = Library::open(&db).unwrap();
+            library.with(insert_migration_fixture_data).unwrap();
+            library
+                .with(|conn| conn.pragma_query_value(None, "schema_version", |row| row.get(0)))
+                .unwrap()
+        };
+
+        open_and_check_migrated_library(&db).unwrap();
+        let schema_after_reopen: i64 = {
+            let conn = Connection::open(&db).unwrap();
+            conn.pragma_query_value(None, "schema_version", |row| row.get(0))
+                .unwrap()
+        };
+        assert_eq!(schema_after_reopen, schema_version);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn 迁移_中途失败回滚已执行的语句() {
+        let dir = temp_dir("migrate-rollback");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = migration_fixture(&db, 2);
+            conn.execute_batch(
+                "INSERT INTO history (id, track_id, played_at) VALUES (10, 4, 5678);
+                 CREATE INDEX idx_history_track ON history(played_at);",
+            )
+            .unwrap();
+        }
+
+        let error = Library::open(&db)
+            .err()
+            .expect("第三版迁移应在建索引时失败");
+        assert!(error
+            .to_string()
+            .contains("index idx_history_track already exists"));
+        {
+            let conn = Connection::open(&db).unwrap();
+            let version: i64 = conn
+                .pragma_query_value(None, "user_version", |row| row.get(0))
+                .unwrap();
+            let history_count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!((version, history_count), (2, 2));
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import type { DownloadView, QrStatus } from './contract'
+import type { DownloadView, QrStatus, WireError } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -42,11 +42,26 @@ const FOLLOW_SEEDS: {
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
 let dynamicLoaded = false
 
+const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
+const settledListFailures = new Set<string>()
+const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
+let libraryPartialRecovered = false
+
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
   // 队列相关命令都在 player 侧实现
   if (command.startsWith('queue_') || command.startsWith('player_')) {
     return playerCommand(command, args)
+  }
+
+  if (listError && (command === 'watch_later_list' || command === 'following')) {
+    if (listError === 'needs_login' && !state.auth.logged_in) throw fail('needs_login', '需要登录')
+    if (!settledListFailures.has(command) && (listError === 'retryable' || listError === 'input')) {
+      await sleep(50)
+      settledListFailures.add(command)
+      const message = listError === 'retryable' ? 'operation timed out' : '列表请求无效'
+      throw { class: listError, message } satisfies WireError
+    }
   }
 
   switch (command) {
@@ -1065,7 +1080,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'library_tracks': {
       const playlist = playlistOf(Math.trunc(num(args, 'playlist_id')))
+      const failing = libraryPartial && playlist.id === 2 && !libraryPartialRecovered
+      if (libraryPartial) performance.mark('library_tracks', { detail: playlist.id })
       await sleep(90)
+      if (failing) {
+        libraryPartialRecovered = true
+        throw Object.assign(new Error('预览：歌单读取失败'), { class: 'retryable' })
+      }
+      if (libraryPartial && playlist.id === 3) return []
       return playlist.keys.flatMap((key) => {
         const track = findTrack(key)
         return track ? [track] : []

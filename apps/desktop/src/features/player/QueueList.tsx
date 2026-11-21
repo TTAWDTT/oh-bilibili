@@ -1,6 +1,6 @@
 import * as ipc from '../../shared/lib/ipc'
 import { Icon } from '../../shared/ui/Icon'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { formatDuration } from '../../shared/lib/format'
 import type { Track } from '../../shared/lib/contract'
@@ -30,7 +30,7 @@ function QueueRow({
   active: boolean
   onPlay: () => void
   onMove: (from: string, to: string) => void
-  onRemove: (key: string) => void
+  onRemove: (viaKeyboard: boolean) => void
 }) {
   return (
     // 用 div 而不是 button 来承载拖拽：WebKit 对 <button draggable> 起拖不可靠，
@@ -93,19 +93,23 @@ function QueueRow({
         </span>
       </span>
       <span className="num shrink-0 font-mono text-[12px] text-[var(--text-2)]">{formatDuration(track.duration_ms)}</span>
-      <span
-        role="button"
-        tabIndex={-1}
+      <button
+        type="button"
+        data-queue-remove={track.key}
         aria-label={`从队列移除 ${track.title}`}
         title="从队列移除"
         onClick={(event) => {
           event.stopPropagation()
-          onRemove(track.key)
+          // 键盘触发的 click detail 为 0，鼠标为 1；只有键盘移除后搬焦点。
+          onRemove(event.detail === 0)
         }}
-        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] group-hover:opacity-100 focus-visible:opacity-100"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+        }}
+        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-[3px] border-0 bg-transparent p-0 text-[var(--text-3)] opacity-0 transition-opacity hover:bg-[var(--hover)] hover:text-[var(--text-1)] focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
       >
         <Icon name="close" size={11} />
-      </span>
+      </button>
     </div>
   )
 }
@@ -119,6 +123,25 @@ export function QueueList() {
   const undoClearQueue = usePlayerStore((state) => state.undoClearQueue)
   const clearUndo = usePlayerStore((state) => state.clearUndo)
   const [restore, setRestore] = useState<[number, number] | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const emptyRef = useRef<HTMLDivElement | null>(null)
+  const removeAndFocus = async (key: string, index: number, focusNext: boolean): Promise<void> => {
+    const items = usePlayerStore.getState().queue?.items ?? []
+    const nextKey = items[index + 1]?.key ?? items[index - 1]?.key
+    await removeFromQueue(key)
+    if (!focusNext) return
+    window.requestAnimationFrame(() => {
+      if (!nextKey) {
+        emptyRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+        return
+      }
+      const buttons = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('[data-queue-remove]') ?? [])]
+      const target = buttons.find((button) => button.dataset.queueRemove === nextKey)
+      const fallback = buttons[Math.min(index, buttons.length - 1)]
+      const focusTarget = target ?? fallback
+      focusTarget?.focus()
+    })
+  }
 
   // 队列在后台补齐时每两秒问一次进度，补完就停。
   useEffect(() => {
@@ -144,7 +167,7 @@ export function QueueList() {
 
   if (queue.items.length === 0) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div ref={emptyRef} className="flex h-full min-h-0 flex-col">
         {clearUndo ? (
           <div
             data-queue-undo
@@ -180,12 +203,12 @@ export function QueueList() {
       active={queue.index === index}
       onPlay={() => void playContext(keys, index)}
       onMove={(from, to) => void moveInQueue(from, to)}
-      onRemove={(key) => void removeFromQueue(key)}
+      onRemove={(viaKeyboard) => void removeAndFocus(track.key, index, viaKeyboard)}
     />
   )
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div ref={listRef} className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between px-5 pb-2 pt-4 text-[12px] tracking-[0.14em] text-[var(--text-2)]">
         <span className="flex items-center gap-2">
           接下来 · {queue.items.length} 首
