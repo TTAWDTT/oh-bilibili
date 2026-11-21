@@ -212,6 +212,328 @@ mod download_restore_tests {
             None
         );
     }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 升级后重试与删除只操作同一条首集下载() {
+        use super::Engine;
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+
+        let dir = temp_dir("download-legacy-p1");
+        let db = dir.join("library.sqlite");
+        let video = track("BV1vs411n7TH");
+        let legacy = track("BV1vs411n7TH_p1");
+        let p2 = track("BV1vs411n7TH_p2");
+        let audio = dir.join("歌 [BV1vs411n7TH_p1].m4a");
+        let audio_p2 = dir.join("歌 [BV1vs411n7TH_p2].m4a");
+        std::fs::write(&audio, b"original P1 audio").unwrap();
+        std::fs::write(&audio_p2, b"original P2 audio").unwrap();
+        {
+            let library = Library::open(&db).unwrap();
+            library.upsert_track(&video).unwrap();
+            library
+                .save_download(&legacy, audio.to_str(), "done", None)
+                .unwrap();
+            library
+                .save_download(&p2, audio_p2.to_str(), "done", None)
+                .unwrap();
+        }
+
+        let helper = dir.join("yt-dlp");
+        std::fs::write(
+            &helper,
+            "#!/bin/sh\nprintf '\"歌 [BV1vs411n7TH_p1].m4a\"\\n'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let engine = Engine::new(&db).unwrap();
+        let restored_keys: Vec<_> = engine
+            .downloads()
+            .into_iter()
+            .map(|item| item.key)
+            .collect();
+        let enqueued = engine
+            .enqueue_download_in(&video.key, helper.clone(), dir.clone())
+            .unwrap();
+        let legacy_enqueued = engine
+            .enqueue_download_in(&legacy.key, helper, dir.clone())
+            .unwrap();
+        let items = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let items = engine.downloads();
+                if items.iter().all(|item| item.state != "running") {
+                    break items;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let same_file: Vec<_> = items
+            .iter()
+            .filter(|item| item.path.as_deref() == audio.to_str())
+            .map(|item| item.key.as_str())
+            .collect();
+        assert_eq!(
+            same_file,
+            [video.key.as_opaque()],
+            "P1 records for the same file"
+        );
+        assert!(restored_keys.contains(&enqueued.key));
+        assert_eq!(legacy_enqueued.key, enqueued.key);
+        assert!(!restored_keys
+            .iter()
+            .any(|key| key == legacy.key.as_opaque()));
+        assert_eq!(enqueued.state, "done");
+        assert_eq!(std::fs::read(&audio).unwrap(), b"original P1 audio");
+
+        let rows = Library::open(&db).unwrap().downloads().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().any(|item| item.key == video.key));
+        assert!(rows.iter().any(|item| item.key == p2.key));
+
+        drop(engine);
+        let restarted = Engine::new(&db).unwrap();
+        assert_eq!(restarted.downloads().len(), 2);
+        assert!(restarted
+            .downloads()
+            .iter()
+            .any(|item| item.key == enqueued.key && item.state == "done"));
+        restarted.download_delete_audio(&enqueued.key).unwrap();
+        drop(restarted);
+        assert!(!audio.exists());
+        assert!(audio_p2.is_file());
+
+        let restarted = Engine::new(&db).unwrap();
+        let items = restarted.downloads();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].key, p2.key.as_opaque());
+        assert_eq!(items[0].state, "done");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 旧首集键从曲库入队时只写一条裸键记录() {
+        use super::Engine;
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+
+        let dir = temp_dir("download-legacy-p1-metadata");
+        let helper = dir.join("yt-dlp");
+        std::fs::write(&helper, "#!/bin/sh\nprintf '\"audio.m4a\"\\n'\n").unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(dir.join("audio.m4a"), b"audio").unwrap();
+
+        let video = track("BV1vs411n7TH");
+        let legacy = track("BV1vs411n7TH_p1");
+        let startup_download = track("BV1xx411c7mD");
+        for (case, tracks, expected) in [
+            ("legacy", [&legacy].as_slice(), &legacy),
+            ("canonical", [&video].as_slice(), &video),
+            ("both", [&video, &legacy].as_slice(), &video),
+        ] {
+            let db = dir.join(format!("{case}.sqlite"));
+            let library = Library::open(&db).unwrap();
+            for track in tracks {
+                library.upsert_track(track).unwrap();
+            }
+            library
+                .save_download(&startup_download, None, "failed", None)
+                .unwrap();
+            let engine = Engine::new(&db).unwrap();
+            engine
+                .download_remove_record(startup_download.key.as_opaque())
+                .unwrap();
+
+            let view = engine
+                .enqueue_download_in(&legacy.key, helper.clone(), dir.clone())
+                .unwrap();
+            assert_eq!(view.key, video.key.as_opaque(), "{case}");
+            assert_eq!(view.title, expected.title, "{case}");
+            let items = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let items = engine.downloads();
+                    if items.iter().all(|item| item.state != "running") {
+                        break items;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(items.len(), 1, "{case}");
+            assert_eq!(items[0].state, "done", "{case}: {:?}", items[0].error);
+            let rows = library.downloads().unwrap();
+            assert_eq!(rows.len(), 1, "{case}");
+            assert_eq!(rows[0].key, video.key, "{case}");
+        }
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 首集旧键与裸键同时存在时保留现有文件() {
+        use super::Engine;
+
+        let dir = temp_dir("download-legacy-p1-collision");
+        let db = dir.join("library.sqlite");
+        let library = Library::open(&db).unwrap();
+        let cases = [
+            ("BV1xx411c7mD", Some(true), true),
+            ("BV1yy411c7mE", Some(false), true),
+            ("BV1zz411c7mF", Some(true), false),
+            ("BV1cc411c7mG", None, true),
+        ];
+        let mut expected = Vec::new();
+        for (key, canonical_exists, legacy_exists) in cases {
+            let audio = dir.join(format!("歌 [{key}_p1].m4a"));
+            let missing = dir.join("missing.m4a");
+            std::fs::write(&audio, key.as_bytes()).unwrap();
+            if let Some(canonical_exists) = canonical_exists {
+                let canonical_path = if canonical_exists { &audio } else { &missing };
+                library
+                    .save_download(&track(key), canonical_path.to_str(), "done", None)
+                    .unwrap();
+            }
+            let legacy_path = if legacy_exists { &audio } else { &missing };
+            library
+                .save_download(
+                    &track(&format!("{key}_p1")),
+                    legacy_path.to_str(),
+                    "done",
+                    None,
+                )
+                .unwrap();
+            expected.push((key, audio));
+        }
+        let engine = Engine::new(&db).unwrap();
+        let views = engine.downloads();
+        let rows = library.downloads().unwrap();
+        assert_eq!(views.len(), expected.len());
+        assert_eq!(rows.len(), expected.len());
+        for (key, audio) in expected {
+            let view = views.iter().find(|view| view.key == key).unwrap();
+            assert_eq!(view.state, "done");
+            assert_eq!(view.path.as_deref(), audio.to_str());
+            let row = rows.iter().find(|row| row.key.as_opaque() == key).unwrap();
+            assert_eq!(row.path.as_deref(), audio.to_str());
+            assert_eq!(std::fs::read(&audio).unwrap(), key.as_bytes());
+        }
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 下载分集后恢复并独立删除() {
+        use super::Engine;
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+
+        let dir = temp_dir("download-pages");
+        let db = dir.join("library.sqlite");
+        let legacy = track("BV1xx411c7mD");
+        let legacy_audio = dir.join("晴天 [BV1xx411c7mD].m4a");
+        std::fs::write(&legacy_audio, b"legacy audio").unwrap();
+        let video = track("BV1vs411n7TH");
+        {
+            let library = Library::open(&db).unwrap();
+            library.upsert_track(&video).unwrap();
+            library
+                .save_download(&legacy, legacy_audio.to_str(), "done", None)
+                .unwrap();
+        }
+        let helper = dir.join("yt-dlp");
+        std::fs::write(
+            &helper,
+            r#"#!/bin/sh
+for url do :; done
+printf '%s\n' "$url" >> urls
+case "$url" in
+    *'?p=2') id=BV1vs411n7TH_p2 ;;
+    *) id=BV1vs411n7TH_p1 ;;
+esac
+file="歌 [$id].m4a"
+printf '%s' "$id" > "$file"
+printf '"%s"\n' "$file"
+"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let engine = Engine::new(&db).unwrap();
+        let mut paths = Vec::new();
+        for page in [1, 2] {
+            let key = if page == 1 {
+                video.key.clone()
+            } else {
+                TrackKey::from_provider("BV1vs411n7TH_p2")
+            };
+            let view = engine
+                .enqueue_download_in(&key, helper.clone(), dir.clone())
+                .unwrap();
+            assert_eq!(view.key, key.as_opaque());
+            let finished = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let item = engine
+                        .downloads()
+                        .into_iter()
+                        .find(|item| item.key == view.key)
+                        .unwrap();
+                    if item.state != "running" {
+                        break item;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(finished.state, "done", "{:?}", finished.error);
+            let path = std::path::PathBuf::from(finished.path.unwrap());
+            let urls = std::fs::read_to_string(dir.join("urls")).unwrap();
+            if page == 2 {
+                assert_eq!(
+                    urls.lines().last(),
+                    Some("https://www.bilibili.com/video/BV1vs411n7TH?p=2")
+                );
+            }
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap(),
+                format!("BV1vs411n7TH_p{page}")
+            );
+            assert_eq!(download_key_of(&path).unwrap().0, key.as_opaque());
+            paths.push((view.key, path));
+        }
+        assert_ne!(paths[0].0, paths[1].0);
+        assert_ne!(paths[0].1, paths[1].1);
+
+        let restored = Engine::new(&db).unwrap();
+        let items = restored.downloads();
+        assert_eq!(items.len(), 3);
+        for (key, path) in &paths {
+            let item = items.iter().find(|item| &item.key == key).unwrap();
+            assert_eq!(item.state, "done");
+            assert_eq!(item.path.as_deref(), path.to_str());
+        }
+        assert!(items.iter().any(|item| {
+            item.key == legacy.key.as_opaque()
+                && item.state == "done"
+                && item.path.as_deref() == legacy_audio.to_str()
+        }));
+        let remaining = restored.download_delete_audio(&paths[1].0).unwrap();
+        assert_eq!(remaining.len(), 2);
+        let p1 = remaining.iter().find(|item| item.key == paths[0].0).unwrap();
+        assert_eq!(p1.state, "done");
+        assert_eq!(p1.path.as_deref(), paths[0].1.to_str());
+        assert!(paths[0].1.is_file());
+        assert!(!paths[1].1.exists());
+        let remaining = Library::open(&db).unwrap().downloads().unwrap();
+        assert_eq!(remaining.len(), 2);
+        assert!(remaining.iter().any(|item| item.key.as_opaque() == paths[0].0));
+        assert!(remaining.iter().all(|item| item.key.as_opaque() != paths[1].0));
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }
 
 #[cfg(test)]
@@ -671,14 +993,16 @@ impl Engine {
         lock(&self.known).insert(track.key.as_opaque().to_string(), track.clone());
     }
 
-    fn track_of(&self, key: &TrackKey) -> Result<Track, WireError> {
+    fn find_track(&self, key: &TrackKey) -> Result<Option<Track>, WireError> {
         if let Some(t) = lock(&self.known).get(key.as_opaque()).cloned() {
-            return Ok(t);
+            return Ok(Some(t));
         }
-        if let Some(t) = self.library.track_by_key(key)? {
-            return Ok(t);
-        }
-        Err(WireError::input("key", "这个键还没有对应的曲目"))
+        Ok(self.library.track_by_key(key)?)
+    }
+
+    fn track_of(&self, key: &TrackKey) -> Result<Track, WireError> {
+        self.find_track(key)?
+            .ok_or_else(|| WireError::input("key", "这个键还没有对应的曲目"))
     }
 
     fn next_token(&self) -> LoadToken {
@@ -2636,7 +2960,7 @@ impl Engine {
     /// 启动时把上次的下载记录装回来。文件已经不在的完成项标成 missing，
     /// 上次没跑完的任务标成 failed，两者都能从界面重新发起。
     fn restore_downloads(&self) {
-        let records = match self.library.downloads() {
+        let records = match self.read_downloads() {
             Ok(records) => records,
             Err(e) => {
                 eprintln!("读取下载记录失败：{e}");
@@ -2661,6 +2985,23 @@ impl Engine {
             views.push(restored_download(record));
         }
         *lock(&self.downloads) = views;
+    }
+
+    fn read_downloads(&self) -> bilimusic_store::Result<Vec<StoredDownload>> {
+        let records = self.library.downloads()?;
+        let mut rekeyed = false;
+        for record in &records {
+            let key = record.key.as_opaque();
+            let canonical = canonical_download_key(key);
+            if key != canonical {
+                self.library.rekey_download(key, canonical)?;
+                rekeyed = true;
+            }
+        }
+        if rekeyed {
+            return self.library.downloads();
+        }
+        Ok(records)
     }
 
     /// 老版本从没写过下载记录。yt-dlp 的落盘文件名带着 `[BVxxx]`，据此把
@@ -2709,29 +3050,45 @@ impl Engine {
         self: &Arc<Self>,
         key: &TrackKey,
     ) -> Result<DownloadView, WireError> {
-        let track = self.track_of(key)?;
         let helper = crate::download::find_helper()
             .ok_or_else(|| WireError::internal("找不到 yt-dlp，请检查应用安装或 PATH"))?;
-        let dir = downloads_dir();
+        self.enqueue_download_in(key, helper, downloads_dir())
+    }
+
+    fn enqueue_download_in(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        helper: std::path::PathBuf,
+        dir: std::path::PathBuf,
+    ) -> Result<DownloadView, WireError> {
+        let (track, url) = self.download_target(key)?;
         std::fs::create_dir_all(&dir)
             .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
         let view = DownloadView {
-            key: key.as_opaque().to_string(),
+            key: track.key.as_opaque().to_string(),
             title: track.title.clone(),
             state: "running".into(),
             progress: 0.0,
             path: None,
             error: None,
         };
-        self.library.save_download(&track, None, "running", None)?;
         {
             let mut list = lock(&self.downloads);
-            if let Some(existing) = list.iter().find(|d| {
-                d.key == view.key && (d.state == "queued" || d.state == "running")
-            }) {
-                return Ok(existing.clone());
+            if let Some(existing) = list.iter().find(|d| d.key == view.key) {
+                let reusable = match existing.state.as_str() {
+                    "queued" | "running" => true,
+                    "done" => existing
+                        .path
+                        .as_deref()
+                        .is_some_and(|path| std::path::Path::new(path).is_file()),
+                    _ => false,
+                };
+                if reusable {
+                    return Ok(existing.clone());
+                }
             }
+            self.library.save_download(&track, None, "running", None)?;
             list.retain(|d| d.key != view.key);
             list.push(view.clone());
         }
@@ -2739,7 +3096,6 @@ impl Engine {
             view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
         });
 
-        let url = format!("https://www.bilibili.com/video/{}", key.as_opaque());
         let engine = self.clone();
         let view_key = view.key.clone();
 
@@ -2773,6 +3129,33 @@ impl Engine {
         });
 
         Ok(view)
+    }
+
+    fn download_target(&self, key: &TrackKey) -> Result<(Track, String), WireError> {
+        let id = key.as_opaque();
+        let root = "https://www.bilibili.com/video";
+        let Some((bvid, page)) = download_part(id) else {
+            return Ok((self.track_of(key)?, format!("{root}/{id}")));
+        };
+        if page == 1 {
+            let canonical_key = TrackKey::from_provider(bvid);
+            let mut track = match self.find_track(&canonical_key)? {
+                Some(track) => track,
+                None => self.track_of(key)?,
+            };
+            track.key = canonical_key;
+            return Ok((track, format!("{root}/{bvid}")));
+        }
+        let track = match self.library.track_by_key(key)? {
+            Some(track) => track,
+            None => {
+                let mut track = self.track_of(&TrackKey::from_provider(bvid))?;
+                track.key = key.clone();
+                track.title = format!("{} · P{page}", track.title);
+                track
+            }
+        };
+        Ok((track, format!("{root}/{bvid}?p={page}")))
     }
 
     /// 网络、限流、登录态属于可重试，保留 pending；其余才是永久拒绝。
@@ -3055,6 +3438,19 @@ fn restored_download(record: &StoredDownload) -> DownloadView {
 
 const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];
 
+fn download_part(key: &str) -> Option<(&str, u32)> {
+    let (bvid, part) = key.rsplit_once("_p")?;
+    let page = part.parse::<std::num::NonZeroU32>().ok()?.get();
+    bvid.starts_with("BV").then_some((bvid, page))
+}
+
+fn canonical_download_key(key: &str) -> &str {
+    match download_part(key) {
+        Some((bvid, 1)) => bvid,
+        _ => key,
+    }
+}
+
 /// yt-dlp 的 `-o` 模板是「标题 [id].扩展名」。只认这种文件名，
 /// 半截的 .part 与目录里的其它文件不碰。
 fn download_key_of(path: &std::path::Path) -> Option<(String, String)> {
@@ -3070,7 +3466,7 @@ fn download_key_of(path: &std::path::Path) -> Option<(String, String)> {
     }
     let title = stem[..open].trim();
     Some((
-        key.to_string(),
+        canonical_download_key(key).to_string(),
         if title.is_empty() {
             stem.to_string()
         } else {

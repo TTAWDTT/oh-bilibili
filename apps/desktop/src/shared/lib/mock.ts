@@ -1167,10 +1167,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return state.auth
     case 'download_enqueue': {
       const key = str(args, 'key')
-      const track = trackOf(key)
+      const part = key.match(/^(BV[a-zA-Z0-9]+)_p([1-9][0-9]*)$/)
+      const track = trackOf(part?.[1] ?? key)
       const existing = state.downloads.find((item) => item.key === key)
       if (existing && (existing.state === 'queued' || existing.state === 'running')) return { ...existing }
-      const view: DownloadView = { key, title: track.title, state: 'queued', progress: 0, path: null, error: null }
+      const title = part ? `${track.title} · P${part[2]}` : track.title
+      const view: DownloadView = { key, title, state: 'queued', progress: 0, path: null, error: null }
       const index = state.downloads.findIndex((item) => item.key === key)
       if (index >= 0) state.downloads[index] = view
       else state.downloads.push(view)

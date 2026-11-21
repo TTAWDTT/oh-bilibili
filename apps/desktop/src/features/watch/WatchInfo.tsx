@@ -168,6 +168,7 @@ export function WatchHead({
 export function WatchInfo({
   track,
   data,
+  currentPage,
   likeDelta,
   favDelta,
   coinDelta,
@@ -180,6 +181,7 @@ export function WatchInfo({
 }: {
   track: Track
   data: WatchData
+  currentPage: number
   /** 点赞与收藏的计数偏移由观看页统一持有，这里只负责显示。 */
   likeDelta: number
   favDelta: number
@@ -244,10 +246,10 @@ export function WatchInfo({
   const [noteOpen, setNoteOpen] = useState(false)
   const [note, setNote] = useState('')
   const noteRef = useRef<HTMLTextAreaElement | null>(null)
-  const [downloadPending, setDownloadPending] = useState(false)
-  const downloadPendingRef = useRef(false)
+  const downloadKey = currentPage > 1 ? `${track.key}_p${currentPage}` : track.key
+  const downloadPending = useDownloadsStore((state) => state.pending.has(downloadKey))
   const download = useDownloadsStore((state) =>
-    (state.items ?? []).find((entry) => entry.key === track.key),
+    state.items?.find((entry) => entry.key === downloadKey),
   )
   const enqueueDownload = useDownloadsStore((state) => state.enqueue)
   const downloading = downloadPending || download?.state === 'queued' || download?.state === 'running'
@@ -491,13 +493,8 @@ export function WatchInfo({
           type="button"
           aria-pressed={downloaded}
           onClick={() => {
-            if (downloadPendingRef.current || downloading || downloaded) return
-            downloadPendingRef.current = true
-            setDownloadPending(true)
-            void enqueueDownload(track.key).finally(() => {
-              downloadPendingRef.current = false
-              setDownloadPending(false)
-            })
+            if (downloading || downloaded) return
+            void enqueueDownload(downloadKey)
           }}
           className={action(downloaded)}
         >
