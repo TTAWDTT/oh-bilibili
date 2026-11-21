@@ -73,7 +73,7 @@ export function NowPlayingRail({ tab, hideHeader = false }: { tab: RailTab; hide
   const queued = queue?.items.length ?? 0
 
   return (
-    <aside aria-label="播放右栏" className="flex h-full w-full flex-col overflow-hidden border-l border-hairline bg-[var(--panel)] md:w-[var(--rail-w)]">
+    <aside aria-label="播放右栏" className="flex h-full w-full flex-col overflow-hidden border-l border-hairline bg-[var(--panel)] xl:w-[var(--rail-w)]">
       <div hidden={hideHeader} className="flex h-9 shrink-0 items-center justify-between border-b border-hairline pl-5 pr-3">
         <div className="flex h-full items-center gap-4">
           <RailTabButton active={tab === 'lyrics'} label="歌词" onClick={() => toggleRail('lyrics')} />

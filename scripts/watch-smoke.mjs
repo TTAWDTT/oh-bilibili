@@ -413,12 +413,23 @@ async function checkShellBreakpoints(page) {
         mobileNav: width('nav[aria-label="主要导航"]'),
         row: width('#scroll-main [data-row="track"] button.min-w-0.flex-1'),
         sheet: !!document.querySelector('[role="dialog"][aria-label="播放详情"]')?.getClientRects().length,
+        sheetBody: width('[role="dialog"][aria-label="播放详情"] aside[aria-label="播放右栏"]'),
       }
     })()`)
   const middle = await measure()
   await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
   await sleep(400)
-  const middleSheet = (await measure()).sheet
+  const middleOpen = await measure()
+  await page.evaluate(
+    `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+  )
+  await sleep(300)
+  await page.viewport(820, 800)
+  await sleep(500)
+  const narrowerMiddle = await measure()
+  await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+  await sleep(400)
+  const narrowerOpen = await measure()
   await page.evaluate(
     `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
   )
@@ -434,20 +445,30 @@ async function checkShellBreakpoints(page) {
   await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
   await sleep(500)
   const wide = await measure()
+  await page.viewport(1024, 800)
+  await sleep(500)
+  const shrunk = await measure()
   check(
     '768 到 1279 收起右栏，播放列表保持可读',
     played &&
       middle.main >= 500 &&
       middle.row >= 160 &&
       !middle.sheet &&
-      middleSheet &&
+      middleOpen.sheet &&
+      middleOpen.sheetBody >= 760 &&
+      narrowerMiddle.main >= 560 &&
+      narrowerMiddle.row >= 220 &&
+      narrowerOpen.sheetBody >= 800 &&
       wideMiddle.main >= 760 &&
       narrow.main >= 760 &&
       narrow.mobileNav >= 760 &&
       narrow.sidebar === 0 &&
       wide.rail === 320 &&
       wide.main < wideMiddle.main &&
-      !wide.sheet,
+      !wide.sheet &&
+      shrunk.rail === 0 &&
+      shrunk.main >= 760 &&
+      !shrunk.sheet,
   )
   await page.viewport(1320, 900)
 }
