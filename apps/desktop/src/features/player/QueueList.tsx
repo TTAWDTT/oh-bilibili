@@ -116,6 +116,8 @@ export function QueueList() {
   const moveInQueue = usePlayerStore((state) => state.moveInQueue)
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue)
   const clearQueue = usePlayerStore((state) => state.clearQueue)
+  const undoClearQueue = usePlayerStore((state) => state.undoClearQueue)
+  const clearUndo = usePlayerStore((state) => state.clearUndo)
   const [restore, setRestore] = useState<[number, number] | null>(null)
 
   // 队列在后台补齐时每两秒问一次进度，补完就停。
@@ -142,13 +144,31 @@ export function QueueList() {
 
   if (queue.items.length === 0) {
     return (
-      <EmptyState
-        icon="biliTv"
-        title="前方高能，队列还是空的"
-        detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
-        action={{ label: '去搜索', onClick: () => focusSearch() }}
-        compact
-      />
+      <div className="flex h-full min-h-0 flex-col">
+        {clearUndo ? (
+          <div
+            data-queue-undo
+            role="status"
+            className="flex items-center justify-between border-b border-hairline px-5 py-2.5 text-[12px] text-[var(--text-2)]"
+          >
+            <span>已清空 {clearUndo.count} 首</span>
+            <button
+              type="button"
+              onClick={() => void undoClearQueue()}
+              className="t press font-medium text-[var(--accent)] hover:opacity-80"
+            >
+              撤销
+            </button>
+          </div>
+        ) : null}
+        <EmptyState
+          icon="biliTv"
+          title="前方高能，队列还是空的"
+          detail="挑一首歌开始播放，接下来的顺序会出现在这里。"
+          action={{ label: '去搜索', onClick: () => focusSearch() }}
+          compact
+        />
+      </div>
     )
   }
 

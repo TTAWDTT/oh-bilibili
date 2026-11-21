@@ -7,6 +7,8 @@ export type MockPlaylist = { id: number; name: string; keys: string[] }
 export type MockState = {
   keys: string[]
   index: number | null
+  /** 最近一次清空前的队列，供撤销恢复。 */
+  clearedQueue: { keys: string[]; index: number | null } | null
   phase: PlayerPhase
   /** 观看页打开时是 watch，退回列表就回到 listen。 */
   mode: 'listen' | 'watch'
@@ -27,9 +29,13 @@ export type MockState = {
   qr: { key: string; url: string; startedAt: number; expiresIn: number; confirmed: boolean } | null
 }
 
+const loggedIn =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('loggedIn')
+
 export const state: MockState = {
   keys: [],
   index: null,
+  clearedQueue: null,
   phase: 'idle',
   mode: 'listen',
   position: 0,
@@ -68,7 +74,18 @@ export const state: MockState = {
   ],
   historyHidden: new Set<string>(),
   historyCleared: false,
-  auth: { logged_in: false, user: null },
+  auth: loggedIn
+    ? {
+        logged_in: true,
+        user: {
+          mid: 1960976249,
+          uname: '-芜芜芜芜芜芜芜湖-',
+          avatar: null,
+          level: 5,
+          coins: 307.6,
+        },
+      }
+    : { logged_in: false, user: null },
   qr: null,
 }
 

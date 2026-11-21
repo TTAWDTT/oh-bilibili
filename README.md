@@ -102,12 +102,15 @@ cargo test --workspace
 npm run typecheck -w @bilimusic/desktop
 ```
 
-需要网络与声卡的真实接口测试：
+需要网络与声卡的真实接口测试走单独入口。需要登录态的部分只读取显式指定的专用测试账号，不读取应用自己的登录态：
 
 ```sh
-cargo test -p bilimusic-bili --test live -- --ignored
-cargo test -p bilimusic-core --test live_engine -- --ignored
+BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json ./scripts/live-test.sh
 ```
+
+未配置凭据时脚本打印 `SKIPPED` 并以 77 退出，表示没有跑过线上用例，不能记成通过；配置后会先只读验证登录，再跑两套用例，全部通过才打印 `VERIFIED`。点赞、稍后再看、收藏这类会写账号的用例跑完会把账号恢复原状。
+
+不要直接对 `--ignored` 套件看退出码当线上结论：缺少凭据时凭据用例会明确失败，而不是把「跳过」计成 passed。
 
 ## 边界
 

@@ -228,16 +228,6 @@ const TrackCard = memo(function TrackCard({
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => onLater(track)}
-          aria-label="稍后再看"
-          title="稍后再看"
-          className="t press pointer-events-none absolute bottom-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-[3px] bg-black/65 text-white opacity-0 transition-opacity duration-150 hover:bg-[var(--accent)] focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-        >
-          <Icon name="watchLater" size={12} />
-        </button>
-
         <CardActions
           track={track}
           onListen={() => onPlay(index)}

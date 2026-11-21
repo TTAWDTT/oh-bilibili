@@ -11,7 +11,7 @@ use std::sync::Arc;
 use bilimusic_core::engine::Engine;
 use bilimusic_core::engine::DownloadView;
 use bilimusic_core::lyrics::LyricDoc;
-use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, WireError};
+use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, SyncOutcome, WireError};
 use bilimusic_model::{Track, TrackKey};
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -481,6 +481,11 @@ fn queue_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<QueueView, WireE
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn queue_undo_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<QueueView, WireError> {
+    engine.queue_undo_clear()
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn queue_restore_progress(engine: tauri::State<'_, Arc<Engine>>) -> Option<(usize, usize)> {
     engine.queue_restore_progress()
 }
@@ -497,6 +502,7 @@ fn queue_move(
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 struct HistoryEntryView {
+    id: i64,
     track: Track,
     /// 播放时刻，Unix 毫秒。
     played_at: i64,
@@ -521,11 +527,14 @@ fn history_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError>
 fn library_history_timed(
     engine: tauri::State<'_, Arc<Engine>>,
     limit: u32,
+    before_played_at: Option<i64>,
+    before_id: Option<i64>,
 ) -> Result<Vec<HistoryEntryView>, WireError> {
     Ok(engine
-        .history_with_time(limit)?
+        .history_with_time(limit, before_played_at.zip(before_id))?
         .into_iter()
-        .map(|(track, played_at, position_ms)| HistoryEntryView {
+        .map(|(track, played_at, position_ms, id)| HistoryEntryView {
+            id,
             track,
             played_at,
             position_ms,
@@ -1133,7 +1142,7 @@ async fn download_enqueue(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-async fn sync_now(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError> {
+async fn sync_now(engine: tauri::State<'_, Arc<Engine>>) -> Result<SyncOutcome, WireError> {
     let arc = engine.inner().clone();
     arc.sync_now().await
 }
@@ -1218,6 +1227,7 @@ pub fn run() {
             queue_move,
             queue_remove,
             queue_clear,
+            queue_undo_clear,
             queue_restore_progress,
             library_history,
             library_history_timed,
