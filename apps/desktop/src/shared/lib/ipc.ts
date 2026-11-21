@@ -148,11 +148,18 @@ export function libraryAdd(playlistId: number, key: string): Promise<null> {
   return call<null>('library_add', { playlist_id: playlistId, key })
 }
 
-export type HistoryEntry = { track: Track; played_at: number; position_ms: number }
+export type HistoryEntry = { id: number; track: Track; played_at: number; position_ms: number }
 
-/** 带播放时间的历史，用于按日期分组。offset 从已加载条数往后翻。 */
-export function libraryHistoryTimed(limit: number, offset = 0): Promise<HistoryEntry[]> {
-  return call<HistoryEntry[]>('library_history_timed', { limit, offset })
+/** 带播放时间的历史。翻页传上一页最旧一条的 (played_at, id) 作为边界。 */
+export function libraryHistoryTimed(
+  limit: number,
+  before?: { played_at: number; id: number },
+): Promise<HistoryEntry[]> {
+  return call<HistoryEntry[]>('library_history_timed', {
+    limit,
+    before_played_at: before?.played_at ?? null,
+    before_id: before?.id ?? null,
+  })
 }
 
 /** 某条视频上次看到的位置。没看过返回 null，和「看过但从 0 开始」区分开。 */

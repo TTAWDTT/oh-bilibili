@@ -23,15 +23,19 @@ export function HistoryView() {
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  /** 下一页从这一条之后取：播放过的条目会跳到最前，offset 会重复或漏项。 */
+  const [cursor, setCursor] = useState<{ played_at: number; id: number } | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
     void ipc
-      .libraryHistoryTimed(HISTORY_PAGE, 0)
+      .libraryHistoryTimed(HISTORY_PAGE)
       .then((list) => {
         if (cancelled) return
         setEntries(list)
+        const last = list[list.length - 1]
+        setCursor(last ? { played_at: last.played_at, id: last.id } : null)
         setHasMore(list.length === HISTORY_PAGE)
       })
       .catch((e) => {
@@ -42,13 +46,18 @@ export function HistoryView() {
     }
   }, [])
 
-  /** 再取一页更早的记录。offset 用已挂出来的条数，删掉已加载的记录会自然对齐。 */
+  /** 再取一页更早的记录。用上一页最旧一条的 (played_at, id) 作边界。 */
   const loadOlder = async (): Promise<void> => {
-    if (!entries || entries.length === 0 || loadingMore) return
+    if (!cursor || loadingMore) return
     setLoadingMore(true)
     try {
-      const older = await ipc.libraryHistoryTimed(HISTORY_PAGE, entries.length)
-      setEntries((prev) => [...(prev ?? []), ...older])
+      const older = await ipc.libraryHistoryTimed(HISTORY_PAGE, cursor)
+      setEntries((prev) => {
+        const seen = new Set((prev ?? []).map((entry) => entry.track.key))
+        return [...(prev ?? []), ...older.filter((entry) => !seen.has(entry.track.key))]
+      })
+      const last = older[older.length - 1]
+      if (last) setCursor({ played_at: last.played_at, id: last.id })
       setHasMore(older.length === HISTORY_PAGE)
     } catch (e) {
       reportActionError('加载更早记录', e)
@@ -62,7 +71,25 @@ export function HistoryView() {
   const removeOne = async (key: string): Promise<void> => {
     try {
       await ipc.historyDelete(key)
-      setEntries((prev) => (prev ?? []).filter((e) => e.track.key !== key))
+      const next = (entries ?? []).filter((e) => e.track.key !== key)
+      if (next.length === 0 && hasMore) {
+        // 已加载的删光了，但数据源还有更早的记录：从最新一页重新读，
+        // 不能把「还没有播放记录」提前亮出来。
+        setLoadingMore(true)
+        try {
+          const list = await ipc.libraryHistoryTimed(HISTORY_PAGE)
+          setEntries(list)
+          const last = list[list.length - 1]
+          setCursor(last ? { played_at: last.played_at, id: last.id } : null)
+          setHasMore(list.length === HISTORY_PAGE)
+        } catch (loadError) {
+          reportActionError('加载更早记录', loadError)
+        } finally {
+          setLoadingMore(false)
+        }
+      } else {
+        setEntries(next)
+      }
     } catch (e) {
       reportActionError('删除记录', e)
     }
@@ -73,6 +100,7 @@ export function HistoryView() {
     try {
       await ipc.historyClear()
       setEntries([])
+      setCursor(null)
       setHasMore(false)
       setConfirmingClear(false)
       toastDone('历史已清空')

@@ -497,6 +497,7 @@ fn queue_move(
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 struct HistoryEntryView {
+    id: i64,
     track: Track,
     /// 播放时刻，Unix 毫秒。
     played_at: i64,
@@ -521,12 +522,14 @@ fn history_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError>
 fn library_history_timed(
     engine: tauri::State<'_, Arc<Engine>>,
     limit: u32,
-    offset: Option<u32>,
+    before_played_at: Option<i64>,
+    before_id: Option<i64>,
 ) -> Result<Vec<HistoryEntryView>, WireError> {
     Ok(engine
-        .history_with_time(limit, offset.unwrap_or(0))?
+        .history_with_time(limit, before_played_at.zip(before_id))?
         .into_iter()
-        .map(|(track, played_at, position_ms)| HistoryEntryView {
+        .map(|(track, played_at, position_ms, id)| HistoryEntryView {
+            id,
             track,
             played_at,
             position_ms,

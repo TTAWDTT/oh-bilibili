@@ -302,30 +302,45 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (state.historyCleared) return []
       const now = Date.now()
       const limit = Math.max(1, Math.min(500, Number(args.limit ?? 60) || 60))
-      const offset = Math.max(0, Number(args.offset ?? 0) || 0)
+      const beforePlayed =
+        args.before_played_at == null ? null : Number(args.before_played_at)
+      const beforeId = args.before_id == null ? null : Number(args.before_id)
       const seed = CATALOG[0]
       if (!seed) return []
       const long = import.meta.env.DEV && new URLSearchParams(window.location.search).has('historyLong')
       const all = long
         ? [
             ...Array.from({ length: 98 }, (_, i) => ({
+              id: i + 1,
               track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
               played_at: now - i * 86_400_000,
             })),
             {
+              id: 99,
               track: { ...seed, key: `${seed.key}-cross-2025`, title: '跨年同日 · 2025' },
               played_at: new Date(2025, 3, 10, 12).getTime(),
             },
             {
+              id: 100,
               track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024' },
               played_at: new Date(2024, 3, 10, 12).getTime(),
             },
           ]
-        : CATALOG.slice(0, 7).map((track, i) => ({ track, played_at: now - i * 9.5 * 3600_000 }))
+        : CATALOG.slice(0, 7).map((track, i) => ({
+            id: i + 1,
+            track,
+            played_at: now - i * 9.5 * 3600_000,
+          }))
       return all
         .filter((entry) => !state.historyHidden.has(entry.track.key))
+        .filter(
+          (entry) =>
+            beforePlayed === null ||
+            entry.played_at < beforePlayed ||
+            (entry.played_at === beforePlayed && entry.id < (beforeId ?? 0)),
+        )
         .sort((a, b) => b.played_at - a.played_at)
-        .slice(offset, offset + limit)
+        .slice(0, limit)
     }
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
