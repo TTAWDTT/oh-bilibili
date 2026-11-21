@@ -774,12 +774,15 @@ printf '"%s"\n' "$file"
             assert_eq!(finished.state, "done", "{:?}", finished.error);
             let path = std::path::PathBuf::from(finished.path.unwrap());
             let urls = std::fs::read_to_string(dir.join("urls")).unwrap();
-            if page == 2 {
-                assert_eq!(
-                    urls.lines().last(),
-                    Some("https://www.bilibili.com/video/BV1vs411n7TH?p=2")
-                );
-            }
+            let expected_url = if page == 1 {
+                "https://www.bilibili.com/video/BV1vs411n7TH"
+            } else {
+                "https://www.bilibili.com/video/BV1vs411n7TH?p=2"
+            };
+            assert_eq!(urls.lines().last(), Some(expected_url), "P{page} 的下载地址");
+            let ids = std::fs::read_to_string(dir.join("ids")).unwrap();
+            let expected_id = format!("BV1vs411n7TH_p{page}");
+            assert_eq!(ids.lines().last(), Some(expected_id.as_str()), "P{page} 的解析结果");
             assert_eq!(
                 std::fs::read(&path).unwrap(),
                 audio_fixture(),
