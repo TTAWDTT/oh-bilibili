@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
-const PORT = 9224
+const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
+const libraryPartialOnly = process.argv.includes('--library-partial')
+const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
   : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
@@ -33,9 +35,12 @@ async function connect() {
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
+      ...(DYNAMIC_RETURN || libraryPartialOnly
+        ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1']
+        : []),
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
-      `--user-data-dir=${join(tmpdir(), 'oh-bilibili-smoke')}`,
+      `--user-data-dir=${join(tmpdir(), `oh-bilibili-smoke-${PORT}`)}`,
       'about:blank',
     ],
     { stdio: 'ignore', detached: false },
@@ -57,12 +62,20 @@ async function connect() {
   const ws = new WebSocket(version.webSocketDebuggerUrl)
   let id = 0
   const pending = new Map()
+  const errors = []
   await new Promise((res, rej) => {
     ws.onopen = res
     ws.onerror = rej
   })
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data)
+    if (msg.method === 'Runtime.exceptionThrown') {
+      const detail = msg.params.exceptionDetails
+      errors.push(detail.exception?.description ?? detail.text)
+    }
+    if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+      errors.push(msg.params.args.map((arg) => arg.description ?? arg.value).join(' '))
+    }
     const done = msg.id ? pending.get(msg.id) : null
     if (done) {
       pending.delete(msg.id)
@@ -149,10 +162,13 @@ async function connect() {
 
   return {
     evaluate,
+    errors,
+    runtimeErrors: errors,
     viewport,
     doubleClick,
     pressSpace,
     mouseEvent: (params) => send('Input.dispatchMouseEvent', params, sid),
+    keyEvent: (params) => send('Input.dispatchKeyEvent', params, sid),
     clickText,
     clickExactText,
     close: () => {
@@ -166,6 +182,109 @@ const checks = []
 function check(name, ok) {
   checks.push({ name, ok })
   console.log(`${ok ? '✓' : '✗'} ${name}`)
+}
+
+async function checkListErrors(page) {
+  const lists = [
+    { label: '稍后再看', title: '稍后再看没取到', entry: '晴天' },
+    { label: '关注', title: '关注列表没取到', entry: '造梦阿瑄' },
+  ]
+  const dialog = `!!document.querySelector('[role="dialog"][aria-label="扫码登录"]')`
+  const waitFor = async (expression, timeout = 3000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  const startErrors = page.runtimeErrors.length
+  for (const kind of ['retryable', 'needs_login', 'input']) {
+    for (const { label, title, entry } of lists) {
+      const url = new URL(WEB)
+      url.searchParams.set('listError', kind)
+      url.searchParams.set('list', label)
+      await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+      await waitFor(`location.href === ${JSON.stringify(url.href)} && !!document.querySelector('nav[aria-label="主导航"]')`)
+      const active = `(() => {
+        const button = document.querySelector('nav[aria-label="主导航"] button[aria-current="page"]')
+        return (button?.getAttribute('aria-label') || button?.textContent.trim()) === ${JSON.stringify(label)}
+      })()`
+      const error = `document.querySelector('main h2')?.textContent.trim() === ${JSON.stringify(title)}`
+      const detail = (text) => `document.querySelector('main p')?.textContent.trim() === ${JSON.stringify(text)}`
+      const buttons = `[...document.querySelectorAll('main button')].map((button) => button.textContent.trim()).join(',')`
+      const recovered = `${active} && !(${error}) && !document.querySelector('[role="dialog"]') && document.querySelector('main #scroll-main')?.innerText.includes(${JSON.stringify(entry)})`
+      const clicked = await page.clickExactText(label)
+      const failed = clicked && await waitFor(`${active} && ${error}`)
+      if (kind === 'retryable') {
+        check(`${label}超时显示原地重试`, failed && await page.evaluate(
+          `${detail('连不上 B 站，检查一下网络。')} && ${buttons} === '重试' && !(${dialog})`,
+        ))
+        const retried = await page.clickExactText('重试')
+        check(`${label}重试后在原页显示列表`, retried && await waitFor(recovered))
+      } else if (kind === 'needs_login') {
+        const login = failed && await page.evaluate(`${buttons} === '去登录'`) && await page.clickExactText('去登录')
+        const qrOpened = login && await waitFor(`${active} && ${dialog}`)
+        check(`${label}需要登录时直接打开登录框`, qrOpened)
+        const confirmed = qrOpened && await waitFor(
+          `${active} && !!document.querySelector('[role="dialog"][aria-label="账号"]')`,
+          10_000,
+        )
+        check(`${label}模拟扫码登录成功`, confirmed)
+        check(`${label}登录后在原页显示列表`, confirmed && await waitFor(recovered))
+      } else {
+        await sleep(300)
+        check(`${label}保留永久错误`, failed && await page.evaluate(
+          `${active} && ${error} && ${detail('列表请求无效')} && ${buttons} === '' && !(${dialog})`,
+        ))
+      }
+    }
+  }
+  const listErrors = page.runtimeErrors.slice(startErrors)
+  check('列表失败和重试没有控制台错误或未处理的拒绝', listErrors.length === 0)
+  for (const error of listErrors) console.log(error)
+}
+
+async function checkLibraryPartial(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('libraryPartial', '1')
+  await page.evaluate(`location.href = ${JSON.stringify(url)}`)
+  let opened = false
+  for (let i = 0; i < 40 && !opened; i += 1) {
+    await sleep(250)
+    opened = await page.clickText('曲库')
+  }
+  check('打开曲库', opened)
+  await sleep(600)
+
+  const card = (name) => `document.querySelector('#scroll-main button [title="${name}"]')?.closest('button')`
+  const labels = await page.evaluate(`[
+    ${card('深夜循环')},
+    ${card('翻唱现场')},
+    ${card('纯音乐与白噪音')},
+  ].map((button) => button?.innerText.split('\\n').at(-1))`)
+  check(`有歌的歌单显示 5 首（实际：${labels[0]}）`, labels[0] === '5 首')
+  check(`失败的歌单提示曲目数未取到（实际：${labels[1]}）`, labels[1] === '曲目数未取到')
+  check(`真正空的歌单显示空歌单（实际：${labels[2]}）`, labels[2] === '空歌单')
+
+  const retried = await page.evaluate(`(() => {
+    performance.clearMarks('library_tracks')
+    const retry = [...(${card('翻唱现场')}?.parentElement.querySelectorAll('button') ?? [])]
+      .find((button) => button.textContent.trim() === '重试')
+    retry?.click()
+    return !!retry
+  })()`)
+  await sleep(600)
+  const reads = await page.evaluate(`performance.getEntriesByName('library_tracks').map((entry) => entry.detail)`)
+  check(`重试只读取翻唱现场一次（实际：${JSON.stringify(reads)}）`, retried && reads.length === 1 && reads[0] === 2)
+  const recovered = await page.evaluate(`${card('翻唱现场')}?.innerText.split('\\n').at(-1)`)
+  check('重试成功后显示 4 首', recovered === '4 首')
+
+  await page.evaluate(`${card('深夜循环')}?.click()`)
+  await sleep(600)
+  const tracks = await page.evaluate(`[...document.querySelectorAll('#scroll-main [data-row="track"]')].map((row) => row.innerText)`)
+  check('打开深夜循环后显示 5 首歌', tracks.length === 5 && tracks[0].includes('晴天'))
+  check(`曲库没有控制台错误或未处理异常（${page.errors.length} 条）`, page.errors.length === 0)
 }
 
 async function controlFit(page) {
@@ -182,6 +301,7 @@ async function controlFit(page) {
     if (!frame || !row) return null
     const frameBox = frame.getBoundingClientRect()
     const buttons = [...row.querySelectorAll('button')].filter((b) => {
+      if (b.parentElement !== row && b.parentElement?.parentElement !== row) return false
       const style = getComputedStyle(b)
       return style.display !== 'none' && style.visibility !== 'hidden' && b.getBoundingClientRect().width > 0
     })
@@ -203,9 +323,153 @@ async function controlFit(page) {
   })()`)
 }
 
+async function dynamicReturn(page) {
+  const title = '起风了｜深夜卧室版'
+  const cardSelector = (name) => `[...document.querySelectorAll('article [role="button"]')].find(
+    (button) => button.textContent.includes(${JSON.stringify(name)}),
+  )`
+  const readCard = (name = title) => page.evaluate(`(async () => {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const scroller = document.querySelector('#scroll-main')
+    const card = ${cardSelector(name)}
+    if (!scroller || !card) return null
+    const rect = card.getBoundingClientRect()
+    const viewport = scroller.getBoundingClientRect()
+    const header = scroller.querySelector('header').getBoundingClientRect()
+    const bodyToggle = [...card.closest('article').querySelectorAll('button')]
+      .find((button) => button.textContent === '收起' || button.textContent === '展开')
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      top: rect.top - viewport.top,
+      scroll: scroller.scrollTop,
+      videoOnly: !scroller.innerText.includes('点歌台｜今晚只放你点的歌'),
+      focused: document.activeElement === card,
+      bodyToggle: bodyToggle?.textContent,
+      visible: rect.top >= header.bottom && rect.bottom <= viewport.bottom,
+    }
+  })()`)
+  const waitForCard = async (name) => {
+    for (let i = 0; i < 30; i += 1) {
+      const card = await readCard(name)
+      if (card) return card
+      await sleep(100)
+    }
+    return null
+  }
+
+  const openFeed = async (scenario) => {
+    if (scenario) {
+      const url = new URL(WEB)
+      url.searchParams.set(scenario, '1')
+      const href = JSON.stringify(url.href)
+      await page.evaluate(`location.href = ${href}`)
+      for (let i = 0; i < 30; i += 1) {
+        if (await page.evaluate(`location.href === ${href}`)) break
+        await sleep(100)
+      }
+    }
+    for (let i = 0; i < 30; i += 1) {
+      const opened = await page.evaluate(`(() => {
+        const tab = [...document.querySelectorAll('[aria-label="主要导航"] button')]
+          .find((button) => button.textContent.trim() === '动态')
+        if (!tab) return false
+        tab.click()
+        return true
+      })()`)
+      if (opened) break
+      await sleep(100)
+    }
+    if (!(await waitForCard()) || !(await page.clickExactText('视频投稿'))) {
+      throw new Error('640×560 预览未载入视频投稿')
+    }
+    await page.evaluate("document.querySelector('#scroll-main').scrollTop = 483")
+    return readCard()
+  }
+  const openWithEnter = async () => {
+    await page.evaluate(`(${cardSelector(title)})?.focus({ preventScroll: true })`)
+    const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }
+    await page.keyEvent({ type: 'keyDown', ...enter })
+    await page.keyEvent({ type: 'keyUp', ...enter })
+    return page.clickExactText('返回')
+  }
+  const toggleBody = (label) => page.evaluate(`(() => {
+    const article = (${cardSelector(title)})?.closest('article')
+    if (!article) return false
+    const toggle = [...article.querySelectorAll('button')]
+      .find((button) => button.textContent === ${JSON.stringify(label)})
+    if (!toggle) return false
+    toggle.click()
+    return true
+  })()`)
+
+  const firstError = page.runtimeErrors.length
+  await page.viewport(640, 560)
+  const before = await openFeed()
+  check('640×560 视频投稿已滚到第二条', before?.videoOnly && before.scroll > 0 && before.y < 560)
+  if (!before) return
+
+  const { x, y } = before
+  await page.mouseEvent({ type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 })
+  await page.mouseEvent({ type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 })
+  check('通过顶栏从第二条视频详情返回', await page.clickExactText('返回'))
+  const after = await waitForCard()
+  check('返回后保留视频投稿筛选', after?.videoOnly)
+  check(
+    `返回后第二条视频恢复位置，scrollTop ${before.scroll} → ${after?.scroll}`,
+    !!after && Math.abs(after.top - before.top) <= 1,
+  )
+
+  const keyboardBack = await openWithEnter()
+  const keyboardReturn = await waitForCard()
+  check('用 Enter 打开后返回，焦点回到第二条视频', keyboardBack && keyboardReturn?.focused)
+
+  const refresh = await page.clickText('刷新动态')
+  const refreshed = await waitForCard()
+  check('主动刷新回到顶部并保留筛选', refresh && refreshed?.scroll === 0 && refreshed.videoOnly)
+
+  await openFeed('longDynamicBody')
+  const expanded = await toggleBody('展开')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const expandedBefore = await readCard()
+  const expandedBack = await openWithEnter()
+  const expandedAfter = await waitForCard()
+  check(
+    `展开长正文后按 Enter 打开视频，返回时保留正文、筛选、位置和焦点，卡片距视口顶部 ${expandedBefore?.top} → ${expandedAfter?.top}`,
+    expanded && expandedBack &&
+      expandedBefore?.bodyToggle === '收起' && expandedBefore.visible &&
+      expandedAfter?.bodyToggle === '收起' && expandedAfter.visible && expandedAfter.videoOnly && expandedAfter.focused &&
+      Math.abs(expandedAfter.top - expandedBefore.top) <= 1 &&
+      Math.abs(expandedAfter.scroll - expandedBefore.scroll) <= 1,
+  )
+
+  const collapsed = await toggleBody('收起')
+  await page.evaluate(`(${cardSelector(title)}).scrollIntoView({ block: 'center' })`)
+  const collapsedBefore = await readCard()
+  const collapsedBack = await openWithEnter()
+  const collapsedAfter = await waitForCard()
+  check(
+    `收起长正文后返回，卡片距视口顶部 ${collapsedBefore?.top} → ${collapsedAfter?.top}`,
+    collapsed && collapsedBack && collapsedBefore?.visible && collapsedBefore.bodyToggle === '展开' &&
+      collapsedAfter?.visible && collapsedAfter.bodyToggle === '展开' && collapsedAfter.focused &&
+      Math.abs(collapsedAfter.top - collapsedBefore.top) <= 1,
+  )
+
+  await openFeed('removeDynamicOnReturn')
+  const removedBack = await openWithEnter()
+  const neighbor = await waitForCard('【翻唱】晴天｜一人双声部')
+  check('原条目删除后，返回同一筛选并聚焦相邻视频', removedBack && neighbor?.focused && neighbor.videoOnly && !(await readCard()))
+
+  const errors = page.runtimeErrors.slice(firstError)
+  check('动态返回没有控制台错误或未处理异常', errors.length === 0)
+  if (errors.length) console.error(errors)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
+    if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
+    if (DYNAMIC_RETURN) process.exitCode = 1
     return
   }
   if (!(await reachable(WEB))) {
@@ -216,7 +480,14 @@ async function main() {
 
   const page = await connect()
   try {
+    await checkLibraryPartial(page)
+    if (libraryPartialOnly) return
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+    if (DYNAMIC_RETURN) {
+      await dynamicReturn(page)
+      if (checks.some((c) => !c.ok)) process.exitCode = 1
+      return
+    }
     await sleep(6000)
 
     // 首页卡片：hover 只露出听、稍后再看和更多；低频动作收进更多。
@@ -479,6 +750,24 @@ async function main() {
 
     await page.viewport(700, 860)
     await sleep(600)
+    for (const width of [380, 420]) {
+      await page.viewport(width, 560)
+      await sleep(600)
+      const fit = await controlFit(page)
+      check(`${width} 宽控制条没有被裁切`, !!fit && fit.overflow <= 1 && fit.outside === 0)
+      check(`${width} 宽保留全屏`, !!fit?.full)
+      const focused = await page.evaluate(`(() => {
+        const btn = document.querySelector('button[aria-label="全屏"]')
+        const frame = document.querySelector('[data-watch-player]')?.getBoundingClientRect()
+        if (!btn || !frame) return false
+        btn.focus()
+        const box = btn.getBoundingClientRect()
+        return document.activeElement === btn && box.right <= frame.right + 0.5
+      })()`)
+      check(`${width} 宽全屏可聚焦且在画面内`, focused)
+    }
+    await page.viewport(700, 860)
+    await sleep(600)
     check('700 宽没有横向溢出', (await page.evaluate(`document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth`)) === 0)
     const speedAt700 = await page.evaluate(`(() => {
       const btn = document.querySelector('button[aria-label^="播放倍速"]')
@@ -633,6 +922,7 @@ async function main() {
     check('结束卡保留自动连播开关', !!endCard?.autoplay)
 
     // 搜索入口只在顶栏：点开有联想 panel，提交后进结果页；侧栏不再有独立搜索页。
+    await page.viewport(640, 560)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     await sleep(5000)
     check(
@@ -673,9 +963,14 @@ async function main() {
       })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
-    await page.evaluate(`(() => {
+    const singleResult = await page.evaluate(`(() => {
       const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
-      dialog?.querySelector('button[aria-label^="观看"]')?.click()
+      if (!dialog) return null
+      dialog.scrollTop = dialog.scrollHeight - dialog.clientHeight
+      const scrollTop = dialog.scrollTop
+      const count = dialog.querySelectorAll('[data-track-card]').length
+      dialog.querySelector('button[aria-label^="观看"]')?.click()
+      return { scrollTop, count }
     })()`)
     let searchVideo = false
     for (let i = 0; i < 30 && !searchVideo; i += 1) {
@@ -692,10 +987,15 @@ async function main() {
         dialog: !!dialog,
         query: input ? input.value : '',
         focused: !!active?.closest?.('[data-track-card]'),
+        scrollTop: dialog?.scrollTop,
       }
     })()`)
     check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
     check('返回后焦点落回结果卡片', returned.focused)
+    check(
+      `单条结果保留滚动位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
+      singleResult?.count === 1 && singleResult.scrollTop > 0 && returned.scrollTop === singleResult.scrollTop,
+    )
 
     // 再次进入同一结果：只点顶栏搜索框后按 Esc 收联想，不能抹掉返回目标。
     const reopenedResult = await page.evaluate(`(() => {
@@ -743,6 +1043,78 @@ async function main() {
       secondReturn.dialog && secondReturn.query === '晴天' && secondReturn.focused,
     )
 
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      if (!input) return
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '周杰伦')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.closest('form')?.requestSubmit()
+    })()`)
+    let resultCount = 0
+    for (let i = 0; i < 20 && resultCount < 5; i += 1) {
+      await sleep(400)
+      resultCount = await page.evaluate(`document.querySelectorAll('#search-scroll [data-track-card]').length`)
+    }
+
+    const filters = ['音乐', '最多播放', '10 分钟以下']
+    const filtersSelected = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const buttons = [...(dialog?.querySelectorAll('button') ?? [])]
+      return ${JSON.stringify(filters)}.every((label) => {
+        const button = buttons.find((button) => button.textContent.trim() === label)
+        button?.click()
+        return !!button
+      })
+    })()`)
+    await sleep(1200)
+    const manyResults = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const cards = dialog?.querySelectorAll('[data-track-card]')
+      const button = cards?.[2]?.querySelector('button[aria-label^="观看"]')
+      if (!button) return null
+      dialog.scrollTop = Math.floor((dialog.scrollHeight - dialog.clientHeight) / 3)
+      button.focus({ preventScroll: true })
+      return {
+        count: cards.length,
+        scrollTop: dialog.scrollTop,
+        focused: document.activeElement?.getAttribute('aria-label'),
+      }
+    })()`)
+    await page.pressSpace()
+    let keyboardOpened = false
+    for (let i = 0; i < 30 && !keyboardOpened; i += 1) {
+      await sleep(500)
+      keyboardOpened = await page.evaluate(`!!document.querySelector('video')`)
+    }
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(900)
+    const returnedMany = await page.evaluate(`(() => {
+      const dialog = document.querySelector('#search-scroll')
+      const pressed = [...(dialog?.querySelectorAll('button[aria-pressed="true"]') ?? [])]
+      return {
+        scrollTop: dialog?.scrollTop,
+        focused: document.activeElement?.getAttribute('aria-label'),
+        query: document.querySelector('input[aria-label="顶栏搜索"]')?.value,
+        filters: pressed.map((button) => button.textContent.trim()),
+      }
+    })()`)
+    check(
+      `多条结果保留滚动位置（${manyResults?.scrollTop} → ${returnedMany.scrollTop}）`,
+      keyboardOpened && manyResults?.count === 5 && manyResults.scrollTop > 0 && returnedMany.scrollTop === manyResults.scrollTop,
+    )
+    check('键盘打开后焦点回到同一张结果卡片', keyboardOpened && !!manyResults?.focused && returnedMany.focused === manyResults.focused)
+    check(
+      '返回后保留关键词、分区、排序和时长',
+      filtersSelected && returnedMany.query === '周杰伦' && filters.every((filter) => returnedMany.filters.includes(filter)),
+    )
+    await page.evaluate(`document.querySelector('#search-scroll button[aria-label="关闭搜索"]')?.click()`)
+    check(
+      '主动关闭搜索后露出原页面',
+      await page.evaluate(`!document.querySelector('#search-scroll') && !!document.querySelector('[data-home-recommend]')`),
+    )
+    await page.viewport(1320, 900)
+
     // 多 P 预览：分享链接和嵌入代码必须指向当前 P。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
     await sleep(5000)
@@ -768,6 +1140,13 @@ async function main() {
     })()`)
     await sleep(1600)
     check('多 P 预览切到 P2', multiVideo && switchedP2)
+    await page.viewport(380, 560)
+    await sleep(600)
+    const multiFit380 = await controlFit(page)
+    check('380 宽多 P 控制条没有被裁切', !!multiFit380 && multiFit380.overflow <= 1 && multiFit380.outside === 0)
+    check('380 宽多 P 保留全屏', !!multiFit380?.full)
+    await page.viewport(1320, 900)
+    await sleep(400)
     await page.evaluate(`(() => {
       window.__copied = ''
       Object.defineProperty(navigator, 'clipboard', {
@@ -1189,6 +1568,38 @@ async function main() {
       '撤销恢复曲目和当前项',
       afterUndo.rows === queueBefore.count && afterUndo.active && !afterUndo.strip,
     )
+    const beforeRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      const target = rows[1]
+      if (!target) return null
+      target.focus()
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        next: rows[2]?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    await page.pressSpace()
+    await sleep(800)
+    const afterRemove = await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const rows = [...(rail?.querySelectorAll('[data-queue-remove]') ?? [])]
+      const current = rail?.querySelector('[role="button"][aria-current="true"]')
+      return {
+        count: rows.length,
+        current: (current?.textContent || '').trim(),
+        focus: document.activeElement?.getAttribute('aria-label') || '',
+      }
+    })()`)
+    check(
+      '键盘移除单曲且不切歌、焦点落到下一项',
+      beforeRemove &&
+        afterRemove.count === beforeRemove.count - 1 &&
+        afterRemove.current === beforeRemove.current &&
+        afterRemove.focus === beforeRemove.next,
+    )
 
     // 首页慢请求：8 秒只提示慢，10 秒成功仍要展示；重试后旧响应按请求 id 丢弃。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?slowHome=1`)}`)
@@ -1248,11 +1659,11 @@ async function main() {
     })`)
     check('请求失败立即报错且不显示加载较慢', failedHome.error && !failedHome.slow && failedHome.retry)
 
+    await checkListErrors(page)
   } finally {
     page.close()
+    if (checks.some((c) => !c.ok)) process.exitCode = 1
   }
-
-  if (checks.some((c) => !c.ok)) process.exitCode = 1
 }
 
 main().catch((e) => {

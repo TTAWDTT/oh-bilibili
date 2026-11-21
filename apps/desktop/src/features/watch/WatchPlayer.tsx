@@ -1729,12 +1729,12 @@ export function WatchPlayer({
           />
         </div>
 
-        <div data-watch-controls className="flex items-center gap-2">
+        <div data-watch-controls className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={togglePlay}
             aria-label={playing ? '暂停' : '播放'}
-            className="bili-icon-btn t press flex h-[22px] w-9 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="bili-icon-btn t press flex h-[22px] w-8 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15 sm:w-9"
           >
             <Icon name={playing ? 'pause' : 'play'} size={15} />
           </button>
@@ -1765,7 +1765,7 @@ export function WatchPlayer({
             onClick={captureShot}
             aria-label="截图"
             title="截图"
-            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 md:hidden xl:flex"
+            className="bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 sm:flex md:hidden xl:flex"
           >
             <Icon name="camera" size={16} />
           </button>
@@ -2065,9 +2065,9 @@ export function WatchPlayer({
                 aria-expanded={pagesOpen}
                 aria-label="选集"
                 title="选集"
-                className="t press flex h-7 items-center gap-1 rounded-[4px] px-2 text-[12px] hover:bg-white/15"
+                className="t press flex h-7 items-center gap-1 rounded-[4px] px-1 text-[12px] hover:bg-white/15 sm:px-2"
               >
-                选集
+                <span className="hidden sm:inline">选集</span>
                 <span className="num text-[11px] text-white/55">P{currentPage}</span>
               </button>
               {pagesOpen ? (
@@ -2173,7 +2173,7 @@ export function WatchPlayer({
             aria-label={loopOne ? '关闭单集循环' : '单集循环'}
             title={loopOne ? '关闭单集循环' : '单集循环'}
             onClick={() => setLoopOne(!loopOne)}
-            className={`bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
+            className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] sm:flex ${
               loopOne ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
             }`}
           >
