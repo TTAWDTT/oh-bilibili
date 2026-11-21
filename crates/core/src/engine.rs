@@ -113,6 +113,136 @@ mod watch_gate_tests {
     }
 }
 
+#[cfg(test)]
+mod queue_restore_tests {
+    use super::replace_queue_if_untouched;
+    use crate::state::Queue;
+    use bilimusic_model::{Track, TrackKey};
+
+    fn track(key: &str) -> Track {
+        Track {
+            key: TrackKey::from_provider(key),
+            title: key.into(),
+            artist: String::new(),
+            duration: None,
+            cover: None,
+            accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
+            up_mid: None,
+            tname: None,
+            typeid: None,
+        }
+    }
+
+    fn keys(items: &[Track]) -> Vec<String> {
+        items
+            .iter()
+            .map(|t| t.key.as_opaque().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn 后台补全只在队列没被动过时替换() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        // 旧格式恢复时本地全未命中，补全从空队列开始。
+        let mut queue = Queue::from_tracks(&[], 0);
+        let generation = queue.generation();
+
+        assert!(replace_queue_if_untouched(
+            &mut queue,
+            generation,
+            &[a.clone(), b.clone(), c.clone()],
+            1
+        ));
+        assert_eq!(queue.items().len(), 3);
+        assert_eq!(queue.index(), Some(1), "补全后光标还停在原来那一首");
+    }
+
+    #[test]
+    fn 用户清空重排或切歌后补全不覆盖() {
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let filled = [a.clone(), b.clone(), c.clone()];
+
+        let mut cleared = Queue::from_tracks(&[a.clone(), b.clone()], 1);
+        let generation = cleared.generation();
+        cleared.replace_from_tracks(&[], 0);
+        assert!(!replace_queue_if_untouched(
+            &mut cleared,
+            generation,
+            &filled,
+            1
+        ));
+        assert_eq!(cleared.items().len(), 0, "清空后不能被补全带回来");
+
+        let mut reordered = Queue::from_tracks(&[b.clone(), a.clone()], 0);
+        let generation = reordered.generation();
+        let b_id = reordered.entry_id_of("BV2").expect("队列里有 BV2");
+        let a_id = reordered.entry_id_of("BV1").expect("队列里有 BV1");
+        reordered.move_entry(a_id, Some(b_id));
+        assert!(!replace_queue_if_untouched(
+            &mut reordered,
+            generation,
+            &filled,
+            0
+        ));
+        assert_eq!(
+            keys(&reordered.items()),
+            keys(&[a.clone(), b.clone()]),
+            "重排后保持用户顺序"
+        );
+
+        let mut switched = Queue::from_tracks(&[a.clone(), b.clone()], 0);
+        let generation = switched.generation();
+        let b_id = switched.entry_id_of("BV2").expect("队列里有 BV2");
+        switched.jump(b_id);
+        assert!(!replace_queue_if_untouched(
+            &mut switched,
+            generation,
+            &filled,
+            0
+        ));
+        assert_eq!(switched.index(), Some(1), "切歌后的光标不能被拨回去");
+    }
+
+    #[test]
+    fn 补全等待期间换歌再清空_迟到的曲目不能落回() {
+        let mut queue = Queue::from_tracks(&[], 0);
+        let generation = queue.generation();
+        // 用户换到 X，再清空；当前值又回到空队列。
+        let x_id = queue.push_back(track("BVX"));
+        queue.jump(x_id);
+        queue.replace_from_tracks(&[], 0);
+
+        assert!(!replace_queue_if_untouched(
+            &mut queue,
+            generation,
+            &[track("BV1"), track("BV2")],
+            0
+        ));
+        assert!(queue.is_empty(), "迟到的 A/B 不能把清空后的队列填回来");
+    }
+
+    #[test]
+    fn 没补到任何曲目就不替换() {
+        let a = track("BV1");
+        let mut queue = Queue::from_tracks(&[a], 0);
+        let generation = queue.generation();
+        assert!(!replace_queue_if_untouched(
+            &mut queue,
+            generation,
+            &[],
+            0
+        ));
+        assert_eq!(queue.items().len(), 1);
+    }
+}
+
 pub struct Engine {
     /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
     cookie_file: std::path::PathBuf,
@@ -895,7 +1025,7 @@ impl Engine {
             .ok_or_else(|| WireError::input("index", "越界"))?;
         {
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&tracks, start);
+            q.replace_from_tracks(&tracks, start);
         }
         self.persist_queue();
         self.play_key(&key).await
@@ -1381,9 +1511,6 @@ impl Engine {
             let queue = lock(&self.queue);
             (queue.items(), queue.index())
         };
-        if tracks.is_empty() {
-            return;
-        }
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
         // 进度也一起存，否则用户还得自己拖回去。
         let snapshot = serde_json::json!({
@@ -1443,7 +1570,7 @@ impl Engine {
             }
             let start = saved_index.min(saved_tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&saved_tracks, start);
+            q.replace_from_tracks(&saved_tracks, start);
             *lock(&self.resume_at_ms) = saved_ms;
             return;
         }
@@ -1451,13 +1578,16 @@ impl Engine {
         if !tracks.is_empty() {
             let start = saved_index.min(tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
-            *q = Queue::from_tracks(&tracks, start);
+            q.replace_from_tracks(&tracks, start);
         }
         *lock(&self.resume_at_ms) = saved_ms;
 
         // 有缺的就后台补，补完再整体替换队列。
         let already = tracks.len();
         if already < keys.len() {
+            // 补全期间用户可能清空、重排、切歌或换了新队列。记下开始时的
+            // 队列代数，回来时只要变过就不覆盖。
+            let generation = lock(&self.queue).generation();
             let engine = self.clone();
             std::thread::spawn(move || {
                 let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -1481,10 +1611,12 @@ impl Engine {
                         *lock(&engine.restoring) = Some((done, total));
                     }
                     let filled = engine.tracks_for(&keys);
-                    if !filled.is_empty() {
-                        let mut q = lock(&engine.queue);
-                        *q = Queue::from_tracks(&filled, 0);
-                    }
+                    replace_queue_if_untouched(
+                        &mut lock(&engine.queue),
+                        generation,
+                        &filled,
+                        saved_index,
+                    );
                     *lock(&engine.restoring) = None;
                 });
             });
@@ -1530,7 +1662,7 @@ impl Engine {
         let Some(saved) = saved else {
             return Err(WireError::input("queue", "没有可撤销的清空"));
         };
-        *lock(&self.queue) = saved;
+        lock(&self.queue).restore_from_snapshot(saved);
         self.persist_queue();
         Ok(self.queue_view())
     }
@@ -2384,6 +2516,24 @@ mod sync_state_tests {
             ReactionState::Rejected
         );
     }
+}
+
+/// 后台补全回来时，只有队列代数还是发起补全时的那一代才替换。
+///
+/// 补全可能跨几秒到几十秒，期间用户可能清空、重排、切歌或换了新队列；
+/// 只看曲目和下标不够——换到 X 再清空又会回到空队列。
+fn replace_queue_if_untouched(
+    queue: &mut Queue,
+    generation: u64,
+    filled: &[Track],
+    saved_index: usize,
+) -> bool {
+    if filled.is_empty() || queue.generation() != generation {
+        return false;
+    }
+    let start = saved_index.min(filled.len() - 1);
+    queue.replace_from_tracks(filled, start);
+    true
 }
 
 fn bangumi_view(item: bilimusic_bili::sync::BangumiItem) -> crate::wire::BangumiView {
