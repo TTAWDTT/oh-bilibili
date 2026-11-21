@@ -10,6 +10,8 @@ import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { PageTitle } from '../../shared/ui/PageTitle'
 
+const HISTORY_PAGE = 60
+
 /**
  * 播放历史。数据来自 SQLite 的 history 表，是真正播过的记录。
  *
@@ -19,14 +21,22 @@ export function HistoryView() {
   const [entries, setEntries] = useState<import('../../shared/lib/ipc').HistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmingClear, setConfirmingClear] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  /** 下一页从这一条之后取：播放过的条目会跳到最前，offset 会重复或漏项。 */
+  const [cursor, setCursor] = useState<{ played_at: number; id: number } | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
     void ipc
-      .libraryHistoryTimed(60)
+      .libraryHistoryTimed(HISTORY_PAGE)
       .then((list) => {
-        if (!cancelled) setEntries(list)
+        if (cancelled) return
+        setEntries(list)
+        const last = list[list.length - 1]
+        setCursor(last ? { played_at: last.played_at, id: last.id } : null)
+        setHasMore(list.length === HISTORY_PAGE)
       })
       .catch((e) => {
         if (!cancelled) setError(toWireError(e).message)
@@ -36,12 +46,50 @@ export function HistoryView() {
     }
   }, [])
 
+  /** 再取一页更早的记录。用上一页最旧一条的 (played_at, id) 作边界。 */
+  const loadOlder = async (): Promise<void> => {
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const older = await ipc.libraryHistoryTimed(HISTORY_PAGE, cursor)
+      setEntries((prev) => {
+        const seen = new Set((prev ?? []).map((entry) => entry.track.key))
+        return [...(prev ?? []), ...older.filter((entry) => !seen.has(entry.track.key))]
+      })
+      const last = older[older.length - 1]
+      if (last) setCursor({ played_at: last.played_at, id: last.id })
+      setHasMore(older.length === HISTORY_PAGE)
+    } catch (e) {
+      reportActionError('加载更早记录', e)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   // 按自然日分组：今天 / 昨天 / 更早。B 站的历史就是这么分的。
   /** 删掉一首歌的全部历史。 */
   const removeOne = async (key: string): Promise<void> => {
     try {
       await ipc.historyDelete(key)
-      setEntries((prev) => (prev ?? []).filter((e) => e.track.key !== key))
+      const next = (entries ?? []).filter((e) => e.track.key !== key)
+      if (next.length === 0 && hasMore) {
+        // 已加载的删光了，但数据源还有更早的记录：从最新一页重新读，
+        // 不能把「还没有播放记录」提前亮出来。
+        setLoadingMore(true)
+        try {
+          const list = await ipc.libraryHistoryTimed(HISTORY_PAGE)
+          setEntries(list)
+          const last = list[list.length - 1]
+          setCursor(last ? { played_at: last.played_at, id: last.id } : null)
+          setHasMore(list.length === HISTORY_PAGE)
+        } catch (loadError) {
+          reportActionError('加载更早记录', loadError)
+        } finally {
+          setLoadingMore(false)
+        }
+      } else {
+        setEntries(next)
+      }
     } catch (e) {
       reportActionError('删除记录', e)
     }
@@ -52,6 +100,8 @@ export function HistoryView() {
     try {
       await ipc.historyClear()
       setEntries([])
+      setCursor(null)
+      setHasMore(false)
       setConfirmingClear(false)
       toastDone('历史已清空')
     } catch (e) {
@@ -61,23 +111,32 @@ export function HistoryView() {
 
   type Entry = import('../../shared/lib/ipc').HistoryEntry
   const groups = (() => {
-    if (entries === null) return [] as { label: string; items: Entry[] }[]
+    if (entries === null) return [] as { key: string; label: string; items: Entry[] }[]
     const startOfDay = (ms: number): number => {
       const d = new Date(ms)
       d.setHours(0, 0, 0, 0)
       return d.getTime()
     }
     const today = startOfDay(Date.now())
-    const buckets = new Map<string, Entry[]>()
+    const year = new Date(today).getFullYear()
+    const buckets = new Map<string, { key: string; label: string; items: Entry[] }>()
     for (const entry of entries) {
       const day = startOfDay(entry.played_at)
+      const date = new Date(day)
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
       const label =
-        day === today ? '今天' : day === today - 86_400_000 ? '昨天' : `${new Date(day).getMonth() + 1} 月 ${new Date(day).getDate()} 日`
-      const list = buckets.get(label)
-      if (list) list.push(entry)
-      else buckets.set(label, [entry])
+        day === today
+          ? '今天'
+          : day === today - 86_400_000
+            ? '昨天'
+            : date.getFullYear() === year
+              ? `${date.getMonth() + 1} 月 ${date.getDate()} 日`
+              : `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`
+      const bucket = buckets.get(key)
+      if (bucket) bucket.items.push(entry)
+      else buckets.set(key, { key, label, items: [entry] })
     }
-    return [...buckets.entries()].map(([label, items]) => ({ label, items }))
+    return [...buckets.values()]
   })()
 
   if (error) {
@@ -133,7 +192,7 @@ export function HistoryView() {
       </div>
 
       {groups.map((group) => (
-        <section key={group.label} className="mb-8">
+        <section key={group.key} className="mb-8">
           <div className="mb-3 flex items-baseline gap-2">
             <h2 className="text-[15px] font-medium text-[var(--text-1)]">{group.label}</h2>
             <span className="num text-[12px] text-[var(--text-3)]">{group.items.length} 个</span>
@@ -162,6 +221,18 @@ export function HistoryView() {
           />
         </section>
       ))}
+      {hasMore ? (
+        <div className="flex justify-center pb-6 pt-1">
+          <button
+            type="button"
+            onClick={() => void loadOlder()}
+            disabled={loadingMore}
+            className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+          >
+            {loadingMore ? '加载中…' : '加载更早记录'}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

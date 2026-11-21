@@ -114,6 +114,9 @@ export function SearchPanel() {
   const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
   const setSearchFilters = useAppStore((state) => state.setSearchFilters)
   const closeSearch = useAppStore((state) => state.closeSearch)
+  const searchFocusResult = useAppStore((state) => state.searchFocusResult)
+  const clearSearchFocusResult = useAppStore((state) => state.clearSearchFocusResult)
+  const focusedResult = useRef(0)
 
   // 把实际在搜的词与筛选条件同步给 store：
   // 顶栏跟着它走，切走再回来也能恢复。
@@ -168,6 +171,18 @@ export function SearchPanel() {
       el.scrollTop = restored.scrollTop
     }
   }, [restored])
+
+  useLayoutEffect(() => {
+    if (!restored || searchFocusResult === 0 || focusedResult.current === searchFocusResult) return
+    const card = scrollerRef.current?.querySelector<HTMLElement>(
+      `[data-track-card][data-index="${restored.index}"]`,
+    )
+    const button = card?.querySelector<HTMLButtonElement>('button')
+    if (!button) return
+    button.focus()
+    focusedResult.current = searchFocusResult
+    clearSearchFocusResult()
+  }, [restored, searchFocusResult, clearSearchFocusResult])
 
   // 只把属于当前查询的结果写进缓存，避免新关键词挂上旧结果。
   useEffect(() => {

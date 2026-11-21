@@ -13,11 +13,13 @@ use bilimusic_audio::{Media, Player};
 use bilimusic_bili::media::RemoteMedia;
 use bilimusic_bili::Source;
 use bilimusic_model::{Millis, Quality, SearchQuery, Track, TrackKey};
-use bilimusic_store::{Library, ReactionKind, ReactionState};
+use bilimusic_store::{Library, Reaction, ReactionKind, ReactionState};
 
 use crate::lyrics::{self, LyricDoc};
 use crate::state::{LoadToken, PlayerState, Prepared, Queue};
-use crate::wire::{AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, WatchView, WireError};
+use crate::wire::{
+    AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, SyncOutcome, WatchView, WireError,
+};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DownloadView {
@@ -147,6 +149,8 @@ pub struct Engine {
     last_transport_at: Mutex<std::time::Instant>,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
+    /// 最近一次清空前的完整队列。只保留一层，供界面上的「撤销」使用。
+    cleared_queue: Mutex<Option<Queue>>,
     watch_gate: WatchGate,
 }
 
@@ -184,6 +188,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            cleared_queue: Mutex::new(None),
             mode: Mutex::new(crate::wire::PlayMode::Listen),
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
@@ -1510,15 +1515,24 @@ impl Engine {
 
     /// 清空队列。
     pub fn queue_clear(&self) -> Result<QueueView, WireError> {
-        {
-            let mut queue = lock(&self.queue);
-            *queue = Queue::from_tracks(&[], 0);
-        }
+        let saved = lock(&self.queue).take_clear_snapshot();
+        *lock(&self.cleared_queue) = saved;
         self.persist_queue();
         Ok(QueueView {
             items: Vec::new(),
             index: None,
         })
+    }
+
+    /// 撤销最近一次清空：整个队列原样放回，随机顺序和当前项都不丢。
+    pub fn queue_undo_clear(&self) -> Result<QueueView, WireError> {
+        let saved = lock(&self.cleared_queue).take();
+        let Some(saved) = saved else {
+            return Err(WireError::input("queue", "没有可撤销的清空"));
+        };
+        *lock(&self.queue) = saved;
+        self.persist_queue();
+        Ok(self.queue_view())
     }
 
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。
@@ -1573,8 +1587,14 @@ impl Engine {
     }
 
     /// 带播放时间的历史，用于按日期分组。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>, WireError> {
-        Ok(self.library.history_with_time(limit)?)
+    pub fn history_with_time(
+        &self,
+        limit: u32,
+        before: Option<(i64, u64)>,
+    ) -> Result<Vec<(Track, i64, u64, i64)>, WireError> {
+        Ok(self
+            .library
+            .history_with_time(limit, before.map(|(played_at, id)| (played_at, id as i64)))?)
     }
 
     /// 某条视频上次看到的位置，观看页打开时用来定位。
@@ -2174,31 +2194,195 @@ impl Engine {
         Ok(view)
     }
 
+    /// 网络、限流、登录态属于可重试，保留 pending；其余才是永久拒绝。
+    fn reaction_failure_state(err: &WireError) -> ReactionState {
+        match err {
+            WireError::Retryable { .. }
+            | WireError::RateLimited { .. }
+            | WireError::NeedsLogin { .. } => ReactionState::Pending,
+            _ => ReactionState::Rejected,
+        }
+    }
+
     /// 把待推的意图推到 B 站。目前只处理喜欢。
-    pub async fn sync_now(self: &Arc<Self>) -> Result<(), WireError> {
+    pub async fn sync_now(self: &Arc<Self>) -> Result<SyncOutcome, WireError> {
         let Some(mid) = self.source.nav().mid else {
             return Err(WireError::needs_login("同步需要登录"));
         };
-        let pending = self.library.pending_reactions(mid, 20)?;
-        for reaction in pending {
-            let Some(track) = self.library.track_by_key_id(reaction.track_id)? else {
-                continue;
-            };
-            let result = match reaction.kind {
-                ReactionKind::Like => self.source.set_like(&track.key, reaction.want).await,
+        let source = &self.source;
+        sync_pending(&self.library, mid, |track, reaction| async move {
+            match reaction.kind {
+                ReactionKind::Like => source
+                    .set_like(&track.key, reaction.want)
+                    .await
+                    .map_err(WireError::from),
                 // 离线重试时不知道当初选的是哪个夹子，退回默认收藏夹
-                ReactionKind::Fav => {
-                    self.source.set_favorite(&track.key, reaction.want, None).await
+                ReactionKind::Fav => source
+                    .set_favorite(&track.key, reaction.want, None)
+                    .await
+                    .map_err(WireError::from),
+            }
+        })
+        .await
+    }
+}
+
+/// 推完当前账号全部的待办，返回本次真正发生的结果。
+///
+/// 待办在开始时就一次取全，暂时失败的条目仍留在 pending，但本次不再重试。
+async fn sync_pending<F, Fut>(
+    library: &Library,
+    mid: u64,
+    mut write: F,
+) -> Result<SyncOutcome, WireError>
+where
+    F: FnMut(Track, Reaction) -> Fut,
+    Fut: std::future::Future<Output = Result<(), WireError>>,
+{
+    let mut outcome = SyncOutcome {
+        synced: 0,
+        deferred: 0,
+        rejected: 0,
+        detail: None,
+    };
+    for reaction in library.pending_reactions_all(mid)? {
+        let Some(track) = library.track_by_key_id(reaction.track_id)? else {
+            library.mark_reaction(&reaction, ReactionState::Rejected)?;
+            outcome.rejected += 1;
+            outcome
+                .detail
+                .get_or_insert_with(|| "曲目已不在本地记录里".into());
+            continue;
+        };
+        match write(track, reaction.clone()).await {
+            Ok(()) => {
+                library.mark_reaction(&reaction, ReactionState::Synced)?;
+                outcome.synced += 1;
+            }
+            Err(err) => {
+                let state = Engine::reaction_failure_state(&err);
+                library.mark_reaction(&reaction, state)?;
+                if state == ReactionState::Rejected {
+                    outcome.rejected += 1;
+                } else {
+                    outcome.deferred += 1;
                 }
-            };
-            let state = if result.is_ok() {
-                ReactionState::Synced
-            } else {
-                ReactionState::Rejected
-            };
-            self.library.mark_reaction(&reaction, state)?;
+                outcome.detail.get_or_insert_with(|| err.message().to_string());
+            }
         }
-        Ok(())
+    }
+    Ok(outcome)
+}
+
+#[cfg(test)]
+mod sync_state_tests {
+    use super::{sync_pending, Engine, ReactionState};
+    use crate::wire::WireError;
+    use bilimusic_model::{Millis, Track, TrackKey};
+    use bilimusic_store::{Library, ReactionKind};
+
+    fn track(n: u32) -> Track {
+        Track {
+            key: TrackKey::from_provider(format!("BV{n}")),
+            title: format!("歌 {n}"),
+            artist: String::new(),
+            duration: Some(Millis(200_000)),
+            cover: None,
+            accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
+            up_mid: None,
+            tname: None,
+            typeid: None,
+        }
+    }
+
+    fn library_with_pending(count: u32) -> Library {
+        let library = Library::open_in_memory().expect("内存库应该能开");
+        for n in 0..count {
+            let id = library.upsert_track(&track(n)).expect("存曲目");
+            library
+                .set_reaction(id, 42, ReactionKind::Like, true)
+                .expect("记一条待办");
+        }
+        library
+    }
+
+    #[tokio::test]
+    async fn 一次同步推完启动时的全部待办() {
+        let library = library_with_pending(21);
+        let mut pushed = Vec::new();
+        let outcome = sync_pending(&library, 42, |track, _| {
+            pushed.push(track.key.as_opaque().to_string());
+            async { Ok::<(), WireError>(()) }
+        })
+        .await
+        .expect("同步应该成功");
+
+        assert_eq!(outcome.synced, 21, "21 条都要推");
+        assert_eq!(pushed.len(), 21, "每条只推一次");
+        assert!(
+            library.pending_reactions(42, 50).unwrap().is_empty(),
+            "没有遗留待办"
+        );
+    }
+
+    #[tokio::test]
+    async fn 暂时失败的条目同一轮不重试() {
+        let library = library_with_pending(21);
+        let mut calls = 0;
+        let outcome = sync_pending(&library, 42, |track, _| {
+            calls += 1;
+            let fails = track.key.as_opaque() == "BV0";
+            async move {
+                if fails {
+                    Err(WireError::Retryable {
+                        message: "超时".into(),
+                        retry_after_ms: None,
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await
+        .expect("同步应该成功");
+
+        assert_eq!(calls, 21, "失败的那条本次不能再试一遍");
+        assert_eq!(outcome.synced, 20);
+        assert_eq!(outcome.deferred, 1);
+        assert_eq!(
+            library.pending_reactions(42, 50).unwrap().len(),
+            1,
+            "暂时失败留给下一轮"
+        );
+    }
+
+    #[test]
+    fn 短暂失败保留待办_明确拒绝才作废() {
+        assert_eq!(
+            Engine::reaction_failure_state(&WireError::Retryable {
+                message: "超时".into(),
+                retry_after_ms: None,
+            }),
+            ReactionState::Pending
+        );
+        assert_eq!(
+            Engine::reaction_failure_state(&WireError::RateLimited {
+                message: "限流".into(),
+                retry_after_ms: 1000,
+            }),
+            ReactionState::Pending
+        );
+        assert_eq!(
+            Engine::reaction_failure_state(&WireError::needs_login("登录失效")),
+            ReactionState::Pending
+        );
+        assert_eq!(
+            Engine::reaction_failure_state(&WireError::internal("业务拒绝")),
+            ReactionState::Rejected
+        );
     }
 }
 

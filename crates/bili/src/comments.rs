@@ -308,7 +308,8 @@ fn to_comment(raw: RawReply) -> Comment {
                     if src.starts_with("//") {
                         format!("https:{src}")
                     } else {
-                        src
+                        // 评论图片接口给的是 http，macOS 的 ATS 会直接拦掉；图床 https 一样能取。
+                        src.replacen("http://", "https://", 1)
                     }
                 })
                 .collect();
@@ -532,10 +533,14 @@ mod tests {
         let mut value = sample();
         value["data"]["replies"][0]["content"]["pictures"] = serde_json::json!([
             { "img_src": "//i0.hdslb.com/pic.jpg" },
+            { "img_src": "http://i0.hdslb.com/plain.jpg" },
             { "img_src": "  " }
         ]);
         let page = cursor_page_from(&value, true);
-        assert_eq!(page.items[0].pictures, vec!["https://i0.hdslb.com/pic.jpg"]);
+        assert_eq!(
+            page.items[0].pictures,
+            vec!["https://i0.hdslb.com/pic.jpg", "https://i0.hdslb.com/plain.jpg"]
+        );
     }
 
     #[test]
