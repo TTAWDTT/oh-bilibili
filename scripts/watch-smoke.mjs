@@ -617,6 +617,23 @@ async function main() {
       '清空后显示数量和撤销',
       afterClear.rows === 0 && afterClear.strip.includes(`已清空 ${queueBefore.count} 首`) && afterClear.strip.includes('撤销'),
     )
+    // 撤销窗口挂在队列层，切到歌词再切回来不能丢。
+    await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const tab = [...(rail?.querySelectorAll('button') ?? [])].find((b) => (b.textContent || '').trim() === '歌词')
+      tab?.click()
+    })()`)
+    await sleep(400)
+    await page.evaluate(`(() => {
+      const rail = document.querySelector('[aria-label="播放右栏"]')
+      const tab = [...(rail?.querySelectorAll('button') ?? [])].find((b) => (b.textContent || '').trim().startsWith('队列'))
+      tab?.click()
+    })()`)
+    await sleep(400)
+    check(
+      '切到歌词再回来撤销仍在',
+      (await page.evaluate(`document.querySelector('[data-queue-undo]')?.textContent?.trim() ?? ''`)).includes('撤销'),
+    )
     await page.evaluate(`document.querySelector('[data-queue-undo] button')?.click()`)
     await sleep(800)
     const afterUndo = await page.evaluate(`(() => {
