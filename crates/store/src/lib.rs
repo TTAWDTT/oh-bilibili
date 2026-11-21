@@ -427,16 +427,16 @@ impl Library {
     }
 
     /// 带播放时间的历史。前端要按「今天 / 昨天 / 更早」分组，得知道每条什么时候播的。
-    pub fn history_with_time(&self, limit: u32) -> Result<Vec<(Track, i64, u64)>> {
+    pub fn history_with_time(&self, limit: u32, offset: u32) -> Result<Vec<(Track, i64, u64)>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
                 &format!(
                     "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms
                      FROM history h JOIN tracks t ON t.id = h.track_id
-                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?1"
+                     ORDER BY h.played_at DESC, h.id DESC LIMIT ?1 OFFSET ?2"
                 ),
             )?;
-            let rows = stmt.query_map(params![limit.clamp(1, 500) as i64], |row| {
+            let rows = stmt.query_map(params![limit.clamp(1, 500) as i64, offset as i64], |row| {
                 Ok((
                     row_to_track(row)?,
                     row.get::<_, i64>(7)?,
@@ -1144,9 +1144,25 @@ mod tests {
         let a = l.upsert_track(&track("BVpos")).unwrap();
         l.push_history(a, 0).unwrap();
         l.set_history_position("BVBVpos", 42_500).unwrap();
-        let rows = l.history_with_time(10).unwrap();
+        let rows = l.history_with_time(10, 0).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].2, 42_500, "回写之后读到的应该是新位置");
+    }
+
+    #[test]
+    fn 历史可以按偏移翻到更早() {
+        let l = lib();
+        for key in ["BVpage1", "BVpage2", "BVpage3", "BVpage4"] {
+            let id = l.upsert_track(&track(key)).unwrap();
+            l.push_history(id, 0).unwrap();
+        }
+        let all = l.history_with_time(10, 0).unwrap();
+        assert_eq!(all.len(), 4);
+        let older = l.history_with_time(2, 2).unwrap();
+        assert_eq!(older.len(), 2);
+        assert_eq!(older[0].0.key.as_opaque(), all[2].0.key.as_opaque());
+        assert_eq!(older[1].0.key.as_opaque(), all[3].0.key.as_opaque());
+        assert_eq!(l.history_with_time(2, 4).unwrap().len(), 0);
     }
 
     #[test]

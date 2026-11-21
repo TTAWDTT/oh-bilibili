@@ -301,9 +301,31 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
       if (state.historyCleared) return []
       const now = Date.now()
-      return CATALOG.slice(0, 7)
-        .filter((t) => !state.historyHidden.has(t.key))
-        .map((track, i) => ({ track, played_at: now - i * 9.5 * 3600_000 }))
+      const limit = Math.max(1, Math.min(500, Number(args.limit ?? 60) || 60))
+      const offset = Math.max(0, Number(args.offset ?? 0) || 0)
+      const seed = CATALOG[0]
+      if (!seed) return []
+      const long = import.meta.env.DEV && new URLSearchParams(window.location.search).has('historyLong')
+      const all = long
+        ? [
+            ...Array.from({ length: 98 }, (_, i) => ({
+              track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
+              played_at: now - i * 86_400_000,
+            })),
+            {
+              track: { ...seed, key: `${seed.key}-cross-2025`, title: '跨年同日 · 2025' },
+              played_at: new Date(2025, 3, 10, 12).getTime(),
+            },
+            {
+              track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024' },
+              played_at: new Date(2024, 3, 10, 12).getTime(),
+            },
+          ]
+        : CATALOG.slice(0, 7).map((track, i) => ({ track, played_at: now - i * 9.5 * 3600_000 }))
+      return all
+        .filter((entry) => !state.historyHidden.has(entry.track.key))
+        .sort((a, b) => b.played_at - a.played_at)
+        .slice(offset, offset + limit)
     }
     case 'library_history':
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。

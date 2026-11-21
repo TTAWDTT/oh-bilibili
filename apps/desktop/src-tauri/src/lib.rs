@@ -521,9 +521,10 @@ fn history_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<(), WireError>
 fn library_history_timed(
     engine: tauri::State<'_, Arc<Engine>>,
     limit: u32,
+    offset: Option<u32>,
 ) -> Result<Vec<HistoryEntryView>, WireError> {
     Ok(engine
-        .history_with_time(limit)?
+        .history_with_time(limit, offset.unwrap_or(0))?
         .into_iter()
         .map(|(track, played_at, position_ms)| HistoryEntryView {
             track,
