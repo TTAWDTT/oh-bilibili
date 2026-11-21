@@ -6,11 +6,11 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use bilimusic_audio::{Media, Player};
+use bilimusic_audio::{probe_audio, AudioError, Media, Player};
 use bilimusic_bili::media::RemoteMedia;
 use bilimusic_bili::Source;
 use bilimusic_model::{Millis, Quality, SearchQuery, Track, TrackKey};
@@ -21,6 +21,8 @@ use crate::state::{LoadToken, PlayerState, Prepared, Queue};
 use crate::wire::{
     AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, SyncOutcome, WatchView, WireError,
 };
+
+const LOCAL_AUDIO_DECODE_ERROR: &str = "本地音频无法解码，请重试下载";
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DownloadView {
@@ -205,6 +207,69 @@ mod download_restore_tests {
             assert!(Instant::now() < deadline, "音频操作超时");
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 无法解码的下载初次和重试都失败() {
+        use crate::wire::AppEvent;
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = temp_dir("download-completion");
+        let output = dir.join("audio");
+        let helper = dir.join("yt-dlp");
+        std::fs::write(
+            &helper,
+            "#!/bin/sh\n[ -f audio ] || printf 'not an audio file' > audio\nprintf '%s\\n' '\"audio\"'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let engine = Engine::open(&dir.join("library.sqlite")).unwrap();
+        let track = track("BV1LOCAL");
+        let mut events = engine.subscribe();
+        let aac = include_bytes!("../tests/fixtures/local-playback.m4a");
+        for expected_state in ["failed", "failed", "done"] {
+            let expected_bytes = if expected_state == "done" {
+                std::fs::write(&output, aac).unwrap();
+                aac.as_slice()
+            } else {
+                b"not an audio file"
+            };
+            let running = engine
+                .enqueue_download_with(&track, helper.clone(), dir.clone())
+                .unwrap();
+            assert_eq!(running.state, "running");
+            assert!(matches!(
+                events.try_recv().unwrap(),
+                AppEvent::Download { view } if view["state"] == "running"
+            ));
+            let event = tokio::time::timeout(Duration::from_secs(5), events.recv())
+                .await
+                .expect("下载完成超时")
+                .unwrap();
+            let AppEvent::Download { view } = event else {
+                panic!("缺少下载完成事件");
+            };
+            assert_eq!(view["state"], expected_state);
+            assert_eq!(view["path"], output.to_str().unwrap());
+            assert_eq!(std::fs::read(&output).unwrap(), expected_bytes);
+
+            let records = engine.library.downloads().unwrap();
+            assert_eq!(records.len(), 1);
+            let record = &records[0];
+            assert_eq!(record.state, expected_state);
+            assert_eq!(record.path.as_deref(), output.to_str());
+            if expected_state == "failed" {
+                assert!(view["error"].as_str().unwrap().contains("请重试下载"));
+                assert_eq!(record.error.as_deref(), view["error"].as_str());
+            } else {
+                assert!(view["error"].is_null());
+                assert!(record.error.is_none());
+            }
+        }
+        drop(engine);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[tokio::test]
@@ -2123,7 +2188,7 @@ impl Engine {
     }
 
     fn fail_local_download(&self, key: &TrackKey) -> WireError {
-        let error = WireError::input("key", "本地音频无法解码，请重试下载");
+        let error = WireError::input("key", LOCAL_AUDIO_DECODE_ERROR);
         let mut downloads = lock(&self.downloads);
         if let Some(view) = downloads.iter_mut().find(|view| view.key == key.as_opaque()) {
             view.state = "failed".into();
@@ -3043,19 +3108,27 @@ impl Engine {
         let track = self.track_of(key)?;
         let helper = crate::download::find_helper()
             .ok_or_else(|| WireError::internal("找不到 yt-dlp，请检查应用安装或 PATH"))?;
-        let dir = downloads_dir();
+        self.enqueue_download_with(&track, helper, downloads_dir())
+    }
+
+    fn enqueue_download_with(
+        self: &Arc<Self>,
+        track: &Track,
+        helper: PathBuf,
+        dir: PathBuf,
+    ) -> Result<DownloadView, WireError> {
         std::fs::create_dir_all(&dir)
             .map_err(|e| WireError::internal(format!("建不了下载目录：{e}")))?;
 
         let view = DownloadView {
-            key: key.as_opaque().to_string(),
+            key: track.key.as_opaque().to_string(),
             title: track.title.clone(),
             state: "running".into(),
             progress: 0.0,
             path: None,
             error: None,
         };
-        self.library.save_download(&track, None, "running", None)?;
+        self.library.save_download(track, None, "running", None)?;
         {
             let mut list = lock(&self.downloads);
             if let Some(existing) = list.iter().find(|d| {
@@ -3070,13 +3143,24 @@ impl Engine {
             view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
         });
 
-        let url = format!("https://www.bilibili.com/video/{}", key.as_opaque());
+        let url = format!("https://www.bilibili.com/video/{}", view.key);
         let engine = self.clone();
         let view_key = view.key.clone();
 
         tokio::task::spawn_blocking(move || {
             let (state, path, error) = match crate::download::audio(&helper, &dir, &url) {
-                Ok(path) => ("done", Some(path), None),
+                Ok(path) => {
+                    let result = File::open(&path)
+                        .map_err(|e| AudioError::Open(e.to_string()))
+                        .and_then(|file| probe_audio(Media::new(file)));
+                    match result {
+                        Ok(()) => ("done", Some(path), None),
+                        Err(e) => {
+                            eprintln!("下载的音频无法打开：{e}");
+                            ("failed", Some(path), Some(LOCAL_AUDIO_DECODE_ERROR.into()))
+                        }
+                    }
+                }
                 Err(e) => {
                     eprintln!("下载失败：{e}");
                     ("failed", None, Some(e.to_string()))

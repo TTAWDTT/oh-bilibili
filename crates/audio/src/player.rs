@@ -313,6 +313,10 @@ struct Session {
     duration_ms: u64,
 }
 
+pub fn probe_audio(media: Media) -> Result<(), AudioError> {
+    open_decoder(media, false).map(|_| ())
+}
+
 fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioError> {
     let mss = MediaSourceStream::new(media.into_inner(), Default::default());
     let mut hint = Hint::new();

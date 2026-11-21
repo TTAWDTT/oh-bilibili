@@ -172,7 +172,8 @@ export function DownloadsView() {
                         <Icon name="copy" size={11} className="shrink-0" />
                         <span className="truncate">{item.path}</span>
                       </button>
-                    ) : item.error ? (
+                    ) : null}
+                    {item.error ? (
                       <div
                         className="mt-1.5 line-clamp-2 max-w-full text-[12px] text-[var(--danger)]"
                         title={item.error}

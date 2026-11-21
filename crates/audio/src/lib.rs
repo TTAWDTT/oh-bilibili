@@ -6,7 +6,7 @@
 use std::io::{Read, Seek, SeekFrom};
 
 pub mod player;
-pub use player::Player;
+pub use player::{probe_audio, Player};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
