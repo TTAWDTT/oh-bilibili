@@ -320,7 +320,16 @@ export function SearchPanel() {
       .searchUsers(trimmed, nextPage)
       .then((list) => {
         if (usersSeq.current !== ticket) return
-        setUsers((prev) => [...prev, ...list])
+        setUsers((prev) => {
+          const seen = new Set(prev.map((user) => user.mid))
+          const merged = [...prev]
+          for (const user of list) {
+            if (seen.has(user.mid)) continue
+            seen.add(user.mid)
+            merged.push(user)
+          }
+          return merged
+        })
         setUsersPage(nextPage)
         setUsersEnded(list.length === 0)
         setUsersLoading(false)
@@ -425,6 +434,7 @@ export function SearchPanel() {
                   {(tab === 'user' ? users : users.slice(0, 6)).map((user) => (
                     <div
                       key={user.mid}
+                      data-user-mid={user.mid}
                       className={`bili-card flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)] ${tab === 'user' ? 'w-full' : 'w-[248px] shrink-0'}`}
                     >
                     <button

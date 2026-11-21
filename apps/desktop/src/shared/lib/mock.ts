@@ -79,6 +79,30 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'search_users': {
       const keyword = str(args, 'keyword').trim()
       const page = Math.max(1, Math.trunc(num(args, 'page')))
+      // 预览用开关：模拟接口分页重叠（第 2 页重复第 1 页、第 3 页整页重复），
+      // 用来验证按 mid 去重后仍会继续翻页。
+      if (keyword.startsWith('重叠')) {
+        const make = (mid: number, name: string) => ({
+          mid,
+          name,
+          face: null,
+          fans: 12000 * mid,
+          videos: 40,
+          sign: '预览模式的占位签名',
+          level: 6,
+          official: null,
+          verify: '',
+          live: false,
+        })
+        const pages = [
+          [make(101, '重叠UP-A'), make(102, '重叠UP-B')],
+          [make(102, '重叠UP-B'), make(103, '重叠UP-C')],
+          [make(103, '重叠UP-C')],
+          [],
+        ]
+        await sleep(80)
+        return pages[page - 1] ?? []
+      }
       const seen = new Map<number, string>()
       for (const t of CATALOG) {
         if (!t.up_mid || !t.artist) continue
