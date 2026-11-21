@@ -1562,6 +1562,7 @@ async function main() {
         ),
     )
     await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
+    await sleep(300)
 
     await page.viewport(380, 560)
     const narrowPlayer = await page.evaluate(`(() => {
