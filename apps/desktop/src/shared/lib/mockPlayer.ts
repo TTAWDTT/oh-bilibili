@@ -108,8 +108,19 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       return queueView()
     }
     case 'queue_clear':
+      state.clearedQueue =
+        state.keys.length > 0 ? { keys: [...state.keys], index: state.index } : null
       state.keys = []
+      state.index = null
       return queueView()
+    case 'queue_undo_clear': {
+      const saved = state.clearedQueue
+      if (!saved) throw fail('input', '没有可撤销的清空')
+      state.keys = [...saved.keys]
+      state.index = saved.index
+      state.clearedQueue = null
+      return queueView()
+    }
     default:
       throw fail('internal', `浏览器 mock 还没有实现 ${command}`)
   }

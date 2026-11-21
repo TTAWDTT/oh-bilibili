@@ -126,6 +126,11 @@ export function queueClear(): Promise<QueueView> {
   return call<QueueView>('queue_clear', {})
 }
 
+/** 撤销最近一次清空。 */
+export function queueUndoClear(): Promise<QueueView> {
+  return call<QueueView>('queue_undo_clear', {})
+}
+
 /** 队列恢复进度 (已补, 总数)；没有在恢复时为 null。 */
 export function queueRestoreProgress(): Promise<[number, number] | null> {
   return call<[number, number] | null>('queue_restore_progress', {})

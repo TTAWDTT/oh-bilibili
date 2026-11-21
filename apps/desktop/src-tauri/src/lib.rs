@@ -481,6 +481,11 @@ fn queue_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<QueueView, WireE
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn queue_undo_clear(engine: tauri::State<'_, Arc<Engine>>) -> Result<QueueView, WireError> {
+    engine.queue_undo_clear()
+}
+
+#[tauri::command(rename_all = "snake_case")]
 fn queue_restore_progress(engine: tauri::State<'_, Arc<Engine>>) -> Option<(usize, usize)> {
     engine.queue_restore_progress()
 }
@@ -1215,6 +1220,7 @@ pub fn run() {
             queue_move,
             queue_remove,
             queue_clear,
+            queue_undo_clear,
             queue_restore_progress,
             library_history,
             library_history_timed,

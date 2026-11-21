@@ -251,6 +251,8 @@ pub struct Engine {
     last_transport_at: Mutex<std::time::Instant>,
     /// 队列恢复进度：(已补, 总数)。为 None 表示没有在恢复。
     restoring: Mutex<Option<(usize, usize)>>,
+    /// 最近一次清空前的队列与光标。只保留一层，供界面上的「撤销」使用。
+    cleared_queue: Mutex<Option<(Vec<Track>, Option<usize>)>>,
     watch_gate: WatchGate,
 }
 
@@ -282,6 +284,7 @@ impl Engine {
             http: reqwest::Client::new(),
             downloads: Mutex::new(Vec::new()),
             restoring: Mutex::new(None),
+            cleared_queue: Mutex::new(None),
             mode: Mutex::new(crate::wire::PlayMode::Listen),
             tickets: crate::tickets::Tickets::new(),
             started_at: std::time::Instant::now(),
@@ -1647,6 +1650,15 @@ impl Engine {
 
     /// 清空队列。
     pub fn queue_clear(&self) -> Result<QueueView, WireError> {
+        let saved = {
+            let queue = lock(&self.queue);
+            if queue.is_empty() {
+                None
+            } else {
+                Some((queue.items(), queue.index()))
+            }
+        };
+        *lock(&self.cleared_queue) = saved;
         {
             let mut queue = lock(&self.queue);
             *queue = Queue::from_tracks(&[], 0);
@@ -1656,6 +1668,21 @@ impl Engine {
             items: Vec::new(),
             index: None,
         })
+    }
+
+    /// 撤销最近一次清空：恢复曲目、顺序和光标。没有可撤销的清空时报错。
+    pub fn queue_undo_clear(&self) -> Result<QueueView, WireError> {
+        let saved = lock(&self.cleared_queue).take();
+        let Some((tracks, index)) = saved else {
+            return Err(WireError::input("queue", "没有可撤销的清空"));
+        };
+        let start = index.unwrap_or(0).min(tracks.len().saturating_sub(1));
+        {
+            let mut queue = lock(&self.queue);
+            *queue = Queue::from_tracks(&tracks, start);
+        }
+        self.persist_queue();
+        Ok(self.queue_view())
     }
 
     /// 队列内重排。`from` 与 `to` 都是条目身份，不是下标，所以重排后光标不会错位。

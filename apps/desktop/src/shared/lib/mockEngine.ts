@@ -7,6 +7,8 @@ export type MockPlaylist = { id: number; name: string; keys: string[] }
 export type MockState = {
   keys: string[]
   index: number | null
+  /** 最近一次清空前的队列，供撤销恢复。 */
+  clearedQueue: { keys: string[]; index: number | null } | null
   phase: PlayerPhase
   /** 观看页打开时是 watch，退回列表就回到 listen。 */
   mode: 'listen' | 'watch'
@@ -30,6 +32,7 @@ export type MockState = {
 export const state: MockState = {
   keys: [],
   index: null,
+  clearedQueue: null,
   phase: 'idle',
   mode: 'listen',
   position: 0,
