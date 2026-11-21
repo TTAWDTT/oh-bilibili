@@ -217,9 +217,10 @@ mod download_restore_tests {
 
 #[cfg(test)]
 mod queue_restore_tests {
-    use super::replace_queue_if_untouched;
+    use super::{replace_queue_if_untouched, Engine};
     use crate::state::Queue;
     use bilimusic_model::{Track, TrackKey};
+    use bilimusic_store::Library;
 
     fn track(key: &str) -> Track {
         Track {
@@ -243,6 +244,56 @@ mod queue_restore_tests {
             .iter()
             .map(|t| t.key.as_opaque().to_string())
             .collect()
+    }
+
+    #[test]
+    fn 播放前重排其他曲目保持续播点() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "bilimusic-queue-restore-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("library.sqlite");
+        let a = track("BV1");
+        let b = track("BV2");
+        let c = track("BV3");
+        let saved = serde_json::json!({
+            "tracks": [&a, &b, &c],
+            "index": 0,
+            "position_ms": 65_000,
+        });
+        Library::open(&db)
+            .unwrap()
+            .save_queue(&saved.to_string())
+            .unwrap();
+
+        let engine = Engine::new(&db).unwrap();
+        let before = engine.snapshot();
+        let reordered = engine
+            .queue_move(c.key.as_opaque(), b.key.as_opaque())
+            .unwrap();
+        let after = engine.snapshot();
+        let persisted = Library::open(&db).unwrap().load_queue().unwrap().unwrap();
+        let persisted: serde_json::Value = serde_json::from_str(&persisted).unwrap();
+        drop(engine);
+        let restarted = Engine::new(&db).unwrap().snapshot();
+        std::fs::remove_dir_all(dir).unwrap();
+
+        assert_eq!(before.phase, "idle");
+        assert_eq!(reordered.items, [a.clone(), c, b]);
+        assert_eq!(reordered.index, Some(0));
+        assert_eq!(persisted["tracks"], serde_json::json!(reordered.items));
+        assert_eq!(persisted["index"], serde_json::json!(reordered.index));
+        assert_eq!(persisted["position_ms"], 65_000, "重排后落盘的续播点");
+        assert_eq!(before.position_ms, 65_000);
+        assert_eq!(after.track.as_ref(), Some(&a));
+        assert_eq!(after.position_ms, 65_000);
+        assert_eq!(restarted.track, Some(a));
+        assert_eq!(restarted.position_ms, 65_000);
     }
 
     #[test]
