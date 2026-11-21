@@ -29,6 +29,9 @@ export type MockState = {
   qr: { key: string; url: string; startedAt: number; expiresIn: number; confirmed: boolean } | null
 }
 
+const loggedIn =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('loggedIn')
+
 export const state: MockState = {
   keys: [],
   index: null,
@@ -71,7 +74,18 @@ export const state: MockState = {
   ],
   historyHidden: new Set<string>(),
   historyCleared: false,
-  auth: { logged_in: false, user: null },
+  auth: loggedIn
+    ? {
+        logged_in: true,
+        user: {
+          mid: 1960976249,
+          uname: '-芜芜芜芜芜芜芜湖-',
+          avatar: null,
+          level: 5,
+          coins: 307.6,
+        },
+      }
+    : { logged_in: false, user: null },
   qr: null,
 }
 
