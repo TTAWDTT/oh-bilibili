@@ -124,6 +124,17 @@ impl Client {
         request
     }
 
+    /// 发请求。DNS 被坏解析器拖住时 reqwest 自己的 timeout 不一定会触发，
+    /// 这里再用 tokio 的超时兜一层，页面才能从 loading 进入错误与重试状态。
+    async fn send(&self, req: reqwest::RequestBuilder) -> Result<reqwest::Response, BiliError> {
+        const LIMIT: Duration = Duration::from_secs(20);
+        match tokio::time::timeout(LIMIT, req.send()).await {
+            Ok(Ok(resp)) => Ok(resp),
+            Ok(Err(e)) => Err(BiliError::Network(e.to_string())),
+            Err(_) => Err(BiliError::Network("请求超时，检查网络后重试".into())),
+        }
+    }
+
     pub fn set_cookie(&self, name: &str, value: &str) {
         if let Ok(mut jar) = self.jar.write() {
             jar.insert(name.to_string(), value.to_string());
@@ -337,7 +348,7 @@ impl Client {
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .header("Accept-Language", "zh-CN,zh;q=0.9");
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         let status = resp.status();
         if session_origin(resp.url()) {
             self.absorb_cookies(resp.headers());
@@ -397,7 +408,7 @@ impl Client {
             .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         Ok(resp.bytes().await.map_err(|e| BiliError::Network(e.to_string()))?.to_vec())
     }
 
@@ -410,7 +421,7 @@ impl Client {
             .session_request(reqwest::Method::GET, url)
             .header("Referer", REFERER)
             .header("User-Agent", UA);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         resp.text().await.map_err(|e| BiliError::Network(e.to_string()))
     }
 
@@ -478,7 +489,7 @@ impl Client {
             .header("Origin", "https://www.bilibili.com")
             .header("Accept", "application/json, text/plain, */*")
             .form(&form);
-        let resp = req.send().await.map_err(|e| BiliError::Network(e.to_string()))?;
+        let resp = self.send(req).await?;
         let status = resp.status();
         if session_origin(resp.url()) {
             self.absorb_cookies(resp.headers());
