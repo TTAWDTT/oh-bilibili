@@ -1,0 +1,125 @@
+import { useEffect, useRef, useState } from 'react'
+import type { LyricLine } from '../../shared/lib/contract'
+
+type StageLyricsProps = {
+  lines: readonly LyricLine[]
+  synced: boolean
+  active: number
+  loading: boolean
+  failed: string | null
+  source: string
+  onSeek: (atMs: number) => void
+  onRetry: () => void
+}
+
+export function StageLyrics({
+  lines,
+  synced,
+  active,
+  loading,
+  failed,
+  source,
+  onSeek,
+  onRetry,
+}: StageLyricsProps) {
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const rows = useRef<Array<HTMLButtonElement | null>>([])
+  const [following, setFollowing] = useState(true)
+
+  const followActive = (): void => {
+    const root = scroller.current
+    const row = rows.current[active]
+    if (!root || !row) return
+    root.scrollTo({
+      top: row.offsetTop - root.clientHeight * 0.38 + row.offsetHeight / 2,
+      behavior: 'smooth',
+    })
+  }
+
+  useEffect(() => {
+    if (following && synced) followActive()
+  }, [active, following, synced])
+
+  if (loading) {
+    return <div className="grid min-h-[220px] place-items-center text-[14px] text-[var(--text-2)]">正在取歌词…</div>
+  }
+
+  if (failed) {
+    return (
+      <div className="grid min-h-[220px] place-items-center">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="t press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          {failed}，重新取一次
+        </button>
+      </div>
+    )
+  }
+
+  if (lines.length === 0) {
+    return (
+      <div className="grid min-h-[220px] place-items-center px-8 text-center">
+        <p className="text-[14px] leading-6 text-[var(--text-2)]">这条视频没挂歌词，先听个响。</p>
+      </div>
+    )
+  }
+
+  return (
+    <div data-stage-lyrics className="flex h-full min-h-0 flex-col">
+      <div className="mb-2 flex h-8 shrink-0 items-center justify-between gap-3 px-2 text-[12px] text-[var(--text-3)]">
+        <span>{source.trim().length > 0 ? source : '歌词'}</span>
+        {!following && synced ? (
+          <button
+            type="button"
+            onClick={() => setFollowing(true)}
+            className="t press rounded-full bg-[var(--panel)]/80 px-3 py-1 text-[12px] text-[var(--text-1)] shadow-sm hover:text-[var(--accent-strong)]"
+          >
+            回到当前句
+          </button>
+        ) : null}
+      </div>
+      <div
+        ref={scroller}
+        data-stage-lyric-scroll
+        tabIndex={0}
+        onWheel={() => setFollowing(false)}
+        onKeyDown={(event) => {
+          if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+            setFollowing(false)
+          }
+        }}
+        className="no-scrollbar lyrics-mask relative min-h-0 flex-1 overflow-y-auto px-3 pb-[38%] pt-[32%] outline-none"
+      >
+        {lines.map((line, index) => {
+          const current = index === active
+          return (
+            <button
+              key={`${line.at_ms}-${index}`}
+              type="button"
+              data-current={current ? 'true' : undefined}
+              ref={(node) => {
+                rows.current[index] = node
+              }}
+              onClick={() => {
+                if (synced) {
+                  onSeek(line.at_ms)
+                  setFollowing(true)
+                }
+              }}
+              className={[
+                't block min-h-9 w-full rounded-[6px] px-3 py-1.5 text-left leading-[1.55]',
+                current
+                  ? 'text-[24px] font-semibold text-[var(--text-1)]'
+                  : 'text-[16px] text-[var(--text-3)] hover:bg-[var(--panel)]/55 hover:text-[var(--text-2)]',
+              ].join(' ')}
+            >
+              {line.text}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

@@ -1015,7 +1015,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
       return {
+        desc: '预览模式下的视频简介。',
         pubdate: Math.floor(Date.now() / 1000) - 86400,
+        views: track.views ?? 0,
+        danmaku: track.danmaku ?? 0,
+        replies: 42,
+        favorites: 1_024,
+        coins: 186,
+        shares: 57,
+        likes: 2_048,
         tname: track.tname ?? null,
         pages: [],
         season: null,

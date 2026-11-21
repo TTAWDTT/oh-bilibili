@@ -474,6 +474,150 @@ async function checkLibraryShelf(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkStageLyrics(page) {
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(6000)
+  const listen = await page.evaluate(`(() => {
+    const hit = document.querySelector('button[aria-label^="听 "]')
+    hit?.click()
+    return !!hit
+  })()`)
+  let stageReady = false
+  for (let i = 0; i < 20 && !stageReady; i += 1) {
+    await sleep(200)
+    stageReady = await page.evaluate(`!!document.querySelector('button[aria-label="打开播放舞台"]')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="打开播放舞台"]')?.click()`)
+  let lyricsReady = false
+  for (let i = 0; i < 30 && !lyricsReady; i += 1) {
+    await sleep(200)
+    lyricsReady = await page.evaluate(
+      `!!document.querySelector('[data-stage-lyrics] button[data-current]')`,
+    )
+  }
+  const stage = await page.evaluate(`(() => {
+    const root = document.querySelector('.stage')
+    const lyrics = document.querySelector('[data-stage-lyric-scroll]')
+    const box = lyrics?.getBoundingClientRect()
+    return root && box
+      ? {
+          columns: getComputedStyle(root.querySelector('.grid')).gridTemplateColumns,
+          width: box.width,
+          height: box.height,
+          active: root.querySelector('button[data-current]')?.textContent?.trim() ?? '',
+          lines: root.querySelectorAll('[data-stage-lyric-scroll] button').length,
+        }
+      : null
+  })()`)
+  check(
+    '舞台宽窗为封面与歌词双栏',
+    listen &&
+      stageReady &&
+      lyricsReady &&
+      stage &&
+      stage.active.length > 0 &&
+      stage.lines > 1 &&
+      stage.width >= 450 &&
+      stage.columns.split(' ').length === 2,
+  )
+
+  const related = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('.stage button')]
+      .find((button) => (button.textContent || '').trim() === '相关推荐')
+    hit?.click()
+    return !!hit
+  })()`)
+  await sleep(250)
+  const relatedOpen = await page.evaluate(`!!document.querySelector('[data-stage-related]')`)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('.stage button')]
+      .find((button) => (button.textContent || '').trim() === '相关推荐')
+    hit?.click()
+  })()`)
+  await sleep(200)
+  const relatedClosed = await page.evaluate(`!document.querySelector('[data-stage-related]')`)
+  check('相关推荐从舞台收进可展开入口', related && relatedOpen && relatedClosed)
+
+  const scrollBox = await page.evaluate(`(() => {
+    const box = document.querySelector('[data-stage-lyric-scroll]')?.getBoundingClientRect()
+    return box ? [box.left + box.width / 2, box.top + box.height / 2] : null
+  })()`)
+  if (scrollBox) {
+    await page.mouseEvent({ type: 'mouseMoved', x: scrollBox[0], y: scrollBox[1] })
+    await page.mouseEvent({
+      type: 'mouseWheel',
+      x: scrollBox[0],
+      y: scrollBox[1],
+      deltaX: 0,
+      deltaY: -240,
+    })
+  }
+  await sleep(300)
+  const browsing = await page.evaluate(
+    `[...document.querySelectorAll('.stage button')].some((button) => (button.textContent || '').trim() === '回到当前句')`,
+  )
+  const currentBefore = stage?.active ?? ''
+  const returnClicked = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('.stage button')]
+      .find((button) => (button.textContent || '').trim() === '回到当前句')
+    hit?.click()
+    return !!hit
+  })()`)
+  await sleep(350)
+  const following = await page.evaluate(
+    `![...document.querySelectorAll('.stage button')].some((button) => (button.textContent || '').trim() === '回到当前句')`,
+  )
+  check(
+    '滚轮浏览歌词后暂停跟随，回到当前句不跳播',
+    browsing &&
+      returnClicked &&
+      following &&
+      currentBefore.length > 0 &&
+      (await page.evaluate(
+        `document.querySelector('button[data-current]')?.textContent?.trim() === ${JSON.stringify(currentBefore)}`,
+      )),
+  )
+
+  const seeked = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('[data-stage-lyric-scroll] button')]
+    const first = rows[0]
+    if (!first) return null
+    const text = first.textContent.trim()
+    first.click()
+    return text
+  })()`)
+  await sleep(700)
+  check(
+    '点击带时间的歌词会跳播',
+    seeked &&
+      (await page.evaluate(
+        `document.querySelector('button[data-current]')?.textContent?.trim() === ${JSON.stringify(seeked)}`,
+      )),
+  )
+
+  await page.viewport(380, 900)
+  await sleep(500)
+  const narrow = await page.evaluate(`(() => {
+    const lyrics = document.querySelector('[data-stage-lyric-scroll]')
+    const box = lyrics?.getBoundingClientRect()
+    return {
+      width: box?.width ?? 0,
+      columns: getComputedStyle(document.querySelector('.stage .grid')).gridTemplateColumns,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      hasVolume: !!document.querySelector('.stage button[aria-label="静音"], .stage button[aria-label="取消静音"]'),
+    }
+  })()`)
+  check(
+    '窄窗舞台按上下布局保留歌词和播放控件',
+    narrow.width >= 300 &&
+      narrow.columns.trim().split(/\s+/).length === 1 &&
+      !narrow.overflow &&
+      narrow.hasVolume,
+  )
+  await page.viewport(1320, 900)
+}
+
 async function checkHeroAllocation(page) {
   const url = new URL(WEB)
   url.searchParams.set('heroAllocation', '1')
@@ -856,6 +1000,7 @@ async function main() {
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
     await checkLibraryShelf(page)
+    await checkStageLyrics(page)
     await checkHeroAllocation(page)
     await checkShellBreakpoints(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
