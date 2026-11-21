@@ -1564,6 +1564,147 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
     await sleep(300)
 
+    await page.viewport(380, 560)
+    const narrowPlayer = await page.evaluate(`(() => {
+      const bar = document.querySelector('button[aria-label="打开播放舞台"]')?.closest('section')
+      const title = bar?.querySelector('.bili-marquee')
+      const queue = bar?.querySelector('button[aria-label="播放队列"]')
+      if (!bar || !title || !queue) return null
+      const barBox = bar.getBoundingClientRect()
+      const titleBox = title.getBoundingClientRect()
+      const queueBox = queue.getBoundingClientRect()
+      queue.focus()
+      return {
+        overflow: bar.scrollWidth - bar.clientWidth,
+        barInside: barBox.left >= 0 && barBox.right <= window.innerWidth,
+        titleWidth: titleBox.width,
+        titleVisible:
+          getComputedStyle(title).visibility !== 'hidden' &&
+          Number(getComputedStyle(title).opacity) > 0.5 &&
+          getComputedStyle(title).color !== 'rgba(0, 0, 0, 0)',
+        queueInside: queueBox.left >= barBox.left && queueBox.right <= barBox.right,
+        queueTabIndex: queue.tabIndex,
+        queueDisabled: queue.disabled,
+        queueFocused: document.activeElement === queue,
+        queueCenter: [queueBox.left + queueBox.width / 2, queueBox.top + queueBox.height / 2],
+      }
+    })()`)
+    await page.pressSpace()
+    await sleep(400)
+    const narrowQueueOpened = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+      return {
+        open: !!dialog,
+        focusInside: !!dialog && dialog.contains(document.activeElement),
+        initialFocus: document.activeElement?.getAttribute('aria-label') ?? '',
+      }
+    })()`)
+    const focusWraps = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="播放详情"]')
+      if (!dialog) return false
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]):not([tabindex="-1"])')]
+        .filter((element) => element.getClientRects().length > 0)
+      if (focusable.length < 2) return false
+      focusable[0].focus()
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+      )
+      return document.activeElement === focusable.at(-1)
+    })()`)
+    await page.evaluate(
+      `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
+    )
+    await sleep(300)
+    const queueClosedByKey = await page.evaluate(`(() => ({
+      closed: !document.querySelector('[role="dialog"][aria-label="播放详情"]'),
+      focusReturned: document.activeElement === document.querySelector('button[aria-label="播放队列"]'),
+    }))()`)
+    await clickAt(narrowPlayer.queueCenter[0], narrowPlayer.queueCenter[1])
+    const queueOpenedByMouse = await page.evaluate(
+      `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
+    )
+    await page.evaluate(
+      `document.querySelector('[role="dialog"][aria-label="播放详情"] button[aria-label="关闭详情"]')?.click()`,
+    )
+    await sleep(300)
+    const openedNarrowStage = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label="打开播放舞台"]')
+      hit?.click()
+      return !!hit
+    })()`)
+    await sleep(400)
+    const narrowStageControls = await page.evaluate(`(() => {
+      const visible = (label) => {
+        const button = document.querySelector('.stage button[aria-label="' + label + '"]')
+        return !!button && button.getClientRects().length > 0 && button.getBoundingClientRect().width > 0
+      }
+      return visible('随机播放') || visible('关闭随机播放')
+        ? visible('循环：关') || visible('循环：列表') || visible('循环：单曲')
+        : false
+    })()`)
+    await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
+    await sleep(300)
+    const narrowResult = {
+      layout:
+        narrowPlayer &&
+        narrowPlayer.overflow === 0 &&
+        narrowPlayer.barInside &&
+        narrowPlayer.titleWidth >= 120 &&
+        narrowPlayer.titleVisible &&
+        narrowPlayer.queueInside &&
+        narrowPlayer.queueTabIndex === 0 &&
+        !narrowPlayer.queueDisabled &&
+        narrowPlayer.queueFocused,
+      keyboard:
+        narrowQueueOpened.open &&
+        narrowQueueOpened.focusInside &&
+        narrowQueueOpened.initialFocus === '关闭详情' &&
+        focusWraps &&
+        queueClosedByKey.closed &&
+        queueClosedByKey.focusReturned,
+      mouse: queueOpenedByMouse,
+      stage: openedNarrowStage && narrowStageControls,
+      closed: !(await page.evaluate(
+        `!!document.querySelector('[role="dialog"][aria-label="播放详情"]')`,
+      )),
+    }
+    check(
+      '380 宽播放条保留曲名和队列，键盘可打开队列',
+      Object.values(narrowResult).every(Boolean),
+    )
+    if (!Object.values(narrowResult).every(Boolean)) console.log(JSON.stringify({ narrowPlayer, narrowQueueOpened, narrowResult }))
+    await page.viewport(1320, 900)
+    await page.evaluate(`(() => {
+      if (document.querySelector('.rail-slot')?.dataset.open === 'false') {
+        document.querySelector('button[aria-label="歌词栏"]')?.click()
+      }
+    })()`)
+    await sleep(300)
+    await page.evaluate(`document.querySelector('button[aria-label="播放队列"]')?.click()`)
+    await sleep(300)
+    const desktopQueueOpened = await page.evaluate(
+      `document.querySelector('.rail-slot')?.dataset.open === 'true'`,
+    )
+    const desktopFocusKept = await page.evaluate(`(() => {
+      const stageButton = document.querySelector('button[aria-label="打开播放舞台"]')
+      stageButton?.focus()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      return document.activeElement === stageButton
+    })()`)
+    await sleep(300)
+    check(
+      '桌面关闭队列不抢走播放舞台的焦点',
+      desktopQueueOpened &&
+        desktopFocusKept &&
+        (await page.evaluate(`document.querySelector('.rail-slot')?.dataset.open === 'false'`)) &&
+        (await page.evaluate(
+          `document.activeElement === document.querySelector('button[aria-label="打开播放舞台"]')`,
+        )),
+    )
+    if (!desktopQueueOpened || !desktopFocusKept) console.log(JSON.stringify({ desktopQueueOpened, desktopFocusKept }))
+    await page.evaluate(`document.querySelector('button[aria-label="歌词栏"]')?.click()`)
+    await sleep(300)
+
     const loginFocused = await page.evaluate(`(() => {
       const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '登录')
       if (!hit) return false

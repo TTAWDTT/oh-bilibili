@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from './appStore'
 import { NowPlayingRail } from '../features/player/NowPlayingRail'
 import { Icon } from '../shared/ui/Icon'
@@ -12,14 +12,46 @@ import { Icon } from '../shared/ui/Icon'
 export function MobileRailSheet({ tab }: { tab: 'lyrics' | 'queue' }) {
   const closeRail = useAppStore((state) => state.closeRail)
   const toggleRail = useAppStore((state) => state.toggleRail)
+  const panel = useRef<HTMLDivElement | null>(null)
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const sync = (): void => setMobile(media.matches)
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!mobile) return
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    panel.current?.querySelector<HTMLButtonElement>('button[aria-label="关闭详情"]')?.focus()
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeRail()
+      if (event.key === 'Escape') {
+        closeRail()
+        return
+      }
+      if (event.key !== 'Tab' || !panel.current) return
+      const focusable = [...panel.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => element.getClientRects().length > 0)
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [closeRail])
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (previous?.isConnected) previous.focus()
+    }
+  }, [closeRail, mobile])
 
   return (
     <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="播放详情">
@@ -30,7 +62,10 @@ export function MobileRailSheet({ tab }: { tab: 'lyrics' | 'queue' }) {
         onClick={closeRail}
         className="absolute inset-0 cursor-default bg-black/35 backdrop-blur-[2px]"
       />
-      <div className="absolute inset-x-0 bottom-0 top-[10%] flex flex-col overflow-hidden rounded-t-[14px] border-t border-[var(--line)] bg-[var(--panel)] shadow-[0_-12px_40px_-20px_rgba(0,0,0,0.4)]">
+      <div
+        ref={panel}
+        className="absolute inset-x-0 bottom-0 top-[10%] flex flex-col overflow-hidden rounded-t-[14px] border-t border-[var(--line)] bg-[var(--panel)] shadow-[0_-12px_40px_-20px_rgba(0,0,0,0.4)]"
+      >
         <div className="flex shrink-0 items-center justify-between border-b border-hairline px-3 py-2">
           <span aria-hidden className="h-1 w-9 rounded-full bg-[var(--line)]" />
           <div className="flex items-center gap-1">
