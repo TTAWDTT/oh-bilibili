@@ -2829,7 +2829,11 @@ impl Engine {
 
     /// 播放历史，最近的在前。
     pub fn history(&self, limit: u32) -> Result<Vec<Track>, WireError> {
-        Ok(self.library.history(limit)?)
+        let tracks = self.library.history(limit)?;
+        for track in &tracks {
+            self.remember(track);
+        }
+        Ok(tracks)
     }
 
     /// 删掉某首歌的历史。
@@ -2852,9 +2856,13 @@ impl Engine {
         limit: u32,
         before: Option<(i64, u64)>,
     ) -> Result<Vec<(Track, i64, u64, i64)>, WireError> {
-        Ok(self
+        let entries = self
             .library
-            .history_with_time(limit, before.map(|(played_at, id)| (played_at, id as i64)))?)
+            .history_with_time(limit, before.map(|(played_at, id)| (played_at, id as i64)))?;
+        for (track, _, _, _) in &entries {
+            self.remember(track);
+        }
+        Ok(entries)
     }
 
     /// 某条视频上次看到的位置，观看页打开时用来定位。
@@ -2884,7 +2892,11 @@ impl Engine {
     }
 
     pub fn playlist_tracks(&self, playlist_id: i64) -> Result<Vec<Track>, WireError> {
-        Ok(self.library.playlist_tracks(playlist_id)?)
+        let tracks = self.library.playlist_tracks(playlist_id)?;
+        for track in &tracks {
+            self.remember(track);
+        }
+        Ok(tracks)
     }
 
     pub async fn like_set(&self, key: &TrackKey, liked: bool) -> Result<(), WireError> {
@@ -4007,7 +4019,8 @@ pub fn downloads_dir() -> std::path::PathBuf {
 
 #[cfg(test)]
 mod offline_boot_tests {
-    use super::Engine;
+    use super::{lock, Engine};
+    use bilimusic_model::{Millis, Track, TrackKey};
     use std::ffi::OsString;
     use std::time::{Duration, Instant};
 
@@ -4088,6 +4101,47 @@ mod offline_boot_tests {
 
         drop(engine);
         drop(network);
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", db.display()));
+        }
+    }
+
+    #[test]
+    fn 持久化歌单和历史读出后能直接组队列() {
+        let db = temp_db();
+        let engine = Engine::new(&db).expect("离线引擎");
+        let playlist = engine.create_playlist("离线歌单").expect("本地写入应该可用");
+        let track = Track {
+            key: TrackKey::from_provider("BV1COLD"),
+            title: "冷启动曲目".into(),
+            artist: "测试".into(),
+            duration: Some(Millis(200_000)),
+            cover: None,
+            accent: None,
+            views: None,
+            danmaku: None,
+            up_avatar: None,
+            up_mid: None,
+            tname: None,
+            typeid: None,
+        };
+        engine.remember(&track);
+        engine.add_to_playlist(playlist.id, &track.key).expect("加入歌单");
+        let stored_id = engine.library.upsert_track(&track).expect("写入曲目");
+        engine.library.push_history(stored_id, 12_000).expect("写入历史");
+
+        lock(&engine.known).clear();
+        let playlist_tracks = engine.playlist_tracks(playlist.id).expect("读歌单");
+        let history = engine.history_with_time(10, None).expect("读历史");
+        let keys = [playlist_tracks[0].key.as_opaque().to_string()];
+        assert_eq!(history.len(), 1);
+        assert_eq!(engine.tracks_for(&keys).len(), 1, "歌单曲目没有进入播放缓存");
+        assert!(
+            lock(&engine.known).contains_key(track.key.as_opaque()),
+            "历史曲目没有进入播放缓存"
+        );
+
+        drop(engine);
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", db.display()));
         }
