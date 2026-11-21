@@ -571,6 +571,64 @@ async function main() {
     await sleep(400)
     check('焦点在页面空白时空格控制播放', blankFocused && (await playLabel()) !== beforeBlank)
 
+    // 首页慢请求：8 秒只提示慢，10 秒成功仍要展示；重试后旧响应按请求 id 丢弃。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?slowHome=1`)}`)
+    let homeSlow = false
+    for (let i = 0; i < 40 && !homeSlow; i += 1) {
+      await sleep(300)
+      homeSlow = await page.evaluate(
+        `!!document.querySelector('[data-home-slow]') && document.body.innerText.includes('加载较慢')`,
+      )
+    }
+    check(
+      '慢推荐 8 秒显示加载较慢与重试',
+      homeSlow && !(await page.evaluate(`document.body.innerText.includes('连不上 B 站')`)),
+    )
+    const retriedSlow = await page.evaluate(`(() => {
+      const hit = document.querySelector('[data-home-retry]')
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(300)
+    const afterRetry = await page.evaluate(`({
+      slow: !!document.querySelector('[data-home-slow]'),
+      recommend: !!document.querySelector('[data-home-recommend]'),
+      loading: document.body.innerText.includes('正在取推荐'),
+    })`)
+    check('重试立即发起新尝试并清掉慢状态', retriedSlow && !afterRetry.slow && afterRetry.loading && !afterRetry.recommend)
+    await sleep(2200)
+    const staleResult = await page.evaluate(`({
+      slow: !!document.querySelector('[data-home-slow]'),
+      recommend: !!document.querySelector('[data-home-recommend]'),
+      loading: document.body.innerText.includes('正在取推荐'),
+    })`)
+    check('旧请求成功后不回填已作废的尝试', !staleResult.recommend && !staleResult.slow && staleResult.loading)
+    let secondSlow = false
+    for (let i = 0; i < 40 && !secondSlow; i += 1) {
+      await sleep(300)
+      secondSlow = await page.evaluate(`!!document.querySelector('[data-home-slow]')`)
+    }
+    check('新尝试到 8 秒仍会提示较慢', secondSlow)
+    let homeRecovered = false
+    for (let i = 0; i < 40 && !homeRecovered; i += 1) {
+      await sleep(300)
+      homeRecovered = await page.evaluate(`(() => {
+        return !!document.querySelector('[data-home-recommend]') && !document.querySelector('[data-home-slow]') && !document.body.innerText.includes('连不上 B 站')
+      })()`)
+    }
+    check('10 秒成功仍展示推荐', homeRecovered)
+
+    // 请求级失败（真实断网最终走到的路径）：应立刻报错，不要等到 8 秒慢提示。
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?failHome=1`)}`)
+    await sleep(1200)
+    const failedHome = await page.evaluate(`({
+      error: document.body.innerText.includes('连不上 B 站，检查一下网络。'),
+      slow: !!document.querySelector('[data-home-slow]'),
+      retry: [...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === '重新取一次'),
+    })`)
+    check('请求失败立即报错且不显示加载较慢', failedHome.error && !failedHome.slow && failedHome.retry)
+
   } finally {
     page.close()
   }
