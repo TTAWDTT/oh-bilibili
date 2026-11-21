@@ -102,12 +102,14 @@ cargo test --workspace
 npm run typecheck -w @bilimusic/desktop
 ```
 
-需要网络与声卡的真实接口测试：
+需要网络与声卡的真实接口测试。需要登录态的部分只读取显式指定的专用测试账号，不读取应用自己的登录态；未设置时相关用例会打印跳过原因：
 
 ```sh
-cargo test -p bilimusic-bili --test live -- --ignored
-cargo test -p bilimusic-core --test live_engine -- --ignored
+BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json cargo test -p bilimusic-bili --test live -- --ignored
+BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json cargo test -p bilimusic-core --test live_engine -- --ignored
 ```
+
+点赞、稍后再看、收藏这类会写账号的用例请单独运行，跑完会把账号恢复原状。
 
 ## 边界
 

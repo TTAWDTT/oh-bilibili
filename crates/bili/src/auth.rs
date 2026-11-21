@@ -34,6 +34,19 @@ pub fn qr_svg(text: &str) -> Result<String, BiliError> {
     ))
 }
 
+fn challenge_from_response(value: &serde_json::Value) -> Result<QrChallenge, BiliError> {
+    let key = value["data"]["qrcode_key"]
+        .as_str()
+        .ok_or_else(|| BiliError::Parse("没有 qrcode_key".into()))?
+        .to_string();
+    let url = value["data"]["url"]
+        .as_str()
+        .ok_or_else(|| BiliError::Parse("没有二维码内容".into()))?
+        .to_string();
+    let svg = qr_svg(&url)?;
+    Ok(QrChallenge { key, url, svg })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QrStatus {
     Waiting,
@@ -50,16 +63,7 @@ impl Client {
                 std::time::Duration::from_millis(300),
             )
             .await?;
-        let key = v["data"]["qrcode_key"]
-            .as_str()
-            .ok_or_else(|| BiliError::Parse("没有 qrcode_key".into()))?
-            .to_string();
-        let url = v["data"]["url"]
-            .as_str()
-            .ok_or_else(|| BiliError::Parse("没有二维码内容".into()))?
-            .to_string();
-        let svg = qr_svg(&url)?;
-        Ok(QrChallenge { key, url, svg })
+        challenge_from_response(&v)
     }
 
     /// 轮询。`Confirmed` 时 cookie 已经落进罐里，调用方接着刷 nav。
@@ -108,5 +112,35 @@ mod tests {
         let a = qr_svg("https://example.com/a").unwrap();
         let b = qr_svg("https://example.com/b").unwrap();
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn 固定响应能解析出二维码挑战() {
+        let value = serde_json::json!({
+            "code": 0,
+            "data": {
+                "qrcode_key": "fixed-key",
+                "url": "https://passport.bilibili.com/h5-app/passport/login/scan?qrcode_key=fixed-key"
+            }
+        });
+        let qr = challenge_from_response(&value).expect("固定响应应该能解析");
+        assert_eq!(qr.key, "fixed-key");
+        assert!(qr.url.starts_with("https://passport.bilibili.com/"));
+        assert!(qr.svg.starts_with("<svg"), "必须生成本地 SVG");
+        assert!(
+            qr.svg.matches("M").count() > 100,
+            "深色模块太少，二维码会是空的"
+        );
+    }
+
+    #[test]
+    fn 缺少二维码字段时明确报解析错误() {
+        let value = serde_json::json!({ "data": { "qrcode_key": "fixed-key" } });
+        match challenge_from_response(&value) {
+            Err(BiliError::Parse(message)) => {
+                assert!(message.contains("二维码内容"), "错误应说明缺了什么：{message}");
+            }
+            other => panic!("预期解析错误，实际 {other:?}"),
+        }
     }
 }
