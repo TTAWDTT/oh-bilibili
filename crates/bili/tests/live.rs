@@ -1,8 +1,8 @@
 //! 真实接口验证。默认 ignore，因为它依赖网络和 B 站的当前风控状态。
 //!
-//! 运行：cargo test -p bilimusic-bili --test live -- --ignored --nocapture
-//! 需要登录态的用例读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json；
-//! 未设置时打印跳过原因。
+//! 运行：`scripts/live-test.sh`。
+//! 需要登录态的用例只读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json。
+//! 直接跑 `cargo test --ignored` 而没有配置时会失败，不会把「跳过」计成通过。
 
 use bilimusic_model::{SearchQuery, TrackKey};
 use bilimusic_bili::Source;
@@ -10,10 +10,12 @@ use bilimusic_bili::Source;
 const LIVE_COOKIES_ENV: &str = "BILIMUSIC_LIVE_COOKIES";
 
 /// 登录态只来自显式指定的专用测试账号，不读取应用自己的数据目录。
-fn live_cookies() -> Option<Vec<(String, String)>> {
+fn live_cookies() -> Vec<(String, String)> {
     let Some(path) = std::env::var_os(LIVE_COOKIES_ENV).map(std::path::PathBuf::from) else {
-        eprintln!("跳过：需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>");
-        return None;
+        panic!(
+            "这条用例需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>。\
+             请运行 scripts/live-test.sh：未配置时它会明确 skip，而不是把用例计为 passed"
+        );
     };
     let raw = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(
@@ -21,16 +23,16 @@ fn live_cookies() -> Option<Vec<(String, String)>> {
             path.display()
         )
     });
-    Some(serde_json::from_str(&raw).unwrap_or_else(|error| {
+    serde_json::from_str(&raw).unwrap_or_else(|error| {
         panic!(
             "{LIVE_COOKIES_ENV} 必须是 cookies.json 的 [(name, value)] 数组（{}）：{error}",
             path.display()
         )
-    }))
+    })
 }
 
-async fn source_with_live_cookies() -> Option<Source> {
-    let cookies = live_cookies()?;
+async fn source_with_live_cookies() -> Source {
+    let cookies = live_cookies();
     let source = Source::open().await.expect("Source 应该能打开");
     source.import_cookies(&cookies);
     source.refresh_session().await.expect("刷新会话");
@@ -38,7 +40,20 @@ async fn source_with_live_cookies() -> Option<Source> {
         source.is_logged_in(),
         "{LIVE_COOKIES_ENV} 指向的账号未登录"
     );
-    Some(source)
+    source
+}
+
+/// live 脚本在跑整套用例前先执行这一条：只读验证凭据确实能登录。
+#[tokio::test]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
+async fn live_preflight_credentials() {
+    let source = source_with_live_cookies().await;
+    let nav = source.nav();
+    assert!(nav.is_login, "{LIVE_COOKIES_ENV} 指向的账号未登录");
+    println!(
+        "VERIFIED: {LIVE_COOKIES_ENV} 对应的账号 {} 可以登录",
+        nav.uname.as_deref().unwrap_or("(无昵称)")
+    );
 }
 
 /// 每周必看：期数列表是公开接口，某一期要走 wbi + web_location，缺了就 -352。
@@ -453,12 +468,10 @@ async fn 换歌的三个网络调用各自多久() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络，用来量收藏夹一页的耗时"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 收藏夹一页要多久() {
     use std::time::Instant;
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
     let folders = source.fav_folders().await.expect("收藏夹列表");
     let folder = folders
         .iter()
@@ -483,11 +496,9 @@ async fn 收藏夹一页要多久() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络，用来核对赞过的视频"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 赞过的视频带封面和分区() {
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
 
     let list = source.liked_videos().await.expect("赞过的视频");
     println!("赞过 {} 条", list.len());
@@ -575,12 +586,10 @@ async fn 入站必刷带推荐语() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络，核对 UP 主置顶评论"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 置顶评论排在第一页最前() {
     // 必须带登录态：游客只回 4 条，测不出真实的 20 条分页。
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
     // BV1kZWX62ENY（影视飓风）的 UP 主置顶是一条「我在这里」。
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let page = source.comments(&key, None, true).await.expect("第一页评论");
@@ -597,11 +606,9 @@ async fn 置顶评论排在第一页最前() {
 }
 
 #[tokio::test]
-#[ignore = "真实网络"]
+#[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 评论游标能翻到第二页() {
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let first = source.comments(&key, None, true).await.expect("第一页评论");
     let next = first.next.clone().expect("第一页应该给下一页游标");
@@ -681,9 +688,7 @@ async fn 合集带全部集数与封面() {
 #[tokio::test]
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 楼中楼能翻页() {
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
 
     let key = bilimusic_model::TrackKey::from_provider("BV1kZWX62ENY");
     let page = source.comments(&key, None, true).await.expect("第一页评论");
@@ -735,9 +740,7 @@ async fn 楼中楼能翻页() {
 #[tokio::test]
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 查看对话能翻页() {
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
 
     // BV1GJ411x7h7：已知这条一级评论下有 3442 条回复，取一条二级评论当对话锚点。
     let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
@@ -835,9 +838,7 @@ async fn messages_live_cursor_pages_are_disjoint() {
     use bilimusic_bili::messages::MessageKind;
     use std::collections::HashSet;
 
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
 
     let mut paginated = 0;
     for kind in [MessageKind::Reply, MessageKind::At, MessageKind::Like] {
@@ -881,9 +882,7 @@ async fn 弹幕正文不带未解开的实体() {
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 有字幕的视频能取到台词() {
     // 字幕（尤其 AI 字幕）只给登录用户，游客拿到的是空列表。
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
     // BV1GJ411x7h7：这条挂了 12 条字幕轨（含 ai-zh）。
     let key = bilimusic_model::TrackKey::from_provider("BV1GJ411x7h7");
     let detail = source.detail(&key).await.expect("详情");
@@ -903,9 +902,7 @@ async fn 有字幕的视频能取到台词() {
 #[tokio::test]
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 async fn 字幕按传入的cid取而不是总拿第一P() {
-    let Some(source) = source_with_live_cookies().await else {
-        return;
-    };
+    let source = source_with_live_cookies().await;
 
     let key = bilimusic_model::TrackKey::from_provider("BV1vs411n7TH");
     let detail = source.detail(&key).await.expect("详情");

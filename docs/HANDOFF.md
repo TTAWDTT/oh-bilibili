@@ -250,9 +250,10 @@ cargo test --workspace                                    # 18 个测试二进�
 npm run typecheck -w @bilimusic/desktop
 
 # 真实接口（需要网络与声卡）
-BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json cargo test -p bilimusic-bili --test live -- --ignored
-BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json cargo test -p bilimusic-core --test live_engine -- --ignored
+BILIMUSIC_LIVE_COOKIES=/path/to/cookies.json ./scripts/live-test.sh
 ```
+
+`live-test.sh` 未配置凭据时打印 `SKIPPED` 并以 77 退出，不能当成线上通过；配置后先只读验证登录，两套用例全部通过才打印 `VERIFIED`。直接跑 `cargo test --ignored` 时，凭据用例在未配置时会失败，不会把跳过计成 passed。
 
 ## 架构要点
 

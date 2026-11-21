@@ -1,8 +1,8 @@
 //! 端到端验证：真实接口搜到歌，真的把音频喂给声卡，位置真的在走。
 //!
-//! 运行：cargo test -p bilimusic-core --test live_engine -- --ignored --nocapture
-//! 需要登录态的用例读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json；
-//! 未设置时打印跳过原因。
+//! 运行：`scripts/live-test.sh`。
+//! 需要登录态的用例只读取 `BILIMUSIC_LIVE_COOKIES` 指向的专用账号 cookies.json。
+//! 直接跑 `cargo test --ignored` 而没有配置时会失败，不会把「跳过」计成通过。
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -46,7 +46,10 @@ impl Drop for TestDir {
 fn live_cookies(required: bool) -> Option<PathBuf> {
     let Some(path) = std::env::var_os(LIVE_COOKIES_ENV).map(PathBuf::from) else {
         if required {
-            eprintln!("跳过：需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>");
+            panic!(
+                "这条用例需要 {LIVE_COOKIES_ENV}=<专用测试账号的 cookies.json>。\
+                 请运行 scripts/live-test.sh：未配置时它会明确 skip，而不是把用例计为 passed"
+            );
         } else {
             println!("未设置 {LIVE_COOKIES_ENV}，以游客态运行");
         }
@@ -67,12 +70,11 @@ fn live_cookies(required: bool) -> Option<PathBuf> {
     Some(path)
 }
 
-fn stage_live_cookies(dir: &Path, required: bool) -> bool {
+fn stage_live_cookies(dir: &Path, required: bool) {
     let Some(source) = live_cookies(required) else {
-        return false;
+        return;
     };
     std::fs::copy(source, dir.join("cookies.json")).expect("复制登录态");
-    true
 }
 
 fn require_live_login(engine: &Engine) {
@@ -703,9 +705,7 @@ fn 听视频接的是正在看的那一条() {
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES"]
 fn 观看进度能上报() {
     let dir = TestDir::new("rp");
-    if !stage_live_cookies(&dir, true) {
-        return;
-    }
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -742,9 +742,7 @@ async fn like_state(engine: &std::sync::Arc<Engine>, key: &bilimusic_model::Trac
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复账号原状"]
 fn 点赞能写入也能取消() {
     let dir = TestDir::new("like");
-    if !stage_live_cookies(&dir, true) {
-        return;
-    }
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -775,14 +773,14 @@ fn 点赞能写入也能取消() {
     });
 }
 
-/// 稍后再看的往返：加进去，再拿出来。写路径是否可用，用这条可逆的操作判定。
+/// 稍后再看的往返：先读原始成员关系，选一条确认没保存过的，加入、验证、移除、再验证。
+///
+/// 不能拿搜索第一项直接「加完再删」：账号原本就存过这条时，删除会把原条目移走。
 #[test]
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复"]
 fn 稍后再看能写入也能移除() {
     let dir = TestDir::new("wl");
-    if !stage_live_cookies(&dir, true) {
-        return;
-    }
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -790,21 +788,60 @@ fn 稍后再看能写入也能移除() {
         .build()
         .expect("runtime");
     rt.block_on(async {
-        let tracks = engine.search("周杰伦 晴天".into(), 1).await.expect("搜索");
-        let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
-        println!("目标 {}", key.as_opaque());
-        match engine.watch_later_set(&key, true).await {
-            Ok(()) => println!("加入稍后再看: ok"),
-            Err(e) => {
-                println!("加入失败: {}", e.message());
-                panic!("写路径不可用");
+        let saved: std::collections::HashSet<String> = engine
+            .watch_later_list()
+            .await
+            .expect("读取稍后再看")
+            .iter()
+            .map(|track| track.key.as_opaque().to_string())
+            .collect();
+        println!("账号原有 {} 条稍后再看", saved.len());
+
+        let mut chosen = None;
+        for page in 1..=3 {
+            let tracks = engine
+                .search("周杰伦 晴天".into(), page)
+                .await
+                .expect("搜索");
+            for track in tracks {
+                if !saved.contains(track.key.as_opaque()) {
+                    chosen = Some(track.key.clone());
+                    break;
+                }
+            }
+            if chosen.is_some() {
+                break;
             }
         }
-        // 立刻移除，保持账号状态不变
-        match engine.watch_later_set(&key, false).await {
-            Ok(()) => println!("移出稍后再看: ok"),
-            Err(e) => panic!("移出失败，账号可能被弄脏: {}", e.message()),
+        let key = chosen.expect("搜索结果都已在稍后再看，找不到可安全加入的目标");
+        println!("目标 {}，已确认不在原始列表", key.as_opaque());
+
+        engine
+            .watch_later_set(&key, true)
+            .await
+            .expect("加入稍后再看");
+        let after_add = engine.watch_later_list().await.expect("加入后读取");
+        if !after_add
+            .iter()
+            .any(|track| track.key.as_opaque() == key.as_opaque())
+        {
+            let _ = engine.watch_later_set(&key, false).await;
+            panic!("加入后没有出现在稍后再看");
         }
+        println!("加入并确认存在");
+
+        engine
+            .watch_later_set(&key, false)
+            .await
+            .expect("移出失败，账号可能残留");
+        let after_remove = engine.watch_later_list().await.expect("移出后读取");
+        assert!(
+            !after_remove
+                .iter()
+                .any(|track| track.key.as_opaque() == key.as_opaque()),
+            "移出后仍然存在，账号可能残留"
+        );
+        println!("移出并确认不存在");
     });
 }
 
@@ -815,9 +852,7 @@ fn 稍后再看能写入也能移除() {
 #[ignore = "真实网络，需要 BILIMUSIC_LIVE_COOKIES；结束时恢复"]
 fn 收藏能写入也能取消() {
     let dir = TestDir::new("fav");
-    if !stage_live_cookies(&dir, true) {
-        return;
-    }
+    stage_live_cookies(&dir, true);
     let engine = Engine::new(&dir.join("library.sqlite")).expect("引擎");
     require_live_login(&engine);
     let rt = tokio::runtime::Builder::new_current_thread()
