@@ -210,28 +210,36 @@ mod download_restore_tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn 无法解码的下载初次和重试都失败() {
-        use crate::wire::AppEvent;
+    fn download_helper(dir: &std::path::Path) -> std::path::PathBuf {
         use std::os::unix::fs::PermissionsExt;
 
-        let dir = temp_dir("download-completion");
-        let output = dir.join("audio");
         let helper = dir.join("yt-dlp");
         std::fs::write(
             &helper,
-            "#!/bin/sh\n[ -f audio ] || printf 'not an audio file' > audio\nprintf '%s\\n' '\"audio\"'\n",
+            "#!/bin/sh\nset -e\n[ -f audio ] || cp source audio\nprintf '%s\\n' '\"audio\"'\n",
         )
         .unwrap();
         std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        helper
+    }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 重试无法解码的下载会替换损坏文件() {
+        use crate::wire::AppEvent;
+
+        let dir = temp_dir("download-completion");
+        let output = dir.join("audio");
+        let source = dir.join("source");
+        std::fs::write(&source, b"not an audio file").unwrap();
+        let helper = download_helper(&dir);
         let engine = Engine::open(&dir.join("library.sqlite")).unwrap();
         let track = track("BV1LOCAL");
         let mut events = engine.subscribe();
         let aac = include_bytes!("../tests/fixtures/local-playback.m4a");
         for expected_state in ["failed", "failed", "done"] {
             let expected_bytes = if expected_state == "done" {
-                std::fs::write(&output, aac).unwrap();
+                std::fs::write(&source, aac).unwrap();
                 aac.as_slice()
             } else {
                 b"not an audio file"
@@ -270,6 +278,49 @@ mod download_restore_tests {
         }
         drop(engine);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn 重试保留可解码文件和完成项并重新下载缺失项() {
+        let aac = include_bytes!("../tests/fixtures/local-playback.m4a").as_slice();
+        let invalid = b"not an audio file".as_slice();
+        for (tag, state, existing, source, expected) in [
+            ("retry-valid", "failed", Some(aac), invalid, aac),
+            ("retry-done", "done", Some(invalid), aac, invalid),
+            ("retry-missing", "failed", None, aac, aac),
+            ("retry-missing-done", "done", None, aac, aac),
+        ] {
+            let dir = temp_dir(tag);
+            let output = dir.join("audio");
+            if let Some(bytes) = existing {
+                std::fs::write(&output, bytes).unwrap();
+            }
+            std::fs::write(dir.join("source"), source).unwrap();
+            let helper = download_helper(&dir);
+            let engine = Engine::open(&dir.join("library.sqlite")).unwrap();
+            let track = track("BV1LOCAL");
+            engine
+                .library
+                .save_download(&track, output.to_str(), state, None)
+                .unwrap();
+            engine.restore_downloads();
+
+            let view = engine
+                .enqueue_download_with(&track, helper, dir.clone())
+                .unwrap();
+            if state == "done" && existing.is_some() {
+                assert_eq!(view.state, "done", "{tag}");
+            } else {
+                assert_eq!(view.state, "running", "{tag}");
+                wait_for(|| engine.downloads()[0].state != "running").await;
+            }
+            assert_eq!(engine.downloads()[0].state, "done", "{tag}");
+            assert_eq!(engine.library.downloads().unwrap()[0].state, "done", "{tag}");
+            assert_eq!(std::fs::read(&output).unwrap(), expected, "{tag}");
+            drop(engine);
+            std::fs::remove_dir_all(&dir).unwrap();
+        }
     }
 
     #[tokio::test]
@@ -3128,17 +3179,24 @@ impl Engine {
             path: None,
             error: None,
         };
-        self.library.save_download(track, None, "running", None)?;
-        {
+        let retry_path = {
             let mut list = lock(&self.downloads);
-            if let Some(existing) = list.iter().find(|d| {
-                d.key == view.key && (d.state == "queued" || d.state == "running")
-            }) {
-                return Ok(existing.clone());
+            let existing = list.iter().find(|d| d.key == view.key);
+            if let Some(existing) = existing {
+                let mut current = existing.clone();
+                current.refresh_file_state();
+                if matches!(current.state.as_str(), "queued" | "running" | "done") {
+                    return Ok(current);
+                }
             }
+            let retry_path = existing
+                .filter(|d| d.state == "failed")
+                .and_then(|d| d.path.clone());
+            self.library.save_download(track, retry_path.as_deref(), "running", None)?;
             list.retain(|d| d.key != view.key);
             list.push(view.clone());
-        }
+            retry_path
+        };
         self.emit(AppEvent::Download {
             view: serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
         });
@@ -3148,7 +3206,19 @@ impl Engine {
         let view_key = view.key.clone();
 
         tokio::task::spawn_blocking(move || {
-            let (state, path, error) = match crate::download::audio(&helper, &dir, &url) {
+            let result = retry_path
+                .as_deref()
+                .map_or(Ok(()), remove_undecodable_download)
+                .map_err(|error| {
+                    (
+                        retry_path.map(PathBuf::from),
+                        format!("删不掉损坏的下载文件：{error}"),
+                    )
+                })
+                .and_then(|()| {
+                    crate::download::audio(&helper, &dir, &url).map_err(|e| (None, e.to_string()))
+                });
+            let (state, path, error) = match result {
                 Ok(path) => {
                     let result = File::open(&path)
                         .map_err(|e| AudioError::Open(e.to_string()))
@@ -3161,9 +3231,9 @@ impl Engine {
                         }
                     }
                 }
-                Err(e) => {
+                Err((path, e)) => {
                     eprintln!("下载失败：{e}");
-                    ("failed", None, Some(e.to_string()))
+                    ("failed", path, Some(e))
                 }
             };
             let path_text = path.map(|p| p.to_string_lossy().to_string());
@@ -3462,6 +3532,13 @@ fn open_download_file(path: Option<&str>) -> Option<File> {
         return None;
     }
     File::open(path).ok()
+}
+
+fn remove_undecodable_download(path: &str) -> std::io::Result<()> {
+    if open_download_file(Some(path)).is_some_and(|file| probe_audio(Media::new(file)).is_err()) {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
 }
 
 const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];
