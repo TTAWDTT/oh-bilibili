@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
-import type { Track } from '../../shared/lib/contract'
+import type { Track, WireError } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -11,6 +11,7 @@ import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
 import { toastDone } from '../../app/notice'
+import { useRetryAfterLogin } from './useRetryAfterLogin'
 
 /**
  * 稍后再看。
@@ -19,11 +20,16 @@ import { toastDone } from '../../app/notice'
  */
 export function WatchLaterView() {
   const navigate = useAppStore((s) => s.navigate)
+  const setAuthOpen = useAppStore((s) => s.setAuthOpen)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const playContext = usePlayerStore((s) => s.playContext)
   const [tracks, setTracks] = useState<Track[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<WireError | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const retry = () => setAttempt((n) => n + 1)
+
+  useRetryAfterLogin(error, retry)
 
   const removeOne = async (key: string): Promise<void> => {
     try {
@@ -45,28 +51,31 @@ export function WatchLaterView() {
         if (!cancelled) setTracks(list)
       })
       .catch((e) => {
-        if (!cancelled) {
-          setTracks([])
-          setError(toWireError(e).message)
-        }
+        if (!cancelled) setError(toWireError(e))
       })
     return () => {
       cancelled = true
     }
-  }, [])
-
-  if (tracks === null) return <BiliLoader label="正在取稍后再看…" />
+  }, [attempt])
 
   if (error) {
+    const action =
+      error.class === 'needs_login'
+        ? { label: '去登录', onClick: () => setAuthOpen(true) }
+        : error.class === 'retryable'
+          ? { label: '重试', onClick: retry }
+          : null
     return (
       <EmptyState
         icon="watchLater"
         title="稍后再看没取到"
-        detail={error}
-        action={{ label: '去登录', onClick: () => navigate({ kind: 'settings' }) }}
+        detail={error.message}
+        action={action}
       />
     )
   }
+
+  if (tracks === null) return <BiliLoader label="正在取稍后再看…" />
 
   if (tracks.length === 0) {
     return (
