@@ -1376,9 +1376,6 @@ impl Engine {
             let queue = lock(&self.queue);
             (queue.items(), queue.index())
         };
-        if tracks.is_empty() {
-            return;
-        }
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
         // 进度也一起存，否则用户还得自己拖回去。
         let snapshot = serde_json::json!({
@@ -1453,6 +1450,17 @@ impl Engine {
         // 有缺的就后台补，补完再整体替换队列。
         let already = tracks.len();
         if already < keys.len() {
+            // 补全期间用户可能清空、重排、切歌或换了新队列。记下当时的队列形态，
+            // 回来时只要对不上就不覆盖。
+            let expected_keys: Vec<String> = tracks
+                .iter()
+                .map(|t| t.key.as_opaque().to_string())
+                .collect();
+            let expected_index = if tracks.is_empty() {
+                None
+            } else {
+                Some(saved_index.min(tracks.len() - 1))
+            };
             let engine = self.clone();
             std::thread::spawn(move || {
                 let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -1478,7 +1486,15 @@ impl Engine {
                     let filled = engine.tracks_for(&keys);
                     if !filled.is_empty() {
                         let mut q = lock(&engine.queue);
-                        *q = Queue::from_tracks(&filled, 0);
+                        let current_keys: Vec<String> = q
+                            .items()
+                            .iter()
+                            .map(|t| t.key.as_opaque().to_string())
+                            .collect();
+                        if current_keys == expected_keys && q.index() == expected_index {
+                            let start = saved_index.min(filled.len() - 1);
+                            *q = Queue::from_tracks(&filled, start);
+                        }
                     }
                     *lock(&engine.restoring) = None;
                 });
