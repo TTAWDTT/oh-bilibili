@@ -122,8 +122,15 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
   }
 })
 
+/** 预览里现造的曲目（比如历史长列表）也要能被播放器认出来。 */
+const extraTracks = new Map<string, Track>()
+
+export function registerTrack(track: Track): void {
+  extraTracks.set(track.key, track)
+}
+
 export function findTrack(key: string): Track | null {
-  return CATALOG.find((track) => track.key === key) ?? null
+  return extraTracks.get(key) ?? CATALOG.find((track) => track.key === key) ?? null
 }
 
 export function trackByTitle(title: string): Track | null {

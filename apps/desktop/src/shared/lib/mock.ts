@@ -1,5 +1,5 @@
 import type { DownloadView, QrStatus, WireError } from './contract'
-import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
+import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
 import { emit, ensureClock, fail, playlistOf, setDuration, snapshot, state, trackOf } from './mockEngine'
@@ -360,24 +360,34 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             ...Array.from({ length: 98 }, (_, i) => ({
               id: i + 1,
               track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
-              played_at: now - i * 86_400_000,
+              played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
+              position_ms: i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000,
             })),
             {
               id: 99,
-              track: { ...seed, key: `${seed.key}-cross-2025`, title: '跨年同日 · 2025' },
+              track: {
+                ...seed,
+                key: `${seed.key}-cross-2025`,
+                title: '跨年同日 · 2025 一段很长的标题用来确认窄窗里也不挤掉播放时间',
+                duration_ms: 1_500_000,
+              },
               played_at: new Date(2025, 3, 10, 12).getTime(),
+              position_ms: 1_122_000,
             },
             {
               id: 100,
-              track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024' },
+              track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024', duration_ms: null },
               played_at: new Date(2024, 3, 10, 12).getTime(),
+              position_ms: 90_000,
             },
           ]
         : CATALOG.slice(0, 7).map((track, i) => ({
             id: i + 1,
             track,
             played_at: now - i * 9.5 * 3600_000,
+            position_ms: [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
           }))
+      for (const entry of all) registerTrack(entry.track)
       return all
         .filter((entry) => !state.historyHidden.has(entry.track.key))
         .filter(

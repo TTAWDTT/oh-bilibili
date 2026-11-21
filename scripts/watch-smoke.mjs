@@ -2251,7 +2251,7 @@ async function main() {
       cleared.count === 80 && cleared.active.includes('P62'),
     )
 
-    // 历史：翻到第 61 条，并把不同年份的同月同日分成两组。
+    // 历史：按日排列的播放日志。时刻来自 played_at，进度来自 position_ms。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?historyLong=1`)}`)
     await sleep(5000)
     const openedHistory = await page.evaluate(`(() => {
@@ -2264,10 +2264,10 @@ async function main() {
     let historyReady = false
     for (let i = 0; i < 20 && !historyReady; i += 1) {
       await sleep(400)
-      historyReady = await page.evaluate(`document.querySelectorAll('[data-track-card]').length > 0`)
+      historyReady = await page.evaluate(`document.querySelectorAll('[data-history-row]').length > 0`)
     }
     const authorContrast = await page.evaluate(`(() => {
-      const author = [...document.querySelectorAll('#scroll-main [data-track-card] span')]
+      const author = [...document.querySelectorAll('#scroll-main [data-history-row] span')]
         .find((element) => element.textContent?.trim() === '周杰伦')
       if (!author) return null
       let background = getComputedStyle(document.body).backgroundColor
@@ -2293,7 +2293,7 @@ async function main() {
       await page.mouseEvent({ type: 'mouseMoved', x: authorContrast.center[0], y: authorContrast.center[1] })
       await sleep(250)
       const hoveredAuthor = await page.evaluate(`(() => {
-        const author = [...document.querySelectorAll('#scroll-main [data-track-card] span')]
+        const author = [...document.querySelectorAll('#scroll-main [data-history-row] span')]
           .find((element) => element.textContent?.trim() === '周杰伦')
         if (!author) return null
         let background = getComputedStyle(document.body).backgroundColor
@@ -2311,58 +2311,76 @@ async function main() {
         hoveredAuthor && contrastRatio(hoveredAuthor.color, hoveredAuthor.background) >= 4.5,
       )
     }
-    const firstPage = await page.evaluate(`(() => ({
-      cards: document.querySelectorAll('[data-track-card]').length,
-      loadMore: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
-    }))()`)
-    check(
-      '历史首屏 60 条并给出加载更早',
-      openedHistory && historyReady && firstPage.cards === 60 && firstPage.loadMore,
-    )
-    const historySpacing = await page.evaluate(`(() => {
-      const groups = [...document.querySelectorAll('#scroll-main section')]
-      const first = groups[0]
-      const second = groups[1]
-      if (!first || !second) return null
-      const cards = [...first.querySelectorAll('[data-track-card]')]
-      const lastCard = cards.at(-1)
-      const nextHeading = second.querySelector('h2')
-      const grid = cards[0]?.parentElement
-      const sentinel = grid?.querySelector(':scope > [aria-hidden]')
+    const firstPage = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('#scroll-main [data-history-row]')]
+      const first = rows[0]
+      const clocks = [...(first?.querySelectorAll('time') ?? [])]
+      const visibleClock = clocks.find((node) => node.offsetParent !== null)
       return {
-        gap:
-          lastCard && nextHeading
-            ? nextHeading.getBoundingClientRect().top - lastCard.getBoundingClientRect().bottom
-            : null,
-        sentinel: sentinel
-          ? {
-              position: getComputedStyle(sentinel).position,
-              display: getComputedStyle(sentinel).display,
-            }
-          : null,
+        rows: rows.length,
+        loadMore: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
+        clock: (visibleClock?.textContent || '').trim(),
+        playedAt: Number(first?.dataset.playedAt),
+        position: Number(first?.dataset.positionMs),
+        finished: (first?.innerText || '').includes('已播完'),
       }
     })()`)
     check(
-      '历史日期组只留一层间距，预取哨兵不占行',
+      '历史首屏 60 条并给出加载更早',
+      openedHistory && historyReady && firstPage.rows === 60 && firstPage.loadMore,
+    )
+    check(
+      '首行显示 played_at 的本地时刻，进度按 position_ms 显示已播完',
+      /^([01]\d|2[0-3]):[0-5]\d$/.test(firstPage.clock) &&
+        Number.isFinite(firstPage.playedAt) &&
+        firstPage.position > 0 &&
+        firstPage.finished,
+    )
+    const historySpacing = await page.evaluate(`(() => {
+      const sections = [...document.querySelectorAll('#scroll-main section')]
+      const first = sections[0]
+      const second = sections[1]
+      if (!first || !second) return null
+      const rows = [...first.querySelectorAll('[data-history-row]')]
+      const lastRow = rows.at(-1)
+      const heading = second.querySelector('h2')
+      return {
+        gap:
+          lastRow && heading
+            ? heading.getBoundingClientRect().top - lastRow.getBoundingClientRect().bottom
+            : null,
+        heights: rows.slice(0, 4).map((row) => Math.round(row.getBoundingClientRect().height)),
+        headingInside: second.contains(heading),
+      }
+    })()`)
+    check(
+      '历史日期组只留一层间距，行高保持紧凑',
       historySpacing &&
-        historySpacing.gap >= 24 &&
-        historySpacing.gap <= 32 &&
-        historySpacing.sentinel?.position === 'absolute' &&
-        historySpacing.sentinel.display !== 'none',
+        historySpacing.gap >= 18 &&
+        historySpacing.gap <= 34 &&
+        historySpacing.headingInside &&
+        historySpacing.heights.every((height) => height >= 60 && height <= 100),
     )
     await page.clickExactText('加载更早记录')
     let loadedAll = false
     for (let i = 0; i < 20 && !loadedAll; i += 1) {
       await sleep(300)
-      loadedAll = await page.evaluate(`document.querySelectorAll('[data-track-card]').length === 100`)
+      loadedAll = await page.evaluate(`document.querySelectorAll('[data-history-row]').length === 100`)
     }
     const afterLoad = await page.evaluate(`(() => {
       const text = document.body.innerText
       const heads = [...document.querySelectorAll('h2')].map((h) => (h.textContent || '').trim())
+      const rows = [...document.querySelectorAll('[data-history-row]')]
+      const long = rows.find((row) => (row.textContent || '').includes('跨年同日 · 2025'))
+      const unknown = rows.find((row) => (row.textContent || '').includes('跨年同日 · 2024'))
       return {
         has61: text.includes('历史记录 61'),
         groups: heads.filter((h) => h.includes('4 月 10 日')),
         more: !![...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '加载更早记录'),
+        longProgress: (long?.innerText || '').includes('播至 18:42'),
+        longBar: long ? !!long.querySelector('div[style*="width"]') : false,
+        unknownProgress: (unknown?.innerText || '').includes('播至 1:30'),
+        unknownBar: unknown ? !!unknown.querySelector('div[style*="width"]') : false,
       }
     })()`)
     check('加载更早记录能找回第 61 条', loadedAll && afterLoad.has61)
@@ -2372,7 +2390,155 @@ async function main() {
         afterLoad.groups.some((g) => g.startsWith('2025')) &&
         afterLoad.groups.some((g) => g.startsWith('2024')),
     )
+    check(
+      '已知进度显示播至时刻与进度条，未知时长只给已知时间',
+      afterLoad.longProgress && afterLoad.longBar && afterLoad.unknownProgress && !afterLoad.unknownBar,
+    )
     check('取完 100 条后按钮收起', !afterLoad.more)
+
+    // 续播：点第二行（12 秒续播点），播放条应接在那个位置而不是从头。
+    const resumed = await page.evaluate(`(() => {
+      const row = [...document.querySelectorAll('[data-history-row]')]
+        .find((item) => (item.textContent || '').includes('历史记录 2 ·'))
+      const hit = row?.querySelector('button[data-history-play]')
+      if (!hit) return null
+      hit.click()
+      return row.dataset.positionMs
+    })()`)
+    await sleep(900)
+    const resumeState = await page.evaluate(`(() => {
+      const slider = document.querySelector('[aria-label="播放进度"]')
+      const bar = document.querySelector('[data-player-bar]')
+      return {
+        ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null,
+        text: (bar?.innerText || document.body.innerText).slice(0, 400),
+      }
+    })()`)
+    check(
+      '从历史续播落在记录的 position_ms',
+      Number(resumed) === 12000 && resumeState.ratio !== null && resumeState.ratio >= 40 && resumeState.ratio <= 60,
+    )
+
+    // 删除单条：只删掉 2024 那一组唯一一行，日期标题不能残留成空组。
+    const deleted = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('[data-history-row]')]
+      const row = rows.find((item) => (item.textContent || '').includes('跨年同日 · 2024'))
+      const more = row?.querySelector('button[aria-haspopup="menu"]')
+      if (!more) return false
+      more.click()
+      return true
+    })()`)
+    await sleep(300)
+    const menuOpen = await page.evaluate(
+      `!!document.querySelector('[role="dialog"][aria-label="历史记录操作"]')`,
+    )
+    const clickedDelete = await page.evaluate(`(() => {
+      const item = [...document.querySelectorAll('button[role="menuitem"]')]
+        .find((node) => (node.textContent || '').includes('删除这条记录'))
+      if (!item) return false
+      item.click()
+      return true
+    })()`)
+    let afterDelete = null
+    for (let i = 0; i < 20 && !afterDelete; i += 1) {
+      await sleep(200)
+      afterDelete = await page.evaluate(`(() => {
+        const rows = [...document.querySelectorAll('[data-history-row]')]
+        if (rows.length !== 99) return null
+        const sections = [...document.querySelectorAll('#scroll-main section')]
+        return {
+          rows: rows.length,
+          emptyGroups: sections.filter((section) => section.querySelectorAll('[data-history-row]').length === 0).length,
+          left2024: (document.body.innerText || '').includes('2024 年 4 月 10 日'),
+          left2024Row: rows.some((row) => (row.textContent || '').includes('跨年同日 · 2024')),
+        }
+      })()`)
+    }
+    check(
+      '删除日期组最后一条后不残留空日期组',
+      deleted && menuOpen && clickedDelete && afterDelete &&
+        afterDelete.rows === 99 && afterDelete.emptyGroups === 0 && !afterDelete.left2024 && !afterDelete.left2024Row,
+    )
+
+    // 返回恢复：滚动到列表中段、把焦点停在某一行，去发现页再回来。
+    const parked = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('[data-history-row]')]
+      const row = rows[20]
+      const box = document.getElementById('scroll-main')
+      if (!row || !box) return null
+      box.scrollTop = 600
+      row.querySelector('button[data-history-play]')?.focus()
+      return { key: row.dataset.key, scrollTop: Math.round(box.scrollTop) }
+    })()`)
+    await sleep(200)
+    const leftHistory = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '发现') : null
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(1200)
+    const backToHistory = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '历史') : null
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(800)
+    const restored = await page.evaluate(`(() => {
+      const box = document.getElementById('scroll-main')
+      const active = document.activeElement
+      const row = active?.closest?.('[data-history-row]')
+      return {
+        rows: document.querySelectorAll('[data-history-row]').length,
+        scrollTop: box ? Math.round(box.scrollTop) : null,
+        focusKey: row?.dataset.key ?? null,
+      }
+    })()`)
+    check(
+      '从历史离开再回来，页数、位置和焦点都原样恢复',
+      leftHistory && backToHistory && parked &&
+        restored.rows === 99 &&
+        Math.abs(restored.scrollTop - parked.scrollTop) <= 2 &&
+        restored.focusKey === parked.key,
+    )
+
+    // 窄窗：时间收在标题上方，进度落在作者下方，页面不横向溢出。
+    await page.viewport(380, 820)
+    await sleep(600)
+    const narrow = await page.evaluate(`(() => {
+      const row = document.querySelector('[data-history-row]')
+      if (!row) return null
+      const clocks = [...row.querySelectorAll('time')].filter((node) => node.offsetParent !== null)
+      const clock = clocks[0]
+      const title = row.querySelector('button[data-history-play][title]')
+      const artist = [...row.querySelectorAll('span')].find((node) => (node.textContent || '').trim() === '周杰伦')
+      const progress = [...row.querySelectorAll('div')].find((node) => (node.textContent || '').trim().startsWith('播至') || (node.textContent || '').trim() === '已播完')
+      const rect = (node) => (node ? node.getBoundingClientRect() : null)
+      const clockBox = rect(clock)
+      const titleBox = rect(title)
+      const artistBox = rect(artist)
+      const progressBox = rect(progress)
+      return {
+        clock: clockBox ? { top: clockBox.top, left: clockBox.left } : null,
+        title: titleBox ? { top: titleBox.top, right: titleBox.right } : null,
+        artistBottom: artistBox?.bottom ?? null,
+        progressTop: progressBox?.top ?? null,
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+      }
+    })()`)
+    check(
+      '窄窗把时刻收在标题上方、进度放在作者下方',
+      narrow && narrow.clock && narrow.title &&
+        narrow.clock.top < narrow.title.top &&
+        narrow.progressTop !== null && narrow.artistBottom !== null &&
+        narrow.progressTop >= narrow.artistBottom - 2,
+    )
+    check('窄窗历史行不横向溢出', narrow && narrow.overflow <= 0)
+    await page.viewport(1320, 900)
+    await sleep(300)
 
     // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。
     // 按 mid 去重后应得到 101、102、103，且整页重叠也要继续翻到空页收尾。
