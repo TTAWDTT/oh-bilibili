@@ -7,6 +7,7 @@ export type MockPlaylist = { id: number; name: string; keys: string[] }
 export type MockState = {
   keys: string[]
   index: number | null
+  localKey: string | null
   /** 最近一次清空前的队列，供撤销恢复。 */
   clearedQueue: { keys: string[]; index: number | null } | null
   phase: PlayerPhase
@@ -29,12 +30,37 @@ export type MockState = {
   qr: { key: string; url: string; startedAt: number; expiresIn: number; confirmed: boolean } | null
 }
 
+const downloadSeeds: Omit<DownloadView, 'key'>[] = [
+  {
+    title: '晴天',
+    state: 'done',
+    progress: 1,
+    path: '~/Music/BiliMusic/周杰伦 - 晴天.m4a',
+    error: null,
+  },
+  {
+    title: '海底',
+    state: 'running',
+    progress: 0.38,
+    path: null,
+    error: null,
+  },
+  {
+    title: '起风了',
+    state: 'missing',
+    progress: 0,
+    path: '~/Music/BiliMusic/起风了.m4a',
+    error: null,
+  },
+]
+
 const loggedIn =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('loggedIn')
 
 export const state: MockState = {
   keys: [],
   index: null,
+  localKey: null,
   clearedQueue: null,
   phase: 'idle',
   mode: 'listen',
@@ -54,24 +80,10 @@ export const state: MockState = {
       return track ? [track.key] : []
     }),
   })),
-  downloads: [
-    {
-      key: 'seed-download-1',
-      title: '晴天',
-      state: 'done',
-      progress: 1,
-      path: '~/Music/BiliMusic/周杰伦 - 晴天.m4a',
-      error: null,
-    },
-    {
-      key: 'seed-download-2',
-      title: '海底',
-      state: 'running',
-      progress: 0.38,
-      path: null,
-      error: null,
-    },
-  ],
+  downloads: downloadSeeds.flatMap((view) => {
+    const track = trackByTitle(view.title)
+    return track ? [{ ...view, key: track.key }] : []
+  }),
   historyHidden: new Set<string>(),
   historyCleared: false,
   auth: loggedIn
@@ -122,6 +134,7 @@ export function playlistOf(id: number): MockPlaylist {
 }
 
 function currentTrack(): Track | null {
+  if (state.localKey) return findTrack(state.localKey)
   return state.index === null ? null : findTrack(state.keys[state.index] ?? '')
 }
 
@@ -137,7 +150,7 @@ export function snapshot(): PlayerSnapshot {
     speed: state.speed ?? 1,
     repeat: state.repeat,
     shuffle: state.shuffle,
-    quality_kbps: track ? 192 : null,
+    quality_kbps: track && !state.localKey ? 192 : null,
   }
 }
 
@@ -156,6 +169,7 @@ export function playIndex(index: number): void {
     return
   }
   state.index = index
+  state.localKey = null
   state.position = 0
   state.duration = track.duration_ms ?? 30_000
   state.phase = 'playing'
@@ -217,6 +231,7 @@ function tick(): void {
     emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
     if (state.position >= state.duration) {
       if (state.repeat === 'one') state.position = 0
+      else if (state.localKey) endPlayback()
       else step(1)
     }
   }

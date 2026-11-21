@@ -5,6 +5,8 @@
 //! 2. 后台变化发事件，命令成功直接返回结果，UI 不用猜。
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -115,7 +117,8 @@ mod watch_gate_tests {
 
 #[cfg(test)]
 mod download_restore_tests {
-    use super::{download_key_of, restored_download};
+    use super::{download_key_of, lock, restored_download, Engine};
+    use std::time::{Duration, Instant};
     use bilimusic_model::{Track, TrackKey};
     use bilimusic_store::Library;
 
@@ -194,6 +197,67 @@ mod download_restore_tests {
         assert_eq!(views[2].state, "failed");
         assert_eq!(views[2].error.as_deref(), Some("上次下载被中断"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    async fn wait_for(mut ready: impl FnMut() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !ready() {
+            assert!(Instant::now() < deadline, "音频操作超时");
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "需要声卡输出"]
+    async fn 本地下载重开后可播放暂停跳转并结束() {
+        let dir = temp_dir("local-playback");
+        let db = dir.join("library.sqlite");
+        let path = dir.join("本地音频.m4a");
+        std::fs::write(&path, include_bytes!("../tests/fixtures/local-playback.m4a")).unwrap();
+        let mut local = track("BV1LOCAL");
+        local.duration = Some(bilimusic_model::Millis(4_000));
+        {
+            let library = Library::open(&db).unwrap();
+            library
+                .save_download(&local, Some(path.to_str().unwrap()), "done", None)
+                .unwrap();
+        }
+        let engine = Engine::open(&db).unwrap();
+        engine.restore_downloads();
+        engine.set_volume(0.0);
+        let queued = [track("BV1QUEUE"), track("BV2QUEUE")];
+        lock(&engine.queue).replace_from_tracks(&queued, 0);
+
+        assert_eq!(engine.downloads()[0].state, "done");
+        let loading = engine.play_local(&local.key).unwrap();
+        assert_eq!(loading.phase, "loading");
+        assert_eq!(loading.track.as_ref().unwrap().key, local.key);
+        wait_for(|| engine.promote_loading()).await;
+        let playing = engine.snapshot();
+        assert_eq!(playing.phase, "playing");
+        assert!(lock(&engine.player).is_started());
+        assert!(playing.duration_ms >= 4_000);
+        assert_eq!(engine.history(1).unwrap()[0].key, local.key);
+
+        assert_eq!(engine.pause().phase, "paused");
+        wait_for(|| !lock(&engine.player).clock().is_playing()).await;
+        engine.seek(2_200);
+        wait_for(|| engine.snapshot().position_ms == 2_200).await;
+        assert_eq!(engine.snapshot().phase, "paused");
+        assert_eq!(engine.toggle_or_load().await.unwrap().phase, "playing");
+        wait_for(|| engine.snapshot().position_ms > 2_300).await;
+        wait_for(|| engine.reached_track_end()).await;
+        engine.finish_track().await;
+        assert_eq!(engine.snapshot().phase, "ended");
+        assert_eq!(engine.queue_view().items, queued);
+        assert_eq!(engine.queue_view().index, Some(0));
+
+        std::fs::rename(&path, dir.join("移走.m4a")).unwrap();
+        assert_eq!(engine.downloads()[0].state, "missing");
+        assert!(engine.play_local(&local.key).is_err());
+        assert_eq!(engine.snapshot().phase, "ended");
+        drop(engine);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -541,6 +605,7 @@ pub struct Engine {
     player: Mutex<Player>,
     queue: Mutex<Queue>,
     state: Mutex<PlayerState>,
+    local_track: Mutex<Option<TrackKey>>,
     known: Mutex<HashMap<String, Track>>,
     lyrics_cache: Mutex<HashMap<String, LyricDoc>>,
     token: AtomicU64,
@@ -574,20 +639,33 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(db_path: &std::path::Path) -> Result<Arc<Engine>, WireError> {
+    pub fn new(db_path: &Path) -> Result<Arc<Engine>, WireError> {
+        let engine = Self::open(db_path)?;
+        engine.start_session_refresh();
+        engine.restore_queue();
+        engine.restore_downloads();
+        engine.start_progress_persist();
+        engine.start_progress_report();
+        engine.start_cookie_persist();
+        engine.start_track_end_watch();
+        Ok(engine)
+    }
+
+    fn open(db_path: &Path) -> Result<Arc<Engine>, WireError> {
         let library = Library::open(db_path)?;
         let source = Source::new()?;
         let cookie_file = db_path.with_file_name("cookies.json");
         load_cookies(&source, &cookie_file);
         let player = Player::start().map_err(|e| WireError::internal(e.to_string()))?;
         let (events, _) = tokio::sync::broadcast::channel(256);
-        let engine = Arc::new(Engine {
+        Ok(Arc::new(Engine {
             cookie_file,
             source,
             library,
             player: Mutex::new(player),
             queue: Mutex::new(Queue::default()),
             state: Mutex::new(PlayerState::Idle),
+            local_track: Mutex::new(None),
             known: Mutex::new(HashMap::new()),
             lyrics_cache: Mutex::new(HashMap::new()),
             token: AtomicU64::new(0),
@@ -607,15 +685,7 @@ impl Engine {
             started_at: std::time::Instant::now(),
             last_transport_at: Mutex::new(std::time::Instant::now()),
             watch_gate: WatchGate::default(),
-        });
-        engine.start_session_refresh();
-        engine.restore_queue();
-        engine.restore_downloads();
-        engine.start_progress_persist();
-        engine.start_progress_report();
-        engine.start_cookie_persist();
-        engine.start_track_end_watch();
-        Ok(engine)
+        }))
     }
 
     /// 启动后异步补一次设备指纹与登录态。
@@ -774,9 +844,7 @@ impl Engine {
         Ok(tracks)
     }
 
-    /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
-    pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
-        self.discard_resume_for_other_track(Some(key));
+    fn begin_load(&self, track: &Track, local: bool) -> LoadToken {
         *lock(&self.last_transport_at) = std::time::Instant::now();
         *lock(&self.pending_prepared) = None;
         {
@@ -789,10 +857,18 @@ impl Engine {
         let token = self.next_token();
         {
             let mut st = lock(&self.state);
-            *st = std::mem::replace(&mut *st, PlayerState::Idle).begin_load(token, key.clone());
+            *lock(&self.local_track) = local.then(|| track.key.clone());
+            *st = std::mem::replace(&mut *st, PlayerState::Idle).begin_load(token, track.key.clone());
         }
-        self.queue.lock().unwrap_or_else(|e| e.into_inner()).jump_by_key(key);
+        token
+    }
+
+    /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
+    pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         let track = self.track_of(key)?;
+        self.discard_resume_for_other_track(Some(key));
+        lock(&self.queue).jump_by_key(key);
+        let token = self.begin_load(&track, false);
         self.emit(AppEvent::Buffering {
             track: track.clone(),
         });
@@ -847,6 +923,43 @@ impl Engine {
                 Err(err)
             }
         }
+    }
+
+    pub fn play_local(&self, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        let download = lock(&self.downloads)
+            .iter()
+            .find(|d| d.key == key.as_opaque() && matches!(d.state.as_str(), "done" | "missing"))
+            .cloned()
+            .ok_or_else(|| WireError::input("key", "这条记录还没有下载完成"))?;
+        let file = open_download_file(download.path.as_deref())
+            .ok_or_else(|| WireError::input("key", "本地音频无法读取，请重试下载"))?;
+        let track = self.track_of(key)?;
+        self.remember(&track);
+        self.watch_gate.cancel();
+        *lock(&self.mode) = crate::wire::PlayMode::Listen;
+        *lock(&self.watch_cid) = None;
+        let token = self.begin_load(&track, true);
+        if let Err(err) = self.load_media(Media::new(file)) {
+            let mut st = lock(&self.state);
+            *st = std::mem::replace(&mut *st, PlayerState::Idle)
+                .fail(crate::state::Fault::Decode(err.message().to_string()));
+            drop(st);
+            self.emit_state();
+            return Err(err);
+        }
+        *lock(&self.pending_prepared) = Some((
+            token,
+            Prepared {
+                quality: Quality::BEST,
+                duration: track.duration.unwrap_or(Millis::ZERO),
+            },
+        ));
+        self.emit_state();
+        Ok(self.snapshot())
+    }
+
+    fn is_local_track(&self, key: &TrackKey) -> bool {
+        lock(&self.local_track).as_ref() == Some(key)
     }
 
     /// 打开观看页。一次调用给齐画面需要的东西，前端看不到任何远端地址。
@@ -1282,15 +1395,7 @@ impl Engine {
         if !self.load_is_current(token) {
             return Err(WireError::internal("加载已过期，用户点了别的"));
         }
-        {
-            let player = lock(&self.player);
-            player.load(Media::new(media)).map_err(|e| WireError::internal(e.to_string()))?;
-            player.set_volume(*lock(&self.volume));
-            player.set_speed(*lock(&self.speed) as f64);
-            player.clock().set_speed(*lock(&self.speed) as f64);
-            // 不要在 load 之后 seek(0)：load 已经重置了时钟，再 seek 一次会在
-            // 音频线程刚开始推进时把帧计数打回 0，位置看起来像卡住。
-        }
+        self.load_media(Media::new(media))?;
         // load 之后再过一次：spawn_blocking 期间仍可能有新的打开插进来。
         // 这一拍已经写了写指针，用 stop 把声卡停住，别让旧音轨继续发声。
         if !self.load_is_current(token) {
@@ -1302,6 +1407,16 @@ impl Engine {
             quality,
             duration: detail.track.duration.unwrap_or(Millis(0)),
         })
+    }
+
+    fn load_media(&self, media: Media) -> Result<(), WireError> {
+        let player = lock(&self.player);
+        player.load(media).map_err(|e| WireError::internal(e.to_string()))?;
+        player.set_volume(*lock(&self.volume));
+        let speed = *lock(&self.speed) as f64;
+        player.set_speed(speed);
+        player.clock().set_speed(speed);
+        Ok(())
     }
 
     /// 按列表里的 key 组播放队列。
@@ -1338,6 +1453,10 @@ impl Engine {
     /// 队列是从快照恢复的，音频从未加载过；这种状态下 `player.play()` 是空操作，
     /// 用户点了播放键会觉得「点了没反应」。
     pub async fn toggle_or_load(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        let local = lock(&self.local_track).clone();
+        if let Some(key) = local.filter(|_| lock(&self.state).phase() == "ended") {
+            return self.play_local(&key);
+        }
         // 先取出 key 再 await：MutexGuard 不能跨 await 存活。
         let idle_key = {
             let idle = lock(&self.state).phase() == "idle";
@@ -1399,7 +1518,7 @@ impl Engine {
 
     pub async fn next(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
         // 单曲循环：播完重放同一首，而不是走到下一首。
-        if *lock(&self.repeat) == "one" {
+        if *lock(&self.repeat) == "one" && lock(&self.local_track).is_none() {
             let current = lock(&self.queue).current().map(|e| e.track.key.clone());
             if let Some(key) = current {
                 return self.play_key(&key).await;
@@ -1459,7 +1578,10 @@ impl Engine {
         let updated_resume = {
             let mut pending = lock(&self.pending_resume);
             match pending.as_mut() {
-                Some((key, at)) if track.as_ref().is_some_and(|track| &track.key == key) => {
+                Some((key, at))
+                    if track.as_ref().is_some_and(|track| &track.key == key)
+                        && !self.is_local_track(key) =>
+                {
                     *at = target;
                     true
                 }
@@ -1476,6 +1598,10 @@ impl Engine {
     /// 从头重播当前视频。结束态的 PlayerState 不保留解码准备信息，
     /// 单靠 seek(0) 回不到 playing，所以重新走一次 play_key。
     pub async fn replay(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        let local = lock(&self.local_track).clone();
+        if let Some(key) = local {
+            return self.play_local(&key);
+        }
         let key = lock(&self.queue).current().map(|e| e.track.key.clone());
         match key {
             Some(k) => {
@@ -1524,11 +1650,17 @@ impl Engine {
 
     pub fn snapshot(&self) -> PlayerSnapshot {
         let state = lock(&self.state).clone();
-        let track = self.snapshot_track(&state);
+        let mut track = self.snapshot_track(&state);
         let position_ms = track
             .as_ref()
             .map_or(0, |track| self.position_for(&track.key, state.track()));
-        let quality = state.prepared().map(|p| p.quality.kbps());
+        let local = lock(&self.local_track).is_some();
+        let quality = state.prepared().filter(|_| !local).map(|p| p.quality.kbps());
+        if local {
+            if let Some(track) = track.as_mut() {
+                track.cover = None;
+            }
+        }
         PlayerSnapshot {
             phase: state.phase().to_string(),
             duration_ms: track.as_ref().and_then(|t| t.duration).map(|d| d.0).unwrap_or(0),
@@ -1558,7 +1690,7 @@ impl Engine {
     }
 
     fn position_for(&self, key: &TrackKey, state_track: Option<&TrackKey>) -> u64 {
-        if let Some(at) = self.pending_resume_for(key) {
+        if let Some(at) = self.pending_resume_for(key).filter(|_| !self.is_local_track(key)) {
             at
         } else if state_track == Some(key) {
             lock(&self.player).clock().position_ms()
@@ -1581,7 +1713,7 @@ impl Engine {
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(5));
             let snapshot = engine.snapshot();
-            if snapshot.phase == "playing" {
+            if snapshot.phase == "playing" && lock(&engine.local_track).is_none() {
                 engine.persist_queue();
             }
         });
@@ -1615,6 +1747,9 @@ impl Engine {
                         continue;
                     }
                     let Some(track) = snapshot.track else { continue };
+                    if engine.is_local_track(&track.key) {
+                        continue;
+                    }
                     last_secs = secs;
                     // 失败只记一条追迹，不重试也不打扰用户
                     let result = rt.block_on(engine.source.report_progress(&track.key, secs, started));
@@ -1684,25 +1819,7 @@ impl Engine {
                         continue;
                     }
                     if engine.reached_track_end() {
-                        // 看模式下放完由观看页决定（重播 / 下一个 / 自动连播）。
-                        // 引擎自己跳下一首会让画面停在旧视频、声音换成另一条，
-                        // 结束面板也永远等不到 ended。
-                        if *lock(&engine.mode) == crate::wire::PlayMode::Watch {
-                            lock(&engine.player).pause();
-                            let mut st = lock(&engine.state);
-                            let current = std::mem::replace(&mut *st, PlayerState::Idle);
-                            *st = current.ended();
-                            drop(st);
-                            engine.emit_state();
-                            stalled = 0;
-                            continue;
-                        }
-                        // 真的唱完了：切下一首；失败就停在 ended，别空转
-                        if rt.block_on(engine.next()).is_err() {
-                            let mut st = lock(&engine.state);
-                            let current = std::mem::replace(&mut *st, PlayerState::Idle);
-                            *st = current.ended();
-                        }
+                        rt.block_on(engine.finish_track());
                         stalled = 0;
                         continue;
                     }
@@ -1712,7 +1829,7 @@ impl Engine {
                         stalled = 0;
                         continue;
                     }
-                    if !engine.stalled_midway() {
+                    if !engine.stalled_midway() || lock(&engine.local_track).is_some() {
                         stalled = 0;
                         continue;
                     }
@@ -1733,6 +1850,26 @@ impl Engine {
             });
         if let Err(e) = spawned {
             eprintln!("结束检测线程起不来: {e}");
+        }
+    }
+
+    async fn finish_track(self: &Arc<Self>) {
+        let local = lock(&self.local_track).clone();
+        let repeat_one = *lock(&self.repeat) == "one";
+        if let Some(key) = local.as_ref() {
+            if repeat_one && self.play_local(key).is_ok() {
+                return;
+            }
+        }
+        if local.is_some() || *lock(&self.mode) == crate::wire::PlayMode::Watch {
+            lock(&self.player).pause();
+            let mut st = lock(&self.state);
+            *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
+            drop(st);
+            self.emit_state();
+        } else if self.next().await.is_err() {
+            let mut st = lock(&self.state);
+            *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
         }
     }
 
@@ -1800,7 +1937,9 @@ impl Engine {
         };
         {
             let mut pending = lock(&self.pending_resume);
-            if pending.as_ref().is_some_and(|(key, _)| key == &track_key) {
+            if !self.is_local_track(&track_key)
+                && pending.as_ref().is_some_and(|(key, _)| key == &track_key)
+            {
                 *pending = None;
             }
         }
@@ -2433,6 +2572,9 @@ impl Engine {
                 return Ok(doc);
             }
         }
+        if self.is_local_track(key) {
+            return Ok(lyrics::from_local(&track).unwrap_or_else(LyricDoc::empty));
+        }
         // 本地 lrc 优先（用户自己放的更准）；没有就同时打 lrclib 和 B 站字幕。
         //
         // 早先是串行三级：lrclib 落空要等满它的超时，再去请求字幕，实测一首歌
@@ -2506,6 +2648,9 @@ impl Engine {
     }
 
     pub async fn danmaku_heat(&self, key: &TrackKey, buckets: usize) -> Result<Vec<u32>, WireError> {
+        if self.is_local_track(key) {
+            return Ok(Vec::new());
+        }
         Ok(self.source.danmaku_heat(key, buckets).await?)
     }
 
@@ -2514,6 +2659,9 @@ impl Engine {
     }
 
     pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, WireError> {
+        if self.is_local_track(key) {
+            return Ok(Vec::new());
+        }
         let tracks = self.source.related(key).await?;
         for t in &tracks {
             self.remember(t);
@@ -2635,7 +2783,11 @@ impl Engine {
     }
 
     pub fn downloads(&self) -> Vec<DownloadView> {
-        lock(&self.downloads).clone()
+        let mut views = lock(&self.downloads).clone();
+        for view in &mut views {
+            view.refresh_file_state();
+        }
+        views
     }
 
     /// 启动时把上次的下载记录装回来。文件已经不在的完成项标成 missing，
@@ -2769,8 +2921,9 @@ impl Engine {
                 item.progress = if state == "done" { 1.0 } else { 0.0 };
                 item.path = path_text;
                 item.error = error;
-                let snapshot = item.clone();
+                let mut snapshot = item.clone();
                 drop(list);
+                snapshot.refresh_file_state();
                 engine.emit(AppEvent::Download {
                     view: serde_json::to_value(&snapshot).unwrap_or(serde_json::Value::Null),
                 });
@@ -3019,24 +3172,38 @@ fn load_cookies(source: &Source, path: &std::path::Path) {
 /// 把一条落盘记录还原成界面状态。`missing` 只活在内存里：文件回来时
 /// 下次启动会自动恢复成 done，不必把磁盘的暂时状态写进库。
 fn restored_download(record: &StoredDownload) -> DownloadView {
-    let on_disk = record
-        .path
-        .as_deref()
-        .is_some_and(|path| std::path::Path::new(path).is_file());
     let (state, error) = match record.state.as_str() {
-        "done" if on_disk => ("done", record.error.clone()),
-        "done" => ("missing", record.error.clone()),
-        "failed" => ("failed", record.error.clone()),
+        state @ ("done" | "failed") => (state, record.error.clone()),
         _ => ("failed", Some("上次下载被中断".to_string())),
     };
-    DownloadView {
+    let mut view = DownloadView {
         key: record.key.as_opaque().to_string(),
         title: record.title.clone(),
         state: state.into(),
-        progress: if state == "done" { 1.0 } else { 0.0 },
+        progress: 0.0,
         path: record.path.clone(),
         error,
+    };
+    view.refresh_file_state();
+    view
+}
+
+impl DownloadView {
+    fn refresh_file_state(&mut self) {
+        if matches!(self.state.as_str(), "done" | "missing") {
+            let readable = open_download_file(self.path.as_deref()).is_some();
+            self.state = if readable { "done" } else { "missing" }.into();
+            self.progress = if readable { 1.0 } else { 0.0 };
+        }
     }
+}
+
+fn open_download_file(path: Option<&str>) -> Option<File> {
+    let path = Path::new(path?);
+    if !path.is_file() {
+        return None;
+    }
+    File::open(path).ok()
 }
 
 const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];

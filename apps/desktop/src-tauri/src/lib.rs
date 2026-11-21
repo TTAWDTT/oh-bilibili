@@ -391,6 +391,14 @@ async fn player_play(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+fn player_play_local(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<PlayerSnapshot, WireError> {
+    engine.play_local(&TrackKey::from_provider(key))
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn player_play_context(
     engine: tauri::State<'_, Arc<Engine>>,
     keys: Vec<String>,
@@ -1220,6 +1228,7 @@ pub fn run() {
             search_q,
             player_state,
             player_play,
+            player_play_local,
             player_play_context,
             player_pause,
             player_toggle,

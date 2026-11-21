@@ -2,6 +2,8 @@ import type { PlayerSnapshot, QueueView } from './contract'
 import { clamp } from './format'
 import { bool, num, str, strArray } from './mockArgs'
 import {
+  emit,
+  endPlayback,
   fail,
   playIndex,
   queueView,
@@ -27,6 +29,21 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       state.index = index
       playIndex(index)
       return snapshot()
+    }
+    case 'player_play_local': {
+      const key = str(args, 'key')
+      const download = state.downloads.find((item) => item.key === key)
+      if (download?.state !== 'done' || !download.path) {
+        throw fail('input', '本地音频无法读取，请重试下载')
+      }
+      state.localKey = key
+      state.mode = 'listen'
+      state.position = 0
+      state.duration = trackOf(key).duration_ms ?? 30_000
+      state.phase = 'playing'
+      const playing = snapshot()
+      emit({ type: 'state', snapshot: playing })
+      return playing
     }
     case 'player_play_context': {
       const keys = strArray(args, 'keys')
@@ -58,6 +75,10 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       return snapshot()
     }
     case 'player_next':
+      if (state.index === null && state.localKey) {
+        endPlayback()
+        return snapshot()
+      }
       if (state.index === null) throw fail('input', '播放队列是空的')
       step(1, true)
       return snapshot()
