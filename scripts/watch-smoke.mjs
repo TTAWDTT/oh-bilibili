@@ -1734,7 +1734,7 @@ async function main() {
     check(
       '700 宽仍能看到章节',
       await page.evaluate(
-        `[...document.querySelectorAll('h3')].some((el) => el.textContent.trim() === '章节' && el.getClientRects().length > 0)`,
+        `[...document.querySelectorAll('h3')].some((el) => el.textContent.trim() === '本集章节' && el.getClientRects().length > 0)`,
       ),
     )
     await page.viewport(1320, 900)
@@ -2065,10 +2065,8 @@ async function main() {
       multiVideo = await page.evaluate(`!!document.querySelector('video')`)
     }
     const switchedP2 = await page.evaluate(`(() => {
-      const picker = document.querySelector('button[aria-label="选集"]')
-      if (!picker) return false
-      picker.click()
-      const p2 = [...document.querySelectorAll('button')].find((b) =>
+      const panel = [...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)
+      const p2 = [...(panel?.querySelectorAll('ol li button') ?? [])].find((b) =>
         (b.textContent || '').includes('第二 P · 预览'))
       if (!p2) return false
       p2.click()
@@ -2167,8 +2165,6 @@ async function main() {
       contextOpened && contextMenuOpen && rightLinkClicked && rightLinkParams?.p === '2',
     )
 
-    await page.evaluate(`document.querySelector('button[aria-label="选集"]')?.click()`)
-    await sleep(300)
     const switchedP1 = await page.evaluate(`(() => {
       const panel = [...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)
       const first = panel?.querySelector('ol li button')
@@ -2242,7 +2238,7 @@ async function main() {
     await page.evaluate(`${visiblePanel}?.querySelector('ol li button')?.click()`)
     await sleep(1500)
     const picked = await page.evaluate(pageRows)
-    check('选中筛选结果才切到 P62', picked.header.includes('(62/80)'))
+    check('选中筛选结果才切到 P62', picked.header.includes('P62/80'))
     await page.evaluate(`${visiblePanel}?.querySelector('button[aria-label="清除筛选"]')?.click()`)
     await sleep(300)
     const cleared = await page.evaluate(pageRows)
@@ -2250,6 +2246,136 @@ async function main() {
       '清除筛选恢复 80 集并保留当前项标记',
       cleared.count === 80 && cleared.active.includes('P62'),
     )
+
+    // 目录：右栏首位、行内进度、当前集定位，以及中等窗口的同一个面板。
+    await page.viewport(1320, 900)
+    await sleep(500)
+    const railDirectory = await page.evaluate(`(() => {
+      const rail = document.querySelector('[data-watch-rail]')
+      const panel = [...document.querySelectorAll('[data-watch-pages]')].find((el) => el.getClientRects().length > 0)
+      const first = rail?.firstElementChild
+      const rows = panel ? [...panel.querySelectorAll('ol li')] : []
+      const current = rows.find((row) => row.querySelector('button[aria-pressed="true"]'))
+      const title = rows[0]?.querySelector('button > span:nth-child(2)')
+      return {
+        firstIsDirectory: !!panel && first === panel,
+        header: panel?.querySelector('h3')?.parentElement?.textContent?.trim() ?? '',
+        rows: rows.length,
+        currentText: current?.textContent?.trim() ?? '',
+        currentIcon: !!current?.querySelector('svg'),
+        chapters: [...document.querySelectorAll('h3')].map((h) => (h.textContent || '').trim()),
+        wraps: title ? getComputedStyle(title).whiteSpace !== 'nowrap' : false,
+      }
+    })()`)
+    check(
+      '右栏第一块是分 P 目录，标题带当前集与总数',
+      railDirectory.firstIsDirectory &&
+        railDirectory.rows === 80 &&
+        railDirectory.header.includes('本视频分 P') &&
+        railDirectory.header.includes('P62/80'),
+    )
+    check(
+      '当前集有选中态和播放图标，标题按行换行',
+      railDirectory.currentText.includes('P62') && railDirectory.currentIcon && railDirectory.wraps,
+    )
+    check('章节标题标明是本集内的时间点', railDirectory.chapters.includes('本集章节'))
+
+    await page.viewport(1000, 900)
+    await sleep(600)
+    const pickerEntry = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-haspopup="dialog"]')
+      return hit && hit.getClientRects().length > 0 ? hit.textContent.trim() : null
+    })()`)
+    check('中等窗口在播放器下方保留选集入口', !!pickerEntry && pickerEntry.includes('选集 · P62/80'))
+    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await sleep(500)
+    const sheet = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"]')
+      const panel = dialog?.querySelector('[data-watch-pages]')
+      const list = panel?.querySelector('ol')
+      const current = panel?.querySelector('li button[aria-pressed="true"]')
+      const listBox = list?.getBoundingClientRect()
+      const currentBox = current?.getBoundingClientRect()
+      return {
+        title: dialog?.getAttribute('aria-label') ?? '',
+        rows: panel?.querySelectorAll('ol li').length ?? 0,
+        inView: !!(
+          listBox &&
+          currentBox &&
+          currentBox.top >= listBox.top - 1 &&
+          currentBox.bottom <= listBox.bottom + 1
+        ),
+        onlyOne: [...document.querySelectorAll('[data-watch-pages]')].filter((el) => el.getClientRects().length > 0).length === 1,
+      }
+    })()`)
+    check(
+      '选集入口展开同一份目录，并让当前集落在视口里',
+      sheet.title === '选集' && sheet.rows === 80 && sheet.inView && sheet.onlyOne,
+    )
+    const dialogFits = async () =>
+      page.evaluate(`(() => {
+        const panel = document.querySelector('.modal-panel')
+        const close = panel?.querySelector('button[aria-label="关闭"]')
+        const box = panel?.getBoundingClientRect()
+        const closeBox = close?.getBoundingClientRect()
+        return {
+          top: box ? Math.round(box.top) : null,
+          bottom: box ? Math.round(box.bottom) : null,
+          closeTop: closeBox ? Math.round(closeBox.top) : null,
+          height: window.innerHeight,
+        }
+      })()`)
+    await page.viewport(380, 560)
+    await sleep(400)
+    const fits380 = await dialogFits()
+    check(
+      '380×560 选集弹窗完整落在视口内，关闭键可见',
+      fits380.top !== null && fits380.top >= 0 && fits380.bottom <= fits380.height && fits380.closeTop >= 0,
+    )
+    await page.viewport(900, 700)
+    await sleep(400)
+    const fits700 = await dialogFits()
+    check(
+      '900×700 选集弹窗完整落在视口内，关闭键可见',
+      fits700.top !== null && fits700.top >= 0 && fits700.bottom <= fits700.height && fits700.closeTop >= 0,
+    )
+    await page.viewport(1000, 900)
+    await sleep(400)
+    await page.keyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await sleep(400)
+    const afterEsc = await page.evaluate(`({
+      dialog: !!document.querySelector('[role="dialog"]'),
+      focused: document.activeElement?.getAttribute('aria-haspopup') ?? null,
+    })`)
+    check('关掉选集面板后焦点回到触发按钮', !afterEsc.dialog && afterEsc.focused === 'dialog')
+
+    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await sleep(400)
+    const switchedInSheet = await page.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"]')
+      const first = dialog?.querySelector('[data-watch-pages] ol li button')
+      if (!first) return false
+      first.click()
+      return true
+    })()`)
+    await sleep(1500)
+    const afterSheetSwitch = await page.evaluate(`(() => ({
+      dialog: !!document.querySelector('[role="dialog"]'),
+      trigger: document.querySelector('button[aria-haspopup="dialog"]')?.textContent?.trim() ?? '',
+    }))()`)
+    check(
+      '从目录里选定分 P 才切集，面板随即收起',
+      switchedInSheet && !afterSheetSwitch.dialog && afterSheetSwitch.trigger.includes('P1/80'),
+    )
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+    await sleep(1200)
+    const backToList = await page.evaluate(`({
+      list: [...document.querySelectorAll('button')].some((b) => (b.getAttribute('aria-label') || '').startsWith('观看')),
+      watch: !!document.querySelector('video'),
+    })`)
+    check('连续换集后一次返回回到入口列表', backToList.list && !backToList.watch)
+
 
     // 历史：按日排列的播放日志。时刻来自 played_at，进度来自 position_ms。
     await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?historyLong=1`)}`)
