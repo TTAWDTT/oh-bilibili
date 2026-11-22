@@ -8,6 +8,12 @@ type SliderProps = {
   step: number
   onChange: (value: number) => void
   onCommit: (value: number) => void
+  /** 手势被系统取消或指针捕获丢失：只清预览，不提交。 */
+  onCancel?: () => void
+  /** 悬停预览；不拖动时才有值，移出轨道为 null。 */
+  onHover?: (value: number | null) => void
+  /** 读屏读出的实际单位（时间、百分比），而不是 0–100 的比例。 */
+  ariaValueText?: string
   disabled?: boolean
   buffered?: number | null
   size?: 'sm' | 'md'
@@ -20,14 +26,15 @@ export function Slider({
   step,
   onChange,
   onCommit,
+  onCancel,
+  onHover,
+  ariaValueText,
   disabled = false,
   buffered = null,
   size = 'md',
 }: SliderProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
-  const latest = useRef(value)
-  latest.current = value
 
   const ratioAt = (clientX: number): number => {
     const rect = trackRef.current?.getBoundingClientRect()
@@ -44,7 +51,10 @@ export function Slider({
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (!dragging.current) return
+    if (!dragging.current) {
+      onHover?.(ratioAt(event.clientX))
+      return
+    }
     onChange(ratioAt(event.clientX))
   }
 
@@ -63,7 +73,13 @@ export function Slider({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    onCommit(latest.current)
+    onCancel?.()
+  }
+
+  const onLostPointerCapture = (): void => {
+    if (!dragging.current) return
+    dragging.current = false
+    onCancel?.()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -93,11 +109,16 @@ export function Slider({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(value * 100)}
+      aria-valuetext={ariaValueText}
       aria-disabled={disabled}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onLostPointerCapture}
+      onPointerLeave={() => {
+        if (!dragging.current) onHover?.(null)
+      }}
       onKeyDown={onKeyDown}
       className={[
         'group relative flex touch-none items-center rounded-full',

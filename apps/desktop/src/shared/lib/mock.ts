@@ -1223,7 +1223,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       await sleep(250)
       // ?followFail=1 专门用来看失败后重试的就地状态。
       if (new URLSearchParams(window.location.search).get('followFail') === '1') {
-        throw fail('network', '预览：关注请求失败')
+        throw fail('internal', '预览：关注请求失败')
       }
       return null
     case 'relation_followed':

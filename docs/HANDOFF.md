@@ -294,6 +294,10 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     「从此刻分享」会清掉旧反馈；微信提示改成面板内一行文字，不再弹全局 Toast。作者页关注按钮显示「处理中…」，
     失败留在按钮上「重试关注」，成功后直接变「已关注」，不再额外弹一次相同的成功提示；迟到的响应只落到发起时的
     作者。跨页任务（下载等）仍走 ToastHost。
+87. **拖动进度先预览后提交**：共享 Slider 悬停回报数值、松手只提交一次；`pointercancel` 与指针捕获丢失只清预览，
+    不再提交用户没确认的位置；换曲目/重载清单时 Slider 重新挂载，旧手势不会落到新曲目。PlaybackProgress 在轨道上方
+    显示悬停/聚焦/拖动目标时间（两端夹在轨道内），读屏 `aria-valuetext` 是实际时间而不是百分比；PlayerBar 改成
+    `overflow-x-clip`，时间标签能露到播放条上方。音量条仍在各自单位（百分比）反馈。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、

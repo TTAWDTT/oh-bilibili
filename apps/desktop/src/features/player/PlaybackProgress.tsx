@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { formatTime } from '../../shared/lib/format'
+import { clamp, formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
 import * as ipc from '../../shared/lib/ipc'
 import { Slider } from '../../shared/ui/Slider'
@@ -12,6 +12,9 @@ export function PlaybackProgress() {
   const duration = snapshot?.duration_ms ?? 0
   const [now, setNow] = useState(() => readPlayhead())
   const [scrub, setScrub] = useState<number | null>(null)
+  /** 悬停/聚焦时的时间预览；拖动时以 scrub 为准。 */
+  const [hover, setHover] = useState<number | null>(null)
+  const [focused, setFocused] = useState(false)
   const [heat, setHeat] = useState<number[]>([])
   const trackKey = snapshot?.local ? null : (snapshot?.track?.key ?? null)
 
@@ -39,7 +42,14 @@ export function PlaybackProgress() {
     return () => window.clearInterval(timer)
   }, [])
 
+  // 换曲目/重载清单时，上一首的拖动手势和预览都不能留到新曲目上。
+  useEffect(() => {
+    setScrub(null)
+    setHover(null)
+  }, [trackKey, duration])
+
   const ratio = scrub ?? (duration > 0 ? Math.min(1, now / duration) : 0)
+  const preview = scrub ?? hover ?? (focused ? ratio : null)
 
   const commit = (value: number): void => {
     if (duration <= 0) return
@@ -58,7 +68,19 @@ export function PlaybackProgress() {
       <span className="num w-9 shrink-0 text-right font-mono text-[11px] text-[var(--text-3)]">
         {formatTime(scrub === null ? now : scrub * duration)}
       </span>
-      <div className="relative min-w-0 flex-1">
+      <div
+        className="relative min-w-0 flex-1"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      >
+        {preview !== null && duration > 0 ? (
+          <span
+            className="num pointer-events-none absolute bottom-full z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-[3px] bg-black/80 px-1.5 py-0.5 font-mono text-[11px] leading-4 text-white"
+            style={{ left: `${clamp(preview, 0.05, 0.95) * 100}%` }}
+          >
+            {formatTime(preview * duration)}
+          </span>
+        ) : null}
         {/* 高能进度条：弹幕越密的地方越亮，和 B 站播放器一致 */}
         {peak > 0 ? (
           <div className="pointer-events-none absolute -bottom-[3px] left-0 flex h-[3px] w-full items-end gap-px">
@@ -72,11 +94,15 @@ export function PlaybackProgress() {
           </div>
         ) : null}
         <Slider
+          key={trackKey ?? 'local'}
           value={ratio}
           label="播放进度"
           step={0.01}
           onChange={setScrub}
           onCommit={commit}
+          onCancel={() => setScrub(null)}
+          onHover={setHover}
+          ariaValueText={formatTime(ratio * duration)}
           disabled={duration <= 0}
         />
       </div>

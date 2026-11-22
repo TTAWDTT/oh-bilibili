@@ -158,7 +158,8 @@ export function PlayerBar() {
 
   return (
     // 三等分列宽让控制区真正落在窗口中线，两侧对称才不会显得偏。
-    <section className="relative z-20 flex h-14 shrink-0 items-center gap-2 overflow-hidden border-t border-hairline bg-[var(--panel)] px-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] md:gap-6">
+    /* 只裁横向：进度条的悬停时间标签要能露到播放条上方，不能被整条裁掉。 */
+    <section className="relative z-20 flex h-14 shrink-0 items-center gap-2 overflow-x-clip border-t border-hairline bg-[var(--panel)] px-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(340px,1.7fr)_minmax(0,1fr)] md:gap-6">
       <AddToPlaylistModal track={track} open={adding} onClose={() => setAdding(false)} />
       <TrackInfo track={track} quality={snapshot?.quality_kbps ?? null} />
 
