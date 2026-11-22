@@ -7,7 +7,7 @@ import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
-import { Mascot2233 } from '../../shared/ui/Mascot2233'
+import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -26,6 +26,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const focusSearch = useAppStore((state) => state.focusSearch)
+  const navigate = useAppStore((state) => state.navigate)
   const searchFor = useAppStore((state) => state.setHeroQuery)
   const me = useAuthStore((state) => state.auth?.user ?? null)
   const [followed, setFollowed] = useState(false)
@@ -37,6 +38,13 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const [order, setOrder] = useState<'pubdate' | 'click' | 'stow'>('pubdate')
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
+  /**
+   * 页首展示的那一件作品。只在第一次拿到投稿时定下来：
+   * 切排序、翻页都不许换图，否则整页会跟着跳。
+   */
+  const [hero, setHero] = useState<Track | null>(null)
+  /** 页首作品属于哪个作者：换作者才重置，换排序不动。 */
+  const heroOwner = useRef<string | null>(null)
   const scroller = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
 
@@ -96,6 +104,16 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     setPage(1)
     setIsFallback(false)
     scroller.current?.scrollTo({ top: 0 })
+    const owner = `${mid ?? 'name'}:${name}`
+    if (heroOwner.current !== owner) {
+      heroOwner.current = owner
+      setHero(null)
+    }
+    /** 第一次拿到这一页投稿时定下页首作品；之后换排序、翻页都不再动它。 */
+    const pickHero = (list: Track[]): void => {
+      if (heroOwner.current !== owner) return
+      setHero((current) => current ?? list[0] ?? null)
+    }
     if (mid) {
       void ipc
         .spaceVideos(mid, 1, order)
@@ -103,6 +121,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
           if (cancelled) return
           setTracks(list)
           setTotal(total)
+          pickHero(list)
         })
         .catch(() => {
           // 空间接口不通时退回搜索聚合，并在界面上标注
@@ -111,7 +130,10 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
           void ipc
             .searchQ(name, 1)
             .then((list) => {
-              if (!cancelled) setTracks(list.filter((t) => t.up_mid === mid))
+              if (cancelled) return
+              const matched = list.filter((t) => t.up_mid === mid)
+              setTracks(matched)
+              pickHero(matched)
             })
             .catch(() => {
               if (!cancelled) setTracks([])
@@ -126,7 +148,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       .then((list) => {
         if (cancelled) return
         setIsFallback(true)
-        setTracks(list.filter((t) => t.artist === name))
+        const matched = list.filter((t) => t.artist === name)
+        setTracks(matched)
+        pickHero(matched)
       })
       .catch(() => {
         if (!cancelled) setTracks([])
@@ -203,108 +227,132 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       id="scroll-main"
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
-      <header className="mb-6 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <div
-          className="relative h-[88px] overflow-hidden rounded-t-[7px]"
-          style={{
-            background: 'linear-gradient(115deg, color-mix(in srgb, var(--accent) 23%, white), color-mix(in srgb, var(--accent) 8%, white) 48%, color-mix(in srgb, var(--accent) 20%, white))',
-          }}
-        >
-          <Mascot2233 height={176} className="pointer-events-none absolute -bottom-[62px] -right-3 opacity-15 sm:right-5" />
-        </div>
-        <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
-          <div className="relative -mt-9 shrink-0 rounded-full bg-white p-[4px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_25%,white),0_3px_12px_color-mix(in oklab, var(--accent) 18%, transparent)]">
-            <Avatar src={avatar} alt={name} size={88} bordered={false} />
-          </div>
-          <div className="min-w-0 max-w-full flex-[1_1_240px] pt-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div className="flex min-w-0 max-w-full items-center gap-2">
-                <h2 className="truncate text-[26px] font-semibold text-[var(--text-1)]" title={name}>
-                  {name}
-                </h2>
-                {card ? <LevelBadge level={card.level} /> : null}
+      <header className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="grid min-w-0 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+          {/* 左半：作者本人。渐变只留头像后面一小块，不再用整条装饰吃掉首屏高度。 */}
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex min-w-0 items-start gap-4">
+              <div
+                className="shrink-0 rounded-full p-[3px]"
+                style={{ background: 'color-mix(in srgb, var(--accent) 22%, white)' }}
+              >
+                <Avatar src={avatar} alt={name} size={72} bordered={false} />
               </div>
-              {isSelf ? null : (
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                  {/* B 站空间页的按钮：充电与消息是描边，关注是实心。 */}
-                  {mid ? (
-                    <>
-                      <button
-                        type="button"
-                        title="去 B 站给 UP 主充电"
-                        onClick={() =>
-                          void ipc
-                            .openExternal(`https://space.bilibili.com/${mid}`)
-                            .catch((cause) => toastFailure('打开充电页', cause))
-                        }
-                        className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                      >
-                        <Icon name="battery" size={14} />
-                        充电
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void ipc
-                            .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
-                            .catch((cause) => toastFailure('打开私信', cause))
-                        }
-                        className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                      >
-                        <Icon name="message" size={14} />
-                        发消息
-                      </button>
-                    </>
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <h2 className="truncate text-[24px] font-semibold text-[var(--text-1)]" title={name}>
+                    {name}
+                  </h2>
+                  {card ? <LevelBadge level={card.level} /> : null}
+                  {card?.official ? (
+                    <span className="inline-flex max-w-full items-center rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
+                      {card.official}
+                    </span>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void follow()}
-                    className={[
-                      't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                      followed
-                        ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                        : 'bg-[var(--accent)] text-white hover:opacity-90',
-                    ].join(' ')}
-                  >
-                    <Icon name={followed ? 'check' : 'plus'} size={14} />
-                    {followed ? '已关注' : '关注'}
-                  </button>
                 </div>
-              )}
+                {card?.sign ? (
+                  <p className="mt-1.5 line-clamp-2 break-words text-[13px] text-[var(--text-2)]" title={card.sign}>
+                    {card.sign}
+                  </p>
+                ) : null}
+                <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--text-3)]">
+                  {card ? (
+                    <>
+                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>
+                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span>
+                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{tracks.length} 个投稿</span>
+                      <span>{formatCount(views)} 累计播放</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-            {card?.official ? (
-              <span className="mt-2 inline-flex max-w-full items-center gap-1 break-words rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
-                {card.official}
-              </span>
-            ) : null}
-            {card?.sign ? (
-              <p className="mt-2 line-clamp-2 break-words text-[13px] text-[var(--text-2)]" title={card.sign}>
-                {card.sign}
-              </p>
-            ) : null}
-            <div className="num mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[var(--text-3)]">
-              {card ? (
-                <>
-                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>
-                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span>
-                  <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>
-                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px]">
-                    {isFallback
-                      ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
-                      : `共 ${formatCount(total)} 个投稿`}
+            {isSelf ? null : (
+              <div className="flex flex-wrap items-center gap-2">
+                {mid ? (
+                  <>
+                    <button
+                      type="button"
+                      title="去 B 站给 UP 主充电"
+                      onClick={() =>
+                        void ipc
+                          .openExternal(`https://space.bilibili.com/${mid}`)
+                          .catch((cause) => toastFailure('打开充电页', cause))
+                      }
+                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                      <Icon name="battery" size={14} />
+                      充电
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void ipc
+                          .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
+                          .catch((cause) => toastFailure('打开私信', cause))
+                      }
+                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    >
+                      <Icon name="message" size={14} />
+                      发消息
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void follow()}
+                  className={[
+                    't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
+                    followed
+                      ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                      : 'bg-[var(--accent)] text-white hover:opacity-90',
+                  ].join(' ')}
+                >
+                  <Icon name={followed ? 'check' : 'plus'} size={14} />
+                  {followed ? '已关注' : '关注'}
+                </button>
+                {isFallback ? (
+                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
+                    空间接口不可用，下方是搜索结果里的 {tracks.length} 个
                   </span>
-                </>
-              ) : (
-                <>
-                  <span>{tracks.length} 个投稿</span>
-                  <span>{formatCount(views)} 累计播放</span>
-                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 leading-[18px]">
-                    来自搜索结果，不是完整投稿列表
-                  </span>
-                </>
-              )}
-            </div>
+                ) : card ? (
+                  <span className="num text-[12px] text-[var(--text-3)]">共 {formatCount(total)} 个投稿</span>
+                ) : null}
+              </div>
+            )}
           </div>
+
+          {hero ? (
+            <button
+              type="button"
+              data-author-hero
+              data-focus-key={hero.key}
+              onClick={() => navigate({ kind: 'watch', track: hero })}
+              className="group flex min-w-0 items-stretch gap-3 text-left lg:flex-col lg:gap-0"
+            >
+              <span
+                className="relative w-[132px] shrink-0 overflow-hidden rounded-[6px] border border-[var(--line)] sm:w-[176px] lg:w-full"
+                style={{ aspectRatio: '16 / 9' }}
+              >
+                <Cover cover={hero.cover} title={hero.title} width={520} className="h-full w-full" />
+                <span className="absolute left-2 top-2 rounded-[3px] bg-black/60 px-1.5 py-0.5 text-[11px] text-white">
+                  {isFallback ? '搜索结果' : '近期投稿'}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 rounded-b-[6px] bg-[var(--panel-raised)] px-3 py-2 lg:rounded-b-[6px] lg:rounded-t-none">
+                <span className="line-clamp-2 text-[14px] font-medium leading-[20px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                  {hero.title}
+                </span>
+                <span className="num text-[12px] text-[var(--text-3)]">
+                  {formatCount(hero.views ?? 0)} 播放
+                </span>
+              </span>
+            </button>
+          ) : null}
         </div>
       </header>
 

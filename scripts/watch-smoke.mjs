@@ -1440,6 +1440,74 @@ async function checkRailScope(page) {
   await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
 }
 
+/** UP 主空间：页首一半是作者、一半是一件真实投稿，切排序不换图。 */
+async function checkAuthorHero(page) {
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4500)
+  await page.evaluate(`document.querySelector('[data-track-card] button[aria-label^="观看"]')?.click()`)
+  await sleep(2500)
+  await page.evaluate(`(() => {
+    const owner = [...document.querySelectorAll('button')]
+      .find((button) => (button.getAttribute('aria-label') || '').startsWith('看 '))
+    owner?.click()
+  })()`)
+  let ready = false
+  for (let i = 0; i < 30 && !ready; i += 1) {
+    await sleep(300)
+    ready = await page.evaluate(`!!document.querySelector('[data-author-hero]')`)
+  }
+  const wide = await page.evaluate(`(() => {
+    const header = document.querySelector('header')
+    const hero = document.querySelector('[data-author-hero]')
+    const row = document.querySelector('#scroll-main [data-track-card]')
+    const cover = hero?.querySelector('span[style*="16 / 9"]')
+    return {
+      header: header ? Math.round(header.getBoundingClientRect().height) : 0,
+      title: (hero?.textContent || '').trim(),
+      heroWidth: hero ? Math.round(hero.getBoundingClientRect().width) : 0,
+      headerWidth: header ? Math.round(header.getBoundingClientRect().width) : 0,
+      cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
+      coverHeight: cover ? Math.round(cover.getBoundingClientRect().height) : 0,
+      firstRow: row ? Math.round(row.getBoundingClientRect().top) : null,
+      scrollable: document.getElementById('scroll-main')?.scrollHeight ?? 0,
+    }
+  })()`)
+  check(
+    `UP 主页首右侧是真实投稿，首行在桌面高度内露出来 ${JSON.stringify(wide)}`,
+    ready && wide.header > 0 && wide.header <= 420 &&
+      wide.heroWidth > 0 && wide.heroWidth <= wide.headerWidth / 2 + 8 &&
+      Math.abs(wide.cover * 9 - wide.coverHeight * 16) <= wide.cover * 2 &&
+      wide.firstRow !== null && wide.firstRow < 900,
+  )
+  const beforeSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多播放')
+    hit?.click()
+  })()`)
+  await sleep(1500)
+  const afterSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
+  check('切换排序不换页首作品', !!beforeSort && afterSort === beforeSort)
+
+  await page.viewport(380, 820)
+  await sleep(600)
+  const narrow = await page.evaluate(`(() => {
+    const hero = document.querySelector('[data-author-hero]')
+    const box = document.getElementById('scroll-main')
+    const cover = hero?.querySelector('span[style*="16 / 9"]')
+    return {
+      hero: !!hero,
+      cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
+      overflow: box ? box.scrollWidth - box.clientWidth : null,
+    }
+  })()`)
+  check(
+    '窄窗先作者后紧凑作品，不横向溢出',
+    narrow.hero && narrow.cover > 0 && narrow.cover <= 180 && narrow.overflow !== null && narrow.overflow <= 0,
+  )
+  await page.viewport(1320, 900)
+}
+
 async function checkShellBreakpoints(page) {
   await page.viewport(768, 800)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
@@ -1729,6 +1797,7 @@ async function main() {
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
     await checkHeroAllocation(page)
+    await checkAuthorHero(page)
     await checkHomeResume(page)
     await checkNavConventions(page)
     await checkRanking(page)
