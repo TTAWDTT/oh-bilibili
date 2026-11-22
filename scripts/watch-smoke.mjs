@@ -12,6 +12,7 @@ const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
 const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const libraryPartialOnly = process.argv.includes('--library-partial')
 const channelOnly = process.argv.includes('--channel-nav')
+const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
@@ -2716,6 +2717,493 @@ async function checkAuthorHero(page) {
   await page.viewport(1320, 900)
 }
 
+/**
+ * 关注目录：全量索引、跨页搜索、关系筛选、失败续查、换账号、作品返回与窄窗。
+ */
+async function checkFollowingDirectory(page) {
+  const waitFor = async (expression, timeout = 6000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(120)
+    }
+    return false
+  }
+  const openFollowing = async (params = {}) => {
+    const url = new URL(WEB)
+    url.searchParams.set('loggedIn', '1')
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
+    await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+    await sleep(900)
+    await waitFor(`!!document.querySelector('nav[aria-label="主导航"]')`, 10000)
+    const clicked = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '关注') : null
+      hit?.click()
+      return !!hit
+    })()`)
+    await waitFor(`!!document.querySelector('[data-following-directory]')`, 10000)
+    return clicked
+  }
+  const setInput = async (value) => {
+    const ok = await page.evaluate(`(() => {
+      const input = document.querySelector('[data-following-search]')
+      if (!input) return false
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      setter.call(input, ${JSON.stringify(value)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    await sleep(700)
+    return ok
+  }
+  const setFilter = async (value) => {
+    const ok = await page.evaluate(`(() => {
+      const hit = document.querySelector('[data-following-filter=${JSON.stringify(value)}]')
+      hit?.click()
+      return !!hit
+    })()`)
+    await sleep(500)
+    return ok
+  }
+  const rows = () =>
+    page.evaluate(
+      `[...document.querySelectorAll('[data-following-author]')].map((b) => ({ mid: b.dataset.followingAuthor, name: b.innerText.split('\\n')[1], text: b.innerText }))`,
+    )
+  const detail = () =>
+    page.evaluate(`(() => {
+      const preview = document.querySelector('[data-following-preview]')
+      return {
+        mid: preview?.dataset.authorMid ?? null,
+        works: [...document.querySelectorAll('[data-following-work]')].map((b) => b.dataset.followingWorkMid),
+        progress: document.querySelector('[data-following-progress]')?.innerText ?? '',
+        focus: document.activeElement?.getAttribute('data-focus-id') ?? '',
+        query: document.querySelector('[data-following-search]')?.value ?? '',
+        filters: [...document.querySelectorAll('[data-following-filter]')].map((b) => b.innerText),
+      }
+    })()`)
+  const unique = async () => {
+    const list = await rows()
+    return { count: list.length, mids: new Set(list.map((row) => row.mid)).size }
+  }
+  const startErrors = page.runtimeErrors.length
+
+  await page.viewport(1320, 900)
+  check('打开关注目录', await openFollowing())
+  check(
+    '不预滚动就读完全部 320 个关注',
+    await waitFor(
+      `document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '320' && !document.querySelector('[data-following-progress]')`,
+      20000,
+    ),
+  )
+  const initial = await page.evaluate(`(() => {
+    const root = document.querySelector('[data-following-directory]')
+    return {
+      loaded: root?.dataset.followingLoaded,
+      total: root?.dataset.followingTotal,
+      scrollTop: root?.scrollTop,
+      search: !!document.querySelector('[data-following-search]'),
+      filters: [...document.querySelectorAll('[data-following-filter]')].map((b) => b.innerText),
+    }
+  })()`)
+  const initialRows = await unique()
+  check(
+    `目录首屏显示搜索与关系筛选 ${JSON.stringify(initial)}`,
+    initial.loaded === '320' && initial.total === '320' && initial.scrollTop === 0 &&
+      initial.search && initial.filters[0]?.includes('320'),
+  )
+  check(
+    `320 人按 mid 去重 ${JSON.stringify(initialRows)}`,
+    initialRows.count === 320 && initialRows.mids === 320,
+  )
+
+  await setInput('混音')
+  const hitWord = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 1 && document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5285'`,
+  )
+  await setFilter('mutual')
+  const hitMutual = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 1 && document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5285'`,
+  )
+  const narrowed = await detail()
+  check(
+    `不滚到末页也能搜到第 286 人并和互关组合 ${JSON.stringify(narrowed)}`,
+    hitWord && hitMutual && narrowed.filters[2]?.includes('1'),
+  )
+  check(
+    '选中作者的预览只显示他自己的投稿',
+    (await waitFor(
+      `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5285' && document.querySelectorAll('[data-following-work]').length > 0`,
+    )) && (await detail()).works.every((mid) => mid === '5285'),
+  )
+
+  await setFilter('all')
+  await setInput('  lOfI  ')
+  const lofi = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 1 && document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5100'`,
+  )
+  await setInput('  cHiLl  ')
+  const chill = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 1 && document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5100'`,
+  )
+  check('英文大小写混排与前后空格仍能命中昵称和签名', lofi && chill)
+
+  await setInput('同名作者')
+  const twins = await waitFor(`document.querySelectorAll('[data-following-author]').length === 2`)
+  const twinRows = await rows()
+  await page.evaluate(`document.querySelector('[data-following-author="5010"]')?.click()`)
+  const firstTwin = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5010'`,
+  )
+  await page.evaluate(`document.querySelector('[data-following-author="5300"]')?.click()`)
+  const secondTwin = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5300'`,
+  )
+  check(
+    `同名作者按 mid 区分 ${JSON.stringify(twinRows.map((row) => row.mid))}`,
+    twins && twinRows.length === 2 && twinRows[0]?.mid === '5010' && twinRows[1]?.mid === '5300' &&
+      firstTwin && secondTwin,
+  )
+
+  await setInput('')
+  await waitFor(`document.querySelectorAll('[data-following-author]').length === 320`)
+  const keyboard = await page.evaluate(`(() => {
+    const all = [...document.querySelectorAll('[data-following-author]')]
+    all[0]?.focus()
+    all[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    return { first: all[0]?.dataset.followingAuthor, second: all[1]?.dataset.followingAuthor, focus: document.activeElement?.dataset.followingAuthor }
+  })()`)
+  await sleep(100)
+  const keyboardFocus = await page.evaluate(
+    `document.activeElement?.dataset.followingAuthor ?? ''`,
+  )
+  check(
+    `键盘方向键在名单里连续移动 ${JSON.stringify(keyboard)} → ${keyboardFocus}`,
+    keyboard.second === keyboardFocus && keyboardFocus !== keyboard.first,
+  )
+  const overflow = await page.evaluate(`(() => {
+    const root = document.querySelector('[data-following-directory]')
+    return root ? root.scrollWidth - root.clientWidth : -1
+  })()`)
+  check('长名单不横向溢出', overflow !== null && overflow <= 0)
+
+  await setInput('长到可以')
+  const longReady = await waitFor(
+    `document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5050'`,
+  )
+  const longRow = await page.evaluate(`(() => {
+    const button = document.querySelector('[data-following-author="5050"]')
+    return button ? { height: Math.round(button.getBoundingClientRect().height), text: button.innerText } : null
+  })()`)
+  check(
+    `长昵称和无签名只收紧行高 ${JSON.stringify(longRow)}`,
+    longReady && longRow && longRow.height <= 64 && !longRow.text.includes('这个人很神秘'),
+  )
+  await page.evaluate(`document.querySelector('[data-following-author="5050"]')?.click()`)
+  const longDetail = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5050'`,
+  )
+  check('无签名的作者预览不留空行', longDetail)
+
+  await setInput('没有投稿')
+  const emptyReady = await waitFor(
+    `document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5051'`,
+  )
+  await page.evaluate(`document.querySelector('[data-following-author="5051"]')?.click()`)
+  const emptyDetail = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5051' && document.body.innerText.includes('暂无近期投稿')`,
+  )
+  check(
+    '无投稿作者仍有进入空间的出口',
+    emptyReady && emptyDetail &&
+      (await page.evaluate(`!!document.querySelector('[data-following-space]')?.getClientRects().length`)),
+  )
+
+  await setInput('关注作者')
+  await waitFor(`document.querySelectorAll('[data-following-author]').length > 100`)
+  await page.evaluate(`document.getElementById('scroll-main').scrollTop = 500`)
+  await sleep(250)
+  const beforeWork = await page.evaluate(`Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0)`)
+  await page.evaluate(`document.querySelector('[data-following-author="5011"]')?.click()`)
+  await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5011' && document.querySelectorAll('[data-following-work]').length > 0`,
+  )
+  await page.evaluate(`document.querySelector('[data-following-work]')?.click()`)
+  await waitFor(`!!document.querySelector('button[aria-label="返回"]')`, 10000)
+  await sleep(800)
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  const workBack = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5011'`,
+    10000,
+  )
+  await sleep(800)
+  const afterWork = await page.evaluate(`(() => ({
+    query: document.querySelector('[data-following-search]')?.value ?? '',
+    relation: document.querySelector('[data-following-filter="all"]')?.getAttribute('aria-pressed'),
+    mid: document.querySelector('[data-following-preview]')?.dataset.authorMid ?? '',
+    top: Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0),
+    focus: document.activeElement?.getAttribute('data-focus-id') ?? '',
+  }))()`)
+  check(
+    `作品返回恢复搜索、关系、作者、锚点和焦点 ${JSON.stringify({ beforeWork, afterWork })}`,
+    workBack && afterWork.query === '关注作者' && afterWork.relation === 'true' &&
+      afterWork.mid === '5011' && Math.abs(afterWork.top - beforeWork) <= 80 &&
+      afterWork.focus.startsWith('following-work:'),
+  )
+
+  await page.evaluate(`document.querySelector('[data-following-space]')?.click()`)
+  const space = await waitFor(
+    `document.querySelector('header[data-up-mid]')?.dataset.upMid === '5011'`,
+    10000,
+  )
+  check(
+    '从预览进入的作者空间就是当前作者',
+    space && (await page.evaluate(`document.querySelector('header h2')?.textContent?.trim() ?? ''`)) === '关注作者 12',
+  )
+  await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '关注') : null
+    hit?.click()
+  })()`)
+  const reentered = await waitFor(
+    `document.querySelector('[data-following-directory]')` + ` && document.querySelector('[data-following-preview]')?.dataset.authorMid === '5011'`,
+    10000,
+  )
+  check(
+    '再次进入目录仍回到原作者',
+    reentered && (await page.evaluate(`document.querySelector('[data-following-search]')?.value ?? ''`)) === '关注作者',
+  )
+
+  await page.viewport(390, 760)
+  await sleep(700)
+  const narrowInitial = await page.evaluate(`(() => ({
+    preview: document.querySelector('[data-following-preview]')?.dataset.authorMid ?? '',
+    back: !!document.querySelector('[data-following-back]'),
+  }))()`)
+  await page.evaluate(`document.querySelector('[data-following-back]')?.click()`)
+  await sleep(500)
+  const narrowList = await page.evaluate(`(() => ({
+    list: [...document.querySelectorAll('[data-following-author]')].some((b) => b.getClientRects().length > 0),
+    preview: !!document.querySelector('[data-following-preview]'),
+  }))()`)
+  check(
+    `窄窗保留选中作者并可返回名单 ${JSON.stringify({ narrowInitial, narrowList })}`,
+    narrowInitial.preview === '5011' && narrowInitial.back &&
+      narrowList.list && !narrowList.preview,
+  )
+  await page.evaluate(`document.querySelector('[data-following-author="5011"]')?.click()`)
+  const narrowOpen = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5011' && document.querySelectorAll('[data-following-work]').length > 0`,
+    10000,
+  )
+  const narrowDetail = await page.evaluate(`(() => ({
+    list: [...document.querySelectorAll('[data-following-author]')].some((b) => b.getClientRects().length > 0),
+    back: !!document.querySelector('[data-following-back]'),
+    space: !!document.querySelector('[data-following-space]'),
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  }))()`)
+  check(
+    `窄窗预览有独立返回与进入空间 ${JSON.stringify(narrowDetail)}`,
+    narrowOpen && !narrowDetail.list && narrowDetail.back && narrowDetail.space && narrowDetail.overflow <= 0,
+  )
+  await page.evaluate(`document.querySelector('[data-following-work]')?.click()`)
+  await waitFor(`!!document.querySelector('button[aria-label="返回"]')`, 10000)
+  await sleep(800)
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  const narrowBack = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5011'`,
+    10000,
+  )
+  await sleep(800)
+  const narrowRestored = await page.evaluate(`(() => ({
+    query: document.querySelector('[data-following-search]')?.value ?? '',
+    mid: document.querySelector('[data-following-preview]')?.dataset.authorMid ?? '',
+    focus: document.activeElement?.getAttribute('data-focus-id') ?? '',
+    list: [...document.querySelectorAll('[data-following-author]')].some((b) => b.getClientRects().length > 0),
+  }))()`)
+  check(
+    `窄窗作品返回仍在原作者预览 ${JSON.stringify(narrowRestored)}`,
+    narrowBack && narrowRestored.query === '关注作者' && narrowRestored.mid === '5011' &&
+      !narrowRestored.list && narrowRestored.focus.startsWith('following-work:'),
+  )
+  await page.evaluate(`document.querySelector('[data-following-space]')?.click()`)
+  check(
+    '窄窗进入空间仍是当前作者',
+    await waitFor(`document.querySelector('header[data-up-mid]')?.dataset.upMid === '5011'`, 10000),
+  )
+
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+  await sleep(1200)
+  await waitFor(`!!document.querySelector('nav[aria-label="主要导航"]')`, 10000)
+  const toMine = await page.clickExactText('我的')
+  await sleep(600)
+  const toFollowing = toMine && await page.clickExactText('关注')
+  const freshNarrow = toFollowing && await waitFor(
+    `document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '320'`,
+    20000,
+  )
+  await sleep(300)
+  const freshNarrowState = await page.evaluate(`(() => ({
+    list: [...document.querySelectorAll('[data-following-author]')].some((b) => b.getClientRects().length > 0),
+    preview: !!document.querySelector('[data-following-preview]'),
+    back: !!document.querySelector('[data-following-back]'),
+  }))()`)
+  check(
+    `窄窗全新进入先看到名单 ${JSON.stringify(freshNarrowState)}`,
+    freshNarrow && freshNarrowState.list && !freshNarrowState.preview && !freshNarrowState.back,
+  )
+  await page.viewport(1320, 900)
+
+  check('打开第 3 页失败的关注目录', await openFollowing({ followFailPage: '3' }))
+  const failed = await waitFor(
+    `(() => {
+      const progress = document.querySelector('[data-following-progress]')?.innerText ?? ''
+      return progress.includes('已读 100 / 320') && progress.includes('第 3 页没取到')
+    })()`,
+    20000,
+  )
+  const failedState = await page.evaluate(`(() => ({
+    loaded: document.querySelector('[data-following-directory]')?.dataset.followingLoaded,
+    filters: [...document.querySelectorAll('[data-following-filter]')].map((b) => b.innerText),
+    continueButton: [...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === '继续检索'),
+  }))()`)
+  check(
+    `缺页时保留已读范围并给出续查 ${JSON.stringify(failedState)}`,
+    failed && failedState.loaded === '100' && failedState.continueButton &&
+      failedState.filters[0]?.includes('320') && failedState.filters[1]?.includes('+') &&
+      failedState.filters[2]?.includes('+'),
+  )
+  await setInput('混音')
+  const partialNone = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 0 && document.body.innerText.includes('已读范围内暂无匹配')`,
+  )
+  check(
+    '索引未齐时不说「没有匹配」',
+    partialNone && !(await page.evaluate(`document.body.innerText.includes('没有匹配的作者')`)),
+  )
+  await setInput('造梦阿瑄')
+  const pageOneHit = await waitFor(
+    `document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5000'`,
+  )
+  await page.evaluate(`document.querySelector('[data-following-author="5000"]')?.click()`)
+  check(
+    '缺页前已读到的作者仍能预览作品',
+    pageOneHit && await waitFor(
+      `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5000' && document.querySelectorAll('[data-following-work]').length > 0`,
+    ),
+  )
+
+  await page.evaluate(`performance.clearMarks('following_page')`)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '继续检索')
+    hit?.click()
+  })()`)
+  const resumed = await waitFor(
+    `document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '320' && !document.querySelector('[data-following-progress]')`,
+    20000,
+  )
+  const pages = await page.evaluate(
+    `performance.getEntriesByName('following_page').map((entry) => entry.detail)`,
+  )
+  await setInput('')
+  await waitFor(`document.querySelectorAll('[data-following-author]').length === 320`)
+  const resumedUnique = await unique()
+  check(
+    `续查从第 3 页继续且结果无重复 ${JSON.stringify({ pages, resumedUnique })}`,
+    resumed && pages[0] === 3 && new Set(pages).size === pages.length &&
+      resumedUnique.count === 320 && resumedUnique.mids === 320,
+  )
+  await setInput('绝对不存在的作者')
+  const noMatch = await waitFor(
+    `document.querySelectorAll('[data-following-author]').length === 0 && document.body.innerText.includes('没有匹配的作者')`,
+  )
+  check('完整查询后才说没有匹配', noMatch)
+  await setInput('混音')
+  await setFilter('mutual')
+  check(
+    '续查后跨页搜索与互关仍然正确',
+    await waitFor(
+      `document.querySelector('[data-following-author]')?.dataset.followingAuthor === '5285'`,
+    ),
+  )
+
+  check('慢速重新打开关注目录', await openFollowing({ followSlow: '1' }))
+  await waitFor(
+    `Number(document.querySelector('[data-following-directory]')?.dataset.followingLoaded ?? 0) >= 50`,
+    10000,
+  )
+  await setInput('关注作者')
+  await setInput('混音')
+  const raced = await waitFor(
+    `document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '320' && !document.querySelector('[data-following-progress]')`,
+    20000,
+  )
+  const racedRows = await rows()
+  check(
+    `旧分页响应不污染新搜索词 ${JSON.stringify(racedRows.map((row) => row.mid))}`,
+    raced && racedRows.length === 1 && racedRows[0]?.mid === '5285',
+  )
+
+  check('再次慢速打开关注目录', await openFollowing({ followSlow: '1' }))
+  await waitFor(
+    `Number(document.querySelector('[data-following-directory]')?.dataset.followingLoaded ?? 0) >= 50`,
+    10000,
+  )
+  const openedAccount = await page.evaluate(
+    `(() => { const hit = document.querySelector('button[aria-label="账号菜单"]'); hit?.click(); return !!hit })()`,
+  )
+  await sleep(300)
+  const logout = openedAccount && await page.clickExactText('退出登录')
+  const loggedOut = logout && await waitFor(
+    `document.querySelector('main h2')?.textContent?.trim() === '关注列表没取到'`,
+    10000,
+  )
+  const login = loggedOut && await page.clickExactText('去登录')
+  const qr = login && await waitFor(`!!document.querySelector('[role="dialog"][aria-label="扫码登录"]')`, 5000)
+  const confirmed = qr && await waitFor(
+    `!!document.querySelector('[role="dialog"][aria-label="账号"]')`,
+    12000,
+  )
+  const switched = confirmed && await waitFor(
+    `document.querySelector('[data-following-directory]')?.dataset.followingAccount === '4381285' && document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '60'`,
+    20000,
+  )
+  const switchedRows = await rows()
+  const switchedUnique = await unique()
+  check(
+    `旧账号的未完成分页不污染新账号 ${JSON.stringify({ count: switchedRows.length, mids: switchedUnique.mids })}`,
+    switched && switchedUnique.count === 60 && switchedUnique.mids === 60 &&
+      switchedRows.some((row) => row.text.includes('账号二专属')) &&
+      !switchedRows.some((row) => row.text.includes('关注作者 319')),
+  )
+
+  check('打开的慢作品接口目录', await openFollowing({ spaceSlowMid: '5010' }))
+  await waitFor(
+    `document.querySelector('[data-following-directory]')?.dataset.followingLoaded === '320'`,
+    10000,
+  )
+  await setInput('同名作者')
+  await waitFor(`document.querySelectorAll('[data-following-author]').length === 2`)
+  await page.evaluate(`document.querySelector('[data-following-author="5010"]')?.click()`)
+  await sleep(120)
+  await page.evaluate(`document.querySelector('[data-following-author="5300"]')?.click()`)
+  const switchedAuthor = await waitFor(
+    `document.querySelector('[data-following-preview]')?.dataset.authorMid === '5300' && document.querySelectorAll('[data-following-work]').length > 0`,
+    10000,
+  )
+  await sleep(1600)
+  const lateWork = await detail()
+  check(
+    `旧作者的作品响应不影响当前选中 ${JSON.stringify(lateWork)}`,
+    switchedAuthor && lateWork.mid === '5300' && lateWork.works.every((mid) => mid === '5300'),
+  )
+
+  const newErrors = page.runtimeErrors.slice(startErrors)
+  check(`关注目录没有控制台错误或未处理异常（${newErrors.length} 条）`, newErrors.length === 0)
+  for (const error of newErrors) console.log(error)
+}
+
 async function checkShellBreakpoints(page) {
   await page.viewport(768, 800)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
@@ -3004,6 +3492,10 @@ async function main() {
       await checkChannelNav(page)
       return
     }
+    if (followingOnly) {
+      await checkFollowingDirectory(page)
+      return
+    }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
     await checkLibraryShelf(page)
@@ -3011,6 +3503,7 @@ async function main() {
     await checkStageMorph(page)
     await checkHeroAllocation(page)
     await checkAuthorHero(page)
+    await checkFollowingDirectory(page)
     await checkHomeResume(page)
     await checkNavConventions(page)
     await checkRanking(page)
