@@ -35,10 +35,12 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
           step={0.05}
           size="sm"
           onChange={setDraft}
+          onCancel={() => setDraft(null)}
           onCommit={(value) => {
             setDraft(null)
             void setVolume(value)
           }}
+          ariaValueText={`${Math.round(shown * 100)}%`}
         />
       </div>
     </div>
