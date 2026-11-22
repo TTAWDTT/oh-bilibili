@@ -274,6 +274,9 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     回归见 `watch-smoke --triple-only`（短按、长按、移出、换稿、键盘、成功与部分失败）。
 80. **榜单首屏**：首次取数用与真实行同列宽、同封面比例的静态骨架，页首、分区和首行起点在数据到达前后不跳；
     骨架 `aria-hidden` 且没有 Tab 停靠点，减少动态效果时也保持静止。回归见 `watch-smoke --ranking-skeleton-only`。
+81. **列表局部失败与空态**：热门下一页失败保留已加载卡片和滚动位置，底部原地重试只追加一次；空曲库用完整 2233 空态
+    和新建入口，窄窗不横向溢出；单歌单失败与空歌单沿用曲库卡片的局部重试。回归见 `--popular-paging-only`、
+    `--library-empty-only` 与 `--library-partial`。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
