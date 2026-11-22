@@ -29,7 +29,8 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const navigate = useAppStore((state) => state.navigate)
   const searchFor = useAppStore((state) => state.setHeroQuery)
   const me = useAuthStore((state) => state.auth?.user ?? null)
-  const [followed, setFollowed] = useState(false)
+  /** null 表示还没问到：按钮先禁用，避免把旧作者的状态带过来。 */
+  const [followed, setFollowed] = useState<boolean | null>(null)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
   const [total, setTotal] = useState(0)
   /** 是否退回了搜索聚合。界面要如实标注这一点。 */
@@ -87,6 +88,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       toastFailure('关注', { class: 'input', message: '这条结果没带 UP 主的 uid' })
       return
     }
+    if (followed === null) return
     const next = !followed
     setFollowed(next)
     try {
@@ -100,18 +102,22 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   useEffect(() => {
     let cancelled = false
-    setTracks(null)
-    setPage(1)
-    setIsFallback(false)
-    scroller.current?.scrollTo({ top: 0 })
     const owner = `${mid ?? 'name'}:${name}`
     if (heroOwner.current !== owner) {
+      // 换人：旧作者的头像、粉丝数、关注态一概不能留；换排序则保留列表等新数据。
       heroOwner.current = owner
+      setTracks(null)
+      setPage(1)
+      setIsFallback(false)
+      setCard(null)
+      setFollowed(null)
       setHero(null)
+      scroller.current?.scrollTo({ top: 0 })
     }
     /** 第一次拿到这一页投稿时定下页首作品；之后换排序、翻页都不再动它。 */
     const pickHero = (list: Track[]): void => {
-      if (heroOwner.current !== owner) return
+      // 只有名字时无法核对 up_mid，不拿它当页首，免得同名作者串图。
+      if (!mid || heroOwner.current !== owner) return
       setHero((current) => current ?? list[0] ?? null)
     }
     if (mid) {
@@ -304,10 +310,11 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 ) : null}
                 <button
                   type="button"
+                  disabled={followed === null}
                   onClick={() => void follow()}
                   className={[
                     't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                    followed
+                    followed === true
                       ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
                       : 'bg-[var(--accent)] text-white hover:opacity-90',
                   ].join(' ')}
@@ -315,13 +322,11 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                   <Icon name={followed ? 'check' : 'plus'} size={14} />
                   {followed ? '已关注' : '关注'}
                 </button>
-                {isFallback ? (
-                  <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
-                    空间接口不可用，下方是搜索结果里的 {tracks.length} 个
-                  </span>
-                ) : card ? (
-                  <span className="num text-[12px] text-[var(--text-3)]">共 {formatCount(total)} 个投稿</span>
-                ) : null}
+                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
+                  {isFallback
+                    ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
+                    : `共 ${formatCount(total)} 个投稿`}
+                </span>
               </div>
             )}
           </div>
@@ -331,6 +336,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               type="button"
               data-author-hero
               data-focus-key={hero.key}
+              aria-label={`观看 ${hero.title}`}
               onClick={() => navigate({ kind: 'watch', track: hero })}
               className="group flex min-w-0 items-stretch gap-3 text-left lg:flex-col lg:gap-0"
             >
@@ -344,7 +350,10 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 </span>
               </span>
               <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 rounded-b-[6px] bg-[var(--panel-raised)] px-3 py-2 lg:rounded-b-[6px] lg:rounded-t-none">
-                <span className="line-clamp-2 text-[14px] font-medium leading-[20px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                <span
+                  className="line-clamp-2 text-[14px] font-medium leading-[20px] text-[var(--text-1)] group-hover:text-[var(--accent)]"
+                  title={hero.title}
+                >
                   {hero.title}
                 </span>
                 <span className="num text-[12px] text-[var(--text-3)]">

@@ -1077,7 +1077,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       const size = 50
       const start = (page - 1) * size
-      return [CATALOG.slice(start, start + size), CATALOG.length]
+      // 空间接口按 mid 返回自己的投稿；排序参数要真的改变顺序，
+      // 否则「切排序不换页首」这类测试永远是假通过。
+      const mid = num(args, 'mid')
+      const order = str(args, 'order')
+      const owned = CATALOG.filter((track) => !mid || track.up_mid === mid)
+      const sorted = [...owned]
+      if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+      if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))
+      return [sorted.slice(start, start + size), sorted.length]
     }
     case 'space_stat':
       return [36, 1_240_000]

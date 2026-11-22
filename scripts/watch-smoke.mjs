@@ -1462,11 +1462,19 @@ async function checkAuthorHero(page) {
     const hero = document.querySelector('[data-author-hero]')
     const row = document.querySelector('#scroll-main [data-track-card]')
     const cover = hero?.querySelector('span[style*="16 / 9"]')
+    const heroKey = hero?.dataset.focusKey ?? ''
+    const heroTitle = hero?.querySelector('.line-clamp-2')?.textContent?.trim() ?? ''
+    const firstCardTitle = row?.dataset.trackTitle ?? ''
     return {
       header: header ? Math.round(header.getBoundingClientRect().height) : 0,
       title: (hero?.textContent || '').trim(),
       heroWidth: hero ? Math.round(hero.getBoundingClientRect().width) : 0,
       headerWidth: header ? Math.round(header.getBoundingClientRect().width) : 0,
+      heroKey,
+      heroTitle,
+      firstCardTitle,
+      name: document.querySelector('header h2')?.textContent ?? '',
+      author: hero?.querySelector('.num')?.textContent ?? '',
       cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
       coverHeight: cover ? Math.round(cover.getBoundingClientRect().height) : 0,
       firstRow: row ? Math.round(row.getBoundingClientRect().top) : null,
@@ -1474,10 +1482,11 @@ async function checkAuthorHero(page) {
     }
   })()`)
   check(
-    `UP 主页首右侧是真实投稿，首行在桌面高度内露出来 ${JSON.stringify(wide)}`,
+    `UP 主页首右侧是该作者自己的投稿，首行在桌面高度内露出来 ${JSON.stringify(wide)}`,
     ready && wide.header > 0 && wide.header <= 420 &&
       wide.heroWidth > 0 && wide.heroWidth <= wide.headerWidth / 2 + 8 &&
       Math.abs(wide.cover * 9 - wide.coverHeight * 16) <= wide.cover * 2 &&
+      wide.heroKey !== '' && wide.heroTitle !== '' && wide.heroTitle === wide.firstCardTitle &&
       wide.firstRow !== null && wide.firstRow < 900,
   )
   const beforeSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
@@ -1489,21 +1498,46 @@ async function checkAuthorHero(page) {
   const afterSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
   check('切换排序不换页首作品', !!beforeSort && afterSort === beforeSort)
 
+  // 切排序时列表可以短暂 loading，但页首必须一直留在 DOM 里，页面也不能回顶。
+  await page.evaluate(`document.getElementById('scroll-main')?.scrollTo({ top: 380 })`)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多收藏')
+    hit?.click()
+  })()`)
+  await sleep(80)
+  const sorting = await page.evaluate(`(() => ({
+    hero: !!document.querySelector('[data-author-hero]'),
+    top: Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0),
+    room: (() => {
+      const box = document.getElementById('scroll-main')
+      return box ? box.scrollHeight - box.clientHeight : 0
+    })(),
+  }))()`)
+  check(
+    `切排序时页首不消失、页面不回顶 ${JSON.stringify(sorting)}`,
+    sorting.hero && (sorting.room < 400 || sorting.top >= 300),
+  )
+
   await page.viewport(380, 820)
   await sleep(600)
   const narrow = await page.evaluate(`(() => {
     const hero = document.querySelector('[data-author-hero]')
     const box = document.getElementById('scroll-main')
     const cover = hero?.querySelector('span[style*="16 / 9"]')
+    const name = document.querySelector('header h2')
     return {
       hero: !!hero,
       cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
+      nameTop: name ? Math.round(name.getBoundingClientRect().top) : null,
+      heroTop: hero ? Math.round(hero.getBoundingClientRect().top) : null,
       overflow: box ? box.scrollWidth - box.clientWidth : null,
     }
   })()`)
   check(
     '窄窗先作者后紧凑作品，不横向溢出',
-    narrow.hero && narrow.cover > 0 && narrow.cover <= 180 && narrow.overflow !== null && narrow.overflow <= 0,
+    narrow.hero && narrow.cover > 0 && narrow.cover <= 180 &&
+      narrow.nameTop !== null && narrow.heroTop !== null && narrow.nameTop < narrow.heroTop &&
+      narrow.overflow !== null && narrow.overflow <= 0,
   )
   await page.viewport(1320, 900)
 }
