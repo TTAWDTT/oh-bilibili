@@ -334,6 +334,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,
       )
     }
+    case 'region_new': {
+      // 预览里分区内容也换标题，能看出范围真的切换了。
+      const rid = num(args, 'rid')
+      return CATALOG.slice(0, 12).map((track, index) =>
+        index === 0 ? { ...track, title: `${track.title} · 分区 ${rid} 最新` } : track,
+      )
+    }
     case 'live_rooms': {
       // 每页换一批 room_id，预览翻页时不会把同一间房重复挂到列表中。
       const page = Math.max(1, Math.trunc(num(args, 'page')))

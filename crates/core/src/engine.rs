@@ -3009,6 +3009,15 @@ impl Engine {
         Ok(tracks)
     }
 
+    /// 分区最新投稿。发现页的分区范围只换内容，不换页面。
+    pub async fn region_new(&self, rid: u32, page: u32) -> Result<Vec<Track>, WireError> {
+        let tracks = self.source.region_new(rid, page).await?;
+        for t in &tracks {
+            self.remember(t);
+        }
+        Ok(tracks)
+    }
+
     /// 直播推荐位。
     pub async fn live_rooms(
         &self,

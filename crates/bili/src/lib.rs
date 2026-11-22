@@ -439,6 +439,11 @@ impl Source {
         self.client.ranking(rid).await
     }
 
+    /// 分区最新投稿。
+    pub async fn region_new(&self, rid: u32, page: u32) -> Result<Vec<Track>, BiliError> {
+        self.client.region_new(rid, page).await
+    }
+
     /// 正在直播的房间。
     pub async fn live_rooms(&self, count: u32, page: u32) -> Result<Vec<sync::LiveRoom>, BiliError> {
         self.client.live_rooms(count, page).await

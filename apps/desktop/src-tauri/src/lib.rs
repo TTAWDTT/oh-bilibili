@@ -778,6 +778,15 @@ async fn ranking(engine: tauri::State<'_, Arc<Engine>>, rid: u32) -> Result<Vec<
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn region_new(
+    engine: tauri::State<'_, Arc<Engine>>,
+    rid: u32,
+    page: u32,
+) -> Result<Vec<Track>, WireError> {
+    engine.region_new(rid, page).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn popular(
     engine: tauri::State<'_, Arc<Engine>>,
     page: u32,
@@ -1283,6 +1292,7 @@ pub fn run() {
             comment_emotes,
             search_users,
             ranking,
+            region_new,
             live_rooms,
             bangumi_rank,
             followed_bangumi,

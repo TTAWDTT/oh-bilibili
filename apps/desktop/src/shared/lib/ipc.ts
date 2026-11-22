@@ -282,6 +282,11 @@ export function ranking(rid = 0): Promise<Track[]> {
   return call<Track[]>('ranking', { rid })
 }
 
+/** 分区最新投稿。发现页选中一个分区时读它，不跳去排行榜。 */
+export function regionNew(rid: number, page = 1): Promise<Track[]> {
+  return call<Track[]>('region_new', { rid, page })
+}
+
 /** 直播推荐位的一张卡。 */
 export type LiveRoom = {
   room_id: number
