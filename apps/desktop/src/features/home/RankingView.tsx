@@ -10,7 +10,7 @@ import { formatCount, formatDuration } from '../../shared/lib/format'
 import { usePlayerStore } from '../player/playerStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { useAppStore } from '../../app/appStore'
-import { HotTabs } from './HotTabs'
+import { HotPageHeader } from './HotPageHeader'
 
 /** 按分区记住读到哪：从视频返回同一分区时回到原位置，换分区从第一名开始。 */
 const rankMemory: { rid: number; top: number } = { rid: -1, top: 0 }
@@ -193,12 +193,16 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       }}
       className="min-h-0 flex-1 overflow-y-auto pb-10"
     >
-      <HotTabs
+      <HotPageHeader
         active="ranking"
         title="排行榜"
         extra={tracks ? String(tracks.length) : undefined}
         below={
-          <div className="no-scrollbar -mb-px flex items-center gap-5 overflow-x-auto border-b border-[var(--line)]">
+          <div
+            role="group"
+            aria-label="榜单分区"
+            className="no-scrollbar mt-3 flex items-center gap-5 overflow-x-auto border-b border-[var(--line)]"
+          >
             {PARTS.map((part) => (
               <button
                 key={part.rid}
@@ -220,8 +224,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
             ))}
           </div>
         }
-      >
-      </HotTabs>
+      />
       <div className="px-4 md:px-8">
       {error ? (
         <EmptyState

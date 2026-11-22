@@ -3,6 +3,7 @@ import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { Icon } from '../shared/ui/Icon'
 import type { IconName } from '../shared/ui/Icon'
+import { HOT_CHANNELS } from '../shared/lib/biliChannels'
 
 type Item = { view: View; label: string; icon: IconName }
 
@@ -17,10 +18,11 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'home' }, label: '发现', icon: 'biliTv' },
       { view: { kind: 'dynamic' }, label: '动态', icon: 'dynamic' },
       { view: { kind: 'messages' }, label: '消息', icon: 'message' },
-      { view: { kind: 'ranking' }, label: '排行', icon: 'rank' },
-      { view: { kind: 'popular' }, label: '热门', icon: 'flame' },
-      { view: { kind: 'precious' }, label: '入站必刷', icon: 'gift' },
-      { view: { kind: 'weekly' }, label: '每周必看', icon: 'calendar' },
+      ...HOT_CHANNELS.map((channel) => ({
+        view: { kind: channel.view } as View,
+        label: channel.label,
+        icon: channel.icon,
+      })),
       { view: { kind: 'live' }, label: '直播', icon: 'live' },
       { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumi' },
     ],
@@ -66,6 +68,7 @@ export function Sidebar() {
       <button
         key={entry.label}
         type="button"
+        data-hot-channel={HOT_CHANNELS.some((channel) => channel.view === entry.view.kind) ? entry.view.kind : undefined}
         onClick={() => navigate(entry.view)}
         aria-current={active ? 'page' : undefined}
         aria-label={collapsed ? entry.label : undefined}

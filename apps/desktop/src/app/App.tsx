@@ -54,7 +54,7 @@ function viewTitle(view: View): string {
     case 'ranking':
       return '排行榜'
     case 'popular':
-      return '热门'
+      return '综合热门'
     case 'precious':
       return '入站必刷'
     case 'weekly':

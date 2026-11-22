@@ -194,8 +194,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         ['[doge]', 'https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png'],
         ['[2233娘_大笑]', 'https://i0.hdslb.com/bfs/emote/16b8794be990cefa6caeba4d901b934a227ee3b8.png'],
       ]
-    case 'ranking':
-      return CATALOG.slice(0, 20)
+    case 'ranking': {
+      // 第一条带上分区：预览里换分区能看出榜单真的换了，而不只是选中态动了。
+      // key 保持原样，观看页还要按它找这条视频。
+      const rid = num(args, 'rid')
+      return CATALOG.slice(0, 20).map((track, index) =>
+        index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,
+      )
+    }
     case 'live_rooms':
       return CATALOG.slice(0, 6).map((track, i) => ({
         room_id: 1000 + i,
@@ -271,11 +277,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'weekly_issue': {
       const number = Math.max(1, Math.trunc(num(args, 'number')))
       await sleep(120)
+      // 第一条带期号：预览里能核对期号、下拉和作品属于同一期。
+      const tracks = CATALOG.slice(0, 12).map((track, index) =>
+        index === 0 ? { ...track, title: `${track.title} · 第 ${number} 期` } : track,
+      )
       return {
         subject: `第 ${number} 期的主题`,
         label: `第${number}期`,
-        tracks: CATALOG.slice(0, 12),
-        notes: Object.fromEntries(CATALOG.slice(0, 12).map((track) => [track.key, '预览模式的推荐语'])),
+        tracks,
+        notes: Object.fromEntries(tracks.map((track) => [track.key, '预览模式的推荐语'])),
       }
     }
     case 'precious':

@@ -6,7 +6,10 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { useAppStore } from '../../app/appStore'
 import { WideCard } from '../tracks/WideCard'
-import { HotTabs } from './HotTabs'
+import { HotPageHeader } from './HotPageHeader'
+
+/** 换期记在模块里：打开作品再返回、去别的频道再回来，都还停在读过的那一期。 */
+const weeklyMemory: { number: number | null } = { number: null }
 
 /**
  * 每周必看。B 站自己按周出的片单：一期一个主题，一次 50 条。
@@ -15,13 +18,16 @@ import { HotTabs } from './HotTabs'
  */
 export function WeeklyView() {
   const [issues, setIssues] = useState<ipc.WeeklyIssue[] | null>(null)
-  const [number, setNumber] = useState<number | null>(null)
+  const [number, setNumber] = useState<number | null>(weeklyMemory.number)
   const [page, setPage] = useState<ipc.WeeklyPage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [periodNonce, setPeriodNonce] = useState(0)
   const [picking, setPicking] = useState(false)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const pickerRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const restoreFocus = useRef(false)
   const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
@@ -51,11 +57,26 @@ export function WeeklyView() {
       ?.scrollIntoView({ block: 'center' })
   }, [picking, number])
 
+  // 打开下拉就把焦点交给当前期；用键盘选完后焦点回到触发按钮，才能接着换期。
+  useEffect(() => {
+    if (!picking) return
+    pickerRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.focus({ preventScroll: true })
+  }, [picking])
+
+  useLayoutEffect(() => {
+    if (picking || !restoreFocus.current) return
+    restoreFocus.current = false
+    triggerRef.current?.focus()
+  }, [picking])
+
   // 点外面收起。用 pointerdown 而不是 click：点在列表里也算「里面」，晚一拍的 click 会重新展开。
   useEffect(() => {
     if (!picking) return
     const onDown = (event: PointerEvent): void => {
-      if (!pickerRef.current?.contains(event.target as Node)) setPicking(false)
+      const target = event.target as Node
+      // 触发按钮自己交给 onClick 取反；这里再关一次会被紧接着的 click 重新打开。
+      if (pickerRef.current?.contains(target) || triggerRef.current?.contains(target)) return
+      setPicking(false)
     }
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
@@ -79,27 +100,45 @@ export function WeeklyView() {
     return () => {
       cancelled = true
     }
-  }, [number])
+  }, [number, periodNonce])
 
   const index = issues && number !== null ? issues.findIndex((i) => i.number === number) : -1
   // 列表按新到旧排：下一期是更早的那一条，上一期是更新的那一条。
   const older = index >= 0 ? (issues?.[index + 1]?.number ?? null) : null
   const newer = index > 0 ? (issues?.[index - 1]?.number ?? null) : null
+  const choose = (next: number | null): void => {
+    setPicking(false)
+    weeklyMemory.number = next
+    setNumber(next)
+  }
 
   return (
     <div ref={scrollerRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      {/*
-       * B 站每周必看：白色 header 带里是「第 N 期(日期更新)」+ 一行更新时间，
-       * 正文和热门、入站必刷一样是两列横排大卡，每张卡多一句 B 站写的推荐语。
-       */}
-      <HotTabs active="weekly" title="每周必看">
-        {/* B 站这一带只有一行：左边「第399期(1113更新) ▾」，紧接着更新时间，右边是前后两期。 */}
-        <div className="flex items-center gap-3">
-          {issues && issues.length > 0 ? (
+      {/* 换期组紧贴页标题，正文直接接当期作品，中间不再放跨频道入口。 */}
+      <HotPageHeader active="weekly" title="每周必看">
+        {issues && issues.length > 0 ? (
+          <div className="flex items-center gap-1">
+            {/* 左箭头回到更早的一期，右箭头往前一期：和时间方向一致，不是和横条的排法一致。 */}
+            <button
+              type="button"
+              aria-label="上一期"
+              title="上一期"
+              disabled={older === null}
+              onClick={() => choose(older)}
+              className="t press flex h-7 w-7 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)] disabled:opacity-40"
+            >
+              <Icon name="chevronLeft" size={16} />
+            </button>
             <div className="relative shrink-0">
               <button
+                ref={triggerRef}
                 type="button"
                 onClick={() => setPicking((open) => !open)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown') return
+                  event.preventDefault()
+                  setPicking(true)
+                }}
                 aria-expanded={picking}
                 aria-haspopup="listbox"
                 className="t press flex h-8 items-center gap-1.5 rounded-[6px] text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
@@ -116,19 +155,51 @@ export function WeeklyView() {
                   ref={pickerRef}
                   role="listbox"
                   aria-label="选择期数"
-                  className="absolute left-0 top-9 z-30 max-h-[60vh] w-[260px] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                  onBlur={(event) => {
+                    const next = event.relatedTarget as Node | null
+                    // 点触发器时焦点会先离开弹层；这次点击由按钮自己收起，别在这里抢着关掉再被 click 打开。
+                    if (event.currentTarget.contains(next) || triggerRef.current?.contains(next)) return
+                    // Tab 离开弹层就收起；焦点已经往前走了，不要再抢回来。
+                    setPicking(false)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      restoreFocus.current = true
+                      setPicking(false)
+                      return
+                    }
+                    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+                    if (step === 0 && event.key !== 'Home' && event.key !== 'End') return
+                    event.preventDefault()
+                    const options = [
+                      ...(pickerRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []),
+                    ]
+                    const at = options.indexOf(document.activeElement as HTMLButtonElement)
+                    const target =
+                      event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? options.length - 1
+                          : Math.min(options.length - 1, Math.max(0, at + step))
+                    options[target]?.focus()
+                    options[target]?.scrollIntoView({ block: 'nearest' })
+                  }}
+                  className="absolute left-0 top-9 z-30 max-h-[60vh] w-[260px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
                 >
                   {issues.map((issue) => (
                     <button
                       key={issue.number}
                       type="button"
                       role="option"
+                      tabIndex={-1}
                       aria-selected={issue.number === number}
                       data-active={issue.number === number}
                       title={issue.name}
                       onClick={() => {
-                        setNumber(issue.number)
-                        setPicking(false)
+                        restoreFocus.current = true
+                        choose(issue.number)
                       }}
                       className={`t flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--ga0)] ${
                         issue.number === number ? 'text-[var(--accent)]' : 'text-[var(--text-2)]'
@@ -143,33 +214,19 @@ export function WeeklyView() {
                 </div>
               ) : null}
             </div>
-          ) : null}
-          {/* 398 期，下拉翻起来也慢；前后各给一个。 */}
-          <span className="ml-auto flex shrink-0 items-center gap-1">
-            {/* 左箭头回到更早的一期，右箭头往前一期：和时间方向一致，不是和横条的排法一致。 */}
-            <button
-              type="button"
-              aria-label="上一期"
-              title="上一期"
-              disabled={older === null}
-              onClick={() => setNumber(older)}
-              className="t press flex h-7 w-7 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)] disabled:opacity-40"
-            >
-              <Icon name="chevronLeft" size={16} />
-            </button>
             <button
               type="button"
               aria-label="下一期"
               title="下一期"
               disabled={newer === null}
-              onClick={() => setNumber(newer)}
+              onClick={() => choose(newer)}
               className="t press flex h-7 w-7 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)] disabled:opacity-40"
             >
               <Icon name="chevronRight" size={16} />
             </button>
-          </span>
-        </div>
-      </HotTabs>
+          </div>
+        ) : null}
+      </HotPageHeader>
 
       <div className="px-4 md:px-8">
       {error ? (
@@ -177,12 +234,19 @@ export function WeeklyView() {
           icon="alert"
           title="每周必看没取到"
           detail={error}
-          action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
+          action={{
+            label: '重试',
+            onClick: () => {
+              // 期数列表与当前期都可能失败；一次重试把两边都重新拉一遍。
+              setNonce((n) => n + 1)
+              setPeriodNonce((n) => n + 1)
+            },
+          }}
         />
       ) : issues === null || (number !== null && page === null) ? (
         <BiliLoader label="正在取本期…" />
       ) : page && page.tracks.length > 0 ? (
-        <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
+        <div data-weekly-issue={number ?? ''} className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
           {page.tracks.map((track) => (
             <WideCard
               key={track.key}
