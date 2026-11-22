@@ -307,6 +307,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
 90. **联合投稿署名**：观看页详情把 `data.staff[]` 的 mid/name/face/title 一起带过来（缓存同一份详情，不逐人请求），
     作者行下显示「合作创作」：前两位预览角色与名字，其余展开成一列；同一 MID 多角色合并，同名不同 MID 分列，
     缺 MID 的保留文字、有 MID 的才可进空间。展开状态与从成员空间返回的滚动位置按 BV 记住。单作者稿件不渲染。
+91. **搜索零结果**：B 站搜索没有匹配时只回 `numResults: 0`、不带 `result` 数组；现在按空列表处理，界面显示
+    「没有找到「关键词」」，不再报「搜索响应里没有 result 数组」。有结果数却缺数组仍按解析失败处理。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
