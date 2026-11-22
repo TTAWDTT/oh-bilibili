@@ -658,7 +658,7 @@ export function DynamicView() {
     >
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--panel)]">
         <div className={`${FEED} flex h-[56px] items-center`}>
-          <h2 className="text-[20px] font-medium text-[var(--text-1)]">动态</h2>
+          <h2 className="text-page-title text-[var(--text-1)]">动态</h2>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
