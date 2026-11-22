@@ -963,6 +963,17 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             current: t.key === track.key,
           })),
         },
+        // 联合投稿：默认给四个署名（同一个人两个角色、一个长昵称），?staff=none 看单作者布局。
+        staff:
+          new URLSearchParams(window.location.search).get('staff') === 'none'
+            ? []
+            : [
+                { mid: track.up_mid ?? 9001, name: track.artist, face: track.up_avatar ?? null, title: 'UP主' },
+                { mid: 9002, name: '陈亦洺', face: null, title: '作曲' },
+                { mid: 9003, name: '音阙诗听', face: null, title: '后期' },
+                { mid: 9003, name: '音阙诗听', face: null, title: '混音' },
+                { mid: 9004, name: '一个很长的合作成员昵称用来验证换行', face: null, title: '动画' },
+              ],
         // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
         manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
         // 观看页拿到的 duration 是当前这一 P 的时长，不是整条投稿的总长。

@@ -8,6 +8,7 @@ import { AuthorHoverCard, useAuthorHover } from '../../shared/ui/AuthorHoverCard
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
+import { Collaborators } from './Collaborators'
 
 /**
  * UP 主名片。B 站网页版把它放在右栏最上面：头像、名字、签名，下面一颗关注。
@@ -63,7 +64,8 @@ export function OwnerCard({
 
   if (inline) {
     return (
-      <div className="flex w-fit max-w-full flex-wrap items-center gap-3 py-1">
+      <div className="min-w-0 py-1">
+      <div className="flex w-fit max-w-full flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={goAuthor}
@@ -130,6 +132,8 @@ export function OwnerCard({
           {followed === true ? '已关注' : '关注'}
         </button>
         {hoverCard}
+      </div>
+      <Collaborators trackKey={data.key} staff={data.staff} />
       </div>
     )
   }
@@ -215,6 +219,7 @@ export function OwnerCard({
           </button>
         </div>
       </div>
+      <Collaborators trackKey={data.key} staff={data.staff} />
       {hoverCard}
     </div>
   )

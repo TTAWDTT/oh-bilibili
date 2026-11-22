@@ -1677,6 +1677,16 @@ impl Engine {
                     })
                     .collect(),
             }),
+            staff: detail
+                .staff
+                .iter()
+                .map(|member| crate::wire::StaffView {
+                    mid: member.mid,
+                    name: member.name.clone(),
+                    face: member.face.clone(),
+                    title: member.title.clone(),
+                })
+                .collect(),
             manifest_url,
             duration_ms: duration.0,
             qualities,

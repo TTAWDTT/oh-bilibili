@@ -336,11 +336,21 @@ pub struct WatchView {
     pub current_page: u32,
     /// 所属合集；没有合集时为空。
     pub season: Option<SeasonView>,
+    /// 联合投稿署名；单作者为空。`title` 是作者在这部作品里的角色。
+    pub staff: Vec<StaffView>,
     /// 清单的完整地址，已经带上本机代理端口。
     pub manifest_url: String,
     pub duration_ms: u64,
     pub qualities: Vec<crate::dash_bridge::QualityOption>,
     pub audio_quality: Option<u16>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StaffView {
+    pub mid: Option<u64>,
+    pub name: String,
+    pub face: Option<String>,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
