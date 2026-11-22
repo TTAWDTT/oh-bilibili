@@ -300,6 +300,14 @@ export function WatchInfo({
     }
   }, [])
 
+  // 换稿时这次按住不再属于任何一条视频，计时和“已触发”标记都要清掉。
+  useEffect(() => {
+    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+    holdTimer.current = null
+    longFired.current = false
+    setHolding(false)
+  }, [track.key])
+
   // 按住时切到别的窗口、触屏开始滚动，都不能在后台继续累计到三连。
   useEffect(() => {
     const cancel = (): void => {
