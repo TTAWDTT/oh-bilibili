@@ -130,7 +130,14 @@ function CurrentView({ view }: { view: View }) {
     case 'profile':
       return <ProfileView />
     case 'watch':
-      return <WatchView key={view.track.key} track={view.track} />
+      return (
+        <WatchView
+          key={`${view.track.key}:${view.page ?? ''}:${view.atMs ?? ''}`}
+          track={view.track}
+          {...(view.page !== undefined ? { page: view.page } : {})}
+          {...(view.atMs !== undefined ? { atMs: view.atMs } : {})}
+        />
+      )
     case 'watchLater':
       return <WatchLaterView />
     case 'following':

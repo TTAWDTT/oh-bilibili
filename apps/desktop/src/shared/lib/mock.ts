@@ -1202,7 +1202,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         shares: 57,
         likes: 2_048,
         tname: track.tname ?? null,
-        pages: [],
+        current_page: 1,
+        pages: [
+          { no: 1, cid: 900001, title: '正片', duration_ms: track.duration_ms ?? 240_000 },
+          { no: 2, cid: 900002, title: '花絮', duration_ms: 180_000 },
+        ],
         season: null,
       }
     }

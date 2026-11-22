@@ -3307,8 +3307,8 @@ impl Engine {
         Ok(self.source.danmaku_heat(key, buckets).await?)
     }
 
-    pub async fn video_meta(&self, key: &TrackKey) -> Result<bilimusic_bili::VideoMeta, WireError> {
-        Ok(self.source.detail(key).await?.meta)
+    pub async fn video_meta(&self, key: &TrackKey) -> Result<bilimusic_bili::TrackDetail, WireError> {
+        Ok(self.source.detail(key).await?)
     }
 
     pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, WireError> {

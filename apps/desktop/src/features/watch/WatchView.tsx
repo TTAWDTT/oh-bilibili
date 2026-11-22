@@ -98,7 +98,17 @@ function directoryTitle(data: WatchData, current: number): string {
  * 声音只有一个发声者，就是音频引擎；画面跟着引擎的时钟走。
  * 清单与分片都走本机代理，前端拿不到任何远端地址。
  */
-export function WatchView({ track }: { track: Track }) {
+export function WatchView({
+  track,
+  page: startPage,
+  atMs,
+}: {
+  track: Track
+  /** 从弹幕引文进来时直接落在这一分 P。 */
+  page?: number
+  /** 同一次跳转还要落到这条弹幕的时刻。 */
+  atMs?: number
+}) {
   const goBack = useAppStore((s) => s.goBack)
   const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
@@ -123,7 +133,7 @@ export function WatchView({ track }: { track: Track }) {
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
-  const storedPage = useRef(loadWatchPage(track.key)).current
+  const storedPage = useRef(startPage ?? loadWatchPage(track.key)).current
   const storedPagePos = useRef(storedPage ? loadPagePos(track.key, storedPage) : null).current
   const [page, setPage] = useState<number | undefined>(storedPage ?? undefined)
   /** 中窄窗的选集面板。宽窗用右栏目录，影院用播放器自带的选集。 */
@@ -142,7 +152,7 @@ export function WatchView({ track }: { track: Track }) {
     pageTriggerRef.current?.focus()
   }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
-  const [pendingResume, setPendingResume] = useState<number | null>(storedPagePos)
+  const [pendingResume, setPendingResume] = useState<number | null>(atMs ?? storedPagePos)
   const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
@@ -187,7 +197,11 @@ export function WatchView({ track }: { track: Track }) {
     setSeekSignal((previous) => ({ at: ms, nonce: (previous?.nonce ?? 0) + 1 }))
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
   const [resume, setResume] = useState<{ key: string; at: number } | null>(
-    storedPagePos ? { key: track.key, at: storedPagePos } : null,
+    atMs !== undefined
+      ? { key: track.key, at: atMs }
+      : storedPagePos
+        ? { key: track.key, at: storedPagePos }
+        : null,
   )
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
@@ -525,6 +539,7 @@ export function WatchView({ track }: { track: Track }) {
         const next = await ipc.watchOpen(track.key, page, pendingResume ?? undefined)
         if (!cancelled) {
           initialStoredPage.current = false
+          if (page !== undefined) saveWatchPage(track.key, page)
           if (page !== undefined && !next.pages.some((entry) => entry.no === page)) {
             const fallback = next.current_page
             const at = loadPagePos(track.key, fallback)

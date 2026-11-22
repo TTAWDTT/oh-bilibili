@@ -17,7 +17,8 @@ export type View =
   | { kind: 'liked' }
   | { kind: 'downloads' | 'history' | 'favs' }
   | { kind: 'author'; name: string; mid?: number | null }
-  | { kind: 'watch'; track: Track }
+  /** `page`/`atMs` 用于从弹幕引文直接落到那一分 P 的那一刻。 */
+  | { kind: 'watch'; track: Track; page?: number; atMs?: number }
   | { kind: 'watchLater' }
   | { kind: 'following' }
   | { kind: 'profile' }

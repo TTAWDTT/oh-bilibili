@@ -262,6 +262,9 @@ pub struct VideoMetaView {
     pub coins: u64,
     pub shares: u64,
     pub likes: u64,
+    /// 分 P 列表与默认页，发现页首推要据此取同一分 P 的弹幕。
+    pub current_page: u32,
+    pub pages: Vec<bilimusic_bili::PageRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
