@@ -1158,7 +1158,133 @@ async function checkHomeResume(page) {
     error: document.body.innerText.includes('连不上 B 站'),
   })`)
   check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
+}
 
+/** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
+async function checkRanking(page) {
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4000)
+  await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '排行') : null
+    hit?.click()
+  })()`)
+  let ready = false
+  for (let i = 0; i < 30 && !ready; i += 1) {
+    await sleep(300)
+    ready = await page.evaluate(`document.querySelectorAll('[data-rank-row]').length >= 9`)
+  }
+  const wide = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('[data-rank-row]')]
+    const lefts = rows.slice(0, 9).map((row) => Math.round(row.getBoundingClientRect().left))
+    const rights = rows.slice(0, 12).map((row) => Math.round(row.firstElementChild.getBoundingClientRect().right))
+    const box = document.getElementById('scroll-main')
+    return {
+      tenth: rows[9]?.dataset.rank ?? '',
+      sameLeft: new Set(lefts).size === 1,
+      rankAligned: new Set(rights).size === 1,
+      overflow: box ? box.scrollWidth - box.clientWidth : null,
+      firstCover: Math.round(rows[0]?.querySelector('.aspect-video')?.getBoundingClientRect().width ?? 0),
+      nextCover: Math.round(rows[1]?.querySelector('.aspect-video')?.getBoundingClientRect().width ?? 0),
+    }
+  })()`)
+  check(
+    '排行榜单列排成一张榜，名次右缘贯穿整页',
+    ready && wide.sameLeft && wide.rankAligned && wide.tenth === '10',
+  )
+  check(
+    '第一名封面更大，宽窗没有横向滚动',
+    wide.firstCover > wide.nextCover && wide.overflow !== null && wide.overflow <= 0,
+  )
+  // 用一条真实长度的长标题压一下，标题列不能把行撑高。
+  const originalTitle = await page.evaluate(`document.querySelector('[data-rank-title]')?.textContent ?? ''`)
+  const clamp = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('[data-rank-row]')]
+    const title = rows[0]?.querySelector('[data-rank-title]')
+    const probe = '一场酣畅淋漓的人类高质量灵魂对话，从北疆的雪到南方的雨，我们把这一路的见闻都记了下来，顺便聊聊为什么大家都在讨论这件事'
+    if (title) title.textContent = probe + probe
+    const heights = rows.slice(0, 12).map((row) => Math.round(row.getBoundingClientRect().height))
+    return {
+      height: title ? Math.round(title.getBoundingClientRect().height) : 0,
+      tallest: heights.length > 0 ? Math.max(...heights) : 0,
+      first: Math.round(rows[0]?.getBoundingClientRect().height ?? 0),
+      second: Math.round(rows[1]?.getBoundingClientRect().height ?? 0),
+    }
+  })()`)
+  check(
+    '长标题最多两行，行高不被撑开',
+    clamp.height > 0 && clamp.height <= 52 && clamp.first > 0 && clamp.first <= 140 && clamp.tallest <= 150,
+  )
+  // 768–1023 有侧栏时，标题列不能被统计列挤成一条缝。
+  const midWidths = []
+  for (const width of [768, 900]) {
+    await page.viewport(width, 820)
+    await sleep(500)
+    midWidths.push(
+      await page.evaluate(`(() => {
+        const row = document.querySelector('[data-rank-row]')
+        const titleButton = row?.querySelector('[data-rank-title]')?.closest('button')
+        const box = document.getElementById('scroll-main')
+        return {
+          width: window.innerWidth,
+          title: titleButton ? Math.round(titleButton.getBoundingClientRect().width) : 0,
+          stats: row ? getComputedStyle(row.lastElementChild).display : '',
+          overflow: box ? box.scrollWidth - box.clientWidth : null,
+        }
+      })()`),
+    )
+  }
+  check(
+    `768 与 900 下标题列仍有足够宽度 ${JSON.stringify(midWidths)}`,
+    midWidths.every((item) => item.title >= 150 && item.stats === 'none' && item.overflow !== null && item.overflow <= 0),
+  )
+  await page.evaluate(`(() => {
+    const title = document.querySelector('[data-rank-title]')
+    if (title) title.textContent = ${JSON.stringify(originalTitle)}
+  })()`)
+  await page.viewport(1440, 900)
+  await sleep(400)
+
+  await page.evaluate(`document.getElementById('scroll-main').scrollTop = 400`)
+  await sleep(300)
+  await page.evaluate(`(() => {
+    const row = document.querySelectorAll('[data-rank-row]')[4]
+    row?.querySelector('button')?.click()
+  })()`)
+  let watching = false
+  for (let i = 0; i < 20 && !watching; i += 1) {
+    await sleep(300)
+    watching = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  await sleep(1500)
+  const back = await page.evaluate(`(() => {
+    const box = document.getElementById('scroll-main')
+    const part = document.querySelector('#scroll-main [aria-pressed="true"]')?.textContent?.trim() ?? ''
+    return { top: box ? Math.round(box.scrollTop) : null, part, rows: document.querySelectorAll('[data-rank-row]').length }
+  })()`)
+  check(
+    '从视频返回仍在该分区和原来的名次附近',
+    watching && back.rows >= 9 && back.part === '全站' && back.top !== null && back.top >= 320,
+  )
+
+  await page.viewport(380, 820)
+  await sleep(700)
+  const narrow = await page.evaluate(`(() => {
+    const row = document.querySelector('[data-rank-row]')
+    const box = document.getElementById('scroll-main')
+    return {
+      cover: Math.round(row?.querySelector('.aspect-video')?.getBoundingClientRect().width ?? 0),
+      rightStats: row ? getComputedStyle(row.lastElementChild).display : '',
+      overflow: box ? box.scrollWidth - box.clientWidth : null,
+    }
+  })()`)
+  check(
+    '窄窗缩封面并把统计移到标题下',
+    narrow.cover > 0 && narrow.cover <= 120 && narrow.rightStats === 'none' && narrow.overflow !== null && narrow.overflow <= 0,
+  )
+  await page.viewport(1440, 900)
 }
 
 async function checkShellBreakpoints(page) {
@@ -1451,6 +1577,7 @@ async function main() {
     await checkStageLyrics(page)
     await checkHeroAllocation(page)
     await checkHomeResume(page)
+    await checkRanking(page)
     await checkShellBreakpoints(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     if (DYNAMIC_RETURN) {

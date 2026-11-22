@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -12,18 +12,20 @@ import { PARTS } from '../../shared/lib/biliParts'
 import { useAppStore } from '../../app/appStore'
 import { HotTabs } from './HotTabs'
 
-/** 名次底色：B 站前三是红 / 橙 / 黄，其余是一块半透明黑。 */
-function rankTone(rank: number): string {
-  if (rank === 1) return 'var(--accent)'
-  if (rank === 2) return '#ff8f3f'
-  if (rank === 3) return '#f6c34a'
-  return 'rgba(0,0,0,0.55)'
+/** 按分区记住读到哪：从视频返回同一分区时回到原位置，换分区从第一名开始。 */
+const rankMemory: { rid: number; top: number } = { rid: -1, top: 0 }
+
+/** 名次颜色：前三名留一点颜色，其余交给正文灰，数字本身先要清楚。 */
+function rankColor(rank: number): string {
+  if (rank === 1) return 'var(--accent-strong)'
+  if (rank === 2) return '#a65300'
+  if (rank === 3) return '#8a6d00'
+  return 'var(--text-2)'
 }
 
 /**
- * 榜单的一行。B 站排行榜不是封面网格，是两列横排列表：
- * 左边封面（左上角压名次），右边标题两行 + UP + 播放/弹幕。
- * 这里也照做，不再套发现页那套卡片，否则名次只是一个角标，榜单感全丢。
+ * 榜单的一行：名次独立成列，竖向对齐成一整条；封面、标题、统计依次向右。
+ * 第一名把封面与标题放大一档，但名次仍与下面同一条线。
  */
 function RankRow({ track, rank, active, onOpen, onAuthor }: {
   track: Track
@@ -32,42 +34,72 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
   onOpen: () => void
   onAuthor: () => void
 }) {
+  const top = rank <= 3
+  const first = rank === 1
   return (
-    <div className="group flex items-start gap-3.5">
-      <button type="button" onClick={onOpen} className="relative shrink-0" title={track.title}>
-        <span className="relative block aspect-video w-[168px] overflow-hidden rounded-[6px]">
-          <Cover cover={track.cover} title={track.title} width={168} className="h-full w-full" />
-          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/60 px-1 text-[11px] leading-[16px] text-white">
-            {formatDuration(track.duration_ms)}
-          </span>
-        </span>
+    <div
+      data-rank-row
+      data-rank={rank}
+      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 lg:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] lg:gap-x-4"
+    >
+      <span className="pt-1 text-right">
+        <span className="sr-only">第 {rank} 名</span>
         <span
-          className="num absolute left-0 top-0 flex h-[22px] w-[22px] items-center justify-center rounded-tl-[6px] rounded-br-[6px] text-[12px] font-medium text-white"
-          style={{ background: rankTone(rank) }}
+          aria-hidden
+          className={`num block font-mono font-semibold tabular-nums ${
+            first ? 'text-[26px] leading-[30px]' : top ? 'text-[21px] leading-[26px]' : 'text-[16px] leading-[22px]'
+          }`}
+          style={{ color: rankColor(rank) }}
         >
           {rank}
         </span>
+      </span>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={track.title}
+        className={`relative w-[7rem] shrink-0 ${first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'}`}
+        title={track.title}
+      >
+        <span className="relative block aspect-video overflow-hidden rounded-[6px]">
+          <Cover cover={track.cover} title={track.title} width={216} className="h-full w-full" />
+          <span
+            aria-hidden
+            className="num absolute bottom-1 right-1 rounded-[2px] bg-black/60 px-1 text-[11px] leading-[16px] text-white"
+          >
+            {formatDuration(track.duration_ms)}
+          </span>
+        </span>
       </button>
-      <span className="min-w-0 flex-1 py-0.5">
+      <div className="min-w-0 py-0.5">
         <button
           type="button"
           onClick={onOpen}
           title={track.title}
-          className={`line-clamp-2 block text-left text-[15px] font-medium leading-[22px] hover:text-[var(--accent)] ${
+          className={`w-full text-left font-medium hover:text-[var(--accent)] ${
+            first ? 'text-[17px] leading-[24px] lg:text-[18px] lg:leading-[26px]' : 'text-[15px] leading-[22px]'
+          } ${
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
           }`}
         >
-          {track.title}
+          {/* 最多两行：按行高钉死高度，不依赖 -webkit-box（按钮/span 的 display 会被浏览器重算） */}
+          <span
+            data-rank-title
+            className={`block overflow-hidden ${first ? 'max-h-12 lg:max-h-[52px]' : 'max-h-11'}`}
+          >
+            {track.title}
+          </span>
         </button>
         <button
           type="button"
           onClick={onAuthor}
-          className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+          className="mt-1.5 flex w-full min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
         >
           <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
           <span className="truncate">{track.artist}</span>
         </button>
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+        {/* 窄窗把统计挪到标题下面，先保住名次、标题和封面的宽度。 */}
+        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] lg:hidden">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -81,6 +113,24 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
             </span>
           ) : null}
         </span>
+      </div>
+      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] lg:flex">
+        {track.views ? (
+          <span className="flex w-16 items-center justify-end gap-1">
+            <Icon name="play" size={11} />
+            {formatCount(track.views)}
+          </span>
+        ) : (
+          <span className="w-16" />
+        )}
+        {(track.danmaku ?? 0) > 0 ? (
+          <span className="flex w-14 items-center justify-end gap-1">
+            <Icon name="danmaku" size={11} />
+            {formatCount(track.danmaku!)}
+          </span>
+        ) : (
+          <span className="w-14" />
+        )}
       </span>
     </div>
   )
@@ -88,7 +138,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
 
 /**
  * 排行榜。读的是 B 站公开榜单，一次 100 条；名次就是接口返回的顺序。
- * 卡片左上角的名次用 B 站前三名的红 / 橙 / 黄。
+ * 名次单独成列、自上而下排成一张榜，前三名用一点颜色。
  */
 export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   const [rid, setRid] = useState(initialRid)
@@ -98,12 +148,19 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const restorePending = useRef(false)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
-    // 换分区就是换一份榜，停在上一份的滚动位置会读到一半。
-    scrollRef.current?.scrollTo({ top: 0 })
+    // 换分区就是换一份榜；同一分区从视频返回则回到原来的名次附近。
+    const box = scrollRef.current
+    const same = rankMemory.rid === rid
+    if (!same) rankMemory.top = 0
+    if (box) box.scrollTop = same ? rankMemory.top : 0
+    rankMemory.rid = rid
+    // 列表还没回来时容器只有 loader，先记下，等这一份榜渲染出来再落位。
+    restorePending.current = same && rankMemory.top > 0
     setTracks(null)
     setError(null)
     void ipc
@@ -119,8 +176,22 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
     }
   }, [rid, nonce])
 
+  useLayoutEffect(() => {
+    if (!restorePending.current || tracks === null) return
+    restorePending.current = false
+    if (scrollRef.current) scrollRef.current.scrollTop = rankMemory.top
+  }, [tracks])
+
   return (
-    <div ref={scrollRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
+    <div
+      ref={scrollRef}
+      id="scroll-main"
+      onScroll={(event) => {
+        rankMemory.rid = rid
+        rankMemory.top = event.currentTarget.scrollTop
+      }}
+      className="min-h-0 flex-1 overflow-y-auto pb-10"
+    >
       <HotTabs
         active="ranking"
         title="排行榜"
@@ -163,8 +234,8 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       ) : tracks.length === 0 ? (
         <EmptyState mascot="missYou" icon="biliTv" title="这个分区今天没有榜单" action={null} />
       ) : (
-        /* 两列横排列表：B 站榜单在宽屏就是左右各一列，一行一条。 */
-        <div className="grid grid-cols-1 gap-x-10 gap-y-6 pb-6 lg:grid-cols-2">
+        /* 单列纵排：名次是独立一列，纵向扫读第 37 名时不用在两列之间找。 */
+        <div className="flex flex-col gap-5 pb-6">
           {tracks.map((track, index) => (
             <RankRow
               key={track.key}
