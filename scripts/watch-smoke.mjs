@@ -1287,6 +1287,59 @@ async function checkRanking(page) {
   await page.viewport(1440, 900)
 }
 
+/** 右栏只服务「听」的页面：在发现页开始播放不该自动拉出一栏歌词。 */
+async function checkRailScope(page) {
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4500)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')]
+      .find((button) => (button.getAttribute('aria-label') || '').startsWith('听 '))
+    hit?.click()
+  })()`)
+  await sleep(1200)
+  const home = await page.evaluate(`(() => {
+    const slot = document.querySelector('.rail-slot')
+    return {
+      playing: !!document.querySelector('button[aria-label="暂停"]'),
+      open: slot?.getAttribute('data-open') === 'true',
+      width: slot ? Math.round(slot.getBoundingClientRect().width) : 0,
+    }
+  })()`)
+  check('发现页开始播放不自动拉出歌词右栏', home.playing && !home.open && home.width <= 1)
+
+  await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '曲库') : null
+    hit?.click()
+  })()`)
+  await sleep(1500)
+  const library = await page.evaluate(`(() => {
+    const slot = document.querySelector('.rail-slot')
+    return {
+      open: slot?.getAttribute('data-open') === 'true',
+      width: slot ? Math.round(slot.getBoundingClientRect().width) : 0,
+    }
+  })()`)
+  check('回到曲库后歌词右栏自动回来', library.open && library.width > 200)
+
+  await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '发现') : null
+    hit?.click()
+  })()`)
+  await sleep(1200)
+  const backHome = await page.evaluate(`(() => {
+    const slot = document.querySelector('.rail-slot')
+    return {
+      open: slot?.getAttribute('data-open') === 'true',
+      width: slot ? Math.round(slot.getBoundingClientRect().width) : 0,
+    }
+  })()`)
+  check('离开听歌页面后右栏收起', !backHome.open && backHome.width <= 1)
+  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
+}
+
 async function checkShellBreakpoints(page) {
   await page.viewport(768, 800)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
@@ -1578,6 +1631,7 @@ async function main() {
     await checkHeroAllocation(page)
     await checkHomeResume(page)
     await checkRanking(page)
+    await checkRailScope(page)
     await checkShellBreakpoints(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
     if (DYNAMIC_RETURN) {
