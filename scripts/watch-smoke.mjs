@@ -13,6 +13,7 @@ const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const libraryPartialOnly = process.argv.includes('--library-partial')
 const channelOnly = process.argv.includes('--channel-nav')
 const topbarOnly = process.argv.includes('--topbar-only')
+const liveOnly = process.argv.includes('--live-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -3595,6 +3596,53 @@ async function checkTopbarSites(page) {
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
 }
 
+/** 直播分页：第二页不能重复第一页的 room_id，列表里也不该出现重复 key。 */
+async function checkLiveRooms(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(120)
+    }
+    return false
+  }
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+  await sleep(2200)
+  const opened = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '直播') : null
+    hit?.click()
+    return !!hit
+  })()`)
+  const firstReady = opened && await waitFor(`!!document.querySelector('[data-live-hero]')`)
+  const firstPage = await page.evaluate(`(() =>
+    [...document.querySelectorAll('[data-live-hero],[data-live-room]')]
+      .map((el) => Number(el.dataset.liveHero || el.dataset.liveRoom))
+  )()`)
+  await page.evaluate(`(() => {
+    const box = document.getElementById('scroll-main')
+    if (box) box.scrollTop = box.scrollHeight
+  })()`)
+  const loadedMore = await waitFor(
+    `document.querySelectorAll('[data-live-hero],[data-live-room]').length >= 24`,
+  )
+  const allRooms = await page.evaluate(`(() =>
+    [...document.querySelectorAll('[data-live-hero],[data-live-room]')]
+      .map((el) => Number(el.dataset.liveHero || el.dataset.liveRoom))
+  )()`)
+  const unique = new Set(allRooms)
+  check(
+    '直播分页加载后 room_id 唯一，不再出现重复卡片',
+    firstReady &&
+      firstPage.length >= 12 &&
+      loadedMore &&
+      allRooms.length >= 24 &&
+      unique.size === allRooms.length,
+  )
+  if (unique.size !== allRooms.length) console.log({ firstPage, allRooms })
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -3618,6 +3666,10 @@ async function main() {
       await checkTopbarSites(page)
       return
     }
+    if (liveOnly) {
+      await checkLiveRooms(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -3630,6 +3682,7 @@ async function main() {
     await checkHeroAllocation(page)
     await checkAuthorHero(page)
     await checkTopbarSites(page)
+    await checkLiveRooms(page)
     await checkFollowingDirectory(page)
     await checkHomeResume(page)
     await checkNavConventions(page)

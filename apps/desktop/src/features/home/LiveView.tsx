@@ -32,7 +32,13 @@ export function LiveView() {
       .then((list) => {
         pageRef.current = next
         setPage(next)
-        setRooms((prev) => (next === 1 ? list : [...prev, ...list]))
+        setRooms((prev) => {
+          const base = next === 1 ? [] : prev
+          // 接口偶尔会在下一页重复上一页的房间；按 room_id 去重，既避免重复卡片，
+          // 也不让 React 收到重复 key。
+          const seen = new Set(base.map((room) => room.room_id))
+          return [...base, ...list.filter((room) => !seen.has(room.room_id))]
+        })
       })
       .catch((cause) => setError(toWireError(cause).message))
       .finally(() => {
@@ -103,6 +109,7 @@ export function LiveView() {
         <div className="mb-4 px-4 md:px-8">
           <button
             type="button"
+            data-live-hero={focus.room_id}
             onClick={() => void ipc.openExternal(focus.url).catch(() => {})}
             title={focus.title}
             className="group relative block h-[220px] w-full overflow-hidden rounded-[8px] bg-[var(--ga1)] text-left sm:h-[280px] lg:h-[320px]"
@@ -148,6 +155,7 @@ export function LiveView() {
           <button
             key={`${room.room_id}`}
             type="button"
+            data-live-room={room.room_id}
             onClick={() => void ipc.openExternal(room.url).catch(() => {})}
             title={room.title}
             className="group min-w-0 text-left"

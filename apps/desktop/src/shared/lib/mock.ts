@@ -329,17 +329,26 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,
       )
     }
-    case 'live_rooms':
-      return CATALOG.slice(0, 6).map((track, i) => ({
-        room_id: 1000 + i,
-        title: track.title,
-        uname: track.artist,
-        face: track.up_avatar ?? null,
-        cover: track.cover,
-        area: '音乐',
-        online: 700_000 - i * 90_000,
-        url: `https://live.bilibili.com/${1000 + i}`,
-      }))
+    case 'live_rooms': {
+      // 每页换一批 room_id，预览翻页时不会把同一间房重复挂到列表中。
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      const count = Math.max(1, Math.trunc(num(args, 'count')))
+      const start = (page - 1) * count
+      return Array.from({ length: count }, (_, i) => {
+        const at = start + i
+        const track = CATALOG[at % CATALOG.length]!
+        return {
+          room_id: 1000 + at,
+          title: track.title,
+          uname: track.artist,
+          face: track.up_avatar ?? null,
+          cover: track.cover,
+          area: '音乐',
+          online: 700_000 - (at % 6) * 90_000,
+          url: `https://live.bilibili.com/${1000 + at}`,
+        }
+      })
+    }
     case 'bangumi_rank': {
       if (![1, 2, 3, 4, 5].includes(num(args, 'season_type'))) {
         throw fail('input', '分类必须为 1 到 5')

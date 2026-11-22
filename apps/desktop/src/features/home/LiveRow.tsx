@@ -63,6 +63,7 @@ export function LiveRow() {
           <button
             key={room.room_id}
             type="button"
+            data-live-room={room.room_id}
             onClick={() => void ipc.openExternal(room.url).catch(() => {})}
             title={room.title}
             className="group min-w-0 text-left"
