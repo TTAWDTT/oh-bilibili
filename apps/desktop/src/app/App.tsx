@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
 import { AuthorView } from '../features/library/AuthorView'
@@ -166,22 +166,29 @@ export default function App() {
   const listening = useIsListening()
   const hasSession = useHasSession()
   const hasContent = listening && hasSession && (track !== null || queued > 0)
+  // 全屏弹幕与右栏都只属于「听」的页面。它说的是一条正在播放的音轨，
+  // 挂在发现、排行、历史这些页面上既不相关，也会白白吃掉正文宽度。
+  const musicView = ['library', 'playlist', 'liked', 'downloads'].includes(view.kind)
   const railOpen = hasContent && rail !== null
   const trackKey = track?.key ?? null
   // 观看页不要导航：播放器要的是宽度，而且这一页里导航没有去处。
   // 返回靠信息区标题旁的返回键，不是靠侧栏。
   const showSidebar = view.kind !== 'watch'
-  // 全屏弹幕只在「正在听」的音乐页出现。它说的是一条正在播放的音轨，
-  // 盖在发现页的封面上就是噪声；观看页有自己的弹幕层，再叠一层会双倍。
-  const musicView = ['library', 'playlist', 'liked', 'downloads'].includes(view.kind)
-
   useEffect(() => {
-    if (!trackKey) return
+    if (!trackKey || !musicView) return
     // 窄屏的右栏是一整张全屏面板，跟着每首歌自动弹出来会盖住正在看的页面；
     // 宽屏才把歌词栏拉回来，窄屏留给迷你播放条上的歌词/队列按钮。
     if (!window.matchMedia('(min-width: 1280px)').matches) return
     if (useAppStore.getState().rail === null) setRail('lyrics')
-  }, [trackKey, setRail])
+  }, [trackKey, musicView, setRail])
+
+  // 离开「听」的页面时收起右栏；在这里手动打开仍然有效，只是不会被自动带过去。
+  const previousKind = useRef(view.kind)
+  useEffect(() => {
+    if (previousKind.current === view.kind) return
+    previousKind.current = view.kind
+    if (!musicView) setRail(null)
+  }, [view.kind, musicView, setRail])
 
   // 从宽窗口拖到窄窗口时，桌面的右栏会变成盖住整页的面板；跨过断点就收起，
   // 需要时再点播放条上的歌词/队列按钮打开。
