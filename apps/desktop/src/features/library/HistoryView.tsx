@@ -59,10 +59,18 @@ export function HistoryView() {
     historyMemory.scrollTop = box.scrollTop
   }
 
-  const applyFirstPage = (list: Entry[]): void => {
-    // 回来时先刷新第一页：这段时间播过的新歌、改过的进度都要反映出来，
-    // 已经翻出来的更早记录继续留在下面。
-    const merged = mergeFirstPage(entriesRef.current, list)
+  const applyFirstPage = async (list: Entry[]): Promise<void> => {
+    // 回来时先刷新第一页：这段时间播过的新歌、改过的进度都要反映出来。
+    // 旧尾巴只有在和第一页接得上时才拼回去，中间隔着新记录就宁可重来。
+    const remembered = entriesRef.current
+    const merged = await mergeFirstPage(remembered, list)
+    if (merged === null) {
+      setEntries(list)
+      const last = list[list.length - 1]
+      setCursor(last ? { played_at: last.played_at, id: last.id } : null)
+      setHasMore(list.length === HISTORY_PAGE)
+      return
+    }
     setEntries(merged)
     const last = merged[merged.length - 1]
     setCursor(last ? { played_at: last.played_at, id: last.id } : null)
@@ -74,7 +82,7 @@ export function HistoryView() {
     void ipc
       .libraryHistoryTimed(HISTORY_PAGE)
       .then((list) => {
-        if (!cancelled) applyFirstPage(list)
+        if (!cancelled) void applyFirstPage(list)
       })
       .catch((e) => {
         if (!cancelled) setError(toWireError(e).message)
@@ -217,13 +225,26 @@ export function HistoryView() {
   if (entries === null) return <BiliLoader label="正在取历史…" />
   if (entries.length === 0) {
     return (
-      <EmptyState
-        mascot="heart"
-        icon="clock"
-        title="还没有播放记录"
-        detail="播过的歌会自动出现在这里，下次一定。"
-        action={null}
-      />
+      <div
+        ref={(node) => {
+          if (!node) return
+          // 删到一条不剩时列表整块消失，把焦点收到空态上，键盘用户不会掉出内容。
+          if (focusRequest.current) {
+            focusRequest.current = null
+            node.focus()
+          }
+        }}
+        tabIndex={-1}
+        className="outline-none"
+      >
+        <EmptyState
+          mascot="heart"
+          icon="clock"
+          title="还没有播放记录"
+          detail="播过的歌会自动出现在这里，下次一定。"
+          action={null}
+        />
+      </div>
     )
   }
 
@@ -293,10 +314,14 @@ export function HistoryView() {
                     .then(() => {
                       // 这一条刚被播过，played_at 和进度都变了；把第一页拉回来，
                       // 它会按真实记录挪到「今天」。
-                      void ipc
-                        .libraryHistoryTimed(HISTORY_PAGE)
-                        .then(applyFirstPage)
-                        .catch(() => {})
+                      // 历史由引擎的 watchdog 写入，等它落库再拉一次，并盯住这一行。
+                      window.setTimeout(() => {
+                        focusRequest.current = { key: entry.track.key }
+                        void ipc
+                          .libraryHistoryTimed(HISTORY_PAGE)
+                          .then(applyFirstPage)
+                          .catch(() => {})
+                      }, 900)
                       const resumeAt = resumablePosition(entry)
                       if (resumeAt === null) return
                       if (usePlayerStore.getState().snapshot?.track?.key !== entry.track.key) return
@@ -505,7 +530,7 @@ function focusRow(box: HTMLElement, key: string | null, mode: 'anchor' | 'reveal
  * 重进历史时用新取的第一页替换顶部，已经翻出来的更早记录接在后面。
  * 第一页都取不满说明库里没有更多了，旧尾巴一并丢掉。
  */
-function mergeFirstPage(older: Entry[], fresh: Entry[]): Entry[] {
+async function mergeFirstPage(older: Entry[], fresh: Entry[]): Promise<Entry[] | null> {
   if (older.length === 0 || fresh.length < HISTORY_PAGE) return fresh
   if (older.length <= fresh.length) return fresh
   const last = fresh[fresh.length - 1]
@@ -516,5 +541,11 @@ function mergeFirstPage(older: Entry[], fresh: Entry[]): Entry[] {
       !seen.has(entry.track.key) &&
       (entry.played_at < last.played_at || (entry.played_at === last.played_at && entry.id < last.id)),
   )
+  const head = tail[0]
+  if (!head) return fresh
+  // 只看新旧顺序不够：离开期间可能又播了超过一页，旧尾巴跟第一页之间会断层。
+  // 用第一页最后一条取下一页，和旧尾巴的头对上了才敢拼。
+  const next = await ipc.libraryHistoryTimed(HISTORY_PAGE, { played_at: last.played_at, id: last.id })
+  if (!next.some((entry) => entry.id === head.id)) return null
   return [...fresh, ...tail]
 }
