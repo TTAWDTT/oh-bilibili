@@ -1585,6 +1585,21 @@ export function WatchPlayer({
           </div>
         ) : null}
 
+        {/* 热度条和进度条各占一层：热度在上、进度条在下，热度不能溢出进度条自己的盒，
+            WebKit 不会把命中区给溢出的绝对定位子元素。 */}
+        <div className="relative mb-1.5 h-5">
+          <DanmakuBeats
+            items={visibleDanmaku}
+            durationMs={duration}
+            enabled={danmakuOn}
+            resetKey={data.current_page}
+            onSeek={(ms) => {
+              if (!duration) return
+              seekTo(ms / duration)
+              // 暂停时按按钮就直接从这一刻播，别只把画面停在新位置。
+              if (!playing) togglePlay()
+            }}
+          />
         <div
           role="slider"
           aria-label="播放进度"
@@ -1649,16 +1664,8 @@ export function WatchPlayer({
             if (scrub !== null) setScrub(ratio)
           }}
           onMouseLeave={() => setHoverAt(null)}
-          className="bili-progress group relative mb-1.5 h-3 cursor-pointer touch-none"
+          className="bili-progress group absolute inset-x-0 bottom-0 h-3 cursor-pointer touch-none"
         >
-          <DanmakuBeats
-            items={visibleDanmaku}
-            durationMs={duration}
-            onSeek={(ms) => {
-              if (!duration) return
-              seekTo(ms / duration)
-            }}
-          />
           {hoverAt ? (
             (() => {
               const shot = shotAt(hoverAt.second)
@@ -1727,6 +1734,7 @@ export function WatchPlayer({
             }`}
             style={{ left: `${shownPercent}%` }}
           />
+        </div>
         </div>
 
         <div data-watch-controls className="flex items-center gap-1 sm:gap-2">
