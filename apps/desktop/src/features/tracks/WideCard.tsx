@@ -1,4 +1,5 @@
 import type { Track } from '../../shared/lib/contract'
+import { useAppStore } from '../../app/appStore'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
@@ -20,35 +21,60 @@ export function WideCard({
   noteAsTag?: boolean
   onOpen: () => void
 }) {
+  const navigate = useAppStore((state) => state.navigate)
+  const author = track.up_mid ?? null
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      data-focus-id={`wide:${track.key}`}
-      data-wide-card={track.key}
-      className="bili-card group flex items-start gap-4 text-left"
-      title={track.title}
-    >
-      <span className="relative aspect-video w-[190px] shrink-0 overflow-hidden rounded-[8px]">
+    <div className="bili-card group flex items-start gap-4" data-wide-card={track.key}>
+      <button
+        type="button"
+        onClick={onOpen}
+        data-focus-id={`wide:${track.key}`}
+        aria-label={`观看 ${track.title}`}
+        className="relative aspect-video w-[190px] shrink-0 overflow-hidden rounded-[8px]"
+      >
         <Cover cover={track.cover} title={track.title} width={190} className="bili-card-cover h-full w-full" />
         <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[16px] text-white">
           {formatDuration(track.duration_ms)}
         </span>
-      </span>
-      <span className="min-w-0 flex-1 py-0.5">
-        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
-          {track.title}
-        </span>
+      </button>
+      <div className="min-w-0 flex-1 py-0.5">
+        <button type="button" onClick={onOpen} title={track.title} className="block w-full text-left">
+          <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+            {track.title}
+          </span>
+        </button>
         {/* 热门页的标签在标题正下方、UP 之上；入站必刷的推荐语在整张卡最底部。 */}
         {note && noteAsTag ? (
           <span className="mt-1 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
             {note}
           </span>
         ) : null}
-        <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </span>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
+          {author !== null ? (
+            <button
+              type="button"
+              aria-label={`UP ${track.artist}`}
+              title={`看 ${track.artist} 的更多视频`}
+              data-focus-id={`wide-author:${track.key}`}
+              onClick={() =>
+                navigate({ kind: 'author', name: track.artist, mid: author }, undefined, `wide-author:${track.key}`)
+              }
+              className="flex min-w-0 items-center gap-1.5 hover:text-[var(--accent-strong-hover)]"
+            >
+              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
+                UP
+              </span>
+              <span className="truncate">{track.artist}</span>
+            </button>
+          ) : (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
+                UP
+              </span>
+              <span className="truncate">{track.artist}</span>
+            </span>
+          )}
+        </div>
         <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
           {track.views ? (
             <span className="flex items-center gap-0.5">
@@ -72,7 +98,7 @@ export function WideCard({
             <span className="truncate">{note}</span>
           </span>
         ) : null}
-      </span>
-    </button>
+      </div>
+    </div>
   )
 }

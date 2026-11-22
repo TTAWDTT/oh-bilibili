@@ -287,6 +287,9 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     只有卡片里的「从 mm:ss 播放」会定位并起播。热度条与进度条分成上下两层（WebKit 不会把命中区给溢出父盒的绝对定位
     子元素），按下/松开/移动都不再触发下方进度条的 seek 或缩略图。换 P、关弹幕、切走时关闭旧预览，Esc 关闭后焦点
     回到热度条。
+85. **横排大卡的两个入口**：综合热门、每周必看、入站必刷的 WideCard 不再是一个大按钮：封面与标题打开作品，UP 署名
+    单独进入作者空间；只有 `up_mid` 存在时署名才是按钮，否则保持普通文字。作者页在可返回时给一个「返回」入口，
+    从作者空间回来焦点回到原卡署名（`wide-author:`），从视频回来回到封面（`wide:`）。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
