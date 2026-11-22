@@ -324,6 +324,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'ranking': {
       // 第一条带上分区：预览里换分区能看出榜单真的换了，而不只是选中态动了。
       // key 保持原样，观看页还要按它找这条视频。
+      if (new URL(window.location.href).searchParams.has('slowRanking')) await sleep(1500)
       const rid = num(args, 'rid')
       return CATALOG.slice(0, 20).map((track, index) =>
         index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,

@@ -272,6 +272,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
 79. **观看页三连**：长按点赞 550ms 或点操作排的「三连」按钮，只有点赞、投币、收藏三项回执都确认后才播完成动画并报完成；
     部分失败列出未确认项，先刷新账号关系再让用户重试。按住时移出、pointercancel、窗口失焦都会取消，减少动态时进度条静止。
     回归见 `watch-smoke --triple-only`（短按、长按、移出、换稿、键盘、成功与部分失败）。
+80. **榜单首屏**：首次取数用与真实行同列宽、同封面比例的静态骨架，页首、分区和首行起点在数据到达前后不跳；
+    骨架 `aria-hidden` 且没有 Tab 停靠点，减少动态效果时也保持静止。回归见 `watch-smoke --ranking-skeleton-only`。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、

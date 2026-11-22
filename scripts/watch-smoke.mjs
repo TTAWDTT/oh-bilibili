@@ -15,6 +15,7 @@ const channelOnly = process.argv.includes('--channel-nav')
 const topbarOnly = process.argv.includes('--topbar-only')
 const liveOnly = process.argv.includes('--live-only')
 const tripleOnly = process.argv.includes('--triple-only')
+const rankingSkeletonOnly = process.argv.includes('--ranking-skeleton-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -1864,6 +1865,7 @@ async function checkRanking(page) {
   await page.evaluate(`(() => {
     const nav = document.querySelector('nav[aria-label="主导航"]')
     const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '排行榜') : null
+    hit?.focus()
     hit?.click()
   })()`)
   let ready = false
@@ -3805,6 +3807,56 @@ async function checkTriple(page) {
   check('键盘可在三连按钮上直接触发', keyboardClicked && keyboardConfirmed)
 }
 
+/** 榜单首屏骨架必须和真实首行同起点，页首和分区在数据到达前后不跳。 */
+async function checkRankingSkeleton(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(80)
+    }
+    return false
+  }
+  const geometry = () =>
+    page.evaluate(`(() => {
+      const header = document.querySelector('[data-hot-page="ranking"]')
+      const group = header?.querySelector('[role="group"]')
+      const first = document.querySelector('[data-rank-skeleton], [data-rank-row]')
+      return {
+        headerBottom: Math.round(header?.getBoundingClientRect().bottom ?? -1),
+        segmentTop: Math.round(group?.getBoundingClientRect().top ?? -1),
+        firstTop: Math.round(first?.getBoundingClientRect().top ?? -1),
+        focus: (document.activeElement?.textContent || '').trim(),
+        skeletonTabs: document.querySelectorAll('[data-rank-skeleton] button, [data-rank-skeleton] [tabindex]').length,
+      }
+    })()`)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&slowRanking=1`)}`)
+  await sleep(2200)
+  const clicked = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '排行榜') : null
+    hit?.focus()
+    return document.activeElement === hit
+  })()`)
+  if (clicked) await page.pressSpace()
+  const skeletonReady = clicked && await waitFor(`!!document.querySelector('[data-rank-skeleton]')`, 1200)
+  const before = await geometry()
+  const loaded = await waitFor(`document.querySelectorAll('[data-rank-row]').length >= 9`, 6000)
+  const after = await geometry()
+  const ok =
+    skeletonReady &&
+    loaded &&
+    before.skeletonTabs === 0 &&
+    before.focus === '排行榜' &&
+    before.headerBottom === after.headerBottom &&
+    before.segmentTop === after.segmentTop &&
+    Math.abs(before.firstTop - after.firstTop) <= 1
+  check('榜单首屏骨架与真实首行同起点，页首和分区不跳', ok)
+  if (!ok) console.log({ skeletonReady, loaded, before, after })
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -3836,6 +3888,10 @@ async function main() {
       await checkTriple(page)
       return
     }
+    if (rankingSkeletonOnly) {
+      await checkRankingSkeleton(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -3854,6 +3910,7 @@ async function main() {
     await checkHomeResume(page)
     await checkNavConventions(page)
     await checkRanking(page)
+    await checkRankingSkeleton(page)
     await checkChannelNav(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)
