@@ -1333,6 +1333,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       })
     }
     case 'coin_set':
+      if (new URL(window.location.href).searchParams.has('failCoin')) {
+        throw fail('internal', '投币回执超时')
+      }
       return null
     case 'relation_states': {
       // 预览：目录第一条固定是已赞/已藏，用来验证进页面时状态会被点亮。

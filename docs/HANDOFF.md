@@ -269,6 +269,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     滚动位置或搜索草稿。
 78. **直播分页**：第二页及之后按 `room_id` 去重后再追加，接口重复上一页的房间时不会产生重复卡片或重复 React key。
     开发 mock 每页换一批 `room_id`，预览翻页能看出新房间，回归见 `watch-smoke --live-only`。
+79. **观看页三连**：长按点赞 550ms 或点操作排的「三连」按钮，只有点赞、投币、收藏三项回执都确认后才播完成动画并报完成；
+    部分失败列出未确认项，先刷新账号关系再让用户重试。按住时移出、pointercancel、窗口失焦都会取消，减少动态时进度条静止。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、

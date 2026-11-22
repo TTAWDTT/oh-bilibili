@@ -300,6 +300,25 @@ export function WatchInfo({
     }
   }, [])
 
+  // 换稿时这次按住不再属于任何一条视频，计时和“已触发”标记都要清掉。
+  useEffect(() => {
+    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+    holdTimer.current = null
+    longFired.current = false
+    setHolding(false)
+  }, [track.key])
+
+  // 按住时切到别的窗口、触屏开始滚动，都不能在后台继续累计到三连。
+  useEffect(() => {
+    const cancel = (): void => {
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+      holdTimer.current = null
+      setHolding(false)
+    }
+    window.addEventListener('blur', cancel)
+    return () => window.removeEventListener('blur', cancel)
+  }, [])
+
   useEffect(() => {
     if (!noteOpen) return
     const timer = window.setTimeout(() => noteRef.current?.focus(), 0)
@@ -396,6 +415,8 @@ export function WatchInfo({
           onPointerDown={startHold}
           onPointerUp={endHold}
           onPointerLeave={endHold}
+          onPointerCancel={endHold}
+          onBlur={endHold}
           onClick={() => {
             // 长按已经触发过三连，这一次松开不再当成普通点赞
             if (longFired.current) {
@@ -467,6 +488,17 @@ export function WatchInfo({
             </span>
           </span>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
+        </button>
+        <button
+          type="button"
+          data-triple
+          aria-label="一键三连"
+          title="一键三连"
+          onClick={onTriple}
+          className={action(false)}
+        >
+          <Icon name="gift" size={20} />
+          三连
         </button>
         <button
           type="button"
