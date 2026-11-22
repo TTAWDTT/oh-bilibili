@@ -62,6 +62,16 @@ export function HomeView() {
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
   const [resume, setResume] = useState<Resume | null>(null)
+  /** 当前浏览的分区；0 是「全部」，保留推荐流。 */
+  const [scope, setScope] = useState(0)
+  const [region, setRegion] = useState<Track[] | null>(null)
+  const [regionError, setRegionError] = useState<string | null>(null)
+  const [regionLoading, setRegionLoading] = useState(false)
+  const [regionAttempt, setRegionAttempt] = useState(0)
+  const regionSeq = useRef(0)
+  /** 进分区前的滚动位置，回到「全部」时放回去。 */
+  const scopeScroll = useRef(0)
+  const restoringScope = useRef(false)
 
   // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
   useEffect(() => {
@@ -264,6 +274,49 @@ export function HomeView() {
     feedMemory.fresh = fresh
   }, [fresh])
 
+  // 选分区就换内容，不换页面：迟到的旧分区响应不能盖掉当前分区。
+  useEffect(() => {
+    if (scope === 0) return
+    const ticket = ++regionSeq.current
+    setRegionLoading(true)
+    setRegionError(null)
+    setRegion(null)
+    void ipc
+      .regionNew(scope, 1)
+      .then((list) => {
+        if (regionSeq.current === ticket) setRegion(list)
+      })
+      .catch((e) => {
+        if (regionSeq.current !== ticket) return
+        setRegion([])
+        setRegionError(toWireError(e).message)
+      })
+      .finally(() => {
+        if (regionSeq.current === ticket) setRegionLoading(false)
+      })
+  }, [scope, regionAttempt])
+
+  useEffect(() => {
+    if (scope !== 0 || !restoringScope.current) return
+    restoringScope.current = false
+    scrollerRef.current?.scrollTo({ top: scopeScroll.current })
+  }, [scope])
+
+  const chooseScope = (rid: number): void => {
+    if (rid === scope) return
+    if (scope === 0) scopeScroll.current = scrollerRef.current?.scrollTop ?? 0
+    setHoverPart(null)
+    setScope(rid)
+    scrollerRef.current?.scrollTo({ top: 0 })
+  }
+
+  const backToAll = (): void => {
+    if (scope === 0) return
+    restoringScope.current = true
+    setHoverPart(null)
+    setScope(0)
+  }
+
   const more = (): void => {
     // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
     if (pending.current || loading || loadingMore || exhausted.current) return
@@ -337,6 +390,8 @@ export function HomeView() {
       id="scroll-main"
       onScroll={(event) => {
         const el = event.currentTarget
+        // 分区里的滚动不是推荐流的位置，别把它写进返回时要用的记忆。
+        if (scope !== 0) return
         feedMemory.scrollTop = el.scrollTop
         const max = el.scrollHeight - el.clientHeight
         // 滚动高度只覆盖已挂出来的卡片，比例要按渲染窗口算，不能按取回的条数算。
@@ -355,7 +410,8 @@ export function HomeView() {
        */}
       <nav className="mb-4 bg-[var(--panel)] py-3">
         <div className="flex items-center gap-5 px-4 md:px-8">
-          <div className="flex shrink-0 items-start gap-3">
+          {/* 宽窗左栏已经有热门/排行榜，这里只留给窄窗的可发现入口。 */}
+          <div className="flex shrink-0 items-start gap-3 md:hidden">
             {[
               { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
               { label: '排行', icon: 'rank' as const, tone: 'var(--accent)', run: () => navigate({ kind: 'ranking' }) },
@@ -393,11 +449,25 @@ export function HomeView() {
                       : ''
               }`}
             >
+              <button
+                type="button"
+                aria-pressed={scope === 0}
+                onClick={backToAll}
+                className={[
+                  't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
+                  scope === 0
+                    ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+                    : 'bg-[var(--ga0)] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]',
+                ].join(' ')}
+              >
+                全部
+              </button>
               {PARTS.filter((part) => part.rid !== 0).map((part) => (
                 <button
                   key={part.rid}
                   type="button"
-                  onClick={() => navigate({ kind: 'ranking', rid: part.rid })}
+                  aria-pressed={scope === part.rid}
+                  onClick={() => chooseScope(part.rid)}
                   onMouseEnter={(event) => {
                     const el = event.currentTarget
                     setHoverPart({
@@ -414,7 +484,12 @@ export function HomeView() {
                       top: el.offsetTop,
                     })
                   }}
-                  className="t h-7 w-[62px] shrink-0 rounded-[4px] bg-[var(--ga0)] text-[12.5px] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]"
+                  className={[
+                    't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
+                    scope === part.rid
+                      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+                      : 'bg-[var(--ga0)] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]',
+                  ].join(' ')}
                 >
                   {part.name}
                 </button>
@@ -469,16 +544,16 @@ export function HomeView() {
           </button>
         </div>
       ) : null}
-      {slow && !attempt.current.append ? slowNotice : null}
+      {scope === 0 && slow && !attempt.current.append ? slowNotice : null}
 
-      {resume ? (
+      {scope === 0 && resume ? (
         <div className="px-4 pt-4 md:px-8 lg:hidden">
           <ResumeCard compact resume={resume} onOpen={openResume} />
         </div>
       ) : null}
 
       {/* 推荐单独失败时，续播卡不跟着消失。 */}
-      {resume && hero.length === 0 ? (
+      {scope === 0 && resume && hero.length === 0 ? (
         <div className="px-4 pt-4 md:px-8">
           <div className="hidden max-w-[560px] lg:block">
             <ResumeCard resume={resume} onOpen={openResume} />
@@ -491,7 +566,7 @@ export function HomeView() {
        * 而不是一列文字条目。轮播用前 5 条、右栏接 6 条，下面网格从第 11 条开始，
        * 同一批推荐不会在屏上出现两次。
        */}
-      {hero.length > 0 ? (
+      {scope === 0 && hero.length > 0 ? (
         <div data-home-recommend className="mb-4 px-4 pt-4 md:px-8">
           {/* 标题行给「换一换」一个和内容左右对齐的落点。之前是贴在右边缘的一整条竖卡，
               宽度顶出内容区，整页就多出一条横向滚动条。 */}
@@ -596,14 +671,54 @@ export function HomeView() {
         </div>
       ) : null}
 
-      {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
-      <LiveRow />
-      <BangumiRow />
-      {PARTITION_FLOORS.map((part) => (
-        <PartitionRow key={part.rid} rid={part.rid} title={part.title} />
-      ))}
+      {scope !== 0 ? (
+        <div data-home-region className="px-4 pt-4 md:px-8">
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <h2 className="text-[17px] font-medium text-[var(--text-1)]">
+              {PARTS.find((part) => part.rid === scope)?.name ?? '分区'}
+              <span className="ml-2 text-[12.5px] font-normal text-[var(--text-3)]">最新投稿</span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => navigate({ kind: 'ranking', rid: scope })}
+              className="t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+            >
+              排行榜
+              <Icon name="chevronRight" size={12} />
+            </button>
+          </div>
+          {regionLoading ? <BiliLoader label="正在取这个分区…" /> : null}
+          {!regionLoading && regionError ? (
+            <div className="flex flex-col items-center gap-2 py-6">
+              <p className="text-center text-[12.5px] text-[var(--text-3)]">{regionError}</p>
+              <button
+                type="button"
+                onClick={() => setRegionAttempt((n) => n + 1)}
+                className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                重试
+              </button>
+            </div>
+          ) : null}
+          {!regionLoading && !regionError && region?.length === 0 ? (
+            <p className="py-8 text-center text-[12.5px] text-[var(--text-3)]">这个分区暂时没有内容。</p>
+          ) : null}
+          {!regionLoading && region && region.length > 0 ? (
+            <ContentGrid tracks={region} activeKey={activeKey} playing={playing} />
+          ) : null}
+        </div>
+      ) : (
+        <>
+          {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
+          <LiveRow />
+          <BangumiRow />
+          {PARTITION_FLOORS.map((part) => (
+            <PartitionRow key={part.rid} rid={part.rid} title={part.title} />
+          ))}
+        </>
+      )}
 
-      {items.length > 0 ? (
+      {scope === 0 && items.length > 0 ? (
         <div data-home-feed className="px-4 md:px-8">
           <ContentGrid
             tracks={feedTracks}
@@ -615,10 +730,10 @@ export function HomeView() {
           />
         </div>
       ) : null}
-      {loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
-      {loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
-      {slow && attempt.current.append ? slowNotice : null}
-      {error && items.length > 0 ? (
+      {scope === 0 && loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
+      {scope === 0 && loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
+      {scope === 0 && slow && attempt.current.append ? slowNotice : null}
+      {scope === 0 && error && items.length > 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">
           <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
           <button

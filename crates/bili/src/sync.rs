@@ -909,6 +909,22 @@ impl Client {
         Ok(tracks_from_list(&v["data"]["list"]))
     }
 
+    /// 分区最新投稿。发现页选中一个分区时读这一条，不把人带去排行榜。
+    /// `data.archives` 的字段和排行榜列表同形，复用同一份解析。
+    pub async fn region_new(
+        &self,
+        rid: u32,
+        page: u32,
+    ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        let v = self
+            .get_json(
+                &format!("{API}/x/web-interface/newlist?rid={rid}&type=0&pn={page}&ps=20"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        Ok(tracks_from_list(&v["data"]["archives"]))
+    }
+
     /// 综合热门（B 站 popular/all）。一次 50 条，`no_more` 为 true 表示翻到底了。
     ///
     /// 每条还带一个 `rcmd_reason.content`，B 站把它印在标题下面当橙色小标签
