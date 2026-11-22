@@ -1160,6 +1160,106 @@ async function checkHomeResume(page) {
   check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
 }
 
+/** 导航约定：歌单详情仍在曲库下，观看页返回把焦点还给进来的那张卡。 */
+async function checkNavConventions(page) {
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4000)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('nav[aria-label="主导航"] button')]
+      .find((button) => (button.textContent || '').trim() === '曲库')
+    hit?.click()
+  })()`)
+  await sleep(1200)
+  await page.evaluate(`(() => {
+    const title = document.querySelector('#scroll-main button [title="深夜循环"]')
+    title?.closest('button')?.click()
+  })()`)
+  await sleep(1000)
+  const playlistNav = await page.evaluate(`(() => {
+    const button = [...document.querySelectorAll('nav[aria-label="主导航"] button')]
+      .find((item) => (item.textContent || '').trim() === '曲库')
+    return {
+      current: button?.getAttribute('aria-current') ?? null,
+      // 详情页独有的标题，别用歌单名——曲库里本来就有这张卡。
+      inPlaylist: (document.querySelector('h1')?.textContent || '').includes('深夜循环'),
+    }
+  })()`)
+  check('歌单详情里左栏仍停在曲库', playlistNav.current === 'page' && playlistNav.inPlaylist)
+
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4000)
+  const opened = await page.evaluate(`(() => {
+    const card = document.querySelector('[data-track-card]')
+    const button = card?.querySelector('button[aria-label^="观看"]')
+    if (!card || !button) return null
+    button.click()
+    return card.dataset.key ?? null
+  })()`)
+  let watching = false
+  for (let i = 0; i < 20 && !watching; i += 1) {
+    await sleep(300)
+    watching = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  const watchShell = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav?.querySelector('[aria-current="page"]')
+    return {
+      nav: !!nav,
+      width: nav ? Math.round(nav.getBoundingClientRect().width) : 0,
+      current: hit ? hit.getAttribute('aria-label') || hit.textContent?.trim() || 'current' : '',
+      currentCount: nav ? nav.querySelectorAll('[aria-current="page"]').length : 0,
+    }
+  })()`)
+  check(
+    `观看页保留可收起的左栏并高亮来源 ${JSON.stringify(watchShell)}`,
+    watching && watchShell.nav && watchShell.width <= 64 && watchShell.currentCount === 1,
+  )
+  await page.evaluate(
+    `document.querySelector('nav[aria-label="主导航"] button[aria-label="展开侧边栏"]')?.click()`,
+  )
+  await sleep(400)
+  const expanded = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    return { width: nav ? Math.round(nav.getBoundingClientRect().width) : 0 }
+  })()`)
+  check('观看页左栏可以展开', expanded.width >= 200)
+
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  await sleep(1500)
+  const back = await page.evaluate(`(() => {
+    const active = document.activeElement
+    const card = active?.closest?.('[data-track-card]')
+    return {
+      key: card?.dataset.key ?? null,
+      label: active?.getAttribute('aria-label') ?? '',
+    }
+  })()`)
+  check(
+    '从观看页返回后焦点回到进来的那张卡',
+    watching && opened !== null && back.key === opened && back.label.startsWith('观看'),
+  )
+
+  // 分区行的入口 id 带 rid：同一曲目也在续播卡/推荐流里时，仍要回到这一行。
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4500)
+  const partition = await page.evaluate(`(() => {
+    const row = document.querySelector('[data-focus-id^="partition:"]')
+    if (!row) return null
+    row.click()
+    return row.dataset.focusId
+  })()`)
+  let partitionVideo = false
+  for (let i = 0; i < 20 && !partitionVideo; i += 1) {
+    await sleep(300)
+    partitionVideo = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  await sleep(1600)
+  const partitionBack = await page.evaluate(`document.activeElement?.dataset?.focusId ?? ''`)
+  check('分区行返回后回到原分区卡', !!partition && partitionVideo && partitionBack === partition)
+}
+
 /** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
 async function checkRanking(page) {
   await page.viewport(1440, 900)
@@ -1630,6 +1730,7 @@ async function main() {
     await checkStageLyrics(page)
     await checkHeroAllocation(page)
     await checkHomeResume(page)
+    await checkNavConventions(page)
     await checkRanking(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)
@@ -3038,6 +3139,7 @@ async function main() {
         narrow.progressTop >= narrow.artistBottom - 2,
     )
     check('窄窗历史行不横向溢出', narrow && narrow.overflow <= 0)
+
     await page.viewport(1320, 900)
     await sleep(300)
 
@@ -3072,11 +3174,38 @@ async function main() {
       rows: document.querySelectorAll('[data-history-row]').length,
       empty: document.body.innerText.includes('还没有播放记录'),
       focused: document.activeElement?.hasAttribute('data-history-empty') ?? false,
+      tag: document.activeElement?.tagName ?? '',
+      label: document.activeElement?.getAttribute('aria-label') ?? '',
     })`)
     check(
-      '清空历史后离开再回来不会复用旧列表，焦点落在空态',
+      `清空历史后离开再回来不会复用旧列表，焦点落在空态 ${JSON.stringify(afterClearReturn)}`,
       historyCleared && afterClearReturn.rows === 0 && afterClearReturn.empty && afterClearReturn.focused,
     )
+
+  // 返回后用户立刻滚动：自动校正不能把位置抢回去。
+  await page.viewport(1320, 900)
+  await sleep(200)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4500)
+  const deep = await page.evaluate(`(() => {
+    const cards = [...document.querySelectorAll('[data-track-card]')]
+    const card = cards.at(-1)
+    card?.querySelector('button[aria-label^="观看"]')?.click()
+    return !!card
+  })()`)
+  let deepVideo = false
+  for (let i = 0; i < 20 && !deepVideo; i += 1) {
+    await sleep(300)
+    deepVideo = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  await sleep(200)
+  await page.evaluate(`document.getElementById('scroll-main').scrollTop = 0`)
+  await sleep(1000)
+  const afterUserScroll = await page.evaluate(
+    `Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0)`,
+  )
+  check('返回后用户滚动不会被自动校正拉回', deep && deepVideo && afterUserScroll === 0)
 
     // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。
     // 按 mid 去重后应得到 101、102、103，且整页重叠也要继续翻到空页收尾。

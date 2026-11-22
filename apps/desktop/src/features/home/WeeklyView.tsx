@@ -188,7 +188,7 @@ export function WeeklyView() {
               key={track.key}
               track={track}
               note={page.notes[track.key] ?? null}
-              onOpen={() => navigate({ kind: 'watch', track })}
+              onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
             />
           ))}
         </div>

@@ -144,7 +144,7 @@ export function PopularView() {
                   track={track}
                   note={notes[track.key] ?? null}
                   noteAsTag
-                  onOpen={() => navigate({ kind: 'watch', track })}
+                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
                 />
               ))}
             </div>

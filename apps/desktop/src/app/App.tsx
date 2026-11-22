@@ -147,6 +147,97 @@ function SidebarGlide() {
   return null
 }
 
+/**
+ * 返回时把焦点还给进来的那一项。
+ *
+ * 入口散在网格、轮播、排行、歌单行里，统一在入口元素上标 `data-focus-key`，
+ * 由这里按记录恢复；搜索面板开着时交给它自己处理。
+ */
+function FocusRestore() {
+  const view = useAppStore((state) => state.view)
+  useEffect(() => {
+    const focus = useAppStore.getState().returnFocus
+    if (!focus) return
+    // 历史页自己按行恢复焦点（空态、删除相邻行都归它管），这里不插手。
+    if (focus.kind === 'history') return
+    let stopped = false
+    let tries = 0
+    let timer: number | null = null
+    const fixes: number[] = []
+    /** 用户一动就停：返回后的自动校正不能跟人抢滚动。 */
+    const stopFixes = (): void => {
+      for (const id of fixes) window.clearTimeout(id)
+      fixes.length = 0
+    }
+    const onUserAction = (): void => {
+      stopFixes()
+    }
+    window.addEventListener('wheel', onUserAction, { passive: true })
+    window.addEventListener('pointerdown', onUserAction, true)
+    window.addEventListener('keydown', onUserAction, true)
+    window.addEventListener('touchstart', onUserAction, { passive: true })
+    const visible = (element: HTMLElement): boolean =>
+      element.isConnected && element.getClientRects().length > 0
+    const find = (): HTMLElement | null =>
+      [...document.querySelectorAll<HTMLElement>(`[data-focus-id="${focus.id}"]`)].find(visible) ?? null
+    /** 列表可能在聚焦后才完成布局：滚到能看见，不改变页面其他位置。 */
+    const ensureVisible = (target: HTMLElement): void => {
+      const box = target.closest<HTMLElement>('#scroll-main')
+      if (!box) return
+      const rect = target.getBoundingClientRect()
+      const area = box.getBoundingClientRect()
+      if (rect.top < area.top || rect.bottom > area.bottom) {
+        target.scrollIntoView({ block: 'nearest' })
+      }
+    }
+    let candidate: HTMLElement | null = null
+    let since = 0
+    const run = (): void => {
+      if (stopped) return
+      const app = useAppStore.getState()
+      if (app.searchOpen || app.view.kind !== focus.kind) return
+      const target = find()
+      if (!target) {
+        // 目标一直不出现（窗口化未渲染、入口已不在）就放弃，不要永远轮询。
+        if (tries >= 30) {
+          app.clearReturnFocus()
+          return
+        }
+        tries += 1
+        timer = window.setTimeout(run, 100)
+        return
+      }
+      // 同一个目标稳定出现 150ms 才算数：续播卡加载完会把同一曲目从推荐流里换走。
+      if (target !== candidate) {
+        candidate = target
+        since = Date.now()
+        timer = window.setTimeout(run, 100)
+        return
+      }
+      if (Date.now() - since < 150) {
+        timer = window.setTimeout(run, 100)
+        return
+      }
+      app.clearReturnFocus()
+      target.focus({ preventScroll: true })
+      ensureVisible(target)
+      fixes.push(window.setTimeout(() => ensureVisible(target), 250))
+      fixes.push(window.setTimeout(() => ensureVisible(target), 700))
+    }
+    run()
+    return () => {
+      stopped = true
+      if (timer !== null) window.clearTimeout(timer)
+      stopFixes()
+      window.removeEventListener('wheel', onUserAction)
+      window.removeEventListener('pointerdown', onUserAction, true)
+      window.removeEventListener('keydown', onUserAction, true)
+      window.removeEventListener('touchstart', onUserAction)
+    }
+  }, [view])
+  return null
+}
+
 export default function App() {
   useBootstrap()
   useShortcuts()
@@ -156,6 +247,7 @@ export default function App() {
   // 只有进系统全屏才藏标题栏。网页全屏要留着它：自定义标题栏里带着
   // 关闭与最小化按钮，藏掉窗口就没法关了。
   const osFullscreen = useAppStore((state) => state.osFullscreen)
+  const cinema = useAppStore((state) => state.cinema)
   const searchOpen = useAppStore((state) => state.searchOpen)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
@@ -166,14 +258,15 @@ export default function App() {
   const listening = useIsListening()
   const hasSession = useHasSession()
   const hasContent = listening && hasSession && (track !== null || queued > 0)
-  // 全屏弹幕与右栏都只属于「听」的页面。它说的是一条正在播放的音轨，
-  // 挂在发现、排行、历史这些页面上既不相关，也会白白吃掉正文宽度。
-  const musicView = ['library', 'playlist', 'liked', 'downloads'].includes(view.kind)
   const railOpen = hasContent && rail !== null
   const trackKey = track?.key ?? null
-  // 观看页不要导航：播放器要的是宽度，而且这一页里导航没有去处。
-  // 返回靠信息区标题旁的返回键，不是靠侧栏。
-  const showSidebar = view.kind !== 'watch'
+  // 观看页也保留左栏：要跳去别的主页面时从同一侧展开，不必先退出去。
+  // 想给视频多留宽度就把它收成窄栏，偏好沿用到下一次。
+  const showSidebar = !(view.kind === 'watch' && (cinema || osFullscreen))
+  // 右栏与全屏弹幕都只属于「听」的页面：它说的是一条正在播放的音轨，
+  // 挂在发现、排行、历史这些页面上既不相关，也会白白吃掉正文宽度。
+  const musicView = ['library', 'playlist', 'liked', 'downloads'].includes(view.kind)
+
   useEffect(() => {
     if (!trackKey || !musicView) return
     // 窄屏的右栏是一整张全屏面板，跟着每首歌自动弹出来会盖住正在看的页面；
@@ -182,7 +275,7 @@ export default function App() {
     if (useAppStore.getState().rail === null) setRail('lyrics')
   }, [trackKey, musicView, setRail])
 
-  // 离开「听」的页面时收起右栏；在这里手动打开仍然有效，只是不会被自动带过去。
+  // 离开「听」的页面时收起右栏；手动打开仍然有效，只是不会被自动带过去。
   const previousKind = useRef(view.kind)
   useEffect(() => {
     if (previousKind.current === view.kind) return
@@ -205,6 +298,7 @@ export default function App() {
     <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
       style={{ background: 'var(--color-ink)' }}>
       <SidebarGlide />
+      <FocusRestore />
       {/* 键盘用户跳过导航直达内容；不聚焦时不可见 */}
       <a
         href="#main-content"
@@ -243,7 +337,8 @@ export default function App() {
       {searchOpen ? <SearchPanel /> : null}
       {searchOpen ? null : <BackToTop targetId="scroll-main" />}
       <PlayerBar />
-      <MobileTabBar />
+      {/* 影院与系统全屏是沉浸态：底部主导航收起，退出后回到原标签。 */}
+      {view.kind === 'watch' && (cinema || osFullscreen) ? null : <MobileTabBar />}
       {railOpen ? <MobileRailSheet tab={rail ?? 'lyrics'} /> : null}
       <StageView />
       <ToastHost />

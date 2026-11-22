@@ -34,7 +34,8 @@ export type DynamicReturn = {
   pages: number
 }
 
-type HistoryEntry = { view: View; dynamicReturn: DynamicReturn | undefined }
+/** 返回时把焦点还给进入下一页的那张卡；没有入口卡片时为空。 */
+type HistoryEntry = { view: View; dynamicReturn: DynamicReturn | undefined; focusId: string | null }
 
 export type RailTab = 'lyrics' | 'queue'
 export type SidebarMode = 'full' | 'rail'
@@ -144,7 +145,15 @@ type AppStore = {
   /** 左栏是完整标签版还是只剩图标的窄条。 */
   sidebar: SidebarMode
   toggleSidebar: () => void
-  navigate: (view: View, dynamicReturn?: DynamicReturn) => void
+  /** 观看页默认只留窄栏给视频让宽度；展开/收起不覆盖浏览页的偏好。 */
+  watchNav: SidebarMode
+  toggleWatchNav: () => void
+  navigate: (view: View, dynamicReturn?: DynamicReturn, fromFocus?: string) => void
+  /** 返回后要接住焦点的卡片：只让对应页面的那一个列表消费。 */
+  returnFocus: { kind: View['kind']; id: string } | null
+  clearReturnFocus: () => void
+  /** 从哪一类页面进的观看页，左栏据此保留来源高亮。 */
+  watchSource: View['kind'] | null
   /** 换一条视频但不进历史：观看页里点相关推荐或自动连播，返回该回到来的那一页。 */
   replace: (view: View) => void
   /** 回上一层；没有历史就回发现页。 */
@@ -170,7 +179,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   view: { kind: 'home' },
   history: [],
   dynamicReturn: undefined,
+  returnFocus: null,
+  clearReturnFocus: () => set({ returnFocus: null }),
+  watchSource: null,
   sidebar: loadSidebar(),
+  watchNav: 'rail',
+  toggleWatchNav: () => set({ watchNav: get().watchNav === 'rail' ? 'full' : 'rail' }),
   toggleSidebar: () => {
     const next: SidebarMode = get().sidebar === 'full' ? 'rail' : 'full'
     saveSidebar(next)
@@ -196,7 +210,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   cinema: false,
   osFullscreen: false,
   toasts: [],
-  navigate: (view, dynamicReturn) =>
+  navigate: (view, dynamicReturn, fromFocus) =>
     set((state) => {
       // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
       if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
@@ -204,11 +218,16 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
       return {
         view,
+        returnFocus: null,
+        watchSource: view.kind === 'watch' ? state.view.kind : null,
         searchOpen: false,
         searchReturn: state.searchOpen && view.kind === 'watch' ? view.track.key : null,
         cinema: false,
         osFullscreen: false,
-        history: [...state.history, { view: state.view, dynamicReturn }].slice(-32),
+        history: [
+          ...state.history,
+          { view: state.view, dynamicReturn, focusId: fromFocus ?? null },
+        ].slice(-32),
         dynamicReturn: undefined,
       }
     }),
@@ -240,6 +259,11 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         searchOpen: state.searchReturn !== null,
         searchReturn: null,
         searchFocusResult: state.searchReturn,
+        // 从搜索结果回来时由搜索面板自己接焦点；普通返回把焦点还给进来的那张卡。
+        returnFocus:
+          state.searchReturn === null && prev.focusId
+            ? { kind: prev.view.kind, id: prev.focusId }
+            : null,
         cinema: false,
         osFullscreen: false,
         history: state.history.slice(0, -1),

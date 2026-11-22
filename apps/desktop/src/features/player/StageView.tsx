@@ -264,9 +264,10 @@ export function StageView() {
                     <button
                       key={item.key}
                       type="button"
+                      data-focus-id={`stage:${item.key}`}
                       onClick={() => {
                         setStage(false)
-                        navigate({ kind: 'watch', track: item })
+                        navigate({ kind: 'watch', track: item }, undefined, `stage:${item.key}`)
                       }}
                       title={item.title}
                       className="group w-[128px] shrink-0 self-start text-left"

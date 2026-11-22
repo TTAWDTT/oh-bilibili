@@ -66,7 +66,8 @@ export function PartitionRow({ rid, title }: PartitionRowProps) {
           <button
             key={track.key}
             type="button"
-            onClick={() => navigate({ kind: 'watch', track })}
+            data-focus-id={`partition:${rid}:${track.key}`}
+            onClick={() => navigate({ kind: 'watch', track }, undefined, `partition:${rid}:${track.key}`)}
             className={`group flex min-w-0 flex-col text-left ${index === 0 ? 'col-span-2 lg:row-span-2' : ''}`}
           >
             <span
