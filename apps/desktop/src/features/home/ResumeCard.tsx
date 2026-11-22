@@ -8,6 +8,9 @@ export type Resume = {
   /** 有本地观看记录才算「看」，否则按「听」处理。 */
   watching: boolean
   page: number | null
+  /** 当前分 P 的位置与时长；听歌条目直接用历史里的值。 */
+  position: number
+  duration: number
 }
 
 /**
@@ -18,27 +21,39 @@ export type Resume = {
  */
 export function resumeFrom(list: HistoryEntry[]): Resume | null {
   for (const entry of list) {
-    const duration = entry.track.duration_ms ?? 0
-    if (duration <= 0) continue
-    if (entry.position_ms < 5_000 || entry.position_ms >= duration - 1_000) continue
     const watch = readWatchProgress(entry.track.key)
+    const position = watch ? watch.position : entry.position_ms ?? 0
+    // 历史里的 duration 是整条投稿的总长；观看记录里有这一 P 自己的时长。
+    const duration = watch ? watch.duration : entry.track.duration_ms ?? 0
+    if (!(position >= 5_000)) continue
+    if (duration <= 0) continue
+    if (position >= duration - 1_000) continue
     const page = watch && watch.page > 1 ? watch.page : null
-    return { entry, watching: watch !== null, page }
+    return { entry, watching: watch !== null, page, position, duration }
   }
   return null
 }
 
 /** 观看页把分 P 进度写在本地；有这份记录才敢说这是「看过的视频」。 */
-function readWatchProgress(key: string): { page: number } | null {
+function readWatchProgress(key: string): { page: number; position: number; duration: number } | null {
+  const read = (page: number) => {
+    const position = Number(localStorage.getItem(`oh-bilibili:watch-pos:${key}:${page}`))
+    const duration = Number(localStorage.getItem(`oh-bilibili:watch-len:${key}:${page}`))
+    return {
+      page,
+      position: Number.isFinite(position) ? position : 0,
+      duration: Number.isFinite(duration) ? duration : 0,
+    }
+  }
   try {
     const stored = Number(localStorage.getItem(`oh-bilibili:watch-page:${key}`))
-    if (Number.isInteger(stored) && stored > 0) return { page: stored }
+    if (Number.isInteger(stored) && stored > 0) return read(stored)
     const prefix = `oh-bilibili:watch-pos:${key}:`
     for (let i = 0; i < localStorage.length; i += 1) {
       const name = localStorage.key(i)
       if (!name?.startsWith(prefix)) continue
       const page = Number(name.slice(prefix.length))
-      if (Number.isInteger(page) && page > 0) return { page }
+      if (Number.isInteger(page) && page > 0) return read(page)
     }
   } catch {
     // 隐私模式读不到，按「听」处理
@@ -56,16 +71,16 @@ export function ResumeCard({
   onOpen: (resume: Resume) => void
 }) {
   const track = resume.entry.track
-  const duration = track.duration_ms ?? 0
-  const ratio = duration > 0 ? Math.min(1, resume.entry.position_ms / duration) : 0
+  const ratio = resume.duration > 0 ? Math.min(1, resume.position / resume.duration) : 0
   const action = resume.watching ? '继续观看' : '继续听'
-  const watchedFor = `${resume.watching ? '已看' : '已听'} ${formatTime(resume.entry.position_ms)}`
+  const watchedFor = `${resume.watching ? '已看' : '已听'} ${formatTime(resume.position)}`
 
   if (compact) {
     return (
       <button
         type="button"
         data-home-resume="compact"
+        data-key={track.key}
         onClick={() => onOpen(resume)}
         className="group flex w-full items-center gap-3 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 text-left"
       >
@@ -96,6 +111,7 @@ export function ResumeCard({
     <button
       type="button"
       data-home-resume="wide"
+      data-key={track.key}
       onClick={() => onOpen(resume)}
       className="group block w-full overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
     >

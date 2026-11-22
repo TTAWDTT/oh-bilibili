@@ -85,7 +85,7 @@ export function HomeView() {
       return
     }
     void playContext([item.entry.track.key], 0).then(() => {
-      void usePlayerStore.getState().seek(item.entry.position_ms)
+      void usePlayerStore.getState().seek(item.position)
     })
   }
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
@@ -140,16 +140,25 @@ export function HomeView() {
   }, [])
 
   const resumeKey = resume?.entry.track.key ?? null
+  /** 续播那一条不再出现在推荐里，宽窄窗都一样。 */
+  const heroPool = resumeKey ? hero.filter((track) => track.key !== resumeKey) : hero
   /** 续播卡占了轮播的位置时，右边从推荐第一批的开头取六张，剩下的接进下方推荐流。 */
-  const heroCards = resume ? hero.slice(0, 6) : hero.slice(5, 11)
+  const heroCards = resume ? heroPool.slice(0, 6) : heroPool.slice(5, 11)
   const heroKeys = new Set(hero.map((track) => track.key))
   const cardKeys = new Set(heroCards.map((track) => track.key))
   const feedRemainder = items.filter((track) => !heroKeys.has(track.key) && track.key !== resumeKey)
   const feedTracks = wideHero
     ? resume
-      ? items.filter((track) => !cardKeys.has(track.key) && track.key !== resumeKey)
+      ? [
+          ...new Map(
+            [
+              ...heroPool.slice(6),
+              ...items.filter((track) => !cardKeys.has(track.key) && track.key !== resumeKey),
+            ].map((track) => [track.key, track]),
+          ).values(),
+        ]
       : feedRemainder
-    : [...new Map([...hero.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
+    : [...new Map([...heroPool.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
@@ -505,7 +514,7 @@ export function HomeView() {
               <ResumeCard resume={resume} onOpen={openResume} />
             </div>
           ) : (
-            <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
+            <HeroBanner tracks={heroPool.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
           )}
           {(resume ? heroCards.length > 0 : hero.length > 5) && wideHero ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */

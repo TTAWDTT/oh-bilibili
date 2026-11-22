@@ -57,6 +57,15 @@ function savePagePos(key: string, page: number, at: number): void {
   }
 }
 
+/** 分 P 的真实时长单独记一份：历史里那条 track 的 duration 是整条投稿的总长。 */
+function savePageLen(key: string, page: number, duration: number): void {
+  try {
+    localStorage.setItem(`oh-bilibili:watch-len:${key}:${page}`, String(Math.round(duration)))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
 function clearPagePos(key: string, page: number): void {
   try {
     localStorage.removeItem(`oh-bilibili:watch-pos:${key}:${page}`)
@@ -136,6 +145,7 @@ export function WatchView({ track }: { track: Track }) {
     const now = usePlayerStore.getState().progress.position_ms
     if (from !== undefined && snap?.track?.key === track.key && now >= 5000) {
       savePagePos(track.key, from, now)
+      if ((snap.duration_ms ?? 0) > 0) savePageLen(track.key, from, snap.duration_ms)
     }
     const at = loadPagePos(track.key, no)
     setResume(at ? { key: track.key, at } : null)
@@ -247,9 +257,11 @@ export function WatchView({ track }: { track: Track }) {
         return
       }
       const at = usePlayerStore.getState().progress.position_ms
+      const duration = snap.duration_ms ?? 0
+      if (duration > 0) savePageLen(track.key, no, duration)
       // 刚切 P 时声音还没起来，进度会短暂为 0；这时不能清掉这一 P 的记录。
       if (at < 5000) return
-      if (data.duration_ms > 0 && at > data.duration_ms - 10_000) return
+      if (duration > 0 && at > duration - 10_000) return
       savePagePos(track.key, no, at)
     }
     const timer = window.setInterval(save, 5000)

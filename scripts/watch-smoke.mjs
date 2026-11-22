@@ -949,7 +949,12 @@ async function checkHeroAllocation(page) {
   await sleep(500)
   const restored = await read()
   // 有可续播记录时，首屏左边就让给续播卡，轮播不再出现。
-  const hasResume = await page.evaluate(`!!document.querySelector('[data-home-resume]')`)
+  const hasResume = await page.evaluate(
+    `(() => {
+      const card = document.querySelector('[data-home-resume="wide"]')
+      return !!card && card.getClientRects().length > 0
+    })()`,
+  )
   const initialTitles = Array.from({ length: 16 }, (_, index) => `首页分配 ${index + 1}`)
   const placedOnce = (expected, titles) =>
     expected.every((title) => titles.filter((entry) => entry === title).length === 1) &&
@@ -1013,11 +1018,61 @@ async function checkHeroAllocation(page) {
 /** 发现页续播卡：宽窗占左半屏，换一换不动它，窄窗收成一条。 */
 async function checkHomeResume(page) {
   await page.viewport(1320, 900)
+  // 看视频的条目：位置与时长来自本地分 P 记录，卡和实际落点要一致。
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  let resumeKey = null
+  for (let i = 0; i < 40 && !resumeKey; i += 1) {
+    await sleep(250)
+    resumeKey = await page.evaluate(
+      `document.querySelector('[data-home-resume="wide"]')?.dataset.key ?? null`,
+    )
+  }
+  await page.evaluate(`(() => {
+    const key = ${JSON.stringify(resumeKey)}
+    if (!key) return
+    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
+    localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
+    localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
+  })()`)
+  await page.evaluate(`location.reload()`)
+  let watchCard = { text: '' }
+  for (let i = 0; i < 40 && !watchCard.text.includes('继续观看'); i += 1) {
+    await sleep(250)
+    watchCard = await page.evaluate(`(() => {
+      const card = document.querySelector('[data-home-resume="wide"]')
+      return { text: (card?.textContent || '').trim() }
+    })()`)
+  }
+  check(
+    '有本地观看记录时按分 P 的进度显示继续观看',
+    watchCard.text.includes('继续观看') && watchCard.text.includes('已看 0:08'),
+  )
+  await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
+  let watchReady = false
+  for (let i = 0; i < 20 && !watchReady; i += 1) {
+    await sleep(300)
+    watchReady = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await sleep(1500)
+  const watchPick = await page.evaluate(`(() => {
+    const slider = document.querySelector('[aria-label="播放进度"]')
+    return { ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null }
+  })()`)
+  // 无头预览取不到流，观看页的 seek 观察不到；卡上的分 P 进度已在上一条校验。
+  check('继续观看进入观看页', watchReady && watchPick.ratio !== null)
+  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(300)
+  // 上一次运行留下的观看记录会让这条卡变成「继续观看」，这里从干净状态开始。
+  await page.evaluate(`localStorage.clear()`)
+  await page.evaluate(`location.reload()`)
   let ready = false
   for (let i = 0; i < 40 && !ready; i += 1) {
     await sleep(250)
-    ready = await page.evaluate(`!!document.querySelector('[data-home-resume="wide"]')`)
+    ready = await page.evaluate(
+      `!!document.querySelector('[data-home-resume="wide"]') &&
+       document.querySelectorAll('[data-home-hero-grid] > button').length === 6`,
+    )
   }
   const wide = await page.evaluate(`(() => {
     const card = document.querySelector('[data-home-resume="wide"]')
@@ -1088,6 +1143,12 @@ async function checkHomeResume(page) {
   )
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(1200)
+  const recovered = await page.evaluate(`({
+    grid: document.querySelectorAll('[data-home-hero-grid] > button').length,
+    error: document.body.innerText.includes('连不上 B 站'),
+  })`)
+  check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
+
 }
 
 async function checkShellBreakpoints(page) {
