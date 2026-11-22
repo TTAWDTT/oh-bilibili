@@ -15,6 +15,7 @@
     "ui:audit": "node scripts/ui-audit.mjs",
     "fetch:yt-dlp:windows": "node scripts/fetch-yt-dlp-windows.mjs",
     "verify": "cargo test --workspace --locked --quiet && npm run typecheck && npm run ui:audit && node scripts/ipc-audit.mjs",
-    "test:sources": "node scripts/sources-test.mjs"
+    "test:sources": "node scripts/sources-test.mjs",
+    "test:watch-session": "node scripts/watch-session-test.mjs"
   }
 }

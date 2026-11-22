@@ -10,6 +10,13 @@ import { toastDone, toastWarn } from '../../app/notice'
 import { Icon } from '../../shared/ui/Icon'
 import { CommentsPanel } from './CommentsPanel'
 import { takeWatchScroll } from './watchScroll'
+import {
+  advanceWatchSession,
+  currentWatchSession,
+  endWatchSession,
+  peekWatchSessionNext,
+  skipWatchSession,
+} from './watchSession'
 import { ChapterList } from './ChapterList'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
@@ -477,8 +484,11 @@ export function WatchView({
   const hasDirectory = data !== null && (data.pages.length > 1 || data.season !== null)
   const directoryLabel = data?.season && data.pages.length > 1 ? '本视频分 P' : '分集'
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
+  const session = currentWatchSession(track.key)
+  const sessionNext = session ? peekWatchSessionNext(track.key) : null
   // 分 P 播完接下一 P；合集里的单集播完接下一集。B 站两者都是自动连播，
-  // 不走相关推荐——只有既没有下一 P 也没有下一集时才退到推荐第一条。
+  // 不走相关推荐；片单播放时再往后接片单，片单到最后一条就停下。
+  // 只有既没有下一 P、下一集，也不在片单里时才退到推荐第一条。
   const seasonEpisodes = data?.season?.episodes ?? []
   const seasonIndex = seasonEpisodes.findIndex((ep) => ep.key === track.key)
   const nextSeasonEp = seasonIndex >= 0 ? seasonEpisodes[seasonIndex + 1] ?? null : null
@@ -500,6 +510,17 @@ export function WatchView({
           durationMs: nextSeasonEp.duration_ms || null,
           page: null,
         }
+      : session
+        ? sessionNext
+          ? {
+              title: sessionNext.title,
+              owner: sessionNext.artist,
+              cover: sessionNext.cover,
+              views: sessionNext.views ?? null,
+              durationMs: sessionNext.duration_ms,
+              page: null,
+            }
+          : null
       : related[0]
       ? {
           title: related[0].title,
@@ -529,8 +550,13 @@ export function WatchView({
       })
       return
     }
-    const track = related[0]
-    if (track) replace({ kind: 'watch', track })
+    if (session) {
+      const next = advanceWatchSession(track.key)
+      if (next) replace({ kind: 'watch', track: next })
+      return
+    }
+    const nextRelated = related[0]
+    if (nextRelated) replace({ kind: 'watch', track: nextRelated })
   }
 
   // 取清单与档位
@@ -576,6 +602,30 @@ export function WatchView({
     // 只在真正离开观看页时清理；换片由 key 比对保证不会误停新视频。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * 片单上下文只在本次观看里有效：换到片单外的视频、或离开观看页就收掉。
+   * 分 P 重挂载后仍是同一条视频，不会被误清。
+   */
+  const [sessionTick, setSessionTick] = useState(0)
+  useEffect(() => {
+    if (!currentWatchSession(track.key)) endWatchSession()
+  }, [track.key, sessionTick])
+  useEffect(() => {
+    return () => {
+      if (useAppStore.getState().view.kind !== 'watch') endWatchSession()
+    }
+  }, [])
+
+  const skipThis = (): void => {
+    const next = skipWatchSession(track.key)
+    if (next) {
+      replace({ kind: 'watch', track: next })
+      return
+    }
+    endWatchSession()
+    setSessionTick((n) => n + 1)
+  }
 
   // 取弹幕。时间轴跟引擎时钟走，画面只是它的跟随者。
   // 多 P 视频的弹幕按 P 分开，cid 没到之前先不拉，免得先闪一屏 P1 的弹幕。
@@ -674,6 +724,29 @@ export function WatchView({
           }
         >
           {/* B 站网页端把标题压在画面之上：先知道在放什么，再决定看不看。 */}
+          {!cinema && session ? (
+            <div
+              data-watch-session
+              className="mb-2 flex min-w-0 items-center gap-2 text-[12.5px] leading-[18px] text-[var(--text-2)]"
+            >
+              <span className="num shrink-0">
+                {session.label} {session.index + 1}/{session.items.length}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[var(--text-3)]">
+                {sessionNext ? `下一条《${sessionNext.title}》` : '最后一条'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  endWatchSession()
+                  setSessionTick((n) => n + 1)
+                }}
+                className="t shrink-0 text-[var(--text-3)] hover:text-[var(--text-1)]"
+              >
+                退出片单
+              </button>
+            </div>
+          ) : null}
           {!cinema && data ? (
             <WatchHead
               track={track}
@@ -740,6 +813,11 @@ export function WatchView({
               >
                 重试
               </button>
+              {session ? (
+                <button type="button" onClick={skipThis} className="t shrink-0 text-[var(--text-3)] hover:text-[var(--text-1)]">
+                  跳过
+                </button>
+              ) : null}
             </div>
           ) : null}
           {!cinema && data ? (
