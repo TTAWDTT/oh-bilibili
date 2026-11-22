@@ -1,5 +1,5 @@
 import type { DownloadView, QrStatus, WireError } from './contract'
-import { CATALOG, avatarArt, buildLyrics, findTrack } from './mockCatalog'
+import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
 import { emit, ensureClock, fail, playlistOf, setDuration, snapshot, state, trackOf } from './mockEngine'
@@ -41,6 +41,8 @@ const FOLLOW_SEEDS: {
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
 let dynamicLoaded = false
+/** 历史的假时间戳固定在一次会话里：同一条记录每次查回来 played_at 都一样。 */
+const HISTORY_EPOCH = Date.now()
 
 const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
 const settledListFailures = new Set<string>()
@@ -347,7 +349,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'library_history_timed': {
       // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
       if (state.historyCleared) return []
-      const now = Date.now()
+      const now = HISTORY_EPOCH
       const limit = Math.max(1, Math.min(500, Number(args.limit ?? 60) || 60))
       const beforePlayed =
         args.before_played_at == null ? null : Number(args.before_played_at)
@@ -360,24 +362,34 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             ...Array.from({ length: 98 }, (_, i) => ({
               id: i + 1,
               track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
-              played_at: now - i * 86_400_000,
+              played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
+              position_ms: i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000,
             })),
             {
               id: 99,
-              track: { ...seed, key: `${seed.key}-cross-2025`, title: '跨年同日 · 2025' },
+              track: {
+                ...seed,
+                key: `${seed.key}-cross-2025`,
+                title: '跨年同日 · 2025 一段很长的标题用来确认窄窗里也不挤掉播放时间',
+                duration_ms: 1_500_000,
+              },
               played_at: new Date(2025, 3, 10, 12).getTime(),
+              position_ms: 1_122_000,
             },
             {
               id: 100,
-              track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024' },
+              track: { ...seed, key: `${seed.key}-cross-2024`, title: '跨年同日 · 2024', duration_ms: null },
               played_at: new Date(2024, 3, 10, 12).getTime(),
+              position_ms: 90_000,
             },
           ]
         : CATALOG.slice(0, 7).map((track, i) => ({
             id: i + 1,
             track,
             played_at: now - i * 9.5 * 3600_000,
+            position_ms: [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
           }))
+      for (const entry of all) registerTrack(entry.track)
       return all
         .filter((entry) => !state.historyHidden.has(entry.track.key))
         .filter(
