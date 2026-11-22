@@ -267,6 +267,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
 77. **顶栏与外链**：站内频道只由左栏承担，顶栏只留「哔哩哔哩网站」菜单，四项外链各带外链标识；窄窗同一个菜单
     补上番剧与直播。菜单打开聚焦首项，方向键移动，Esc 关闭并把焦点还给触发按钮；开关菜单不改当前页面、
     滚动位置或搜索草稿。
+78. **直播分页**：第二页及之后按 `room_id` 去重后再追加，接口重复上一页的房间时不会产生重复卡片或重复 React key。
+    开发 mock 每页换一批 `room_id`，预览翻页能看出新房间，回归见 `watch-smoke --live-only`。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
