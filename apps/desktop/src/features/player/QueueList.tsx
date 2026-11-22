@@ -130,7 +130,9 @@ export function QueueList() {
     const nextKey = items[index + 1]?.key ?? items[index - 1]?.key
     await removeFromQueue(key)
     if (!focusNext) return
-    window.requestAnimationFrame(() => {
+    // 不能挂在 requestAnimationFrame 上：窗口被遮住时它会被节流到不触发，
+    // 键盘删除后焦点就丢了。这里只是等 React 提交，宏任务足够。
+    window.setTimeout(() => {
       if (!nextKey) {
         emptyRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
         return
@@ -140,7 +142,7 @@ export function QueueList() {
       const fallback = buttons[Math.min(index, buttons.length - 1)]
       const focusTarget = target ?? fallback
       focusTarget?.focus()
-    })
+    }, 0)
   }
 
   // 队列在后台补齐时每两秒问一次进度，补完就停。
