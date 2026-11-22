@@ -21,6 +21,7 @@ import { WatchPlayer, type NextUp } from './WatchPlayer'
 import { setWatchFavHandler } from './watchActions'
 import { FavPicker } from '../library/FavPicker'
 import { usePlayerStore } from '../player/playerStore'
+import { Modal } from '../../shared/ui/Modal'
 
 function loadWatchPage(key: string): number | null {
   try {
@@ -64,6 +65,15 @@ function clearPagePos(key: string, page: number): void {
   }
 }
 
+/** 中窄窗选集入口上的一行字：分 P 用 P 序号，合集用集序。 */
+function directoryTitle(data: WatchData, current: number): string {
+  if (data.pages.length > 1) return `选集 · P${current}/${data.pages.length}`
+  const season = data.season
+  if (!season) return '选集'
+  const index = season.episodes.findIndex((episode) => episode.current)
+  return `选集 · ${index >= 0 ? index + 1 : current}/${season.episodes.length}`
+}
+
 /**
  * 观看页。只负责取数与拼装：播放器、信息区、评论区、右栏各是一块。
  *
@@ -95,6 +105,21 @@ export function WatchView({ track }: { track: Track }) {
   const storedPage = useRef(loadWatchPage(track.key)).current
   const storedPagePos = useRef(storedPage ? loadPagePos(track.key, storedPage) : null).current
   const [page, setPage] = useState<number | undefined>(storedPage ?? undefined)
+  /** 中窄窗的选集面板。宽窗用右栏目录，影院用播放器自带的选集。 */
+  const [pickingPage, setPickingPage] = useState(false)
+  const pageTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const pickingPageRef = useRef(false)
+  useEffect(() => {
+    if (pickingPage) {
+      pickingPageRef.current = true
+      return
+    }
+    if (!pickingPageRef.current) return
+    pickingPageRef.current = false
+    // 弹窗自己会把焦点还给打开前的元素；鼠标点按钮时那个元素可能不是按钮，
+    // 所以这里显式还给选集入口。
+    pageTriggerRef.current?.focus()
+  }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
   const [pendingResume, setPendingResume] = useState<number | null>(storedPagePos)
   const initialStoredPage = useRef(page !== undefined)
@@ -355,6 +380,8 @@ export function WatchView({ track }: { track: Track }) {
   const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
+  const hasDirectory = data !== null && (data.pages.length > 1 || data.season !== null)
+  const directoryLabel = data?.season && data.pages.length > 1 ? '本视频分 P' : '分集'
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
   // 分 P 播完接下一 P；合集里的单集播完接下一集。B 站两者都是自动连播，
   // 不走相关推荐——只有既没有下一 P 也没有下一集时才退到推荐第一条。
@@ -512,6 +539,32 @@ export function WatchView({ track }: { track: Track }) {
       ) : null}
       <TripleBurst run={burst} />
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
+      <Modal
+        open={pickingPage && data !== null}
+        title="选集"
+        description={null}
+        onClose={() => setPickingPage(false)}
+        width="max-w-lg"
+      >
+        {data ? (
+          <>
+            {data.pages.length > 1 ? (
+              <PageList
+                bare
+                title={directoryLabel}
+                pages={data.pages}
+                current={currentPageNo}
+                onPage={(no) => {
+                  setPickingPage(false)
+                  changePage(no)
+                }}
+                progress={pagePos}
+              />
+            ) : null}
+            {data.season ? <SeasonList bare season={data.season} /> : null}
+          </>
+        ) : null}
+      </Modal>
       {/* 返回在顶栏（TitleBar），不在画面上：浮在视频角上会挡住画面内容。 */}
       {/* 左画面右推荐的布局：视频客户端的信息骨架，音乐播放器那套单列竖排不适用。 */}
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
@@ -566,6 +619,22 @@ export function WatchView({ track }: { track: Track }) {
           ) : (
             <div className="aspect-video w-full shrink-0 bg-black" />
           )}
+          {!cinema && data && hasDirectory ? (
+            <div className="border-b border-hairline xl:hidden">
+              <button
+                ref={pageTriggerRef}
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={pickingPage}
+                onClick={() => setPickingPage(true)}
+                className="t press flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+              >
+                <Icon name="queue" size={14} className="shrink-0 text-[var(--text-3)]" />
+                <span className="min-w-0 flex-1 truncate">{directoryTitle(data, page ?? data.current_page)}</span>
+                <Icon name="chevronRight" size={13} className="shrink-0 rotate-90 text-[var(--text-3)]" />
+              </button>
+            </div>
+          ) : null}
           {!cinema && error ? (
             <div className="flex items-center gap-3 border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]">
               <span className="min-w-0 flex-1">这条视频没打开：{error}</span>
@@ -612,25 +681,15 @@ export function WatchView({ track }: { track: Track }) {
           ) : null}
           {!cinema && data ? (
             <div className="border-t border-hairline xl:hidden">
-              <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} />
-            </div>
-          ) : null}
-          {!cinema && data && data.pages.length > 1 ? (
-            <div className="border-t border-hairline xl:hidden">
-              <PageList
-                pages={data.pages}
-                current={page ?? data.current_page}
-                onPage={changePage}
-                progress={pagePos}
+              <ChapterList
+                desc={data.desc}
+                chapters={chapters}
+                onSeek={seekTo}
+                title={hasDirectory ? '本集章节' : '章节'}
               />
             </div>
           ) : null}
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
-          {!cinema && data?.season ? (
-            <div className="border-t border-hairline xl:hidden">
-              <SeasonList season={data.season} />
-            </div>
-          ) : null}
           {!cinema ? (
             <div data-watch-inline className="border-t border-hairline xl:hidden">
               <RelatedAside items={related} />
@@ -648,6 +707,17 @@ export function WatchView({ track }: { track: Track }) {
             data-watch-rail
             className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline xl:block"
           >
+            {/* 目录贴住视频顶边：连续看教程时先找「在放哪一集」，再关心别的。 */}
+            {data && data.pages.length > 1 ? (
+              <PageList
+                title={directoryLabel}
+                pages={data.pages}
+                current={currentPageNo}
+                onPage={changePage}
+                progress={pagePos}
+              />
+            ) : null}
+            {data?.season ? <SeasonList season={data.season} /> : null}
             {data ? (
               <OwnerCard
                 data={data}
@@ -658,16 +728,14 @@ export function WatchView({ track }: { track: Track }) {
               />
             ) : null}
             <DanmakuList items={danmaku} />
-            {data ? <ChapterList desc={data.desc} chapters={chapters} onSeek={seekTo} /> : null}
             {data ? (
-              <PageList
-                pages={data.pages}
-                current={page ?? data.current_page}
-                onPage={changePage}
-                progress={pagePos}
+              <ChapterList
+                desc={data.desc}
+                chapters={chapters}
+                onSeek={seekTo}
+                title={hasDirectory ? '本集章节' : '章节'}
               />
             ) : null}
-            {data?.season ? <SeasonList season={data.season} /> : null}
             <RelatedAside items={related} />
           </aside>
         ) : null}

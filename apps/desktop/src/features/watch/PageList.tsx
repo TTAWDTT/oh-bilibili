@@ -37,12 +37,17 @@ export function PageList({
   current,
   onPage,
   progress,
+  title = '分集',
+  bare = false,
 }: {
   pages: PageRef[]
   current: number
   onPage: (no: number) => void
   /** P 序号 → 已看到的毫秒数。没有记录的不画。 */
   progress?: Record<number, number>
+  title?: string
+  /** 放进弹窗时去掉外框，阵容由弹窗自己给。 */
+  bare?: boolean
 }) {
   const currentRef = useRef<HTMLButtonElement | null>(null)
   const listRef = useRef<HTMLOListElement | null>(null)
@@ -67,12 +72,12 @@ export function PageList({
   const onlyMatch = visible.length === 1 ? visible[0] : null
 
   return (
-    <div data-watch-pages className="px-2 pb-2">
-      <div className="overflow-hidden rounded-[8px] border border-[var(--line)]">
+    <div data-watch-pages className={bare ? '' : 'px-2 pb-2'}>
+      <div className={bare ? '' : 'overflow-hidden rounded-[8px] border border-[var(--line)]'}>
         <div className="flex items-baseline gap-2 border-b border-hairline px-3 py-2">
-          <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">视频选集</h3>
+          <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">{title}</h3>
           <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
-            ({current}/{pages.length})
+            {' '}P{current}/{pages.length}
           </span>
         </div>
         {filterable ? (
@@ -106,11 +111,16 @@ export function PageList({
             </div>
           </div>
         ) : null}
-        <ol ref={listRef} className="flex max-h-[320px] flex-col overflow-y-auto px-1.5 py-1.5">
+        <ol
+          ref={listRef}
+          className={`flex flex-col overflow-y-auto px-1.5 py-1 ${bare ? 'max-h-[52vh]' : 'max-h-[320px]'}`}
+        >
           {visible.map((page) => {
             const active = page.no === current
             const seen = progress?.[page.no] ?? 0
-            const ratio = page.duration_ms > 0 ? Math.min(1, seen / page.duration_ms) : 0
+            const known = page.duration_ms > 0 && seen > 0
+            const finished = known && seen >= page.duration_ms - 1_000
+            const ratio = known ? Math.min(1, seen / page.duration_ms) : 0
             return (
               <li key={page.cid}>
                 <button
@@ -119,7 +129,7 @@ export function PageList({
                   aria-pressed={active}
                   onClick={() => onPage(page.no)}
                   title={page.title}
-                  className={`t relative flex h-8 w-full items-center gap-2 rounded-[4px] px-2 text-left ${
+                  className={`t relative flex w-full items-start gap-2 rounded-[4px] px-2 py-1.5 text-left ${
                     active ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--panel-alt)]'
                   }`}
                 >
@@ -127,37 +137,41 @@ export function PageList({
                     <span className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-[var(--accent)]" />
                   ) : null}
                   <span
-                    className={`num w-6 shrink-0 text-[11px] ${
+                    className={`num w-6 shrink-0 pt-0.5 text-[11px] ${
                       active ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'
                     }`}
                   >
                     P{page.no}
                   </span>
                   <span
-                    className={`min-w-0 flex-1 truncate text-[12px] ${
+                    className={`line-clamp-2 min-w-0 flex-1 text-[12px] leading-[1.4] ${
                       active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
                     }`}
                   >
                     {page.title || `第 ${page.no} P`}
                   </span>
-                  {page.duration_ms ? (
-                    <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
-                      {formatTime(page.duration_ms)}
-                    </span>
-                  ) : null}
-                  {active ? (
-                    <LivePageBar durationMs={page.duration_ms} />
-                  ) : ratio > 0 ? (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute bottom-0.5 left-8 right-2 h-[2px] overflow-hidden rounded-full bg-[var(--line)]"
-                    >
-                      <span
-                        className="block h-full rounded-full bg-[var(--accent)]"
-                        style={{ width: `${ratio * 100}%` }}
-                      />
-                    </span>
-                  ) : null}
+                  <span className="num flex w-[62px] shrink-0 flex-col items-end gap-0.5 pt-0.5 text-[11px]">
+                    {page.duration_ms ? (
+                      <span className="text-[var(--text-3)]">{formatTime(page.duration_ms)}</span>
+                    ) : null}
+                    {active ? null : finished ? (
+                      <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-3)]'}>已看完</span>
+                    ) : known ? (
+                      <span className={active ? 'text-[var(--accent)]' : 'text-[var(--text-2)]'}>
+                        播至 {formatTime(seen)}
+                      </span>
+                    ) : null}
+                    {known && !active ? (
+                      <span aria-hidden className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--line)]">
+                        <span
+                          className="block h-full rounded-full bg-[var(--accent)]"
+                          style={{ width: `${ratio * 100}%` }}
+                        />
+                      </span>
+                    ) : null}
+                  </span>
+                  {active ? <Icon name="play" size={11} className="mt-1 shrink-0 text-[var(--accent)]" /> : null}
+                  {active ? <LivePageBar durationMs={page.duration_ms} /> : null}
                 </button>
               </li>
             )

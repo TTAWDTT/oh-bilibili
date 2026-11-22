@@ -2052,8 +2052,9 @@ export function WatchPlayer({
             ) : null}
           </div>
 
-          {data.pages.length > 1 ? (
-            <div className="relative flex shrink-0 md:hidden xl:flex">
+          {/* 普通布局另有目录入口（窄窗在播放器下方，宽窗在右栏），这里只留给影院/全屏。 */}
+          {data.pages.length > 1 && cinema ? (
+            <div className="relative flex shrink-0">
               <button
                 type="button"
                 onClick={() => {

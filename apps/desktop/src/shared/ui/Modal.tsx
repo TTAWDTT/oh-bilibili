@@ -89,9 +89,10 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`modal-panel relative w-full ${width} rounded-[10px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_18px_50px_-16px_rgba(0,0,0,0.35)]`}
+        /* 窗口矮的时候整块要能压缩：内容在 body 里滚，标题与关闭键始终留在视口内。 */
+        className={`modal-panel relative flex max-h-[calc(100vh-3rem)] w-full flex-col ${width} rounded-[10px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_18px_50px_-16px_rgba(0,0,0,0.35)]`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-hairline px-3 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-hairline px-3 py-5">
           <div>
             <h2 className="text-[18px] font-semibold text-[var(--text-1)]">{title}</h2>
             {description ? <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-[var(--text-3)]">{description}</p> : null}
@@ -106,7 +107,7 @@ export function Modal({ open, title, description, onClose, children, width = 'ma
             <Icon name="close" size={16} />
           </button>
         </div>
-        <div className="px-3 py-5">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-3 py-5">{children}</div>
       </div>
     </div>,
     document.body,

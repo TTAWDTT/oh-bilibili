@@ -12,10 +12,13 @@ export function ChapterList({
   desc,
   chapters: fromMeta,
   onSeek,
+  title = '章节',
 }: {
   desc: string
   chapters: Chapter[]
   onSeek: (ms: number) => void
+  /** 页面上还有分 P 或合集时，标题要说明这是本集内的时间点。 */
+  title?: string
 }) {
   // UP 主设过章节就用它；没设过才退回简介里的时间戳。
   const chapters = fromMeta.length > 0 ? fromMeta : chaptersFrom(desc)
@@ -38,7 +41,7 @@ export function ChapterList({
     <div className="px-2 pb-2">
       <div className="overflow-hidden rounded-[8px] border border-[var(--line)]">
         <div className="flex items-baseline gap-2 border-b border-hairline px-3 py-2">
-          <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">章节</h3>
+          <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">{title}</h3>
           <span className="num shrink-0 text-[11px] text-[var(--text-3)]">{chapters.length} 节</span>
         </div>
         <ol className="max-h-[240px] overflow-y-auto py-1">
