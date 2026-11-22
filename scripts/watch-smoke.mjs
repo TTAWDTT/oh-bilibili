@@ -4975,13 +4975,26 @@ async function main() {
     deepVideo = await page.evaluate(`!!document.querySelector('video')`)
   }
   await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
-  await sleep(200)
+  // FocusRestore 先等目标稳定再聚焦，聚焦后的校正才由滚轮取消；
+  // 先等焦点真正落回卡片，再模拟用户滚动，别跟这段时序抢跑。
+  let focusRestored = false
+  for (let i = 0; i < 50 && !focusRestored; i += 1) {
+    await sleep(100)
+    focusRestored = await page.evaluate(
+      `document.activeElement?.getAttribute('data-focus-id')?.startsWith('card:') === true`,
+    )
+  }
+  await page.mouseEvent({ type: 'mouseWheel', x: 660, y: 450, deltaX: 0, deltaY: -200 })
+  await sleep(100)
   await page.evaluate(`document.getElementById('scroll-main').scrollTop = 0`)
   await sleep(1000)
   const afterUserScroll = await page.evaluate(
     `Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0)`,
   )
-  check('返回后用户滚动不会被自动校正拉回', deep && deepVideo && afterUserScroll === 0)
+  check(
+    `返回后用户滚动不会被自动校正拉回 ${JSON.stringify({ deep, deepVideo, focusRestored, afterUserScroll })}`,
+    deep && deepVideo && focusRestored && afterUserScroll === 0,
+  )
 
     // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。
     // 按 mid 去重后应得到 101、102、103，且整页重叠也要继续翻到空页收尾。
