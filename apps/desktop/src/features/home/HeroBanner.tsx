@@ -4,6 +4,7 @@ import { thumbWide } from '../../shared/lib/thumb'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import { HeroQuoteLine, quoteLabel, useHeroQuote } from './HeroQuote'
 
 const SLIDE_MS = 6000
 
@@ -12,9 +13,15 @@ const carouselMemory: { first: string | null; index: number } = { first: null, i
 
 /**
  * 发现页顶部的轮播。B 站首页第一屏就是一张大图，标题压在图上。
- * 只用推荐流里已有的条目，不额外请求；鼠标停在上面时不再自动翻页。
+ * 条目来自推荐流，只有当前这一张会补取同分 P 的弹幕引文；鼠标停留或键盘聚焦时不再自动翻页。
  */
-export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track: Track) => void }) {
+export function HeroBanner({
+  tracks,
+  onOpen,
+}: {
+  tracks: Track[]
+  onOpen: (track: Track, start?: { page: number; atMs: number }) => void
+}) {
   const slides = tracks.filter((t) => t.cover).slice(0, 5)
   const [index, setIndex] = useState(() => {
     const remembered = carouselMemory.first === slides[0]?.key ? carouselMemory.index : 0
@@ -44,16 +51,22 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
     return () => window.clearInterval(timer)
   }, [paused, slides.length, index, first])
 
+  const activeKey = slides[Math.min(index, Math.max(0, slides.length - 1))]?.key
+  const quote = useHeroQuote(activeKey)
+
   if (slides.length === 0) return null
   const current = slides[Math.min(index, slides.length - 1)]!
 
   return (
+    <div className="min-w-0">
     <section
       /* key 绑首条：换一换之后整块重挂载，淡入从第一帧开始，而不是新封面直接顶替。 */
       key={slides[0]?.key}
       aria-label="推荐轮播"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
       /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
          之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
       className="bili-hero-swap relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)] lg:aspect-[7/5]"
@@ -117,7 +130,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
         aria-label={`观看 ${current.title}`}
         className="absolute inset-0 text-left"
       >
-        <span className="absolute inset-y-0 left-0 flex max-w-[64%] flex-col justify-end gap-2.5 p-6">
+        <span className="absolute inset-y-0 left-0 flex max-w-[64%] flex-col justify-end gap-2.5 p-6 md:max-w-[56%]">
           <span className="line-clamp-2 text-[26px] font-medium leading-snug text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.55)]">
             {current.title}
           </span>
@@ -135,6 +148,28 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
           </span>
         </span>
       </button>
+      {quote ? (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-[28%] flex-col justify-end gap-2 p-5 pb-12 md:flex">
+          <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(0,0,0,0.62),rgba(0,0,0,0.16)_72%,transparent)]" />
+          <div className="relative flex flex-col gap-1.5">
+            {quote.lines.map((line, i) => (
+              <span
+                key={`${line}-${i}`}
+                className="truncate text-right text-[13px] leading-relaxed text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,0.65)]"
+              >
+                {line}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpen(current, { page: quote.page, atMs: quote.at * 1000 })}
+            className="t press pointer-events-auto relative w-fit self-end rounded-[6px] bg-white/20 px-2.5 py-1 text-[12px] text-white backdrop-blur-sm hover:bg-white/30"
+          >
+            {quoteLabel(quote)}
+          </button>
+        </div>
+      ) : null}
       {/* B 站轮播左上角那颗红色「荐」印章：方形红底、白字、轻微倾斜。 */}
       <span
         aria-hidden
@@ -143,5 +178,15 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
         荐
       </span>
     </section>
+    {quote ? (
+      <div className="md:hidden">
+        <HeroQuoteLine
+          track={current}
+          quote={quote}
+          onOpen={(track, start) => onOpen(track, start)}
+        />
+      </div>
+    ) : null}
+    </div>
   )
 }

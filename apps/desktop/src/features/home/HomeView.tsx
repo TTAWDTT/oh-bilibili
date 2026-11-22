@@ -7,6 +7,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { PART_CHILDREN, PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
+import { HeroQuoteLine, useHeroQuote } from './HeroQuote'
 import { LiveRow } from './LiveRow'
 import { BangumiRow } from './BangumiRow'
 import { PartitionRow } from './PartitionRow'
@@ -144,6 +145,8 @@ export function HomeView() {
   const heroPool = resumeKey ? hero.filter((track) => track.key !== resumeKey) : hero
   /** 续播卡占了轮播的位置时，右边从推荐第一批的开头取六张，剩下的接进下方推荐流。 */
   const heroCards = resume ? heroPool.slice(0, 6) : heroPool.slice(5, 11)
+  /** 续播卡占左列时，右侧第一张就是首推；它才是唯一要补弹幕引文的那张。 */
+  const featuredQuote = useHeroQuote(resume && wideHero ? heroCards[0]?.key : undefined)
   const heroKeys = new Set(hero.map((track) => track.key))
   const cardKeys = new Set(heroCards.map((track) => track.key))
   const feedRemainder = items.filter((track) => !heroKeys.has(track.key) && track.key !== resumeKey)
@@ -514,18 +517,29 @@ export function HomeView() {
               <ResumeCard resume={resume} onOpen={openResume} />
             </div>
           ) : (
-            <HeroBanner tracks={heroPool.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track }, undefined, `hero:${track.key}`)} />
+            <HeroBanner
+              tracks={heroPool.slice(0, 5)}
+              onOpen={(track, start) =>
+                navigate(
+                  start
+                    ? { kind: 'watch', track, page: start.page, atMs: start.atMs }
+                    : { kind: 'watch', track },
+                  undefined,
+                  `hero:${track.key}`,
+                )
+              }
+            />
           )}
           {(resume ? heroCards.length > 0 : hero.length > 5) && wideHero ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
             <div key={heroCards[0]?.key} data-home-hero-grid className="bili-hero-swap grid grid-cols-3 gap-3">
-              {heroCards.map((track) => (
+              {heroCards.map((track, i) => (
+                <div key={track.key} className="min-w-0">
                 <button
-                  key={track.key}
                   type="button"
                   onClick={() => navigate({ kind: 'watch', track }, undefined, `herocard:${track.key}`)}
                   data-focus-id={`herocard:${track.key}`}
-                  className="bili-card group min-w-0 text-left"
+                  className="bili-card group block w-full min-w-0 text-left"
                 >
                   <span className="relative block aspect-video overflow-hidden rounded-[6px]">
                     <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
@@ -561,6 +575,20 @@ export function HomeView() {
                     <span className="truncate">{track.artist}</span>
                   </span>
                 </button>
+                {i === 0 && featuredQuote ? (
+                  <HeroQuoteLine
+                    track={track}
+                    quote={featuredQuote}
+                    onOpen={(target, start) =>
+                      navigate(
+                        { kind: 'watch', track: target, page: start.page, atMs: start.atMs },
+                        undefined,
+                        `hero:${target.key}`,
+                      )
+                    }
+                  />
+                ) : null}
+                </div>
               ))}
             </div>
           ) : null}

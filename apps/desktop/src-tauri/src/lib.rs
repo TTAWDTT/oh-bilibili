@@ -70,16 +70,19 @@ async fn video_meta(
     key: String,
 ) -> Result<bilimusic_core::wire::VideoMetaView, WireError> {
     let m = engine.video_meta(&TrackKey::from_provider(key)).await?;
+    let current_page = m.pages.first().map(|page| page.no).unwrap_or(1);
     Ok(bilimusic_core::wire::VideoMetaView {
-        desc: m.desc,
-        pubdate: m.pubdate,
-        views: m.views,
-        danmaku: m.danmaku,
-        replies: m.replies,
-        favorites: m.favorites,
-        coins: m.coins,
-        shares: m.shares,
-        likes: m.likes,
+        desc: m.meta.desc,
+        pubdate: m.meta.pubdate,
+        views: m.meta.views,
+        danmaku: m.meta.danmaku,
+        replies: m.meta.replies,
+        favorites: m.meta.favorites,
+        coins: m.meta.coins,
+        shares: m.meta.shares,
+        likes: m.meta.likes,
+        current_page,
+        pages: m.pages,
     })
 }
 

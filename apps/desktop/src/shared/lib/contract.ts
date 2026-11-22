@@ -206,6 +206,9 @@ export type VideoMeta = {
   coins: number
   shares: number
   likes: number
+  /** 默认分 P 与完整分 P 列表。首推按同一 cid 取真实弹幕。 */
+  current_page: number
+  pages: PageRef[]
 }
 
 export type QueueView = {
