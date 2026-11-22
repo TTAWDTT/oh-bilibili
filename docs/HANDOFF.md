@@ -319,6 +319,8 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     一个链接的条目；多链接行、纯链接行、指向本稿的链接都跳过。观看页简介下显示「素材与出处」：关系词按原文顺序、
     站内 BV 进观看页、外部资源标明站点并交给系统浏览器，原句始终保留。简介展开状态按 BV 记住。
     站内条目用轻量 `video_brief`（同一份详情缓存）补标题/封面/UP，取不到就退回 BV 号。
+    回归：`npm run test:sources`（Node ≥ 22.6 的类型剥离直接跑真实模块），覆盖跨行配对、同行 BV、多链接跳过、
+    纯链接忽略、本稿跳过与重复去重。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
