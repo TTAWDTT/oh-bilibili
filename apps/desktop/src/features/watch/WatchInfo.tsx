@@ -10,6 +10,11 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { useDownloadsStore } from '../downloads/downloadsStore'
 import { AnchoredPanel } from '../../shared/ui/AnchoredPanel'
 import { Icon } from '../../shared/ui/Icon'
+import { parseSources } from './sources'
+import { SourceLinks } from './SourceLinks'
+
+/** 简介展开状态按 BV 记住：从素材里的站内作品返回，简介仍是展开的。 */
+const descOpenMemory = new Map<string, boolean>()
 import { Modal } from '../../shared/ui/Modal'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { SharePanel } from './SharePanel'
@@ -208,9 +213,10 @@ export function WatchInfo({
   /** 视频标签。公开接口，取不到就不显示这一行。 */
   const [tags, setTags] = useState<string[]>([])
   /** 简介默认收两行，长简介给一个展开。 */
-  const [descOpen, setDescOpen] = useState(false)
+  const [descOpen, setDescOpen] = useState(() => descOpenMemory.get(track.key) ?? false)
   const [descCanExpand, setDescCanExpand] = useState(false)
   const descRef = useRef<HTMLParagraphElement | null>(null)
+  const sources = parseSources(data.desc, data.key)
 
   useEffect(() => {
     setDescOpen(false)
@@ -697,12 +703,17 @@ export function WatchInfo({
           {descCanExpand ? (
             <button
               type="button"
-              onClick={() => setDescOpen((open) => !open)}
+              onClick={() => {
+                const next = !descOpen
+                descOpenMemory.set(track.key, next)
+                setDescOpen(next)
+              }}
               className="t mt-1 text-[12px] text-[var(--accent)] hover:underline"
             >
               {descOpen ? '收起' : '展开更多'}
             </button>
           ) : null}
+          <SourceLinks entries={sources} />
         </div>
       ) : null}
 
