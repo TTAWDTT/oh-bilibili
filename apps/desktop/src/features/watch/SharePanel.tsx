@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
 import { copyText } from '../../shared/lib/clipboard'
 import { formatTime } from '../../shared/lib/format'
 import { readPlayhead } from '../../shared/lib/playhead'
-import { toastDone, toastFailure } from '../../app/notice'
+import { toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
@@ -13,6 +13,8 @@ import { watchUrl } from './watchUrl'
 
 const SOCIALS = ['动态', '微信', 'QQ', 'QQ空间', '微博', '贴吧', '嵌入代码'] as const
 type Social = (typeof SOCIALS)[number]
+type CopyKey = 'link' | 'dynamic' | 'embed'
+type CopyState = 'idle' | 'done' | 'failed'
 
 /**
  * B 站视频页的分享弹层：封面 + 分享链接、二维码，下面一排平台按钮。
@@ -32,6 +34,15 @@ export function SharePanel({
   const [qr, setQr] = useState<string | null>(null)
   const [qrError, setQrError] = useState(false)
   const [embedOpen, setEmbedOpen] = useState(false)
+  /** 每个复制入口各自维护结果；连续点击以最后一次为准。 */
+  const [copyState, setCopyState] = useState<Record<CopyKey, CopyState>>({
+    link: 'idle',
+    dynamic: 'idle',
+    embed: 'idle',
+  })
+  const [hint, setHint] = useState<string | null>(null)
+  const timers = useRef<Partial<Record<CopyKey, number>>>({})
+  const seq = useRef<Record<CopyKey, number>>({ link: 0, dynamic: 0, embed: 0 })
 
   const baseUrl = watchUrl(track.key, page)
   const seconds = Math.floor(startAt / 1000)
@@ -57,8 +68,36 @@ export function SharePanel({
     }
   }, [shareUrl])
 
-  const copy = (text: string, done: string): void => {
-    void copyText(text).then((ok) => toastDone(ok ? done : '复制失败'))
+  // 换分 P、改「从此刻开始」都会改链接：旧链接的反馈不能留在新链接上。
+  useEffect(() => {
+    setCopyState({ link: 'idle', dynamic: 'idle', embed: 'idle' })
+    setHint(null)
+    for (const timer of Object.values(timers.current)) {
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+    timers.current = {}
+    return () => {
+      for (const timer of Object.values(timers.current)) {
+        if (timer !== undefined) window.clearTimeout(timer)
+      }
+    }
+  }, [shareUrl])
+
+  const copy = (key: CopyKey, text: string): void => {
+    const ticket = ++seq.current[key]
+    const previous = timers.current[key]
+    if (previous !== undefined) window.clearTimeout(previous)
+    delete timers.current[key]
+    setHint(null)
+    void copyText(text).then((ok) => {
+      if (seq.current[key] !== ticket) return
+      setCopyState((state) => ({ ...state, [key]: ok ? 'done' : 'failed' }))
+      if (!ok) return
+      timers.current[key] = window.setTimeout(() => {
+        if (seq.current[key] !== ticket) return
+        setCopyState((state) => ({ ...state, [key]: 'idle' }))
+      }, 1600)
+    })
   }
 
   const open = (url: string): void => {
@@ -70,10 +109,10 @@ export function SharePanel({
     const title = encodeURIComponent(track.title)
     switch (label) {
       case '动态':
-        copy(shareUrl, '链接已复制，去动态粘贴给好友')
+        copy('dynamic', shareUrl)
         return
       case '微信':
-        toastDone('请用手机微信扫码，或把链接发给好友')
+        setHint('请用手机微信扫码，或把链接发给好友')
         return
       case 'QQ':
         open(`https://connect.qq.com/widget/shareqq/index.html?url=${encoded}&title=${title}`)
@@ -126,10 +165,18 @@ export function SharePanel({
           </label>
           <button
             type="button"
-            onClick={() => copy(shareUrl, '链接已复制')}
-            className="t press mt-2 h-8 w-full rounded-[4px] bg-[var(--accent)] text-[13px] text-white hover:opacity-90"
+            onClick={() => copy('link', shareUrl)}
+            aria-live="polite"
+            className={[
+              't press mt-2 h-8 w-full rounded-[4px] text-[13px] text-white',
+              copyState.link === 'failed'
+                ? 'bg-[var(--danger)] hover:opacity-90'
+                : copyState.link === 'done'
+                  ? 'bg-[var(--accent)] opacity-90'
+                  : 'bg-[var(--accent)] hover:opacity-90',
+            ].join(' ')}
           >
-            获取视频分享链接
+            {copyState.link === 'done' ? '✓ 已复制' : copyState.link === 'failed' ? '复制失败，点此重试' : '获取视频分享链接'}
           </button>
         </div>
 
@@ -154,13 +201,23 @@ export function SharePanel({
             type="button"
             title={label}
             onClick={() => act(label)}
+            aria-live={label === '动态' ? 'polite' : undefined}
             className="t press flex w-11 flex-col items-center gap-1 whitespace-nowrap text-[11px] text-[var(--text-3)] hover:text-[var(--text-1)]"
           >
             <span className="h-10 w-10" dangerouslySetInnerHTML={{ __html: SHARE_ICONS[label] ?? '' }} />
-            {label}
+            {label === '动态' && copyState.dynamic === 'done'
+              ? '已复制'
+              : label === '动态' && copyState.dynamic === 'failed'
+                ? '重试'
+                : label}
           </button>
         ))}
       </div>
+      {hint ? (
+        <p role="status" className="mt-2 text-[12px] text-[var(--text-2)]">
+          {hint}
+        </p>
+      ) : null}
 
       {embedOpen ? (
         <div className="mt-3 rounded-[6px] border border-[var(--line)] bg-[var(--ga0)] p-2">
@@ -174,10 +231,13 @@ export function SharePanel({
           />
           <button
             type="button"
-            onClick={() => copy(embedCode, '嵌入代码已复制')}
-            className="t mt-1.5 h-7 rounded-[4px] bg-[var(--accent)] px-3 text-[12px] text-white hover:opacity-90"
+            onClick={() => copy('embed', embedCode)}
+            aria-live="polite"
+            className={`t mt-1.5 h-7 rounded-[4px] px-3 text-[12px] text-white hover:opacity-90 ${
+              copyState.embed === 'failed' ? 'bg-[var(--danger)]' : 'bg-[var(--accent)]'
+            }`}
           >
-            复制嵌入代码
+            {copyState.embed === 'done' ? '✓ 已复制' : copyState.embed === 'failed' ? '复制失败，点此重试' : '复制嵌入代码'}
           </button>
         </div>
       ) : null}

@@ -1220,6 +1220,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return null
     case 'follow_set':
       // 预览里不真的改关注关系，返回成功即可；界面上按钮会切成「已关注」。
+      await sleep(250)
+      // ?followFail=1 专门用来看失败后重试的就地状态。
+      if (new URLSearchParams(window.location.search).get('followFail') === '1') {
+        throw fail('network', '预览：关注请求失败')
+      }
       return null
     case 'relation_followed':
       return false
