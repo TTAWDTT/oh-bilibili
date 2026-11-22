@@ -2610,10 +2610,11 @@ async function main() {
     const afterClearReturn = await page.evaluate(`({
       rows: document.querySelectorAll('[data-history-row]').length,
       empty: document.body.innerText.includes('还没有播放记录'),
+      focused: document.activeElement?.hasAttribute('data-history-empty') ?? false,
     })`)
     check(
-      '清空历史后离开再回来不会复用旧列表',
-      historyCleared && afterClearReturn.rows === 0 && afterClearReturn.empty,
+      '清空历史后离开再回来不会复用旧列表，焦点落在空态',
+      historyCleared && afterClearReturn.rows === 0 && afterClearReturn.empty && afterClearReturn.focused,
     )
 
     // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。

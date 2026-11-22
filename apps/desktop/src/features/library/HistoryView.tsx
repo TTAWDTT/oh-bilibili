@@ -47,8 +47,11 @@ export function HistoryView() {
   /** 回来时要落到的位置。刷新第一页会重排列表，不能让它把这次恢复冲掉。 */
   const restoreScrollTop = useRef(restored ? historyMemory.scrollTop : 0)
   const restoreScrollPending = useRef(restored)
+  const emptyFocusPending = useRef(true)
   const entriesRef = useRef<Entry[]>(historyMemory.entries)
   const hasMoreRef = useRef(historyMemory.hasMore)
+  /** 本地删改/翻页的次数：异步合并在返回时据此判断列表是否已经被改过。 */
+  const revision = useRef(0)
   /** 删掉当前焦点所在的一行之后，把焦点交给下一行；null 表示没有相邻行。 */
   const focusRequest = useRef<{ key: string | null } | null>(null)
   /** 回到历史时把上次看的那一行放回视口顶部，不依赖滚动事件有没有送达。 */
@@ -63,7 +66,9 @@ export function HistoryView() {
     // 回来时先刷新第一页：这段时间播过的新歌、改过的进度都要反映出来。
     // 旧尾巴只有在和第一页接得上时才拼回去，中间隔着新记录就宁可重来。
     const remembered = entriesRef.current
+    const startRevision = revision.current
     const merged = await mergeFirstPage(remembered, list)
+    if (revision.current !== startRevision) return
     if (merged === null) {
       setEntries(list)
       const last = list[list.length - 1]
@@ -128,6 +133,7 @@ export function HistoryView() {
     setLoadingMore(true)
     try {
       const older = await ipc.libraryHistoryTimed(HISTORY_PAGE, cursor)
+      revision.current += 1
       setEntries((prev) => {
         const seen = new Set((prev ?? []).map((entry) => entry.track.key))
         return [...(prev ?? []), ...older.filter((entry) => !seen.has(entry.track.key))]
@@ -147,6 +153,7 @@ export function HistoryView() {
   const removeOne = async (key: string): Promise<void> => {
     try {
       await ipc.historyDelete(key)
+      revision.current += 1
       const list = entries ?? []
       const index = list.findIndex((entry) => entry.track.key === key)
       const next = list.filter((e) => e.track.key !== key)
@@ -179,6 +186,7 @@ export function HistoryView() {
   const clearAll = async (): Promise<void> => {
     try {
       await ipc.historyClear()
+      revision.current += 1
       focusRequest.current = { key: null }
       setEntries([])
       setCursor(null)
@@ -229,13 +237,15 @@ export function HistoryView() {
       <div
         ref={(node) => {
           if (!node) return
-          // 删到一条不剩时列表整块消失，把焦点收到空态上，键盘用户不会掉出内容。
-          if (focusRequest.current) {
+          // 删到一条不剩、清空、或者重新进入空历史：焦点都收到空态上。
+          if (focusRequest.current || emptyFocusPending.current) {
             focusRequest.current = null
+            emptyFocusPending.current = false
             node.focus()
           }
         }}
         tabIndex={-1}
+        data-history-empty
         className="rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       >
         <EmptyState
@@ -317,8 +327,17 @@ export function HistoryView() {
                       // 它会按真实记录挪到「今天」。
                       // 历史由引擎的 watchdog 写入，等它落库再拉一次，并盯住这一行。
                       window.setTimeout(() => {
-                        // 用户可能已经去点别的行了；焦点还在这一行时才交回来。
-                        if (historyMemory.focusKey === entry.track.key) {
+                        // 用户可能已经换了目标（点别的行、点封面、去侧栏）；
+                        // 只有播放器还停在这一条、焦点也没离开这一行时才交回来。
+                        const active = document.activeElement as HTMLElement | null
+                        const scope = active?.closest<HTMLElement>('[data-history-row]')
+                        const mine =
+                          usePlayerStore.getState().snapshot?.track?.key === entry.track.key &&
+                          historyMemory.focusKey === entry.track.key &&
+                          (active === null ||
+                            active === document.body ||
+                            scope?.dataset.key === entry.track.key)
+                        if (mine) {
                           focusRequest.current = { key: entry.track.key }
                         }
                         void ipc
@@ -549,6 +568,7 @@ async function mergeFirstPage(older: Entry[], fresh: Entry[]): Promise<Entry[] |
   // 只看新旧顺序不够：离开期间可能又播了超过一页，旧尾巴跟第一页之间会断层。
   // 用第一页最后一条取下一页，旧尾巴的头必须是这页第一条，中间才没有漏项。
   const next = await ipc.libraryHistoryTimed(HISTORY_PAGE, { played_at: last.played_at, id: last.id })
-  if (next[0]?.id !== head.id) return null
+  // id 按曲目稳定，重播只会更新 played_at；两样都对上才算同一个历史版本。
+  if (next[0]?.id !== head.id || next[0].played_at !== head.played_at) return null
   return [...fresh, ...tail]
 }

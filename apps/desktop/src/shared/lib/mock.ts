@@ -41,6 +41,8 @@ const FOLLOW_SEEDS: {
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
 let dynamicLoaded = false
+/** 历史的假时间戳固定在一次会话里：同一条记录每次查回来 played_at 都一样。 */
+const HISTORY_EPOCH = Date.now()
 
 const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
 const settledListFailures = new Set<string>()
@@ -347,7 +349,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'library_history_timed': {
       // 预览模式造三个不同日期的记录，用来验证「今天 / 昨天 / 更早」分组。
       if (state.historyCleared) return []
-      const now = Date.now()
+      const now = HISTORY_EPOCH
       const limit = Math.max(1, Math.min(500, Number(args.limit ?? 60) || 60))
       const beforePlayed =
         args.before_played_at == null ? null : Number(args.before_played_at)
