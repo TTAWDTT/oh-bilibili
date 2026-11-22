@@ -449,15 +449,16 @@ export function FollowingView() {
           selected ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6' : ''
         }
       >
-        <div className={selected && !wide ? 'hidden' : ''}>
+        {/* 长签名会把 grid item 的最小宽度撑开，压到右侧预览下面；显式允许它收窄。 */}
+        <div className={`min-w-0 ${selected && !wide ? 'hidden' : ''}`}>
           {filtered.length > 0 ? (
-            <ul ref={listRef} className="grid gap-1.5">
+            <ul ref={listRef} className="grid min-w-0 gap-1.5">
               {filtered.map((user, at) => {
                 const active = user.mid === selectedMid
                 const ambiguous = (nameCounts.get(user.name) ?? 0) > 1
                 const compact = !user.sign && !ambiguous
                 return (
-                  <li key={user.mid}>
+                  <li key={user.mid} className="min-w-0">
                     <button
                       type="button"
                       data-following-author={user.mid}
@@ -466,7 +467,7 @@ export function FollowingView() {
                       onClick={() => pick(user.mid)}
                       onKeyDown={(event) => onRowKeyDown(event, at)}
                       className={[
-                        'bili-card group flex w-full items-center gap-3 rounded-[10px] border px-3 text-left',
+                        'bili-card group flex w-full min-w-0 items-center gap-3 rounded-[10px] border px-3 text-left',
                         compact ? 'py-2' : 'py-2.5',
                         active
                           ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
