@@ -1293,9 +1293,13 @@ mod wire {
     }
 
     pub fn search_candidates(value: &serde_json::Value) -> Result<Vec<Candidate>, BiliError> {
-        let result = value["data"]["result"]
-            .as_array()
-            .ok_or_else(|| BiliError::Parse("搜索响应里没有 result 数组".into()))?;
+        // 没有匹配时 B 站只给 numResults=0，不带 result 数组；这不是解析失败。
+        let zero = value["data"]["numResults"].as_u64() == Some(0);
+        let result = match value["data"]["result"].as_array() {
+            Some(list) => list,
+            None if zero => return Ok(Vec::new()),
+            None => return Err(BiliError::Parse("搜索响应里没有 result 数组".into())),
+        };
 
         let mut out = Vec::with_capacity(result.len());
         for item in result {
@@ -1585,6 +1589,15 @@ mod tests {
         assert_eq!(c[0].duration, Some(Millis(317_000)));
         assert_eq!(c[0].cover.as_deref(), Some("https://i0.hdslb.com/x.jpg"));
         assert_eq!(c[0].typeid, 3);
+    }
+
+    #[test]
+    fn 搜索零结果不算解析失败() {
+        let v = serde_json::json!({ "data": { "numResults": 0 } });
+        assert!(wire::search_candidates(&v).expect("零结果应是空列表").is_empty());
+        // 有结果数却没有数组，仍当解析失败，避免把接口变更吞掉。
+        let broken = serde_json::json!({ "data": { "numResults": 12 } });
+        assert!(wire::search_candidates(&broken).is_err());
     }
 
     #[test]
