@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
@@ -17,9 +17,9 @@ const rankMemory: { rid: number; top: number } = { rid: -1, top: 0 }
 
 /** 名次颜色：前三名留一点颜色，其余交给正文灰，数字本身先要清楚。 */
 function rankColor(rank: number): string {
-  if (rank === 1) return 'var(--accent)'
-  if (rank === 2) return '#e8853a'
-  if (rank === 3) return '#c2952a'
+  if (rank === 1) return 'var(--accent-strong)'
+  if (rank === 2) return '#a65300'
+  if (rank === 3) return '#8a6d00'
   return 'var(--text-2)'
 }
 
@@ -42,23 +42,31 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
       data-rank={rank}
       className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 sm:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] sm:gap-x-4"
     >
-      <span
-        className={`num pt-1 text-right font-mono font-semibold tabular-nums ${
-          first ? 'text-[26px] leading-[30px]' : top ? 'text-[21px] leading-[26px]' : 'text-[16px] leading-[22px]'
-        }`}
-        style={{ color: rankColor(rank) }}
-      >
-        {rank}
+      <span className="pt-1 text-right">
+        <span className="sr-only">第 {rank} 名</span>
+        <span
+          aria-hidden
+          className={`num block font-mono font-semibold tabular-nums ${
+            first ? 'text-[26px] leading-[30px]' : top ? 'text-[21px] leading-[26px]' : 'text-[16px] leading-[22px]'
+          }`}
+          style={{ color: rankColor(rank) }}
+        >
+          {rank}
+        </span>
       </span>
       <button
         type="button"
         onClick={onOpen}
+        aria-label={track.title}
         className={`relative w-[7rem] shrink-0 ${first ? 'sm:w-[13.5rem]' : 'sm:w-[10.5rem]'}`}
         title={track.title}
       >
         <span className="relative block aspect-video overflow-hidden rounded-[6px]">
           <Cover cover={track.cover} title={track.title} width={216} className="h-full w-full" />
-          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/60 px-1 text-[11px] leading-[16px] text-white">
+          <span
+            aria-hidden
+            className="num absolute bottom-1 right-1 rounded-[2px] bg-black/60 px-1 text-[11px] leading-[16px] text-white"
+          >
             {formatDuration(track.duration_ms)}
           </span>
         </span>
@@ -68,13 +76,20 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           type="button"
           onClick={onOpen}
           title={track.title}
-          className={`line-clamp-2 block w-full text-left font-medium hover:text-[var(--accent)] ${
+          className={`w-full text-left font-medium hover:text-[var(--accent)] ${
             first ? 'text-[17px] leading-[24px] sm:text-[18px] sm:leading-[26px]' : 'text-[15px] leading-[22px]'
           } ${
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
           }`}
         >
-          {track.title}
+          {/* 最多两行：按行高钉死高度，不依赖 -webkit-box（按钮/span 的 display 会被浏览器重算） */}
+          <span
+            data-rank-title
+            className="block overflow-hidden"
+            style={{ maxHeight: first ? 52 : 44 }}
+          >
+            {track.title}
+          </span>
         </button>
         <button
           type="button"
@@ -162,7 +177,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
     }
   }, [rid, nonce])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!restorePending.current || tracks === null) return
     restorePending.current = false
     if (scrollRef.current) scrollRef.current.scrollTop = rankMemory.top

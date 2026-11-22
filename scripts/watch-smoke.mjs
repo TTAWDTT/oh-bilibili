@@ -1197,6 +1197,19 @@ async function checkRanking(page) {
     '第一名封面更大，宽窗没有横向滚动',
     wide.firstCover > wide.nextCover && wide.overflow !== null && wide.overflow <= 0,
   )
+  const clamp = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('[data-rank-row]')]
+    const title = rows[0]?.querySelector('[data-rank-title]')
+    const heights = rows.slice(0, 12).map((row) => Math.round(row.getBoundingClientRect().height))
+    return {
+      height: title ? Math.round(title.getBoundingClientRect().height) : 0,
+      tallest: heights.length > 0 ? Math.max(...heights) : 0,
+    }
+  })()`)
+  check(
+    '长标题最多两行，行高不被撑开',
+    clamp.height > 0 && clamp.height <= 52 && clamp.tallest > 0 && clamp.tallest <= 150,
+  )
 
   await page.evaluate(`document.getElementById('scroll-main').scrollTop = 400`)
   await sleep(300)
