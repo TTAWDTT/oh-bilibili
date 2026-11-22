@@ -19,8 +19,8 @@ export function ReactionButtons({ track, size = 16, className }: ReactionButtons
       <button
         type="button"
         aria-pressed={liked}
-        aria-label={liked ? '取消喜欢' : '喜欢'}
-        title={liked ? '取消喜欢' : '喜欢'}
+        aria-label={liked ? '取消点赞' : '点赞'}
+        title={liked ? '取消点赞' : '点赞'}
         onClick={(event) => {
           event.stopPropagation()
           void toggleLike(track)

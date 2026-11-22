@@ -14,7 +14,7 @@ const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
   { kind: 'home', label: '发现', icon: 'biliTv' },
   { kind: 'dynamic', label: '动态', icon: 'dynamic' },
   { kind: 'library', label: '曲库', icon: 'library' },
-  { kind: 'liked', label: '喜欢', icon: 'heart' },
+  { kind: 'liked', label: '赞过', icon: 'heart' },
   { kind: 'profile', label: '我的', icon: 'user' },
 ]
 
@@ -31,7 +31,7 @@ export function MobileTabBar() {
       {TABS.map((tab) => {
         const active =
           view.kind === tab.kind || (tab.kind === 'library' && view.kind === 'playlist')
-        // 「喜欢」在没有歌可喜欢时依然是可点的，只是不高亮
+        // 「赞过」在没有可点的内容时依然可点，只是不高亮
         void track
         return (
           <button

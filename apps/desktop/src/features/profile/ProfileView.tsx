@@ -78,9 +78,9 @@ export function ProfileView() {
         const reason = outcome.detail ? `：${outcome.detail}` : ''
         toastWarn(outcome.rejected > 0 ? '部分同步失败' : '同步稍后重试', `${parts.join('，')}${reason}`)
       } else if (outcome.synced === 0) {
-        toastDone('同步完成', '没有待同步的喜欢与收藏。')
+        toastDone('同步完成', '没有待同步的点赞与收藏。')
       } else {
-        toastDone('同步完成', `已推送 ${outcome.synced} 条喜欢与收藏。`)
+        toastDone('同步完成', `已推送 ${outcome.synced} 条点赞与收藏。`)
       }
     } catch (cause) {
       toastFailure('同步', cause)

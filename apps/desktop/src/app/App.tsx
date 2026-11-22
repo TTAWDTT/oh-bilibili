@@ -69,7 +69,7 @@ function viewTitle(view: View): string {
     case 'playlist':
       return `播放列表：${view.name}`
     case 'liked':
-      return '我喜欢的音乐'
+      return '赞过的视频'
     case 'downloads':
       return '已下载'
     case 'history':

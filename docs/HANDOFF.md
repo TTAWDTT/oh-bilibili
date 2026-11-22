@@ -298,6 +298,9 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
     不再提交用户没确认的位置；换曲目/重载清单时 Slider 重新挂载，旧手势不会落到新曲目。PlaybackProgress 在轨道上方
     显示悬停/聚焦/拖动目标时间（两端夹在轨道内），读屏 `aria-valuetext` 是实际时间而不是百分比；PlayerBar 改成
     `overflow-x-clip`，时间标签能露到播放条上方。音量条仍在各自单位（百分比）反馈。
+88. **赞过的视频归位**：侧栏「我的」用完整名称「赞过的视频」，音乐区只留曲库与已下载；点赞动作统一叫「点赞」，
+    登录与同步提示也说「点赞与收藏」。页面按标题/UP 主查找并写明范围（占位符与 aria 里都有「账号赞过的 N 个视频」），
+    筛选时计数为 `1/20`；封面/标题进观看、署名进作者空间，「听全部」是描边次要按钮。返回后保留查找词与滚动位置。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、
