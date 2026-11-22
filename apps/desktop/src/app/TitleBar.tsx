@@ -16,6 +16,13 @@ import { LevelBadge } from '../shared/ui/LevelBadge'
 
 const overlayTitleBar = isTauri && isMacOS
 
+const EXTERNAL_SITES: { label: string; icon: IconName; url: string }[] = [
+  { label: '游戏中心', icon: 'game', url: 'https://game.bilibili.com/' },
+  { label: '会员购', icon: 'gift', url: 'https://show.bilibili.com/' },
+  { label: '漫画', icon: 'article', url: 'https://manga.bilibili.com/' },
+  { label: '赛事', icon: 'rank', url: 'https://www.bilibili.com/v/game/match/' },
+]
+
 /**
  * 顶栏搜索框下面的建议面板。
  *
@@ -193,7 +200,10 @@ export function TitleBar() {
   const [focused, setFocused] = useState(false)
   const [account, setAccount] = useState<Anchor | null>(null)
   const [submitMenu, setSubmitMenu] = useState<Anchor | null>(null)
+  const [siteMenu, setSiteMenu] = useState<Anchor | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const siteTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const sitePanelRef = useRef<HTMLDivElement | null>(null)
   const drag = useWindowDrag()
 
   // 搜索快捷键和左侧栏都会递增 nonce，这里跟着聚焦。
@@ -234,6 +244,7 @@ export function TitleBar() {
     const rect = button.getBoundingClientRect()
     const width = 280
     setSubmitMenu(null)
+    setSiteMenu(null)
     setAccount({
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
@@ -245,12 +256,38 @@ export function TitleBar() {
     const rect = button.getBoundingClientRect()
     const width = 280
     setAccount(null)
+    setSiteMenu(null)
     setSubmitMenu({
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
       anchorTop: rect.top,
     })
   }
+
+  const openSiteMenu = (button: HTMLButtonElement): void => {
+    const rect = button.getBoundingClientRect()
+    const width = 240
+    setAccount(null)
+    setSubmitMenu(null)
+    setSiteMenu({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      top: rect.bottom + 8,
+      anchorTop: rect.top,
+    })
+  }
+
+  const closeSiteMenu = (restoreFocus: boolean): void => {
+    setSiteMenu(null)
+    if (restoreFocus) window.requestAnimationFrame(() => siteTriggerRef.current?.focus())
+  }
+
+  useEffect(() => {
+    if (!siteMenu) return
+    const timer = window.setTimeout(() => {
+      sitePanelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [siteMenu])
 
   const accountItem = (label: string, icon: IconName, run: () => void) => (
     <button
@@ -292,60 +329,24 @@ export function TitleBar() {
       )}
 
       {/*
-       * B 站网页端 header 里 logo 右边那排频道：首页 / 番剧 / 直播 / 游戏中心 / 会员购 / 漫画 / 赛事。
-       * 前三个进站内页；后四个没有站内实现，如实交给系统浏览器，
-       * 不做成点了没反应的假入口。窄窗口收起来，避免和搜索框抢位置。
+       * 站内导航只由左栏承担；顶栏这一颗只收没有站内实现的外部站点。
+       * 窄窗没有左栏，同一个菜单顺带补上番剧与直播。
        */}
       {!viewing ? (
-        <nav aria-label="频道" className="pointer-events-auto hidden shrink-0 items-center gap-0.5 xl:flex">
-          {[
-            { label: '首页', run: () => navigate({ kind: 'home' }) },
-            { label: '番剧', run: () => navigate({ kind: 'bangumi' }) },
-            { label: '直播', run: () => navigate({ kind: 'live' }) },
-            {
-              label: '游戏中心',
-              run: () => {
-                void ipc
-                  .openExternal('https://game.bilibili.com/')
-                  .catch((cause) => toastFailure('打开游戏中心', cause))
-              },
-            },
-            {
-              label: '会员购',
-              run: () => {
-                void ipc
-                  .openExternal('https://show.bilibili.com/')
-                  .catch((cause) => toastFailure('打开会员购', cause))
-              },
-            },
-            {
-              label: '漫画',
-              run: () => {
-                void ipc
-                  .openExternal('https://manga.bilibili.com/')
-                  .catch((cause) => toastFailure('打开漫画', cause))
-              },
-            },
-            {
-              label: '赛事',
-              run: () => {
-                void ipc
-                  .openExternal('https://www.bilibili.com/v/game/match/')
-                  .catch((cause) => toastFailure('打开赛事', cause))
-              },
-            },
-          ].map((entry) => (
-            <button
-              key={entry.label}
-              type="button"
-              onClick={entry.run}
-              /* 网页端这排是纯文字，不带图标；带上图标就成了 App 的频道栏 */
-              className="t press flex h-8 shrink-0 items-center rounded-[6px] px-2.5 text-[13.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
-            >
-              {entry.label}
-            </button>
-          ))}
-        </nav>
+        <button
+          ref={siteTriggerRef}
+          type="button"
+          data-site-menu-trigger
+          onClick={(event) => openSiteMenu(event.currentTarget)}
+          aria-label="哔哩哔哩网站"
+          aria-expanded={siteMenu !== null}
+          aria-haspopup="menu"
+          title="哔哩哔哩网站"
+          className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] px-2 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+        >
+          <Icon name="external" size={15} />
+          <span className="hidden lg:inline">哔哩哔哩网站</span>
+        </button>
       ) : null}
 
       <div
@@ -497,6 +498,84 @@ export function TitleBar() {
           </button>
         )}
       </div>
+      <AnchoredPanel
+        anchor={siteMenu}
+        onClose={() => closeSiteMenu(false)}
+        label="哔哩哔哩网站"
+        width={240}
+      >
+        <div
+          ref={sitePanelRef}
+          data-site-menu
+          className="py-1"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              event.stopPropagation()
+              closeSiteMenu(true)
+              return
+            }
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+            const items = [
+              ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+            ]
+            const at = items.indexOf(document.activeElement as HTMLButtonElement)
+            if (at < 0) return
+            event.preventDefault()
+            const step = event.key === 'ArrowDown' ? 1 : -1
+            items[(at + step + items.length) % items.length]?.focus()
+          }}
+        >
+          {window.innerWidth < 768 ? (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                data-site-kind="bangumi"
+                onClick={() => {
+                  closeSiteMenu(false)
+                  navigate({ kind: 'bangumi' })
+                }}
+                className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+              >
+                <Icon name="bangumi" size={15} className="text-[var(--text-3)]" />
+                番剧
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-site-kind="live"
+                onClick={() => {
+                  closeSiteMenu(false)
+                  navigate({ kind: 'live' })
+                }}
+                className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+              >
+                <Icon name="live" size={15} className="text-[var(--text-3)]" />
+                直播
+              </button>
+              <div className="my-1 h-px bg-hairline" />
+            </>
+          ) : null}
+          {EXTERNAL_SITES.map((site) => (
+            <button
+              key={site.label}
+              type="button"
+              role="menuitem"
+              data-site-url={site.url}
+              onClick={() => {
+                closeSiteMenu(false)
+                void ipc.openExternal(site.url).catch((cause) => toastFailure(`打开${site.label}`, cause))
+              }}
+              className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
+            >
+              <Icon name={site.icon} size={15} className="text-[var(--text-3)]" />
+              <span className="min-w-0 flex-1 truncate">{site.label}</span>
+              <Icon name="external" size={12} className="text-[var(--text-3)]" />
+            </button>
+          ))}
+        </div>
+      </AnchoredPanel>
       <AnchoredPanel anchor={submitMenu} onClose={() => setSubmitMenu(null)} label="投稿" width={280}>
         <div className="grid grid-cols-2 gap-1 p-2">
           {(
