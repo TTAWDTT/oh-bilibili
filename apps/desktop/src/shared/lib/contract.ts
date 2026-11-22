@@ -139,10 +139,19 @@ export type WatchView = {
   current_page: number
   /** 所属合集；没有合集时为 null。 */
   season: SeasonView | null
+  /** 联合投稿署名；单作者为空。 */
+  staff: WatchStaff[]
   manifest_url: string
   duration_ms: number
   qualities: QualityOption[]
   audio_quality: number | null
+}
+
+export type WatchStaff = {
+  mid: number | null
+  name: string
+  face: string | null
+  title: string
 }
 
 export type SeasonView = {

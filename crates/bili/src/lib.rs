@@ -66,6 +66,17 @@ pub struct TrackDetail {
     pub pages: Vec<PageRef>,
     /// 这条视频所属的合集。B 站观看页右栏那一块「合集」。
     pub season: Option<SeasonRef>,
+    /// 联合投稿的署名。单作者稿件为空；顺序与接口一致。
+    pub staff: Vec<StaffMember>,
+}
+
+/// 联合投稿里的一个成员。`title` 是作者在这部作品里的角色，例如「作曲」「后期」。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaffMember {
+    pub mid: Option<u64>,
+    pub name: String,
+    pub face: Option<String>,
+    pub title: String,
 }
 
 /// 一个合集。只有 `ugc_season` 存在的视频才有。
@@ -1385,6 +1396,28 @@ fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
                     .collect()
             })
             .unwrap_or_default();
+        let staff: Vec<StaffMember> = data["staff"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|member| {
+                        let name = member["name"].as_str()?.trim();
+                        if name.is_empty() {
+                            return None;
+                        }
+                        Some(StaffMember {
+                            mid: member["mid"].as_u64(),
+                            name: name.to_string(),
+                            face: member["face"]
+                                .as_str()
+                                .filter(|face| !face.is_empty())
+                                .map(|face| face.replacen("http://", "https://", 1)),
+                            title: member["title"].as_str().unwrap_or("").trim().to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let track = Track {
             key: key.clone(),
             title: search::strip_tags(data["title"].as_str().unwrap_or("（无标题）")),
@@ -1413,6 +1446,7 @@ fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
             pages,
             meta,
             season: season_of(data),
+            staff,
         })
     }
 
@@ -1551,6 +1585,37 @@ mod tests {
         assert_eq!(c[0].duration, Some(Millis(317_000)));
         assert_eq!(c[0].cover.as_deref(), Some("https://i0.hdslb.com/x.jpg"));
         assert_eq!(c[0].typeid, 3);
+    }
+
+    #[test]
+    fn 联合投稿署名保留顺序与角色() {
+        let v = serde_json::json!({
+            "data": {
+                "cid": 11,
+                "aid": 22,
+                "title": "天色将明",
+                "pic": "//i0.hdslb.com/cover.jpg",
+                "owner": { "name": "茶理理理子", "mid": 684169, "face": "http://i0.hdslb.com/a.jpg" },
+                "stat": {},
+                "pages": [{ "page": 1, "cid": 11, "part": "正片", "duration": 200 }],
+                "staff": [
+                    { "mid": 684169, "name": "茶理理理子", "face": "http://i0.hdslb.com/a.jpg", "title": "UP主" },
+                    { "mid": 362982702, "name": "陈亦洺", "face": "http://i0.hdslb.com/b.jpg", "title": "作曲" },
+                    { "name": "无名后期", "title": "后期" },
+                    { "mid": 55775966, "name": "音阙诗听", "face": "", "title": "后期" }
+                ]
+            }
+        });
+        let detail = wire::track_detail(&v, &TrackKey::from_provider("BV1qf421Q7ok")).expect("详情");
+        let staff = detail.staff;
+        assert_eq!(staff.len(), 4, "接口顺序与缺 MID 的署名都要保留");
+        assert_eq!(staff[0].name, "茶理理理子");
+        assert_eq!(staff[0].title, "UP主");
+        assert_eq!(staff[1].mid, Some(362982702));
+        assert_eq!(staff[1].title, "作曲");
+        assert_eq!(staff[2].mid, None);
+        assert_eq!(staff[2].face, None);
+        assert_eq!(staff[3].face, None, "空 face 不当成地址");
     }
 }
 

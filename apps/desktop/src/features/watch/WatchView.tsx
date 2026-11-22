@@ -9,6 +9,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { toastDone, toastWarn } from '../../app/notice'
 import { Icon } from '../../shared/ui/Icon'
 import { CommentsPanel } from './CommentsPanel'
+import { takeWatchScroll } from './watchScroll'
 import { ChapterList } from './ChapterList'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
@@ -159,6 +160,13 @@ export function WatchView({
     if (page === undefined) return
     document.getElementById('scroll-main')?.scrollTo({ top: 0 })
   }, [page])
+
+  // 从合作成员空间返回同一个 BV 时，回到离开前的阅读位置（只恢复一次）。
+  useEffect(() => {
+    if (!data) return
+    const top = takeWatchScroll(track.key)
+    if (top !== null) document.getElementById('scroll-main')?.scrollTo({ top })
+  }, [data, track.key])
 
   // 老版本只写过按页进度；拿到这一页的时长就补写一份，续播卡从此有页级时长可用。
   useEffect(() => {
