@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
@@ -137,6 +136,44 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
   )
 }
 
+/** 首屏骨架沿用真实行的列宽和封面比例，数据到达时首行起点不跳。 */
+function RankSkeletonRow({ rank }: { rank: number }) {
+  const first = rank === 1
+  return (
+    <div
+      data-rank-skeleton-row
+      aria-hidden
+      className="grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 lg:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] lg:gap-x-4"
+    >
+      <span className="pt-1">
+        <span
+          className={`ml-auto block rounded-[3px] bg-[var(--ga1)] ${
+            first ? 'h-[30px] w-6' : 'h-[22px] w-5'
+          }`}
+        />
+      </span>
+      <span
+        className={`block w-[7rem] shrink-0 aspect-video rounded-[6px] bg-[var(--ga1)] ${
+          first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'
+        }`}
+      />
+      <div className="min-w-0 py-0.5">
+        <span
+          className={`block rounded-[3px] bg-[var(--ga1)] ${
+            first ? 'h-[24px] w-[70%]' : 'h-[22px] w-[60%]'
+          }`}
+        />
+        <span className="mt-1.5 block h-[14px] w-24 rounded-[3px] bg-[var(--ga0)]" />
+        <span className="mt-1 block h-[12px] w-32 rounded-[3px] bg-[var(--ga1)] lg:hidden" />
+      </div>
+      <span className="hidden shrink-0 items-center gap-4 pt-1 lg:flex">
+        <span className="block h-3 w-16 rounded-[3px] bg-[var(--ga1)]" />
+        <span className="block h-3 w-14 rounded-[3px] bg-[var(--ga1)]" />
+      </span>
+    </div>
+  )
+}
+
 /**
  * 排行榜。读的是 B 站公开榜单，一次 100 条；名次就是接口返回的顺序。
  * 名次单独成列、自上而下排成一张榜，前三名用一点颜色。
@@ -234,7 +271,12 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
         />
       ) : tracks === null ? (
-        <BiliLoader label="正在取榜单…" />
+        <div data-rank-skeleton aria-busy="true" className="flex flex-col gap-5 pb-6">
+          <span className="sr-only">正在取榜单…</span>
+          {[1, 2, 3, 4, 5, 6].map((rank) => (
+            <RankSkeletonRow key={rank} rank={rank} />
+          ))}
+        </div>
       ) : tracks.length === 0 ? (
         <EmptyState mascot="missYou" icon="biliTv" title="这个分区今天没有榜单" action={null} />
       ) : (
