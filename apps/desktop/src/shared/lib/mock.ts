@@ -337,7 +337,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'live_rooms': {
       // 每页换一批 room_id，预览翻页时不会把同一间房重复挂到列表中。
       const page = Math.max(1, Math.trunc(num(args, 'page')))
-      const count = Math.max(1, Math.trunc(num(args, 'count')))
+      const params = new URLSearchParams(window.location.search)
+      const onlyOne = params.get('liveRooms') === '1'
+      const noCover = params.get('liveCover') === 'none'
+      if (onlyOne && page > 1) return []
+      const count = onlyOne && page === 1 ? 1 : Math.max(1, Math.trunc(num(args, 'count')))
       const start = (page - 1) * count
       return Array.from({ length: count }, (_, i) => {
         const at = start + i
@@ -347,7 +351,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           title: track.title,
           uname: track.artist,
           face: track.up_avatar ?? null,
-          cover: track.cover,
+          cover: noCover ? null : track.cover,
           area: '音乐',
           online: 700_000 - (at % 6) * 90_000,
           url: `https://live.bilibili.com/${1000 + at}`,
