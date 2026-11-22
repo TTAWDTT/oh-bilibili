@@ -1081,7 +1081,22 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 否则「切排序不换页首」这类测试永远是假通过。
       const mid = num(args, 'mid')
       const order = str(args, 'order')
-      const owned = CATALOG.filter((track) => !mid || track.up_mid === mid)
+      let owned = CATALOG.filter((track) => !mid || track.up_mid === mid)
+      // 预览里有一位「多页作者」：用来验证翻页、切排序后页码和总数不丢。
+      const longAuthor =
+        import.meta.env.DEV && new URLSearchParams(window.location.search).has('authorLong')
+      if (longAuthor && mid) {
+        const base = owned.length > 0 ? owned : CATALOG.slice(0, 5)
+        owned = Array.from({ length: 125 }, (_, index) => {
+          const seed = base[index % base.length]!
+          return {
+            ...seed,
+            key: `${seed.key}-long-${index}`,
+            title: `${seed.title} 第 ${index + 1} 期`,
+            views: 1_000_000 - index * 1000,
+          }
+        })
+      }
       const sorted = [...owned]
       if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
       if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))

@@ -1443,7 +1443,7 @@ async function checkRailScope(page) {
 /** UP 主空间：页首一半是作者、一半是一件真实投稿，切排序不换图。 */
 async function checkAuthorHero(page) {
   await page.viewport(1320, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?authorLong=1`)}`)
   await sleep(4500)
   await page.evaluate(`document.querySelector('[data-track-card] button[aria-label^="观看"]')?.click()`)
   await sleep(2500)
@@ -1516,6 +1516,35 @@ async function checkAuthorHero(page) {
   check(
     `切排序时页首不消失、页面不回顶 ${JSON.stringify(sorting)}`,
     sorting.hero && (sorting.room < 400 || sorting.top >= 300),
+  )
+
+  // 多页作者：切排序后页码要归零，翻页仍能把 125 条取回来。
+  const loadAll = async () => {
+    for (let i = 0; i < 60; i += 1) {
+      const count = await page.evaluate(`document.querySelectorAll('#scroll-main [data-track-card]').length`)
+      if (count >= 125) return count
+      await page.evaluate(`(() => {
+        const box = document.getElementById('scroll-main')
+        if (box) box.scrollTop = box.scrollHeight
+      })()`)
+      await sleep(300)
+    }
+    return page.evaluate(`document.querySelectorAll('#scroll-main [data-track-card]').length`)
+  }
+  const loadedAll = await loadAll()
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多播放')
+    hit?.click()
+  })()`)
+  await sleep(1200)
+  const afterOrder = await page.evaluate(`(() => ({
+    hero: document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key') ?? '',
+    total: [...document.querySelectorAll('span')].find((node) => /共 \\d+ 个投稿/.test(node.textContent || ''))?.textContent ?? '',
+  }))()`)
+  const reloadedAll = await loadAll()
+  check(
+    `多页作者切排序后总数与页码都不丢 ${JSON.stringify({ loadedAll, afterOrder, reloadedAll })}`,
+    loadedAll >= 125 && reloadedAll >= 125 && afterOrder.total.includes('125'),
   )
 
   await page.viewport(380, 820)

@@ -46,6 +46,8 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const [hero, setHero] = useState<Track | null>(null)
   /** 页首作品属于哪个作者：换作者才重置，换排序不动。 */
   const heroOwner = useRef<string | null>(null)
+  /** 第几次取数：换排序/换作者后，旧的翻页响应直接丢掉。 */
+  const loadEpoch = useRef(0)
   const scroller = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
 
@@ -102,18 +104,21 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   useEffect(() => {
     let cancelled = false
-    const owner = `${mid ?? 'name'}:${name}`
+    // 有 mid 时名字变化不算换人；只有按名字搜索时名字才是身份。
+    const owner = mid ? `mid:${mid}` : `name:${name}`
     if (heroOwner.current !== owner) {
       // 换人：旧作者的头像、粉丝数、关注态一概不能留；换排序则保留列表等新数据。
       heroOwner.current = owner
       setTracks(null)
-      setPage(1)
       setIsFallback(false)
       setCard(null)
       setFollowed(null)
       setHero(null)
       scroller.current?.scrollTo({ top: 0 })
     }
+    // 换排序也要从第 1 页重新开始，否则下一页会从旧的页码继续。
+    setPage(1)
+    const epoch = ++loadEpoch.current
     /** 第一次拿到这一页投稿时定下页首作品；之后换排序、翻页都不再动它。 */
     const pickHero = (list: Track[]): void => {
       // 只有名字时无法核对 up_mid，不拿它当页首，免得同名作者串图。
@@ -124,25 +129,25 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       void ipc
         .spaceVideos(mid, 1, order)
         .then(([list, total]) => {
-          if (cancelled) return
+          if (cancelled || loadEpoch.current !== epoch) return
           setTracks(list)
           setTotal(total)
           pickHero(list)
         })
         .catch(() => {
           // 空间接口不通时退回搜索聚合，并在界面上标注
-          if (cancelled) return
+          if (cancelled || loadEpoch.current !== epoch) return
           setIsFallback(true)
           void ipc
             .searchQ(name, 1)
             .then((list) => {
-              if (cancelled) return
+              if (cancelled || loadEpoch.current !== epoch) return
               const matched = list.filter((t) => t.up_mid === mid)
               setTracks(matched)
               pickHero(matched)
             })
             .catch(() => {
-              if (!cancelled) setTracks([])
+              if (!cancelled && loadEpoch.current === epoch) setTracks([])
             })
         })
       return () => {
@@ -152,14 +157,14 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     void ipc
       .searchQ(name, 1)
       .then((list) => {
-        if (cancelled) return
+        if (cancelled || loadEpoch.current !== epoch) return
         setIsFallback(true)
         const matched = list.filter((t) => t.artist === name)
         setTracks(matched)
         pickHero(matched)
       })
       .catch(() => {
-        if (!cancelled) setTracks([])
+        if (!cancelled && loadEpoch.current === epoch) setTracks([])
       })
     return () => {
       cancelled = true
@@ -171,8 +176,10 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     if (!mid || loadingRef.current || isFallback || !tracks || tracks.length >= total) return
     loadingRef.current = true
     setLoadingMore(true)
+    const epoch = loadEpoch.current
     try {
       const [list] = await ipc.spaceVideos(mid, page + 1, order)
+      if (loadEpoch.current !== epoch) return
       if (list.length === 0) {
         // 接口提前到底：把总数对齐，之后就别再对着同一页空转
         setTotal(tracks.length)
@@ -308,27 +315,31 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                     </button>
                   </>
                 ) : null}
-                <button
-                  type="button"
-                  disabled={followed === null}
-                  onClick={() => void follow()}
-                  className={[
-                    't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                    followed === true
-                      ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                      : 'bg-[var(--accent)] text-white hover:opacity-90',
-                  ].join(' ')}
-                >
-                  <Icon name={followed ? 'check' : 'plus'} size={14} />
-                  {followed ? '已关注' : '关注'}
-                </button>
-                <span className="rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
-                  {isFallback
-                    ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
-                    : `共 ${formatCount(total)} 个投稿`}
-                </span>
+                {mid || tracks.some((item) => item.up_mid) ? (
+                  <button
+                    type="button"
+                    disabled={followed === null}
+                    onClick={() => void follow()}
+                    className={[
+                      't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
+                      followed === true
+                        ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                        : 'bg-[var(--accent)] text-white hover:opacity-90',
+                    ].join(' ')}
+                  >
+                    <Icon name={followed ? 'check' : 'plus'} size={14} />
+                    {followed ? '已关注' : '关注'}
+                  </button>
+                ) : null}
               </div>
             )}
+            <span className="w-fit rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
+              {!mid
+                ? `来自搜索结果，共 ${tracks.length} 个`
+                : isFallback
+                  ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
+                  : `共 ${formatCount(total)} 个投稿`}
+            </span>
           </div>
 
           {hero ? (
