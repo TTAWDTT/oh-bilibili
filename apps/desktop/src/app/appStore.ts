@@ -20,6 +20,7 @@ export type View =
   | { kind: 'watch'; track: Track }
   | { kind: 'watchLater' }
   | { kind: 'following' }
+  | { kind: 'profile' }
   | { kind: 'settings' }
 
 export type DynamicTab = 'all' | 'video' | 'opus'
