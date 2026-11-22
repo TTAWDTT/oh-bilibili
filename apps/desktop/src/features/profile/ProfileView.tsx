@@ -125,7 +125,7 @@ export function ProfileView() {
                 </div>
                 <div className="flex flex-wrap items-start gap-x-5 gap-y-3 px-4 pb-5 sm:px-5">
                   <div className="relative -mt-10 shrink-0 rounded-full bg-white p-[5px] shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_25%,white),0_3px_12px_color-mix(in oklab, var(--accent) 18%, transparent)]">
-                    <Avatar src={user.avatar} alt={user.uname} size={120} bordered={false} />
+                    <Avatar src={user.avatar} alt={user.uname} size={96} bordered={false} />
                   </div>
                   <div className="min-w-0 flex-[1_1_240px] pt-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -153,30 +153,30 @@ export function ProfileView() {
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <div className="mt-4 grid grid-cols-3 gap-2 md:flex md:flex-wrap md:items-center">
                       <button
                         type="button"
                         onClick={() => navigate({ kind: 'author', name: user.uname, mid: user.mid })}
-                        className="t press flex h-8 items-center justify-center gap-2 rounded-[6px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90"
+                        className="t press flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-[6px] bg-[var(--accent)] px-1.5 text-[12px] font-medium text-white hover:opacity-90 md:gap-2 md:px-4 md:text-[14px]"
                       >
-                        <Icon name="user" size={14} />
+                        <Icon name="user" size={13} className="shrink-0" />
                         个人空间
                       </button>
                       <button
                         type="button"
                         onClick={() => void sync()}
                         disabled={syncing}
-                        className="t press flex h-8 items-center gap-2 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40"
+                        className="t press flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-[6px] border border-[var(--line)] px-1.5 text-[12px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-default disabled:opacity-40 md:gap-2 md:px-4 md:text-[14px]"
                       >
-                        <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} />
+                        <Icon name="sync" size={13} className={`shrink-0 ${syncing ? 'animate-spin' : ''}`} />
                         {syncing ? '同步中…' : '立即同步'}
                       </button>
                       <button
                         type="button"
                         onClick={() => void logout()}
-                        className="t press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                        className="t press flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[6px] border border-[var(--line)] px-1.5 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] md:px-4 md:text-[14px]"
                       >
-                        <Icon name="logout" size={13} />
+                        <Icon name="logout" size={12} className="shrink-0" />
                         退出
                       </button>
                     </div>
