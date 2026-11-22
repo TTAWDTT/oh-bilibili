@@ -12,6 +12,7 @@ const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
 const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const libraryPartialOnly = process.argv.includes('--library-partial')
 const channelOnly = process.argv.includes('--channel-nav')
+const topbarOnly = process.argv.includes('--topbar-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -3473,6 +3474,127 @@ async function dynamicReturn(page) {
   if (errors.length) console.error(errors)
 }
 
+/** 顶栏只留一个「哔哩哔哩网站」菜单；站内导航交给左栏或窄窗的同一个菜单。 */
+async function checkTopbarSites(page) {
+  const waitFor = async (expression, timeout = 6000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  const openMenu = async () => {
+    const clicked = await page.evaluate(`(() => {
+      const hit = document.querySelector('[data-site-menu-trigger]')
+      hit?.click()
+      return !!hit
+    })()`)
+    return clicked && await waitFor(`!!document.querySelector('[data-site-menu]')`)
+  }
+  const menuState = () =>
+    page.evaluate(`(() => ({
+      site: [...document.querySelectorAll('[data-site-menu] [data-site-kind]')]
+        .map((el) => el.dataset.siteKind),
+      ext: [...document.querySelectorAll('[data-site-menu] [data-site-url]')]
+        .map((el) => el.dataset.siteUrl),
+      focus: (document.activeElement?.textContent || '').trim(),
+      focusKind: document.activeElement?.dataset.siteKind ?? '',
+      focusUrl: document.activeElement?.dataset.siteUrl ?? '',
+      trigger: document.querySelectorAll('[data-site-menu-trigger]').length,
+      channelNav: document.querySelectorAll('nav[aria-label="频道"]').length,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    }))()`)
+  const key = async (name, code, vk) => {
+    await page.keyEvent({ type: 'keyDown', key: name, code, windowsVirtualKeyCode: vk })
+    await page.keyEvent({ type: 'keyUp', key: name, code, windowsVirtualKeyCode: vk })
+    await sleep(120)
+  }
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(2500)
+  const wideBefore = await menuState()
+  const wideOpened = await openMenu()
+  await sleep(120)
+  const wideMenu = await menuState()
+  check(
+    '宽窗顶栏不再重复站内频道',
+    wideBefore.trigger === 1 && wideBefore.channelNav === 0 && wideOpened,
+  )
+  check(
+    '宽窗外链菜单四项且首项可键盘选择',
+    wideMenu.site.length === 0 &&
+      wideMenu.ext.length === 4 &&
+      wideMenu.ext.includes('https://game.bilibili.com/') &&
+      wideMenu.focus === '游戏中心',
+  )
+  await key('ArrowDown', 'ArrowDown', 40)
+  const wideNext = await menuState()
+  check('外链菜单方向键移动到下一项', wideNext.focus === '会员购')
+
+  await page.evaluate(`(() => {
+    const input = document.querySelector('input[aria-label="顶栏搜索"]')
+    if (!input) return false
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, '草稿')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  await key('Escape', 'Escape', 27)
+  const afterEsc = await page.evaluate(`({
+    menu: !!document.querySelector('[data-site-menu]'),
+    focus: document.activeElement?.hasAttribute('data-site-menu-trigger') === true,
+    draft: document.querySelector('input[aria-label="顶栏搜索"]')?.value ?? '',
+  })`)
+  check(
+    'Esc 关闭外链菜单并回到触发按钮，搜索草稿保留',
+    !afterEsc.menu && afterEsc.focus && afterEsc.draft === '草稿',
+  )
+
+  await page.viewport(380, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(2500)
+  const narrowOpened = await openMenu()
+  await sleep(120)
+  const narrowMenu = await menuState()
+  const narrowLayout = await page.evaluate(`(() => {
+    const trigger = document.querySelector('[data-site-menu-trigger]')?.getBoundingClientRect()
+    const form = document.querySelector('form')?.getBoundingClientRect()
+    const message = document.querySelector('button[aria-label^="消息"]')?.getBoundingClientRect()
+    return {
+      triggerRight: trigger?.right ?? -1,
+      formLeft: form?.left ?? -1,
+      formRight: form?.right ?? -1,
+      messageLeft: message?.left ?? -1,
+    }
+  })()`)
+  check(
+    '窄窗同一个菜单补上番剧与直播',
+    narrowOpened &&
+      narrowMenu.site.join(',') === 'bangumi,live' &&
+      narrowMenu.ext.length === 4 &&
+      narrowMenu.overflow <= 0,
+  )
+  check(
+    '窄窗网站按钮与搜索框、消息入口不重叠',
+    narrowLayout.triggerRight <= narrowLayout.formLeft + 1 &&
+      narrowLayout.formRight <= narrowLayout.messageLeft + 1,
+  )
+
+  await page.evaluate(`document.querySelector('[data-site-kind="bangumi"]')?.click()`)
+  const wentBangumi = await waitFor(`document.querySelector('h1')?.textContent?.trim() === '番剧'`, 8000)
+  check('窄窗菜单可以进入番剧', narrowOpened && wentBangumi)
+
+  const liveOpened = await openMenu()
+  await page.evaluate(`document.querySelector('[data-site-kind="live"]')?.click()`)
+  const wentLive = await waitFor(`document.querySelector('h1')?.textContent?.trim() === '直播'`, 8000)
+  check('窄窗菜单可以进入直播', liveOpened && wentLive)
+
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -3492,6 +3614,10 @@ async function main() {
       await checkChannelNav(page)
       return
     }
+    if (topbarOnly) {
+      await checkTopbarSites(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -3503,6 +3629,7 @@ async function main() {
     await checkStageMorph(page)
     await checkHeroAllocation(page)
     await checkAuthorHero(page)
+    await checkTopbarSites(page)
     await checkFollowingDirectory(page)
     await checkHomeResume(page)
     await checkNavConventions(page)
