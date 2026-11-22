@@ -8,6 +8,64 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
 /**
+ * 首房与同排的两间。封面保持直播源常见的 16:10，不再把 16:9/16:10 的图裁进
+ * 3.6:1 的横幅；标题、主播与人气放在图外，避免压住人脸或游戏 HUD。
+ */
+function LiveFeature({ room, hero }: { room: ipc.LiveRoom; hero: boolean }) {
+  return (
+    <button
+      type="button"
+      data-live-hero={hero ? room.room_id : undefined}
+      data-live-room={hero ? undefined : room.room_id}
+      onClick={() => void ipc.openExternal(room.url).catch(() => {})}
+      title={room.title}
+      className="t group flex min-w-0 flex-col text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+    >
+      <span
+        className="relative block w-full overflow-hidden rounded-[8px] bg-[var(--ga1)]"
+        style={{ aspectRatio: '16 / 10' }}
+      >
+        {room.cover ? (
+          <img
+            src={room.cover}
+            alt=""
+            referrerPolicy="no-referrer"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-[320ms] group-hover:scale-[1.015]"
+          />
+        ) : null}
+        <span className="absolute left-2 top-2 flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 py-0.5 text-[11px] font-medium leading-[16px] text-white">
+          <span className="bili-live-dot" aria-hidden />
+          LIVE
+        </span>
+      </span>
+      <span
+        className={[
+          'mt-2 line-clamp-2 font-medium text-[var(--text-1)] group-hover:text-[var(--accent)]',
+          hero ? 'text-[18px] leading-[26px]' : 'text-[13.5px] leading-[20px]',
+        ].join(' ')}
+      >
+        {room.title}
+      </span>
+      <span className="mt-1.5 flex min-w-0 items-center gap-2 text-[12px] text-[var(--text-3)]">
+        <Avatar src={room.face} alt={room.uname} size={hero ? 20 : 16} />
+        <span className="truncate">{room.uname}</span>
+        <span className="num flex shrink-0 items-center gap-0.5">
+          <Icon name="flame" size={11} />
+          {formatCount(room.online)}
+        </span>
+        {hero ? (
+          <span className="ml-auto flex shrink-0 items-center gap-1">
+            <Icon name="external" size={12} />
+            在浏览器打开
+          </span>
+        ) : null}
+      </span>
+    </button>
+  )
+}
+
+/**
  * 直播频道。B 站直播区的一排房间就是这种密度：16:10 封面 + 主播 + 标题。
  *
  * 直播流（HLS + 播放鉴权）本机解不了，卡片点开交给系统浏览器；
@@ -65,7 +123,9 @@ export function LiveView() {
     load(pageRef.current + 1)
   }
 
-  const focus = rooms[0]
+  const lead = rooms[0]
+  const side = rooms.slice(1, 3)
+  const tail = rooms.slice(3)
 
   if (page === 0 && loading) return <BiliLoader label="正在取直播间…" />
   if (page === 0 && error) {
@@ -105,53 +165,28 @@ export function LiveView() {
           </button>
         </div>
       </nav>
-      {focus ? (
-        <div className="mb-4 px-4 md:px-8">
-          <button
-            type="button"
-            data-live-hero={focus.room_id}
-            onClick={() => void ipc.openExternal(focus.url).catch(() => {})}
-            title={focus.title}
-            className="group relative block h-[220px] w-full overflow-hidden rounded-[8px] bg-[var(--ga1)] text-left sm:h-[280px] lg:h-[320px]"
+      {lead ? (
+        <div className="mb-5 px-4 md:px-8">
+          <div
+            className={
+              side.length > 0
+                ? 'grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'
+                : 'max-w-[720px]'
+            }
           >
-            {focus.cover ? (
-              <img
-                src={focus.cover}
-                alt=""
-                referrerPolicy="no-referrer"
-                decoding="async"
-                className="h-full w-full object-cover transition-transform duration-[320ms] group-hover:scale-[1.015]"
-              />
+            <LiveFeature room={lead} hero />
+            {side.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+                {side.map((room) => (
+                  <LiveFeature key={room.room_id} room={room} hero={false} />
+                ))}
+              </div>
             ) : null}
-            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_20%,rgba(0,0,0,0.78)_100%)]" />
-            <span className="absolute left-3 top-3 flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 py-0.5 text-[11px] font-medium leading-[16px] text-white">
-              <span className="bili-live-dot" aria-hidden />
-              LIVE
-            </span>
-            <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-6 p-4 text-white md:p-5">
-              <span className="min-w-0">
-                <span className="line-clamp-2 text-[18px] font-medium leading-[26px] [text-shadow:0_1px_6px_rgba(0,0,0,0.55)] md:text-[22px] md:leading-[30px]">
-                  {focus.title}
-                </span>
-                <span className="mt-2 flex items-center gap-2 text-[12.5px] [text-shadow:0_1px_4px_rgba(0,0,0,0.7)]">
-                  <Avatar src={focus.face} alt={focus.uname} size={22} />
-                  <span className="truncate">{focus.uname}</span>
-                  <span className="num flex items-center gap-1">
-                    <Icon name="flame" size={12} />
-                    {formatCount(focus.online)}
-                  </span>
-                </span>
-              </span>
-              <span className="hidden shrink-0 items-center gap-1 rounded-[4px] bg-black/35 px-2 py-1 text-[12px] backdrop-blur-sm sm:flex">
-                <Icon name="external" size={13} />
-                在浏览器打开
-              </span>
-            </span>
-          </button>
+          </div>
         </div>
       ) : null}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 px-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 md:px-8">
-        {rooms.slice(1).map((room) => (
+        {tail.map((room) => (
           <button
             key={`${room.room_id}`}
             type="button"
