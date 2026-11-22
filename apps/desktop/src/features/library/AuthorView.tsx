@@ -1,6 +1,5 @@
-import { toastDone, toastFailure } from '../../app/notice'
+import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
-import { toWireError } from '../../shared/lib/errors'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
@@ -33,6 +32,10 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   const me = useAuthStore((state) => state.auth?.user ?? null)
   /** null 表示还没问到：按钮先禁用，避免把旧作者的状态带过来。 */
   const [followed, setFollowed] = useState<boolean | null>(null)
+  /** 关注请求在飞时不重复发；失败留在按钮上重试，不弹全局提示。 */
+  const [followBusy, setFollowBusy] = useState(false)
+  const [followFailed, setFollowFailed] = useState(false)
+  const followOwner = useRef<number | null>(null)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
   const [total, setTotal] = useState(0)
   /** 是否退回了搜索聚合。界面要如实标注这一点。 */
@@ -85,15 +88,20 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
 
   /** 关注是真接口：写进你的 B 站关注列表，取关同理。没有 mid 就没有关注按钮。 */
   const follow = async (): Promise<void> => {
-    if (!mid || followed === null) return
+    if (!mid || followed === null || followBusy) return
+    const owner = mid
     const next = !followed
-    setFollowed(next)
+    setFollowBusy(true)
+    setFollowFailed(false)
+    followOwner.current = owner
     try {
-      await ipc.followSet(mid, next)
-      toastDone(next ? '已关注' : '已取消关注')
-    } catch (e) {
-      setFollowed(!next)
-      toastFailure('关注', toWireError(e))
+      await ipc.followSet(owner, next)
+      // 请求回来时用户可能已经切到别的作者，结果只落在原来的作者上。
+      if (followOwner.current === owner) setFollowed(next)
+    } catch {
+      if (followOwner.current === owner) setFollowFailed(true)
+    } finally {
+      if (followOwner.current === owner) setFollowBusy(false)
     }
   }
 
@@ -108,6 +116,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       setIsFallback(false)
       setCard(null)
       setFollowed(null)
+      setFollowBusy(false)
+      setFollowFailed(false)
+      followOwner.current = null
       setHero(null)
       scroller.current?.scrollTo({ top: 0 })
     }
@@ -331,17 +342,21 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 {mid ? (
                   <button
                     type="button"
-                    disabled={followed === null}
+                    disabled={followed === null || followBusy}
                     onClick={() => void follow()}
+                    aria-live="polite"
                     className={[
                       't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                      followed === true
-                        ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                        : 'bg-[var(--accent)] text-white hover:opacity-90',
+                      followFailed
+                        ? 'border border-[var(--danger)] text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_8%,white)]'
+                        : followed === true
+                          ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                          : 'bg-[var(--accent)] text-white hover:opacity-90',
+                      followBusy ? 'opacity-70' : '',
                     ].join(' ')}
                   >
-                    <Icon name={followed ? 'check' : 'plus'} size={14} />
-                    {followed ? '已关注' : '关注'}
+                    <Icon name={followFailed ? 'refresh' : followed ? 'check' : 'plus'} size={14} />
+                    {followBusy ? '处理中…' : followFailed ? '重试关注' : followed ? '已关注' : '关注'}
                   </button>
                 ) : null}
               </div>
