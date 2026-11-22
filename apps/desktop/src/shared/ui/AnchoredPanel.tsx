@@ -54,6 +54,7 @@ export function AnchoredPanel({
       <button
         type="button"
         aria-label="关闭"
+        tabIndex={-1}
         onClick={onClose}
         className="fixed inset-0 z-40 cursor-default"
       />

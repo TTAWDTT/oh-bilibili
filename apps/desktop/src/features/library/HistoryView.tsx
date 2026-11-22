@@ -43,19 +43,38 @@ export function HistoryView() {
   )
   const snapshot = usePlayerStore((state) => state.snapshot)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
-  const restorePending = useRef(restored)
+  const focusPending = useRef(restored)
+  /** 回来时要落到的位置。刷新第一页会重排列表，不能让它把这次恢复冲掉。 */
+  const restoreScrollTop = useRef(restored ? historyMemory.scrollTop : 0)
+  const restoreScrollPending = useRef(restored)
+  const entriesRef = useRef<Entry[]>(historyMemory.entries)
+  const hasMoreRef = useRef(historyMemory.hasMore)
+  /** 删掉当前焦点所在的一行之后，把焦点交给下一行；null 表示没有相邻行。 */
+  const focusRequest = useRef<{ key: string | null } | null>(null)
+  /** 回到历史时把上次看的那一行放回视口顶部，不依赖滚动事件有没有送达。 */
+  const restoreScroll = (box: HTMLElement): void => {
+    const key = historyMemory.focusKey
+    if (key) focusRow(box, key, 'anchor')
+    else box.scrollTop = restoreScrollTop.current
+    historyMemory.scrollTop = box.scrollTop
+  }
+
+  const applyFirstPage = (list: Entry[]): void => {
+    // 回来时先刷新第一页：这段时间播过的新歌、改过的进度都要反映出来，
+    // 已经翻出来的更早记录继续留在下面。
+    const merged = mergeFirstPage(entriesRef.current, list)
+    setEntries(merged)
+    const last = merged[merged.length - 1]
+    setCursor(last ? { played_at: last.played_at, id: last.id } : null)
+    setHasMore(merged.length > list.length ? hasMoreRef.current : list.length === HISTORY_PAGE)
+  }
 
   useEffect(() => {
-    if (restored) return
     let cancelled = false
     void ipc
       .libraryHistoryTimed(HISTORY_PAGE)
       .then((list) => {
-        if (cancelled) return
-        setEntries(list)
-        const last = list[list.length - 1]
-        setCursor(last ? { played_at: last.played_at, id: last.id } : null)
-        setHasMore(list.length === HISTORY_PAGE)
+        if (!cancelled) applyFirstPage(list)
       })
       .catch((e) => {
         if (!cancelled) setError(toWireError(e).message)
@@ -69,19 +88,30 @@ export function HistoryView() {
     historyMemory.entries = entries ?? []
     historyMemory.cursor = cursor
     historyMemory.hasMore = hasMore
+    entriesRef.current = entries ?? []
+    hasMoreRef.current = hasMore
   }, [entries, cursor, hasMore])
 
   useLayoutEffect(() => {
     const box = scrollerRef.current
-    if (!box || !restorePending.current) return
-    restorePending.current = false
-    box.scrollTop = historyMemory.scrollTop
-    const key = historyMemory.focusKey
-    if (!key) return
-    const row = [...box.querySelectorAll<HTMLElement>('[data-history-row]')].find(
-      (element) => element.dataset.key === key,
-    )
-    row?.querySelector<HTMLElement>('button[data-history-play]')?.focus({ preventScroll: true })
+    if (!box) return
+    if (focusPending.current) {
+      focusPending.current = false
+      restoreScroll(box)
+      return
+    }
+    // 刷新第一页会换掉一批行，列表高度变化可能把 scrollTop 夹回 0；提交后再落一次。
+    if (!restoreScrollPending.current) return
+    restoreScrollPending.current = false
+    restoreScroll(box)
+  }, [entries])
+
+  useLayoutEffect(() => {
+    const request = focusRequest.current
+    const box = scrollerRef.current
+    if (!request || !box) return
+    focusRequest.current = null
+    focusRow(box, request.key, 'reveal')
   }, [entries])
 
   /** 再取一页更早的记录。用上一页最旧一条的 (played_at, id) 作边界。 */
@@ -109,7 +139,10 @@ export function HistoryView() {
   const removeOne = async (key: string): Promise<void> => {
     try {
       await ipc.historyDelete(key)
-      const next = (entries ?? []).filter((e) => e.track.key !== key)
+      const list = entries ?? []
+      const index = list.findIndex((entry) => entry.track.key === key)
+      const next = list.filter((e) => e.track.key !== key)
+      focusRequest.current = { key: next[index]?.track.key ?? next[index - 1]?.track.key ?? null }
       if (next.length === 0 && hasMore) {
         // 已加载的删光了，但数据源还有更早的记录：从最新一页重新读，
         // 不能把「还没有播放记录」提前亮出来。
@@ -129,6 +162,7 @@ export function HistoryView() {
         setEntries(next)
       }
     } catch (e) {
+      focusRequest.current = null
       reportActionError('删除记录', e)
     }
   }
@@ -197,12 +231,14 @@ export function HistoryView() {
     <div
       ref={scrollerRef}
       id="scroll-main"
+      tabIndex={-1}
       onScroll={(event) => {
         historyMemory.scrollTop = event.currentTarget.scrollTop
       }}
       onFocusCapture={(event) => {
-        historyMemory.focusKey =
-          (event.target as HTMLElement).closest<HTMLElement>('[data-history-row]')?.dataset.key ?? null
+        const key = (event.target as HTMLElement).closest<HTMLElement>('[data-history-row]')?.dataset.key
+        // 焦点停在「加载更早记录」这类控件上时，保留上一行的锚点。
+        if (key) historyMemory.focusKey = key
       }}
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
@@ -255,6 +291,12 @@ export function HistoryView() {
                     .getState()
                     .playContext(keys, index)
                     .then(() => {
+                      // 这一条刚被播过，played_at 和进度都变了；把第一页拉回来，
+                      // 它会按真实记录挪到「今天」。
+                      void ipc
+                        .libraryHistoryTimed(HISTORY_PAGE)
+                        .then(applyFirstPage)
+                        .catch(() => {})
                       const resumeAt = resumablePosition(entry)
                       if (resumeAt === null) return
                       if (usePlayerStore.getState().snapshot?.track?.key !== entry.track.key) return
@@ -297,7 +339,24 @@ function HistoryRow({
   onDelete: () => void
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const deleteRef = useRef<HTMLButtonElement | null>(null)
+  const wasOpen = useRef(false)
   const title = entry.track.title
+  const action = finishedEntry(entry) ? '从头播放' : '继续播放'
+
+  useEffect(() => {
+    if (anchor) {
+      wasOpen.current = true
+      // 面板是 fixed 定位，聚焦不能顺手把整页滚一下：那会立刻触发面板的滚动关闭。
+      deleteRef.current?.focus({ preventScroll: true })
+      return
+    }
+    if (!wasOpen.current) return
+    wasOpen.current = false
+    // 菜单关了，焦点跟着回到触发按钮，键盘用户不会掉到页面顶部。
+    triggerRef.current?.focus()
+  }, [anchor])
 
   return (
     <article
@@ -314,16 +373,13 @@ function HistoryRow({
       <time className="num hidden w-12 shrink-0 font-mono text-[12px] text-[var(--text-2)] sm:block">
         {playedClock(entry.played_at)}
       </time>
-      <button
-        type="button"
-        tabIndex={-1}
+      <div
         onClick={onPlay}
-        aria-label={`继续播放 ${title}`}
-        title={`继续播放 ${title}`}
-        className="relative h-12 w-20 shrink-0 overflow-hidden rounded-[4px] border border-[var(--line)] sm:h-[54px] sm:w-24"
+        title={`${action} ${title}`}
+        className="relative h-12 w-20 shrink-0 cursor-pointer overflow-hidden rounded-[4px] border border-[var(--line)] sm:h-[54px] sm:w-24"
       >
         <Cover cover={entry.track.cover} title={title} width={192} className="h-full w-full" />
-      </button>
+      </div>
       <div className="min-w-0 flex-1">
         <time className="num mb-0.5 block font-mono text-[11px] text-[var(--text-3)] sm:hidden">
           {playedClock(entry.played_at)}
@@ -332,7 +388,7 @@ function HistoryRow({
           type="button"
           data-history-play
           onClick={onPlay}
-          aria-label={`继续播放 ${title}`}
+          aria-label={`${action} ${title}`}
           className={[
             'block w-full truncate text-left text-[14px]',
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)] group-hover:text-[var(--accent-strong)]',
@@ -353,9 +409,10 @@ function HistoryRow({
         <HistoryProgress entry={entry} />
       </div>
       <button
+        ref={triggerRef}
         type="button"
         aria-label={`更多操作 ${title}`}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={anchor !== null}
         title="更多操作"
         onClick={(event) => {
@@ -368,8 +425,8 @@ function HistoryRow({
       </button>
       <AnchoredPanel anchor={anchor} onClose={() => setAnchor(null)} label="历史记录操作" width={160}>
         <button
+          ref={deleteRef}
           type="button"
-          role="menuitem"
           onClick={() => {
             setAnchor(null)
             onDelete()
@@ -421,4 +478,43 @@ function playedClock(ms: number): string {
     minute: '2-digit',
     hour12: false,
   })
+}
+
+/** 焦点优先回到原来那一行；行没了就落到第一行，别让键盘用户掉出列表。 */
+function focusRow(box: HTMLElement, key: string | null, mode: 'anchor' | 'reveal'): void {
+  const rows = [...box.querySelectorAll<HTMLElement>('[data-history-row]')]
+  const row = key ? rows.find((element) => element.dataset.key === key) : undefined
+  const scope = row ?? rows[0]
+  const target = scope?.querySelector<HTMLElement>('button[data-history-play]')
+  if (!scope || !target) {
+    box.focus({ preventScroll: true })
+    return
+  }
+  historyMemory.focusKey = scope.dataset.key ?? null
+  target.focus({ preventScroll: true })
+  const offset = scope.getBoundingClientRect().top - box.getBoundingClientRect().top
+  if (mode === 'anchor') {
+    box.scrollTop += offset - 8
+  } else if (offset < 0 || offset + scope.offsetHeight > box.clientHeight) {
+    box.scrollTop += offset - Math.max(8, Math.round(box.clientHeight / 3))
+  }
+  historyMemory.scrollTop = box.scrollTop
+}
+
+/**
+ * 重进历史时用新取的第一页替换顶部，已经翻出来的更早记录接在后面。
+ * 第一页都取不满说明库里没有更多了，旧尾巴一并丢掉。
+ */
+function mergeFirstPage(older: Entry[], fresh: Entry[]): Entry[] {
+  if (older.length === 0 || fresh.length < HISTORY_PAGE) return fresh
+  if (older.length <= fresh.length) return fresh
+  const last = fresh[fresh.length - 1]
+  if (!last) return fresh
+  const seen = new Set(fresh.map((entry) => entry.track.key))
+  const tail = older.filter(
+    (entry) =>
+      !seen.has(entry.track.key) &&
+      (entry.played_at < last.played_at || (entry.played_at === last.played_at && entry.id < last.id)),
+  )
+  return [...fresh, ...tail]
 }

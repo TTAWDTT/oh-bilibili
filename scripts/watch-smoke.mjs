@@ -2323,6 +2323,7 @@ async function main() {
         playedAt: Number(first?.dataset.playedAt),
         position: Number(first?.dataset.positionMs),
         finished: (first?.innerText || '').includes('已播完'),
+        finishedAction: (first?.querySelector('button[data-history-play]')?.getAttribute('aria-label') || '').startsWith('从头播放'),
       }
     })()`)
     check(
@@ -2336,6 +2337,7 @@ async function main() {
         firstPage.position > 0 &&
         firstPage.finished,
     )
+    check('已播完的记录主操作改叫从头播放', firstPage.finishedAction)
     const historySpacing = await page.evaluate(`(() => {
       const sections = [...document.querySelectorAll('#scroll-main section')]
       const first = sections[0]
@@ -2418,12 +2420,38 @@ async function main() {
       '从历史续播落在记录的 position_ms',
       Number(resumed) === 12000 && resumeState.ratio !== null && resumeState.ratio >= 40 && resumeState.ratio <= 60,
     )
+    // 后面的搜索与队列用例不假设有声音在放，验完就停掉。
+    await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
+    await sleep(300)
 
     // 删除单条：只删掉 2024 那一组唯一一行，日期标题不能残留成空组。
+    // 菜单：打开后焦点落在唯一一项上，Esc 关闭并把焦点还给触发按钮。
+    await page.evaluate(`(() => {
+      const row = document.querySelectorAll('[data-history-row]')[0]
+      row?.querySelector('button[aria-haspopup="dialog"]')?.click()
+    })()`)
+    await sleep(300)
+    const menuFocus = await page.evaluate(`({
+      dialog: !!document.querySelector('[role="dialog"][aria-label="历史记录操作"]'),
+      focused: document.activeElement?.textContent?.trim() ?? '',
+    })`)
+    await page.keyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await sleep(300)
+    const menuClosed = await page.evaluate(`({
+      dialog: !!document.querySelector('[role="dialog"][aria-label="历史记录操作"]'),
+      focused: document.activeElement?.getAttribute('aria-label') ?? '',
+    })`)
+    check('更多菜单打开时聚焦唯一动作', menuFocus.dialog && menuFocus.focused.includes('删除这条记录'))
+    check(
+      'Esc 关闭更多菜单并把焦点还给触发按钮',
+      !menuClosed.dialog && menuClosed.focused.startsWith('更多操作'),
+    )
+
     const deleted = await page.evaluate(`(() => {
       const rows = [...document.querySelectorAll('[data-history-row]')]
       const row = rows.find((item) => (item.textContent || '').includes('跨年同日 · 2024'))
-      const more = row?.querySelector('button[aria-haspopup="menu"]')
+      const more = row?.querySelector('button[aria-haspopup="dialog"]')
       if (!more) return false
       more.click()
       return true
@@ -2433,7 +2461,9 @@ async function main() {
       `!!document.querySelector('[role="dialog"][aria-label="历史记录操作"]')`,
     )
     const clickedDelete = await page.evaluate(`(() => {
-      const item = [...document.querySelectorAll('button[role="menuitem"]')]
+      const item = [
+        ...document.querySelectorAll('[role="dialog"][aria-label="历史记录操作"] button'),
+      ]
         .find((node) => (node.textContent || '').includes('删除这条记录'))
       if (!item) return false
       item.click()
@@ -2458,6 +2488,13 @@ async function main() {
       '删除日期组最后一条后不残留空日期组',
       deleted && menuOpen && clickedDelete && afterDelete &&
         afterDelete.rows === 99 && afterDelete.emptyGroups === 0 && !afterDelete.left2024 && !afterDelete.left2024Row,
+    )
+    const focusAfterDelete = await page.evaluate(
+      `document.activeElement?.closest?.('[data-history-row]')?.dataset.key ?? null`,
+    )
+    check(
+      '删掉焦点所在行后焦点落到相邻行',
+      focusAfterDelete === 'BV1Mk4y11000-cross-2025',
     )
 
     // 返回恢复：滚动到列表中段、把焦点停在某一行，去发现页再回来。
@@ -2491,17 +2528,20 @@ async function main() {
       const box = document.getElementById('scroll-main')
       const active = document.activeElement
       const row = active?.closest?.('[data-history-row]')
+      const boxRect = box?.getBoundingClientRect()
+      const rowRect = row?.getBoundingClientRect()
       return {
         rows: document.querySelectorAll('[data-history-row]').length,
         scrollTop: box ? Math.round(box.scrollTop) : null,
         focusKey: row?.dataset.key ?? null,
+        inView: !!(boxRect && rowRect && rowRect.top >= boxRect.top - 1 && rowRect.top <= boxRect.top + 64),
       }
     })()`)
     check(
-      '从历史离开再回来，页数、位置和焦点都原样恢复',
+      '从历史离开再回来，页数、那一行和焦点都原样恢复',
       leftHistory && backToHistory && parked &&
         restored.rows === 99 &&
-        Math.abs(restored.scrollTop - parked.scrollTop) <= 2 &&
+        restored.inView &&
         restored.focusKey === parked.key,
     )
 
@@ -2539,6 +2579,42 @@ async function main() {
     check('窄窗历史行不横向溢出', narrow && narrow.overflow <= 0)
     await page.viewport(1320, 900)
     await sleep(300)
+
+    // 清空之后离开再回来：不能把会话里那份旧列表又端上来。
+    await page.clickExactText('清空历史')
+    await sleep(200)
+    await page.clickExactText('清空')
+    let historyCleared = false
+    for (let i = 0; i < 20 && !historyCleared; i += 1) {
+      await sleep(200)
+      historyCleared = await page.evaluate(
+        `document.querySelectorAll('[data-history-row]').length === 0 && document.body.innerText.includes('还没有播放记录')`,
+      )
+    }
+    await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '发现') : null
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(900)
+    await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '历史') : null
+      if (!hit) return false
+      hit.click()
+      return true
+    })()`)
+    await sleep(900)
+    const afterClearReturn = await page.evaluate(`({
+      rows: document.querySelectorAll('[data-history-row]').length,
+      empty: document.body.innerText.includes('还没有播放记录'),
+    })`)
+    check(
+      '清空历史后离开再回来不会复用旧列表',
+      historyCleared && afterClearReturn.rows === 0 && afterClearReturn.empty,
+    )
 
     // UP 主分页重叠：mock 第 2 页重复 102 并新增 103，第 3 页整页重复。
     // 按 mid 去重后应得到 101、102、103，且整页重叠也要继续翻到空页收尾。
@@ -2578,10 +2654,10 @@ async function main() {
     await clickMoreUsers()
     await sleep(500)
     check('整页重叠不卡住页码', (await readUserMids()).join(',') === '101,102,103')
-    await clickMoreUsers()
     let usersEnded = false
-    for (let i = 0; i < 20 && !usersEnded; i += 1) {
-      await sleep(200)
+    for (let i = 0; i < 8 && !usersEnded; i += 1) {
+      await clickMoreUsers()
+      await sleep(400)
       usersEnded = await page.evaluate(
         `![...document.querySelectorAll('button')].some((b) => (b.textContent || '').trim() === '更多 UP 主')`,
       )
