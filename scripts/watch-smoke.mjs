@@ -50,8 +50,13 @@ async function connect() {
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
+      // 无头窗口会被 Chrome 当成被遮挡，WAAPI 动画会停在 0 秒；舞台过渡的检查需要它持续运行。
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling',
+      '--disable-background-networking',
       ...(DYNAMIC_RETURN || libraryPartialOnly
-        ? ['--disable-background-networking', '--proxy-server=http://127.0.0.1:1']
+        ? ['--proxy-server=http://127.0.0.1:1']
         : []),
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
@@ -105,9 +110,23 @@ async function connect() {
     })
 
   const target = await send('Target.createTarget', { url: 'about:blank' })
+  await send('Target.activateTarget', { targetId: target.result.targetId })
   const attached = await send('Target.attachToTarget', { targetId: target.result.targetId, flatten: true })
   const sid = attached.result.sessionId
   await send('Runtime.enable', {}, sid)
+  // 无头 Chrome 仍可能被 chrome://settings/help 抢走前台，页面一隐藏 WAAPI 就停住。
+  const keepActive = setInterval(() => {
+    void send('Page.setWebLifecycleState', { state: 'active' }, sid).then((result) => {
+      if (result.error) return
+      void send('Target.getTargets').then((targets) => {
+        for (const info of targets.result?.targetInfos ?? []) {
+          if (info.type === 'page' && info.url.startsWith('chrome://settings')) {
+            void send('Target.closeTarget', { targetId: info.targetId })
+          }
+        }
+      })
+    })
+  }, 1500)
   await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: 1, mobile: false }, sid)
 
   const viewport = (width, height) =>
@@ -188,6 +207,7 @@ async function connect() {
     clickText,
     clickExactText,
     close: () => {
+      clearInterval(keepActive)
       ws.close()
       chrome.kill()
     },
@@ -911,6 +931,577 @@ async function checkStageLyrics(page) {
   await page.evaluate(`document.querySelector('button[aria-label="退出舞台"]')?.click()`)
   await sleep(200)
   await page.emulateMedia([])
+}
+
+async function checkStageMorph(page) {
+  const waitFor = async (expression, timeout = 3000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  const read = () =>
+    page.evaluate(`(() => {
+      const stage = document.querySelector('.stage')
+      const vinyl = document.querySelector('[data-stage-cover]')
+      const cover = vinyl?.querySelector('img')
+      const flyer = document.querySelector('[data-stage-flyer]')
+      const origin = document.querySelector('[data-stage-origin]')
+      const originImage = origin?.querySelector('img')
+      const bar = origin?.closest('section')
+      const progress = bar?.querySelector('[aria-label="播放进度"]')
+      const play = bar?.querySelector('button[aria-label="暂停"], button[aria-label="播放"]')
+      const originRect = origin?.getBoundingClientRect()
+      const hit = originRect
+        ? document.elementFromPoint(
+            originRect.left + originRect.width / 2,
+            originRect.top + originRect.height / 2,
+          )
+        : null
+      const coverVisible =
+        !!cover &&
+        getComputedStyle(cover).visibility !== 'hidden' &&
+        cover.getClientRects().length > 0
+      const coverBox = cover?.getBoundingClientRect()
+      const originVisible =
+        !!originImage &&
+        getComputedStyle(originImage).visibility !== 'hidden' &&
+        originImage.getClientRects().length > 0
+      return {
+        visibility: document.visibilityState,
+        stage: !!stage,
+        stageOpacity: stage ? Number(getComputedStyle(stage).opacity) : 0,
+        flyer: !!flyer,
+        flyerPointerEvents: flyer ? getComputedStyle(flyer).pointerEvents : '',
+        coverVisible,
+        // 中心与未旋转的尺寸：唱片一直在转，直接比包围盒会随角度变胖。
+        coverRect: cover && coverBox
+          ? [coverBox.left + coverBox.width / 2, coverBox.top + coverBox.height / 2, cover.offsetWidth, cover.offsetHeight]
+          : null,
+        fallback: !!stage?.querySelector('[data-stage-cover] img[data-cover-fallback]'),
+        originVisible,
+        originConnected: !!origin,
+        originHittable: !!hit?.closest('[data-stage-origin]'),
+        progress: progress ? Number(progress.getAttribute('aria-valuenow')) : -1,
+        phase: play?.getAttribute('aria-label') ?? '',
+        focus: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName ?? '',
+        stageTitle: stage?.querySelector('h2')?.textContent?.trim() ?? '',
+        barTitle: bar?.querySelector('.bili-marquee')?.textContent?.trim() ?? '',
+      }
+    })()`)
+
+  /**
+   * 点开后逐帧记录飞图与舞台封面的矩形，直到飞图消失。
+   * CDP 往返要几十毫秒，错过末帧就量不到落点，所以取样放在页面里做。
+   */
+  const openAndSample = () =>
+    page.evaluate(`new Promise((resolve) => {
+      const origin = document.querySelector('[data-stage-origin]')
+      if (!origin) {
+        resolve(null)
+        return
+      }
+      const samples = []
+      let coverHidden = false
+      const started = performance.now()
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        const cover = document.querySelector('[data-stage-cover] img')
+        resolve({
+          flyer: samples.length > 0,
+          stage: !!document.querySelector('.stage'),
+          coverHidden,
+          settledHidden: !!cover && getComputedStyle(cover).visibility === 'hidden',
+          samples,
+        })
+      }
+      const tick = () => {
+        if (done) return
+        const flyer = document.querySelector('[data-stage-flyer]')
+        const target = document.querySelector('[data-stage-cover] img')
+        if (flyer && target) {
+          const box = flyer.getBoundingClientRect()
+          const goal = target.getBoundingClientRect()
+          if (samples.length === 0) coverHidden = getComputedStyle(target).visibility === 'hidden'
+          samples.push({
+            at: Math.round(performance.now() - started),
+            flyer: [
+              box.left + box.width / 2,
+              box.top + box.height / 2,
+              flyer.offsetWidth,
+              flyer.offsetHeight,
+            ],
+            target: [
+              goal.left + goal.width / 2,
+              goal.top + goal.height / 2,
+              target.offsetWidth,
+              target.offsetHeight,
+            ],
+          })
+        }
+        if (samples.length > 0 && !document.querySelector('[data-stage-flyer]')) {
+          finish()
+          return
+        }
+        // 没有飞图（缺封面、入口不可见、减少动态效果）等不到消失事件。
+        if (samples.length === 0 && performance.now() - started > 800) {
+          finish()
+          return
+        }
+        if (performance.now() - started > 4000) {
+          finish()
+          return
+        }
+        requestAnimationFrame(tick)
+      }
+      origin.click()
+      requestAnimationFrame(tick)
+    })`)
+
+  const closeAndSample = () =>
+    page.evaluate(`new Promise((resolve) => {
+      const exit = document.querySelector('button[aria-label="退出舞台"]')
+      if (!exit) {
+        resolve(null)
+        return
+      }
+      let flyerSeen = false
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('[data-stage-flyer]')) flyerSeen = true
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      exit.click()
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        observer.disconnect()
+        const originImage = document.querySelector('[data-stage-origin] img')
+        resolve({
+          flyer: flyerSeen || !!document.querySelector('[data-stage-flyer]'),
+          originHidden: !!originImage && getComputedStyle(originImage).visibility === 'hidden',
+          stage: !!document.querySelector('.stage'),
+        })
+      }
+      requestAnimationFrame(finish)
+      setTimeout(finish, 1500)
+    })`)
+
+  const openThenEscape = () =>
+    page.evaluate(`new Promise((resolve) => {
+      const origin = document.querySelector('[data-stage-origin]')
+      if (!origin) {
+        resolve(null)
+        return
+      }
+      origin.click()
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        const flyerBeforeEscape = !!document.querySelector('[data-stage-flyer]')
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+        resolve({ flyerBeforeEscape })
+      }
+      requestAnimationFrame(finish)
+      setTimeout(finish, 1500)
+    })`)
+
+  const openThenExitClick = () =>
+    page.evaluate(`new Promise((resolve) => {
+      const origin = document.querySelector('[data-stage-origin]')
+      if (!origin) {
+        resolve(null)
+        return
+      }
+      origin.click()
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        const flyerBeforeExit = !!document.querySelector('[data-stage-flyer]')
+        document.querySelector('button[aria-label="退出舞台"]')?.click()
+        resolve({ flyerBeforeExit })
+      }
+      requestAnimationFrame(finish)
+      setTimeout(finish, 1500)
+    })`)
+
+  const pressEscape = async () => {
+    await page.keyEvent({
+      type: 'keyDown',
+      key: 'Escape',
+      code: 'Escape',
+      windowsVirtualKeyCode: 27,
+      nativeVirtualKeyCode: 27,
+    })
+    await page.keyEvent({
+      type: 'keyUp',
+      key: 'Escape',
+      code: 'Escape',
+      windowsVirtualKeyCode: 27,
+      nativeVirtualKeyCode: 27,
+    })
+  }
+
+  /** 两组 [中心 x, 中心 y, 宽, 高] 的差。 */
+  const landingGap = (sample) => {
+    const [flyerX, flyerY, flyerWidth, flyerHeight] = sample.flyer
+    const [targetX, targetY, targetWidth, targetHeight] = sample.target
+    return {
+      dx: Math.abs(flyerX - targetX),
+      dy: Math.abs(flyerY - targetY),
+      dw: Math.abs(flyerWidth - targetWidth),
+      dh: Math.abs(flyerHeight - targetHeight),
+    }
+  }
+  const aligned = (sample) => {
+    if (!sample) return false
+    const gap = landingGap(sample)
+    return Math.max(gap.dx, gap.dy, gap.dw, gap.dh) <= 2
+  }
+  const sameRect = (a, b) =>
+    !!a &&
+    !!b &&
+    Math.max(
+      Math.abs(a[0] - b[0]),
+      Math.abs(a[1] - b[1]),
+      Math.abs(a[2] - b[2]),
+      Math.abs(a[3] - b[3]),
+    ) <= 2
+  const centerY = (sample) => sample.target[1]
+
+  const loadAndListen = async (search = '') => {
+    const url = new URL(WEB)
+    if (search) url.search = search
+    await page.viewport(1320, 900)
+    await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
+    await sleep(5500)
+    const clicked = await page.evaluate(`(() => {
+      const hit = document.querySelector('button[aria-label^="听 "]')
+      hit?.click()
+      return !!hit
+    })()`)
+    const barReady = await waitFor(`(() => {
+      const origin = document.querySelector('[data-stage-origin]')
+      const image = origin?.querySelector('img')
+      return !!origin && !!image && image.complete && image.naturalWidth > 0
+    })()`, 8000)
+    return clicked && barReady
+  }
+
+  const baseReady = await loadAndListen()
+  const playingReady = await waitFor(`(() => {
+    const bar = document.querySelector('[data-stage-origin]')?.closest('section')
+    return !!bar?.querySelector('button[aria-label="暂停"]')
+  })()`, 4000)
+  const before = await read()
+  const opening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const settled = await read()
+  const closing = await closeAndSample()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const closed = await read()
+  const landing = opening?.samples?.at(-1) ?? null
+
+  check(
+    '播放中从播放条展开时封面飞向舞台封面',
+    baseReady &&
+      playingReady &&
+      opening &&
+      opening.stage &&
+      opening.flyer &&
+      opening.coverHidden &&
+      settled.flyerPointerEvents !== 'auto',
+  )
+  check('飞图末帧与舞台封面中心、尺寸对齐（≤2px）', aligned(landing))
+  if (!aligned(landing)) console.log(JSON.stringify({ landing, gap: landing && landingGap(landing) }))
+  check(
+    '舞台稳定后只剩一张前景封面，焦点落在舞台',
+    settled.stage &&
+      settled.stageOpacity === 1 &&
+      settled.coverVisible &&
+      !settled.flyer &&
+      aligned(landing) &&
+      sameRect(landing.target, settled.coverRect) &&
+      settled.focus === '退出舞台',
+  )
+  check(
+    '收起时封面回到播放条，播放进度继续',
+    closing &&
+      closing.stage &&
+      closing.flyer &&
+      closing.originHidden &&
+      !closed.stage &&
+      !closed.flyer &&
+      closed.originVisible &&
+      closed.phase === '暂停' &&
+      closed.progress > before.progress &&
+      closed.focus === '打开播放舞台' &&
+      closed.originHittable,
+  )
+  if (
+    closed.stage ||
+    !closing ||
+    !closed.originVisible ||
+    closed.phase !== '暂停' ||
+    !(closed.progress > before.progress) ||
+    closed.focus !== '打开播放舞台' ||
+    !closed.originHittable
+  ) {
+    console.log(JSON.stringify({ before, closing, closed }))
+  }
+
+  await page.evaluate(`(() => {
+    const bar = document.querySelector('[data-stage-origin]')?.closest('section')
+    bar?.querySelector('button[aria-label="暂停"]')?.click()
+  })()`)
+  await sleep(300)
+  const pausedBefore = await read()
+  const originFocused = await page.evaluate(`(() => {
+    const origin = document.querySelector('[data-stage-origin]')
+    origin?.focus()
+    return document.activeElement === origin
+  })()`)
+  await page.pressSpace()
+  const keyboardStage = await waitFor(`!!document.querySelector('.stage')`)
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const keyboardSettled = await read()
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const pausedAfter = await read()
+  check(
+    '暂停时用键盘开合舞台仍保持暂停',
+    originFocused &&
+      keyboardStage &&
+      keyboardSettled.stage &&
+      keyboardSettled.phase === '播放' &&
+      !pausedAfter.stage &&
+      pausedAfter.phase === '播放' &&
+      Math.abs(pausedAfter.progress - pausedBefore.progress) <= 1,
+  )
+
+  await page.viewport(380, 720)
+  await sleep(400)
+  const narrowOpening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const narrowSettled = await read()
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const narrowClosed = await read()
+  await page.viewport(1320, 900)
+  await sleep(400)
+  check(
+    '窄窗展开和收起也共用同一张封面',
+    narrowOpening &&
+      narrowOpening.stage &&
+      narrowOpening.flyer &&
+      narrowSettled.stage &&
+      !narrowSettled.flyer &&
+      narrowSettled.coverVisible &&
+      !narrowClosed.stage &&
+      narrowClosed.originHittable,
+  )
+
+  // 详情和推荐晚于首帧到达时，左栏会被撑高、唱片上移；飞图必须跟着走。
+  const slowReady = await loadAndListen('?slowStage=1')
+  const slowOpening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const slowSettled = await read()
+  const slowShift = slowOpening?.samples.length
+    ? Math.max(...slowOpening.samples.map((sample) => Math.abs(centerY(sample) - centerY(slowOpening.samples[0]))))
+    : 0
+  check(
+    `详情晚到时封面跟着唱片上移，落点仍对齐（位移 ${Math.round(slowShift)}px）`,
+    slowReady &&
+      slowOpening &&
+      slowOpening.flyer &&
+      slowShift >= 10 &&
+      aligned(slowOpening.samples.at(-1)) &&
+      slowSettled.stage &&
+      !slowSettled.flyer &&
+      slowSettled.coverVisible &&
+      sameRect(slowOpening.samples.at(-1).target, slowSettled.coverRect),
+  )
+  if (!aligned(slowOpening?.samples.at(-1))) {
+    console.log(JSON.stringify({ shift: slowShift, landing: slowOpening?.samples.at(-1) }))
+  }
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+
+  const escDuringOpen = await openThenEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const afterEsc = await read()
+  check(
+    '展开动画中按 Esc 按最新意图收起',
+    escDuringOpen &&
+      escDuringOpen.flyerBeforeEscape &&
+      !afterEsc.stage &&
+      !afterEsc.flyer &&
+      afterEsc.originVisible &&
+      afterEsc.focus === '打开播放舞台' &&
+      afterEsc.originHittable,
+  )
+
+  const exitDuringOpen = await openThenExitClick()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const afterExit = await read()
+  check(
+    '展开动画中点退出按钮同样收起',
+    exitDuringOpen &&
+      exitDuringOpen.flyerBeforeExit &&
+      !afterExit.stage &&
+      !afterExit.flyer &&
+      afterExit.originHittable,
+  )
+
+  let cycles = true
+  for (let i = 0; i < 3; i += 1) {
+    const cycleOpen = await openThenEscape()
+    await waitFor(`!document.querySelector('.stage')`, 3000)
+    const cycleState = await read()
+    cycles = cycles && !!cycleOpen?.flyerBeforeEscape && !cycleState.stage && !cycleState.flyer
+  }
+  const afterCycles = await read()
+  check(
+    '连续快速开合后没有旧图或透明层残留',
+    cycles && !afterCycles.stage && afterCycles.originVisible && afterCycles.originHittable,
+  )
+
+  await openAndSample()
+  await sleep(40)
+  await page.viewport(1100, 800)
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const resized = await read()
+  check(
+    '展开途中缩放窗口直接落到舞台封面',
+    resized.stage && !resized.flyer && resized.coverVisible,
+  )
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  await page.viewport(1320, 900)
+  await sleep(200)
+  const afterResize = await read()
+  check('缩放后收起仍回到可操作的播放条', !afterResize.stage && afterResize.originHittable)
+  if (afterResize.stage || !afterResize.originHittable) {
+    console.log(JSON.stringify({ resized, afterResize }))
+  }
+
+  const beforeTrack = await read()
+  await openAndSample()
+  await sleep(30)
+  const changed = await page.evaluate(`(() => {
+    const next = document.querySelector('.stage button[aria-label="下一首"]')
+    next?.click()
+    return !!next
+  })()`)
+  await waitFor(`(() => {
+    const stage = document.querySelector('.stage')
+    const bar = document.querySelector('[data-stage-origin]')?.closest('section')
+    return !!stage &&
+      !document.querySelector('[data-stage-flyer]') &&
+      stage.querySelector('h2')?.textContent?.trim() === bar?.querySelector('.bili-marquee')?.textContent?.trim()
+  })()`, 3000)
+  const afterTrack = await read()
+  check(
+    '展开途中切歌直接落到新封面',
+    changed &&
+      afterTrack.stage &&
+      !afterTrack.flyer &&
+      afterTrack.coverVisible &&
+      afterTrack.stageTitle.length > 0 &&
+      afterTrack.stageTitle === afterTrack.barTitle &&
+      afterTrack.stageTitle !== beforeTrack.stageTitle,
+  )
+  if (
+    !changed ||
+    !afterTrack.stage ||
+    afterTrack.flyer ||
+    !afterTrack.coverVisible ||
+    afterTrack.stageTitle !== afterTrack.barTitle ||
+    afterTrack.stageTitle === beforeTrack.stageTitle
+  ) {
+    console.log(JSON.stringify({ beforeTrack, afterTrack, changed }))
+  }
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+
+  await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
+  const reducedOpen = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage')`, 2000)
+  const reduced = await read()
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 2000)
+  const reducedClosed = await read()
+  await page.emulateMedia([])
+  check(
+    '减少动态效果时直接落位',
+    reducedOpen &&
+      reducedOpen.stage &&
+      !reducedOpen.flyer &&
+      reduced.stage &&
+      reduced.stageOpacity === 1 &&
+      reduced.coverVisible &&
+      !reduced.flyer &&
+      !reducedClosed.stage &&
+      !reducedClosed.flyer,
+  )
+
+  const noCoverReady = await loadAndListen('?stageNoCover=1')
+  const noCoverOpening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && Number(getComputedStyle(document.querySelector('.stage')).opacity) === 1`, 3000)
+  const noCoverSettled = await read()
+  await closeAndSample()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const noCoverClosed = await read()
+  check(
+    '缺封面时展开和收起都不出现飞图',
+    noCoverReady &&
+      noCoverOpening &&
+      noCoverOpening.stage &&
+      !noCoverOpening.flyer &&
+      noCoverSettled.stage &&
+      noCoverSettled.fallback &&
+      !noCoverSettled.flyer &&
+      !noCoverClosed.stage &&
+      !noCoverClosed.flyer,
+  )
+
+  const visibleReady = await loadAndListen()
+  const hiddenOrigin = await page.evaluate(`(() => {
+    const origin = document.querySelector('[data-stage-origin]')
+    if (!origin) return false
+    origin.style.visibility = 'hidden'
+    return true
+  })()`)
+  const hiddenOpening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]') && Number(getComputedStyle(document.querySelector('.stage')).opacity) === 1`, 3000)
+  const hiddenSettled = await read()
+  await page.evaluate(`(() => {
+    const origin = document.querySelector('[data-stage-origin]')
+    if (origin) origin.style.visibility = ''
+  })()`)
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
+  const hiddenClosed = await read()
+  check(
+    '入口不可见时不出现飞图，收起后入口恢复操作',
+    visibleReady &&
+      hiddenOrigin &&
+      hiddenOpening.stage &&
+      !hiddenOpening.flyer &&
+      hiddenSettled.stage &&
+      !hiddenSettled.flyer &&
+      !hiddenClosed.stage &&
+      hiddenClosed.originHittable,
+  )
+  if (hiddenOpening.flyer || hiddenSettled.flyer || hiddenClosed.stage || !hiddenClosed.originHittable) {
+    console.log(JSON.stringify({ hiddenOpening, hiddenSettled, hiddenClosed }))
+  }
 }
 
 async function checkHeroAllocation(page) {
@@ -1877,6 +2468,7 @@ async function main() {
     if (libraryPartialOnly) return
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
+    await checkStageMorph(page)
     await checkHeroAllocation(page)
     await checkAuthorHero(page)
     await checkHomeResume(page)

@@ -8,6 +8,7 @@ import { ReactionButtons } from '../../shared/ui/ReactionButtons'
 import type { Track } from '../../shared/lib/contract'
 import { PlaybackProgress } from './PlaybackProgress'
 import { useIsListening, useHasSession, usePlayerStore } from './playerStore'
+import { rememberStageOrigin } from './stageCoverMorph'
 import { Transport } from './Transport'
 import { VolumeControl } from './VolumeControl'
 
@@ -73,7 +74,11 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <button
         type="button"
-        onClick={() => setStage(true)}
+        data-stage-origin={track.key}
+        onClick={(event) => {
+          rememberStageOrigin(event.currentTarget, track)
+          setStage(true)
+        }}
         aria-label="打开播放舞台"
         className="bili-press relative shrink-0 overflow-hidden rounded-[4px] border border-[var(--line)]"
       >

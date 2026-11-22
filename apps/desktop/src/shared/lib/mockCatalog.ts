@@ -101,6 +101,10 @@ const MID_BY_ARTIST = new Map<string, number>(
   Array.from(new Set(SEEDS.map((s) => s.artist))).map((artist, i) => [artist, 900000 + i]),
 )
 
+/** 预览冒烟专用：让所有曲目都没有封面，验证舞台过渡不飞兜底图。 */
+const STAGE_NO_COVER =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('stageNoCover')
+
 export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
   const key = `BV1Mk4y1${String(1000 + index * 37)}`
   return {
@@ -110,7 +114,7 @@ export const CATALOG: readonly Track[] = SEEDS.map((seed, index) => {
     // 浏览器 mock 的假音源统一在 30 秒上下，进度、切歌、歌词一屏内就能走完。
     duration_ms: 26_000 + ((index * 1700) % 7000),
     // 有真封面就用真封面，没有才退回生成图。
-    cover: REAL_COVERS[seed.title] ?? coverArt(seed.title, hueFor(key), index),
+    cover: STAGE_NO_COVER ? null : REAL_COVERS[seed.title] ?? coverArt(seed.title, hueFor(key), index),
     up_avatar: REAL_AVATARS[seed.title] ?? null,
     // 播放量按名次递减，排行榜才有真实感；不是随机数。
     // 目录有三四十条，线性递减会减成负数；到底之后按最低值兜住。
