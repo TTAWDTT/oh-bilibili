@@ -964,6 +964,7 @@ async function checkStageMorph(page) {
         !!cover &&
         getComputedStyle(cover).visibility !== 'hidden' &&
         cover.getClientRects().length > 0
+      const coverBox = cover?.getBoundingClientRect()
       const originVisible =
         !!originImage &&
         getComputedStyle(originImage).visibility !== 'hidden' &&
@@ -975,7 +976,10 @@ async function checkStageMorph(page) {
         flyer: !!flyer,
         flyerPointerEvents: flyer ? getComputedStyle(flyer).pointerEvents : '',
         coverVisible,
-        coverCount: stage ? stage.querySelectorAll('[data-stage-cover] img').length : 0,
+        // 中心与未旋转的尺寸：唱片一直在转，直接比包围盒会随角度变胖。
+        coverRect: cover && coverBox
+          ? [coverBox.left + coverBox.width / 2, coverBox.top + coverBox.height / 2, cover.offsetWidth, cover.offsetHeight]
+          : null,
         fallback: !!stage?.querySelector('[data-stage-cover] img[data-cover-fallback]'),
         originVisible,
         originConnected: !!origin,
@@ -988,7 +992,10 @@ async function checkStageMorph(page) {
       }
     })()`)
 
-  /** 点击后在同一帧里记录飞图是否出现过，避免 CDP 往返错过 220ms 的过渡。 */
+  /**
+   * 点开后逐帧记录飞图与舞台封面的矩形，直到飞图消失。
+   * CDP 往返要几十毫秒，错过末帧就量不到落点，所以取样放在页面里做。
+   */
   const openAndSample = () =>
     page.evaluate(`new Promise((resolve) => {
       const origin = document.querySelector('[data-stage-origin]')
@@ -996,26 +1003,63 @@ async function checkStageMorph(page) {
         resolve(null)
         return
       }
-      let flyerSeen = false
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('[data-stage-flyer]')) flyerSeen = true
-      })
-      observer.observe(document.body, { childList: true, subtree: true })
-      origin.click()
-      let settled = false
+      const samples = []
+      let coverHidden = false
+      const started = performance.now()
+      let done = false
       const finish = () => {
-        if (settled) return
-        settled = true
-        observer.disconnect()
+        if (done) return
+        done = true
         const cover = document.querySelector('[data-stage-cover] img')
         resolve({
-          flyer: flyerSeen || !!document.querySelector('[data-stage-flyer]'),
+          flyer: samples.length > 0,
           stage: !!document.querySelector('.stage'),
-          coverHidden: !!cover && getComputedStyle(cover).visibility === 'hidden',
+          coverHidden,
+          settledHidden: !!cover && getComputedStyle(cover).visibility === 'hidden',
+          samples,
         })
       }
-      requestAnimationFrame(finish)
-      setTimeout(finish, 1500)
+      const tick = () => {
+        if (done) return
+        const flyer = document.querySelector('[data-stage-flyer]')
+        const target = document.querySelector('[data-stage-cover] img')
+        if (flyer && target) {
+          const box = flyer.getBoundingClientRect()
+          const goal = target.getBoundingClientRect()
+          if (samples.length === 0) coverHidden = getComputedStyle(target).visibility === 'hidden'
+          samples.push({
+            at: Math.round(performance.now() - started),
+            flyer: [
+              box.left + box.width / 2,
+              box.top + box.height / 2,
+              flyer.offsetWidth,
+              flyer.offsetHeight,
+            ],
+            target: [
+              goal.left + goal.width / 2,
+              goal.top + goal.height / 2,
+              target.offsetWidth,
+              target.offsetHeight,
+            ],
+          })
+        }
+        if (samples.length > 0 && !document.querySelector('[data-stage-flyer]')) {
+          finish()
+          return
+        }
+        // 没有飞图（缺封面、入口不可见、减少动态效果）等不到消失事件。
+        if (samples.length === 0 && performance.now() - started > 800) {
+          finish()
+          return
+        }
+        if (performance.now() - started > 4000) {
+          finish()
+          return
+        }
+        requestAnimationFrame(tick)
+      }
+      origin.click()
+      requestAnimationFrame(tick)
     })`)
 
   const closeAndSample = () =>
@@ -1104,6 +1148,33 @@ async function checkStageMorph(page) {
     })
   }
 
+  /** 两组 [中心 x, 中心 y, 宽, 高] 的差。 */
+  const landingGap = (sample) => {
+    const [flyerX, flyerY, flyerWidth, flyerHeight] = sample.flyer
+    const [targetX, targetY, targetWidth, targetHeight] = sample.target
+    return {
+      dx: Math.abs(flyerX - targetX),
+      dy: Math.abs(flyerY - targetY),
+      dw: Math.abs(flyerWidth - targetWidth),
+      dh: Math.abs(flyerHeight - targetHeight),
+    }
+  }
+  const aligned = (sample) => {
+    if (!sample) return false
+    const gap = landingGap(sample)
+    return Math.max(gap.dx, gap.dy, gap.dw, gap.dh) <= 2
+  }
+  const sameRect = (a, b) =>
+    !!a &&
+    !!b &&
+    Math.max(
+      Math.abs(a[0] - b[0]),
+      Math.abs(a[1] - b[1]),
+      Math.abs(a[2] - b[2]),
+      Math.abs(a[3] - b[3]),
+    ) <= 2
+  const centerY = (sample) => sample.target[1]
+
   const loadAndListen = async (search = '') => {
     const url = new URL(WEB)
     if (search) url.search = search
@@ -1135,6 +1206,7 @@ async function checkStageMorph(page) {
   const closing = await closeAndSample()
   await waitFor(`!document.querySelector('.stage')`, 3000)
   const closed = await read()
+  const landing = opening?.samples?.at(-1) ?? null
 
   check(
     '播放中从播放条展开时封面飞向舞台封面',
@@ -1146,13 +1218,16 @@ async function checkStageMorph(page) {
       opening.coverHidden &&
       settled.flyerPointerEvents !== 'auto',
   )
+  check('飞图末帧与舞台封面中心、尺寸对齐（≤2px）', aligned(landing))
+  if (!aligned(landing)) console.log(JSON.stringify({ landing, gap: landing && landingGap(landing) }))
   check(
     '舞台稳定后只剩一张前景封面，焦点落在舞台',
     settled.stage &&
       settled.stageOpacity === 1 &&
       settled.coverVisible &&
-      settled.coverCount === 1 &&
       !settled.flyer &&
+      aligned(landing) &&
+      sameRect(landing.target, settled.coverRect) &&
       settled.focus === '退出舞台',
   )
   check(
@@ -1169,6 +1244,17 @@ async function checkStageMorph(page) {
       closed.focus === '打开播放舞台' &&
       closed.originHittable,
   )
+  if (
+    closed.stage ||
+    !closing ||
+    !closed.originVisible ||
+    closed.phase !== '暂停' ||
+    !(closed.progress > before.progress) ||
+    closed.focus !== '打开播放舞台' ||
+    !closed.originHittable
+  ) {
+    console.log(JSON.stringify({ before, closing, closed }))
+  }
 
   await page.evaluate(`(() => {
     const bar = document.querySelector('[data-stage-origin]')?.closest('section')
@@ -1220,6 +1306,32 @@ async function checkStageMorph(page) {
       !narrowClosed.stage &&
       narrowClosed.originHittable,
   )
+
+  // 详情和推荐晚于首帧到达时，左栏会被撑高、唱片上移；飞图必须跟着走。
+  const slowReady = await loadAndListen('?slowStage=1')
+  const slowOpening = await openAndSample()
+  await waitFor(`!!document.querySelector('.stage') && !document.querySelector('[data-stage-flyer]')`, 3000)
+  const slowSettled = await read()
+  const slowShift = slowOpening?.samples.length
+    ? Math.max(...slowOpening.samples.map((sample) => Math.abs(centerY(sample) - centerY(slowOpening.samples[0]))))
+    : 0
+  check(
+    `详情晚到时封面跟着唱片上移，落点仍对齐（位移 ${Math.round(slowShift)}px）`,
+    slowReady &&
+      slowOpening &&
+      slowOpening.flyer &&
+      slowShift >= 10 &&
+      aligned(slowOpening.samples.at(-1)) &&
+      slowSettled.stage &&
+      !slowSettled.flyer &&
+      slowSettled.coverVisible &&
+      sameRect(slowOpening.samples.at(-1).target, slowSettled.coverRect),
+  )
+  if (!aligned(slowOpening?.samples.at(-1))) {
+    console.log(JSON.stringify({ shift: slowShift, landing: slowOpening?.samples.at(-1) }))
+  }
+  await pressEscape()
+  await waitFor(`!document.querySelector('.stage')`, 3000)
 
   const escDuringOpen = await openThenEscape()
   await waitFor(`!document.querySelector('.stage')`, 3000)

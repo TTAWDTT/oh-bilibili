@@ -5,6 +5,16 @@ import type { Track } from '../../shared/lib/contract'
 const ENTER_MS = 220
 const EXIT_MS = 200
 const FADE_MS = 140
+/**
+ * 飞行结束后还要贴住目标这么久再结算。详情和推荐是异步来的，
+ * 首帧量到的唱片位置不是最终位置；飞图在落点等一会儿，晚到的内容
+ * 把唱片顶上去时也能跟着走，不会停在旧落点再瞬移。
+ */
+const MIN_HOLD_MS = 500
+/** 落点连续这么多帧不动才算稳。 */
+const QUIET_FRAMES = 3
+/** 内容迟迟不来也不能一直挡着目标封面。 */
+const MAX_HOLD_MS = 1500
 
 type Rect = { left: number; top: number; width: number; height: number }
 type Box = Rect & { radius: number; angle: number }
@@ -21,10 +31,15 @@ type Flight = {
   key: string
   flyer: HTMLDivElement
   stage: HTMLElement
+  vinyl: HTMLElement
   targetImage: HTMLImageElement
   originImage: HTMLImageElement
+  /** 最近一次写进飞图的矩形；收起时从这里接着走，不重算旋转后的包围盒。 */
+  box: Box
   animation: Animation | null
   stageAnimation: Animation | null
+  stopEnter: (() => void) | null
+  done: boolean
 }
 
 let pendingSource: StageSource | null = null
@@ -105,21 +120,6 @@ function stageCoverBox(image: HTMLImageElement, vinyl: HTMLElement): Box {
   }
 }
 
-function readFlyer(flyer: HTMLElement): Box {
-  const style = getComputedStyle(flyer)
-  const rect = flyer.getBoundingClientRect()
-  const width = Number.parseFloat(style.width) || rect.width
-  const height = Number.parseFloat(style.height) || rect.height
-  return {
-    left: rect.left + rect.width / 2 - width / 2,
-    top: rect.top + rect.height / 2 - height / 2,
-    width,
-    height,
-    radius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-    angle: angleOf(style.transform),
-  }
-}
-
 function createFlyer(image: HTMLImageElement, box: Box): HTMLDivElement {
   const flyer = document.createElement('div')
   flyer.setAttribute('data-stage-flyer', '')
@@ -133,10 +133,7 @@ function createFlyer(image: HTMLImageElement, box: Box): HTMLDivElement {
     'overflow:hidden',
     'will-change:transform,width,height,border-radius',
     'background:var(--panel)',
-    `width:${box.width}px`,
-    `height:${box.height}px`,
-    `border-radius:${box.radius}px`,
-    `transform:translate(${box.left}px, ${box.top}px) rotate(${box.angle}deg)`,
+    'box-shadow:inset 0 0 0 1px rgb(255 255 255 / 0.2), 0 2px 12px rgb(0 0 0 / 0.5)',
   ].join(';')
 
   const img = document.createElement('img')
@@ -147,8 +144,73 @@ function createFlyer(image: HTMLImageElement, box: Box): HTMLDivElement {
   img.referrerPolicy = 'no-referrer'
   img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover'
   flyer.appendChild(img)
+  applyBox(flyer, box)
   document.body.appendChild(flyer)
   return flyer
+}
+
+function applyBox(flyer: HTMLDivElement, box: Box): void {
+  flyer.style.width = `${box.width}px`
+  flyer.style.height = `${box.height}px`
+  flyer.style.borderRadius = `${box.radius}px`
+  flyer.style.transform = `translate(${box.left}px, ${box.top}px) rotate(${box.angle}deg)`
+}
+
+function lerpBox(from: Box, to: Box, t: number): Box {
+  const mix = (a: number, b: number): number => a + (b - a) * t
+  return {
+    left: mix(from.left, to.left),
+    top: mix(from.top, to.top),
+    width: mix(from.width, to.width),
+    height: mix(from.height, to.height),
+    radius: mix(from.radius, to.radius),
+    angle: mix(from.angle, to.angle),
+  }
+}
+
+/** 只看落点，不看角度：唱片一直在转，角度每帧都在变。 */
+function samePlace(a: Box, b: Box): boolean {
+  return (
+    Math.abs(a.left - b.left) < 0.5 &&
+    Math.abs(a.top - b.top) < 0.5 &&
+    Math.abs(a.width - b.width) < 0.5 &&
+    Math.abs(a.height - b.height) < 0.5
+  )
+}
+
+/**
+ * 逐帧跟着目标飞。舞台的左栏会被异步到达的详情、推荐撑高，首帧量到的落点
+ * 不是最终落点；按帧重取目标，飞行结束后再贴住一段时间，落点静下来才结算。
+ */
+function startEnter(flight: Flight, from: Box, isCurrent: () => boolean, forget: () => void): void {
+  const started = performance.now()
+  let previous = from
+  let stable = 0
+  let frame = 0
+
+  const step = (now: number): void => {
+    if (flight.done || !isCurrent()) return
+    const target = stageCoverBox(flight.targetImage, flight.vinyl)
+    const progress = Math.min(1, (now - started) / ENTER_MS)
+    const box = progress >= 1 ? target : lerpBox(from, target, 1 - (1 - progress) ** 3)
+    applyBox(flight.flyer, box)
+    flight.box = box
+    if (progress < 1) {
+      frame = requestAnimationFrame(step)
+      return
+    }
+    stable = samePlace(previous, target) ? stable + 1 : 0
+    previous = target
+    if ((now - started >= MIN_HOLD_MS && stable >= QUIET_FRAMES) || now - started >= MAX_HOLD_MS) {
+      forget()
+      settle(flight)
+      return
+    }
+    frame = requestAnimationFrame(step)
+  }
+
+  frame = requestAnimationFrame(step)
+  flight.stopEnter = () => cancelAnimationFrame(frame)
 }
 
 function animateFlyer(flyer: HTMLDivElement, from: Box, to: Box, duration: number): Animation {
@@ -180,6 +242,10 @@ function animateStage(stage: HTMLElement, from: number, to: number, duration: nu
 }
 
 function settle(flight: Flight): void {
+  if (flight.done) return
+  flight.done = true
+  flight.stopEnter?.()
+  flight.stopEnter = null
   flight.animation?.cancel()
   flight.stageAnimation?.cancel()
   flight.stage.style.opacity = ''
@@ -285,19 +351,25 @@ export function useStageCoverMorph({
       key: track.key,
       flyer,
       stage,
+      vinyl,
       targetImage,
       originImage,
+      box: source.box,
       animation: null,
       stageAnimation: null,
+      stopEnter: null,
+      done: false,
     }
-    flight.animation = animateFlyer(flyer, source.box, target, ENTER_MS)
     flight.stageAnimation = animateStage(stage, 0, 1, ENTER_MS)
     flightRef.current = flight
-    flight.animation.onfinish = () => {
-      if (flightRef.current !== flight) return
-      flightRef.current = null
-      settle(flight)
-    }
+    startEnter(
+      flight,
+      source.box,
+      () => flightRef.current === flight,
+      () => {
+        if (flightRef.current === flight) flightRef.current = null
+      },
+    )
   }, [open, track, stageRef, vinylRef])
 
   // 过渡中切歌：旧封面的飞图不能留在新曲目上，直接落到新目标。
@@ -370,27 +442,35 @@ export function useStageCoverMorph({
     let from: Box
 
     if (current) {
-      from = readFlyer(current.flyer)
+      from = current.box
+      current.stopEnter?.()
+      current.stopEnter = null
       current.animation?.cancel()
       current.stageAnimation?.cancel()
       stage.style.opacity = ''
       flight = current
     } else {
       from = target
+      const flyer = createFlyer(targetImage, target)
       flight = {
         key,
-        flyer: createFlyer(targetImage, target),
+        flyer,
         stage,
+        vinyl,
         targetImage,
         originImage,
+        box: target,
         animation: null,
         stageAnimation: null,
+        stopEnter: null,
+        done: false,
       }
       flightRef.current = flight
     }
 
     flight.targetImage = targetImage
     flight.originImage = originImage
+    flight.box = from
     targetImage.style.visibility = 'hidden'
     originImage.style.visibility = 'hidden'
     const originRect = origin.getBoundingClientRect()

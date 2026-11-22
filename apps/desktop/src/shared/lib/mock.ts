@@ -49,6 +49,8 @@ const settledListFailures = new Set<string>()
 const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
 const libraryBrokenCover =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryBrokenCover')
+/** 预览冒烟专用：让舞台详情晚于首帧到达，复现左栏被撑高、唱片上移。 */
+const slowStage = import.meta.env.DEV && new URLSearchParams(window.location.search).has('slowStage')
 let libraryPartialRecovered = false
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
@@ -166,6 +168,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
     }
     case 'related': {
+      if (slowStage) await sleep(120)
       // 预览模式给同目录里的相邻几首，够看清右栏推荐的样子。
       const key = str(args, 'key')
       const idx = CATALOG.findIndex((t) => t.key === key)
@@ -1025,6 +1028,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'comment_hate':
       return null
     case 'video_meta': {
+      if (slowStage) await sleep(170)
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
       return {
