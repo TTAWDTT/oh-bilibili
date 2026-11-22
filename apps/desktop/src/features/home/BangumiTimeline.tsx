@@ -4,6 +4,8 @@ import { toWireError } from '../../shared/lib/errors'
 import { Icon } from '../../shared/ui/Icon'
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+/** 切到「我的追番」再回来时，星期选择不能丢。 */
+const pickedMemory: { weekday: number | null } = { weekday: null }
 
 /**
  * 番剧更新表。B 站首页右下角那块「周一 … 周日」，是催番的人最常看的一栏。
@@ -24,7 +26,12 @@ export function BangumiTimeline() {
         if (cancelled) return
         setDays(list)
         const today = list.find((d) => d.today)
-        setPicked(today?.weekday ?? list.find((d) => d.episodes.length > 0)?.weekday ?? 1)
+        setPicked(
+          pickedMemory.weekday ??
+            today?.weekday ??
+            list.find((d) => d.episodes.length > 0)?.weekday ??
+            1,
+        )
       })
       .catch((cause) => {
         if (!cancelled) setError(toWireError(cause).message)
@@ -68,7 +75,10 @@ export function BangumiTimeline() {
             <button
               key={weekday}
               type="button"
-              onClick={() => setPicked(weekday)}
+              onClick={() => {
+                pickedMemory.weekday = weekday
+                setPicked(weekday)
+              }}
               disabled={!day}
               className={[
                 't press flex shrink-0 flex-col items-center rounded-[6px] px-3 py-1.5 text-[12.5px]',
