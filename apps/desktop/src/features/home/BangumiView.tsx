@@ -14,13 +14,14 @@ const TABS = [
   { type: 3, label: '纪录片', url: 'https://www.bilibili.com/documentary/' },
   { type: 4, label: '国创', url: 'https://www.bilibili.com/guochuang/' },
   { type: 5, label: '电视剧', url: 'https://www.bilibili.com/tv/' },
-  { type: 0, label: '追番', url: '' },
 ] as const
 
 /** 番剧频道使用高封面，播放交给系统浏览器。 */
 export function BangumiView() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [seasonType, setSeasonType] = useState(1)
+  /** 「我的追番」是账号收藏，和公共内容类型是两件事，单独一层。 */
+  const [mode, setMode] = useState<'public' | 'mine'>('public')
   const [nonce, setNonce] = useState(0)
   const [items, setItems] = useState<ipc.Bangumi[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +30,9 @@ export function BangumiView() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [needLogin, setNeedLogin] = useState(false)
   const loadMoreRef = useRef<() => void>(() => {})
+  /** 从追番返回公共页时恢复原来的阅读位置。 */
+  const publicScroll = useRef(0)
+  const restoreScroll = useRef(false)
   const auth = useAuthStore((state) => state.auth)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const activeTab = TABS.find((tab) => tab.type === seasonType) ?? TABS[0]
@@ -44,7 +48,7 @@ export function BangumiView() {
     loadMoreRef.current = () => {}
     scrollRef.current?.scrollTo({ top: 0 })
 
-    if (seasonType === 0) {
+    if (mode === 'mine') {
       if (!auth?.logged_in) return
       let pending = false
       let nextPage = 1
@@ -97,9 +101,24 @@ export function BangumiView() {
     return () => {
       cancelled = true
     }
-  }, [seasonType, nonce, auth])
+  }, [mode, seasonType, nonce, auth])
 
-  const hasMore = seasonType === 0 && page > 0 && items !== null && total !== null && items.length < total
+  const hasMore = mode === 'mine' && page > 0 && items !== null && total !== null && items.length < total
+
+  useEffect(() => {
+    if (mode !== 'public' || items === null || !restoreScroll.current) return
+    restoreScroll.current = false
+    scrollRef.current?.scrollTo({ top: publicScroll.current })
+  }, [mode, items])
+
+  const openMine = (): void => {
+    publicScroll.current = scrollRef.current?.scrollTop ?? 0
+    setMode('mine')
+  }
+  const backToPublic = (): void => {
+    restoreScroll.current = true
+    setMode('public')
+  }
 
   const onScroll = () => {
     const box = scrollRef.current
@@ -112,9 +131,32 @@ export function BangumiView() {
     <div ref={scrollRef} id="scroll-main" onScroll={onScroll} className="bili-canvas min-h-0 flex-1 overflow-y-auto pb-10">
       <nav className="mb-4 bg-[var(--panel)] px-4 pt-4 md:px-8">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-[17px] font-medium text-[var(--text-1)]">番剧</h2>
-          {seasonType === 0 ? (
-            total !== null ? <span className="text-[12px] text-[var(--text-3)]">共 {total} 部</span> : null
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="text-[17px] font-medium text-[var(--text-1)]">
+              {mode === 'mine' ? '我的追番' : '番剧'}
+            </h2>
+            {mode === 'public' ? (
+              <button
+                type="button"
+                onClick={openMine}
+                className="t press flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[var(--line)] px-2 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                <Icon name="user" size={12} />
+                我的追番
+              </button>
+            ) : total !== null ? (
+              <span className="text-[12px] text-[var(--text-3)]">共 {total} 部</span>
+            ) : null}
+          </div>
+          {mode === 'mine' ? (
+            <button
+              type="button"
+              onClick={backToPublic}
+              className="t press flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              <Icon name="chevronLeft" size={12} />
+              返回公共浏览
+            </button>
           ) : (
             <button
               type="button"
@@ -126,43 +168,45 @@ export function BangumiView() {
             </button>
           )}
         </div>
-        <div className="no-scrollbar flex items-center gap-5 overflow-x-auto">
-          {TABS.map((tab) => (
-            <button
-              key={tab.type}
-              type="button"
-              aria-pressed={seasonType === tab.type}
-              onClick={() => setSeasonType(tab.type)}
-              className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
-                seasonType === tab.type
-                  ? 'border-[var(--accent)] text-[var(--accent)]'
-                  : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {mode === 'public' ? (
+          <div className="no-scrollbar flex items-center gap-5 overflow-x-auto">
+            {TABS.map((tab) => (
+              <button
+                key={tab.type}
+                type="button"
+                aria-pressed={seasonType === tab.type}
+                onClick={() => setSeasonType(tab.type)}
+                className={`t shrink-0 whitespace-nowrap border-b-2 pb-2 text-[14px] ${
+                  seasonType === tab.type
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </nav>
-      {seasonType === 0 && !auth ? (
+      {mode === 'mine' && !auth ? (
         <BiliLoader label="正在确认登录状态…" />
-      ) : seasonType === 0 && (auth?.logged_in !== true || needLogin) ? (
+      ) : mode === 'mine' && (auth?.logged_in !== true || needLogin) ? (
         <EmptyState icon="biliTv" title="登录后查看追番" action={{ label: '登录', onClick: () => setAuthOpen(true) }} />
       ) : items === null ? (
         error ? (
-          <EmptyState icon="alert" title={seasonType === 0 ? '追番没取到' : '榜单没取到'} detail={error} action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }} />
+          <EmptyState icon="alert" title={mode === 'mine' ? '追番没取到' : '榜单没取到'} detail={error} action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }} />
         ) : (
-          <BiliLoader label={seasonType === 0 ? '正在取追番…' : '正在取榜单…'} />
+          <BiliLoader label={mode === 'mine' ? '正在取追番…' : '正在取榜单…'} />
         )
       ) : items.length === 0 ? (
-        seasonType === 0 ? (
-          <EmptyState icon="biliTv" title="还没有追番" action={{ label: '去番剧', onClick: () => setSeasonType(1) }} />
+        mode === 'mine' ? (
+          <EmptyState icon="biliTv" title="还没有追番" action={{ label: '去番剧', onClick: backToPublic }} />
         ) : (
           <EmptyState icon="biliTv" title="榜单暂时是空的" action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }} />
         )
       ) : (
         <>
-          {seasonType === 1 ? (
+          {mode === 'public' && seasonType === 1 ? (
             <div className="px-4 md:px-8">
               <BangumiTimeline />
             </div>
