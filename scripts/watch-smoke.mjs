@@ -16,6 +16,8 @@ const topbarOnly = process.argv.includes('--topbar-only')
 const liveOnly = process.argv.includes('--live-only')
 const tripleOnly = process.argv.includes('--triple-only')
 const rankingSkeletonOnly = process.argv.includes('--ranking-skeleton-only')
+const popularPagingOnly = process.argv.includes('--popular-paging-only')
+const libraryEmptyOnly = process.argv.includes('--library-empty-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -3857,6 +3859,143 @@ async function checkRankingSkeleton(page) {
   if (!ok) console.log({ skeletonReady, loaded, before, after })
 }
 
+/** 热门第二页失败时保留已加载卡片，原地重试只追加一次，不跳回顶部。 */
+async function checkPopularPaging(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  const state = () =>
+    page.evaluate(`(() => {
+      const cards = [...document.querySelectorAll('[data-wide-card]')]
+      const box = document.getElementById('scroll-main')
+      const retry = [...document.querySelectorAll('#scroll-main button')]
+        .find((button) => (button.textContent || '').trim() === '重试')
+      return {
+        count: cards.length,
+        keys: [...new Set(cards.map((card) => card.getAttribute('data-wide-card')))],
+        error: document.body.innerText.includes('预览：热门第二页失败'),
+        retry: !!retry,
+        scrollTop: Math.round(box?.scrollTop ?? -1),
+        first: cards[0]?.getAttribute('data-wide-card') ?? '',
+      }
+    })()`)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&popularFailOnce=1`)}`)
+  await sleep(2200)
+  const clicked = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '综合热门') : null
+    hit?.click()
+    return !!hit
+  })()`)
+  const firstReady = clicked && await waitFor(`document.querySelectorAll('[data-wide-card]').length === 20`)
+  await page.evaluate(`(() => {
+    const box = document.getElementById('scroll-main')
+    if (box) box.scrollTop = box.scrollHeight
+  })()`)
+  const failed = await waitFor(`document.body.innerText.includes('预览：热门第二页失败')`)
+  const failedState = await state()
+  const retried = failed && await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('#scroll-main button')]
+      .find((button) => (button.textContent || '').trim() === '重试')
+    hit?.click()
+    return !!hit
+  })()`)
+  const appended = await waitFor(`document.querySelectorAll('[data-wide-card]').length === 40`)
+  const finalState = await state()
+  check(
+    '热门下一页失败保留已有卡片，原地重试只追加一次且不回到顶部',
+    firstReady &&
+      failed &&
+      failedState.count === 20 &&
+      failedState.error &&
+      failedState.retry &&
+      retried &&
+      appended &&
+      finalState.count === 40 &&
+      finalState.keys.length === 40 &&
+      finalState.first === failedState.first &&
+      finalState.scrollTop > 0 &&
+      !finalState.error,
+  )
+  if (!appended || finalState.count !== 40) console.log({ failedState, finalState })
+}
+
+/** 真正空的曲库用完整 2233 空态和新建入口；窄窗不横向溢出。 */
+async function checkLibraryEmpty(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(120)
+    }
+    return false
+  }
+  const state = () =>
+    page.evaluate(`(() => {
+      const button = [...document.querySelectorAll('#scroll-main button')]
+        .find((el) => (el.textContent || '').trim() === '新建歌单')
+      return {
+        empty: !!document.querySelector('#scroll-main img[src$="/assets/2233.png"]'),
+        button: !!button,
+        visible: (button?.getClientRects().length ?? 0) > 0,
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      }
+    })()`)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&libraryEmpty=1`)}`)
+  await sleep(2200)
+  let opened = false
+  for (let i = 0; i < 30 && !opened; i += 1) {
+    await sleep(200)
+    opened = await page.clickText('曲库')
+  }
+  const emptyReady = opened && await waitFor(`document.body.innerText.includes('还没有歌单')`)
+  const wide = await state()
+  const modalOpened = emptyReady && await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('#scroll-main button')]
+      .find((el) => (el.textContent || '').trim() === '新建歌单')
+    hit?.click()
+    return !!hit
+  })()`)
+  const inputReady = modalOpened && await waitFor(`!!document.querySelector('input[placeholder="给歌单起个名字"]')`)
+  await page.keyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+  await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+  await sleep(200)
+
+  await page.viewport(380, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&libraryEmpty=1`)}`)
+  await sleep(2200)
+  const narrowOpened = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主要导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '曲库') : null
+    hit?.click()
+    return !!hit
+  })()`)
+  const narrowReady = narrowOpened && await waitFor(`document.body.innerText.includes('还没有歌单')`)
+  const narrow = await state()
+  const ok =
+    emptyReady &&
+    wide.empty &&
+    wide.button &&
+    wide.visible &&
+    inputReady &&
+    narrowReady &&
+    narrow.empty &&
+    narrow.button &&
+    narrow.visible &&
+    narrow.overflow <= 0
+  check('空曲库使用完整空态与新建入口，窄窗不溢出', ok)
+  if (!ok) console.log({ emptyReady, inputReady, narrowReady, wide, narrow })
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -3892,6 +4031,14 @@ async function main() {
       await checkRankingSkeleton(page)
       return
     }
+    if (popularPagingOnly) {
+      await checkPopularPaging(page)
+      return
+    }
+    if (libraryEmptyOnly) {
+      await checkLibraryEmpty(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -3911,6 +4058,8 @@ async function main() {
     await checkNavConventions(page)
     await checkRanking(page)
     await checkRankingSkeleton(page)
+    await checkPopularPaging(page)
+    await checkLibraryEmpty(page)
     await checkChannelNav(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)

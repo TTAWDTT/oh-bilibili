@@ -175,9 +175,13 @@ const failedFollowPages = new Set<number>()
 const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
 const libraryBrokenCover =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryBrokenCover')
+const libraryEmpty = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryEmpty')
 /** 预览冒烟专用：让舞台详情晚于首帧到达，复现左栏被撑高、唱片上移。 */
 const slowStage = import.meta.env.DEV && new URLSearchParams(window.location.search).has('slowStage')
 let libraryPartialRecovered = false
+const popularFailOnce =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('popularFailOnce')
+let popularFailedOnce = false
 
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
@@ -396,15 +400,24 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           url: `https://www.bilibili.com/bangumi/play/ss${40_000 + i * 10 + j}`,
         })),
       }))
-    case 'popular':
-      return {
-        items: CATALOG.slice(0, 20).map((track, i) => ({
-          track,
+    case 'popular': {
+      const page = Math.max(1, Math.trunc(num(args, 'page')))
+      if (page === 2 && popularFailOnce && !popularFailedOnce) {
+        popularFailedOnce = true
+        throw Object.assign(new Error('预览：热门第二页失败'), { class: 'retryable' })
+      }
+      const items = Array.from({ length: 20 }, (_, i) => {
+        const at = (page - 1) * 20 + i
+        const base = CATALOG[at % CATALOG.length]!
+        return {
+          // 第二页起换 key，模拟真实分页返回新条目；第一页保持稳定。
+          track: page === 1 ? base : { ...base, key: `${base.key}:p${page}:${i}`, title: `${base.title} · 第${page}页` },
           // 和真接口一样：多数条目带标签，少数留空。
           note: i % 3 === 0 ? '' : i % 2 === 0 ? '百万播放' : '7万点赞',
-        })),
-        no_more: false,
-      }
+        }
+      })
+      return { items, no_more: page >= 2 }
+    }
     case 'weekly_issues':
       return Array.from({ length: 8 }, (_, i) => ({
         number: 399 - i,
@@ -1293,6 +1306,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'danmaku':
       return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']
     case 'library_playlists':
+      if (libraryEmpty) return []
       return state.playlists.map((item) => ({ id: item.id, name: item.name }))
     case 'library_create': {
       const name = str(args, 'name').trim()

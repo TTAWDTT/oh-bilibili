@@ -25,6 +25,7 @@ export function WideCard({
       type="button"
       onClick={onOpen}
       data-focus-id={`wide:${track.key}`}
+      data-wide-card={track.key}
       className="bili-card group flex items-start gap-4 text-left"
       title={track.title}
     >
