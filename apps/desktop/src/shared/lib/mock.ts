@@ -1,4 +1,4 @@
-import type { DownloadView, QrStatus, WireError } from './contract'
+import type { DownloadView, QrStatus, Track, WireError } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -25,18 +25,136 @@ const COMMENT_SEEDS: { author: string; mid: number; text: string; level: number;
   },
 ]
 
-const FOLLOW_SEEDS: {
+type FollowSeed = {
   name: string
   sign: string
   official: number | null
   vip: boolean
   mutual: boolean
   special: boolean
-}[] = [
-  { name: '造梦阿瑄', sign: '每周五更新', official: 0, vip: true, mutual: true, special: true },
-  { name: '传送门研究所', sign: '音乐区 UP 主', official: 1, vip: false, mutual: false, special: false },
-  { name: '不睡觉的鹿', sign: '翻唱 / 混音', official: null, vip: false, mutual: false, special: false },
-]
+}
+
+/** 第一个账号的 320 个关注：第 286 人签名含「混音」且互关，另有一对同名作者。 */
+const FOLLOW_SEEDS: FollowSeed[] = Array.from({ length: 320 }, (_, i) => {
+  if (i === 0) {
+    return { name: '造梦阿瑄', sign: '每周五更新', official: 0, vip: true, mutual: true, special: true }
+  }
+  if (i === 1) {
+    return { name: '传送门研究所', sign: '音乐区 UP 主', official: 1, vip: false, mutual: false, special: false }
+  }
+  if (i === 2) {
+    return { name: '不睡觉的鹿', sign: '翻唱 / 现场', official: null, vip: false, mutual: false, special: false }
+  }
+  if (i === 285) {
+    return {
+      name: '夜间母带师',
+      sign: '夜间混音与母带制作',
+      official: null,
+      vip: true,
+      mutual: true,
+      special: false,
+    }
+  }
+  if (i === 10 || i === 300) {
+    return {
+      name: '同名作者',
+      sign: i === 10 ? '一号的签名' : '二号的签名',
+      official: null,
+      vip: false,
+      mutual: false,
+      special: false,
+    }
+  }
+  if (i === 100) {
+    return {
+      name: 'LoFi 电台',
+      sign: 'Chill beats 与夜晚',
+      official: null,
+      vip: false,
+      mutual: false,
+      special: false,
+    }
+  }
+  if (i === 50) {
+    return {
+      name: '这个名字长到可以把整行撑开的作者',
+      sign: '',
+      official: null,
+      vip: false,
+      mutual: false,
+      special: false,
+    }
+  }
+  if (i === 51) {
+    return {
+      name: '没有投稿的作者',
+      sign: '',
+      official: null,
+      vip: false,
+      mutual: false,
+      special: false,
+    }
+  }
+  return {
+    name: `关注作者 ${i + 1}`,
+    sign: i % 3 === 0 ? '日常更新' : i % 3 === 1 ? '偶尔直播' : '翻唱与现场',
+    official: null,
+    vip: false,
+    mutual: i % 13 === 0,
+    special: i % 29 === 0,
+  }
+})
+
+/** 扫码登录后的第二个账号：名单和第一个账号完全不同，用来验证换账号后不串数据。 */
+const FOLLOW_SEEDS_B: FollowSeed[] = Array.from({ length: 60 }, (_, i) => ({
+  name: i === 0 ? '造梦阿瑄' : i === 1 ? '账号二专属' : `账号二作者 ${i + 1}`,
+  sign: `第二账号的第 ${i + 1} 位关注`,
+  official: null,
+  vip: false,
+  mutual: false,
+  special: false,
+}))
+
+const FOLLOW_MID_BASE = 5000
+const FOLLOW_B_MID_BASE = 6000
+
+function followByMid(mid: number): { seed: FollowSeed; index: number } | null {
+  for (const [base, seeds] of [
+    [FOLLOW_MID_BASE, FOLLOW_SEEDS],
+    [FOLLOW_B_MID_BASE, FOLLOW_SEEDS_B],
+  ] as const) {
+    const index = mid - base
+    if (index >= 0 && index < seeds.length) return { seed: seeds[index]!, index }
+  }
+  return null
+}
+
+const followTrackCache = new Map<number, Track[]>()
+
+/** 关注名单里的人不一定在首页目录里；给预览造几条确定归属他的投稿。 */
+function followTracks(mid: number): Track[] | null {
+  const found = followByMid(mid)
+  if (!found) return null
+  if (mid === FOLLOW_MID_BASE + 51) return []
+  const cached = followTrackCache.get(mid)
+  if (cached) return cached
+  const tracks = Array.from({ length: 4 }, (_, i) => ({
+    key: `BVfollow${mid}${i}`,
+    title: `${found.seed.name} 的近期投稿 ${i + 1}`,
+    artist: found.seed.name,
+    duration_ms: 180_000 + i * 1000,
+    cover: CATALOG[(found.index + i) % CATALOG.length]?.cover ?? null,
+    views: 12_000 + i * 1300,
+    danmaku: 80 + i,
+    up_avatar: avatarArt(),
+    up_mid: mid,
+    tname: '音乐',
+    typeid: 3,
+  }))
+  for (const track of tracks) registerTrack(track)
+  followTrackCache.set(mid, tracks)
+  return tracks
+}
 
 /** 预览里发出去的评论，按视频 key 存着，刷新评论列表时插到最前面。 */
 const sentComments = new Map<string, { text: string; at: number; id: string }[]>()
@@ -46,6 +164,14 @@ const HISTORY_EPOCH = Date.now()
 
 const listError = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('listError') : null
 const settledListFailures = new Set<string>()
+const followSlow = import.meta.env.DEV && new URLSearchParams(window.location.search).has('followSlow')
+const followFailPage = import.meta.env.DEV
+  ? Number(new URLSearchParams(window.location.search).get('followFailPage') ?? 0)
+  : 0
+const spaceSlowMid = import.meta.env.DEV
+  ? Number(new URLSearchParams(window.location.search).get('spaceSlowMid') ?? 0)
+  : 0
+const failedFollowPages = new Set<number>()
 const libraryPartial = import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryPartial')
 const libraryBrokenCover =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('libraryBrokenCover')
@@ -152,15 +278,16 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'author_card': {
       const mid = num(args, 'mid')
       const owner = CATALOG.find((t) => t.up_mid === mid)
-      if (!owner) throw fail('input', '这个 UP 主不在目录里')
+      const follow = followByMid(mid)
+      if (!owner && !follow) throw fail('input', '这个 UP 主不在目录里')
       return {
-        name: owner.artist,
-        face: owner.up_avatar ?? '',
+        name: follow?.seed.name ?? owner!.artist,
+        face: follow ? avatarArt() : (owner!.up_avatar ?? ''),
         // 按 mid 造一个稳定的粉丝数，同一个 UP 每次一样
         fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
-        sign: '这里是 B 站的占位签名，真机走真实接口。',
+        sign: follow?.seed.sign ?? '这里是 B 站的占位签名，真机走真实接口。',
         official_type: 1,
-        vip: true,
+        vip: follow?.seed.vip ?? true,
         official: null,
         level: 6,
         videos: 952,
@@ -1075,8 +1202,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'following': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
-      const users = FOLLOW_SEEDS.map((seed, i) => ({
-        mid: 5000 + i,
+      if (import.meta.env.DEV) performance.mark('following_page', { detail: page })
+      // 真接口登录态失效会报 needs_login；listError 场景由上面的开关单独覆盖。
+      if (!state.auth.logged_in && !listError) throw fail('needs_login', '需要登录')
+      if (followSlow) await sleep(450)
+      if (followFailPage === page && !failedFollowPages.has(page)) {
+        failedFollowPages.add(page)
+        throw { class: 'retryable', message: 'operation timed out' } satisfies WireError
+      }
+      const second = state.auth.user?.mid === 4381285
+      const seeds = second ? FOLLOW_SEEDS_B : FOLLOW_SEEDS
+      const base = second ? FOLLOW_B_MID_BASE : FOLLOW_MID_BASE
+      const users = seeds.map((seed, i) => ({
+        mid: base + i,
         name: seed.name,
         face: null,
         sign: seed.sign,
@@ -1085,7 +1223,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         mutual: seed.mutual,
         special: seed.special,
       }))
-      return [page === 1 ? users : [], users.length]
+      const start = (page - 1) * 50
+      return [users.slice(start, start + 50), users.length]
     }
     case 'space_videos': {
       const page = Math.max(1, Math.trunc(num(args, 'page')))
@@ -1095,7 +1234,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 否则「切排序不换页首」这类测试永远是假通过。
       const mid = num(args, 'mid')
       const order = str(args, 'order')
+      if (mid === spaceSlowMid) await sleep(1200)
       let owned = CATALOG.filter((track) => !mid || track.up_mid === mid)
+      if (owned.length === 0 && mid) owned = followTracks(mid) ?? []
       // 预览里有一位「多页作者」：用来验证翻页、切排序后页码和总数不丢。
       const longAuthor =
         import.meta.env.DEV && new URLSearchParams(window.location.search).has('authorLong')
