@@ -48,6 +48,7 @@ export function HistoryView() {
   const restoreScrollTop = useRef(restored ? historyMemory.scrollTop : 0)
   const restoreScrollPending = useRef(restored)
   const emptyFocusPending = useRef(true)
+  const emptyRef = useRef<HTMLDivElement | null>(null)
   const entriesRef = useRef<Entry[]>(historyMemory.entries)
   const hasMoreRef = useRef(historyMemory.hasMore)
   /** 本地删改/翻页的次数：异步合并在返回时据此判断列表是否已经被改过。 */
@@ -125,6 +126,17 @@ export function HistoryView() {
     if (!request || !box) return
     focusRequest.current = null
     focusRow(box, request.key, 'reveal')
+  }, [entries])
+
+  // 空态没有行可聚焦：删到一条不剩、清空、或重新进入空历史时把焦点收在它身上。
+  // 等一帧再落焦点：点击导航按钮的默认聚焦发生在本轮渲染之后，抢在它前面会被覆盖。
+  useEffect(() => {
+    if (entries === null || entries.length > 0) return
+    if (!emptyFocusPending.current && !focusRequest.current) return
+    focusRequest.current = null
+    emptyFocusPending.current = false
+    const timer = window.setTimeout(() => emptyRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
   }, [entries])
 
   /** 再取一页更早的记录。用上一页最旧一条的 (played_at, id) 作边界。 */
@@ -235,15 +247,7 @@ export function HistoryView() {
   if (entries.length === 0) {
     return (
       <div
-        ref={(node) => {
-          if (!node) return
-          // 删到一条不剩、清空、或者重新进入空历史：焦点都收到空态上。
-          if (focusRequest.current || emptyFocusPending.current) {
-            focusRequest.current = null
-            emptyFocusPending.current = false
-            node.focus()
-          }
-        }}
+        ref={emptyRef}
         tabIndex={-1}
         data-history-empty
         className="rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"

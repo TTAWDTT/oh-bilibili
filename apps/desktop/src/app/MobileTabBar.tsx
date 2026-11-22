@@ -29,7 +29,8 @@ export function MobileTabBar() {
       className="safe-bottom flex shrink-0 items-stretch border-t border-[var(--line)] bg-[var(--panel)] md:hidden"
     >
       {TABS.map((tab) => {
-        const active = view.kind === tab.kind
+        const active =
+          view.kind === tab.kind || (tab.kind === 'library' && view.kind === 'playlist')
         // 「喜欢」在没有歌可喜欢时依然是可点的，只是不高亮
         void track
         return (

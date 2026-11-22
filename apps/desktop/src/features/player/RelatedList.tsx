@@ -50,7 +50,8 @@ export function RelatedList({ trackKey }: { trackKey: string }) {
           <li key={track.key}>
             <button
               type="button"
-              onClick={() => navigate({ kind: 'watch', track })}
+              onClick={() => navigate({ kind: 'watch', track }, undefined, `related:${track.key}`)}
+              data-focus-id={`related:${track.key}`}
               title={`${track.title} · ${track.artist}`}
               className="group flex w-full items-center gap-2.5 px-4 py-1.5 text-left hover:bg-[var(--hover)]"
             >

@@ -47,11 +47,21 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
 export function Sidebar() {
   const view = useAppStore((state) => state.view)
   const navigate = useAppStore((state) => state.navigate)
-  const collapsed = useAppStore((state) => state.sidebar === 'rail')
+  const preference = useAppStore((state) => state.sidebar)
+  const watchNav = useAppStore((state) => state.watchNav)
+  /** 观看页没有自己的导航项，用进入它的那一页（历史栈顶）保留来源高亮。 */
+  const previousView = useAppStore((state) => state.history.at(-1)?.view.kind ?? null)
   const toggleSidebar = useAppStore((state) => state.toggleSidebar)
+  const toggleWatchNav = useAppStore((state) => state.toggleWatchNav)
+  const onWatch = view.kind === 'watch'
+  const collapsed = (onWatch ? watchNav : preference) === 'rail'
 
   const item = (entry: Item): ReactNode => {
-    const active = view.kind === entry.view.kind
+    // 歌单详情还是曲库的一部分，左栏继续停在「曲库」。
+    // 观看页保留来源那一项：用户能看出自己是从哪里进来的。
+    const source = view.kind === 'watch' ? previousView : view.kind
+    const active =
+      source === entry.view.kind || (entry.view.kind === 'library' && source === 'playlist')
     return (
       <button
         key={entry.label}
@@ -77,9 +87,12 @@ export function Sidebar() {
   return (
     <nav
       aria-label="主导航"
-      className={`bili-sidebar hidden h-full shrink-0 flex-col gap-5 overflow-y-auto border-r border-hairline bg-[var(--panel)] py-4 md:flex ${
-        collapsed ? 'w-[60px] px-2' : 'w-[208px] px-3'
-      }`}
+      className={[
+        'bili-sidebar h-full shrink-0 flex-col gap-5 overflow-y-auto border-r border-hairline bg-[var(--panel)] py-4',
+        // 观看页在中等宽度先让出这一栏：播放器控制条在 768 加上侧栏会被裁。
+        onWatch ? 'hidden lg:flex' : 'hidden md:flex',
+        collapsed ? 'w-[60px] px-2' : 'w-[208px] px-3',
+      ].join(' ')}
     >
       {GROUPS.map((group, index) => (
         <div key={group.title ?? `g${index}`} className="flex flex-col gap-0.5">
@@ -97,7 +110,7 @@ export function Sidebar() {
         {item({ view: { kind: 'settings' }, label: '设置', icon: 'settings' })}
         <button
           type="button"
-          onClick={toggleSidebar}
+        onClick={onWatch ? toggleWatchNav : toggleSidebar}
           aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
           aria-expanded={!collapsed}
           title={collapsed ? '展开侧边栏' : '收起侧边栏'}

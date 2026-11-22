@@ -57,6 +57,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
       <button
         type="button"
         onClick={onOpen}
+        data-focus-id={`rank:${track.key}`}
         aria-label={track.title}
         className={`relative w-[7rem] shrink-0 ${first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'}`}
         title={track.title}
@@ -242,7 +243,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
               track={track}
               rank={index + 1}
               active={track.key === snapshot?.track?.key}
-              onOpen={() => navigate({ kind: 'watch', track })}
+              onOpen={() => navigate({ kind: 'watch', track }, undefined, `rank:${track.key}`)}
               onAuthor={() =>
                 navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })
               }

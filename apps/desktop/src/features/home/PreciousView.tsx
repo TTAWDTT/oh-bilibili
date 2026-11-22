@@ -68,7 +68,7 @@ export function PreciousView() {
                 key={item.track.key}
                 track={item.track}
                 note={noteMap.get(item.track.key) ?? null}
-                onOpen={() => navigate({ kind: 'watch', track: item.track })}
+                onOpen={() => navigate({ kind: 'watch', track: item.track }, undefined, `wide:${item.track.key}`)}
               />
             ))}
           </div>

@@ -81,7 +81,7 @@ export function HomeView() {
   const openResume = (item: Resume): void => {
     if (item.watching) {
       // 观看页自己会从本地记录恢复到分 P 与位置。
-      navigate({ kind: 'watch', track: item.entry.track })
+      navigate({ kind: 'watch', track: item.entry.track }, undefined, `resume:${item.entry.track.key}`)
       return
     }
     void playContext([item.entry.track.key], 0).then(() => {
@@ -514,7 +514,7 @@ export function HomeView() {
               <ResumeCard resume={resume} onOpen={openResume} />
             </div>
           ) : (
-            <HeroBanner tracks={heroPool.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
+            <HeroBanner tracks={heroPool.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track }, undefined, `hero:${track.key}`)} />
           )}
           {(resume ? heroCards.length > 0 : hero.length > 5) && wideHero ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
@@ -523,7 +523,8 @@ export function HomeView() {
                 <button
                   key={track.key}
                   type="button"
-                  onClick={() => navigate({ kind: 'watch', track })}
+                  onClick={() => navigate({ kind: 'watch', track }, undefined, `herocard:${track.key}`)}
+                  data-focus-id={`herocard:${track.key}`}
                   className="bili-card group min-w-0 text-left"
                 >
                   <span className="relative block aspect-video overflow-hidden rounded-[6px]">

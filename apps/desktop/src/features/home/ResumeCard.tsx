@@ -81,6 +81,7 @@ export function ResumeCard({
         type="button"
         data-home-resume="compact"
         data-key={track.key}
+        data-focus-id={`resume:${track.key}`}
         onClick={() => onOpen(resume)}
         className="group flex w-full items-center gap-3 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 text-left"
       >
@@ -112,6 +113,7 @@ export function ResumeCard({
       type="button"
       data-home-resume="wide"
       data-key={track.key}
+      data-focus-id={`resume:${track.key}`}
       onClick={() => onOpen(resume)}
       className="group block w-full overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
     >

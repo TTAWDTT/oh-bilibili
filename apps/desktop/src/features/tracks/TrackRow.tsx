@@ -85,7 +85,8 @@ export function TrackRow({ track, index, active, playing, onPlay }: TrackRowProp
         type="button"
         aria-label={`看视频 ${track.title}`}
         title="看视频"
-        onClick={() => navigate({ kind: 'watch', track })}
+        onClick={() => navigate({ kind: 'watch', track }, undefined, `row:${track.key}`)}
+        data-focus-id={`row:${track.key}`}
         className="t press flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--text-3)] hover:text-[var(--text-1)]"
       >
         <Icon name="play" size={13} />

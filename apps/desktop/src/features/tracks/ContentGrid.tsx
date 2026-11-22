@@ -153,11 +153,18 @@ const TrackCard = memo(function TrackCard({
   onCancelCoin,
 }: CardProps) {
   return (
-    <article data-track-card data-track-title={track.title} data-index={index} className="bili-card group">
+    <article
+      data-track-card
+      data-key={track.key}
+      data-track-title={track.title}
+      data-index={index}
+      className="bili-card group"
+    >
       <div className="relative">
         <button
           type="button"
           onClick={() => onOpen(track)}
+          data-focus-id={`card:${track.key}`}
           aria-label={`观看 ${track.title}`}
           /* 封面本身就是卡片：不描边，靠图片与留白分隔，鼠标悬停时整块抬升。
              之前每张封面套 1px 灰边，一屏几十张全是框线，页面读起来像表格。 */
@@ -353,7 +360,12 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
   const keysRef = useRef<string[]>([])
   keysRef.current = tracks.map((t) => t.key)
 
-  const onOpen = useCallback((track: Track) => navigate({ kind: 'watch', track }), [navigate])
+  const onOpen = useCallback(
+    (track: Track) =>
+      navigate({ kind: 'watch', track }, undefined, `card:${track.key}`),
+    [navigate],
+  )
+
   const onAuthor = useCallback(
     (track: Track) => navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null }),
     [navigate],

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
 import { thumbWide } from '../../shared/lib/thumb'
 import { formatCount, formatDuration } from '../../shared/lib/format'
@@ -7,20 +7,34 @@ import { Icon } from '../../shared/ui/Icon'
 
 const SLIDE_MS = 6000
 
+/** 按会话记住轮播停在哪一张：从视频返回时回到原来那张，而不是第一张。 */
+const carouselMemory: { first: string | null; index: number } = { first: null, index: 0 }
+
 /**
  * 发现页顶部的轮播。B 站首页第一屏就是一张大图，标题压在图上。
  * 只用推荐流里已有的条目，不额外请求；鼠标停在上面时不再自动翻页。
  */
 export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track: Track) => void }) {
   const slides = tracks.filter((t) => t.cover).slice(0, 5)
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(() => {
+    const remembered = carouselMemory.first === slides[0]?.key ? carouselMemory.index : 0
+    return Math.min(remembered, Math.max(0, slides.length - 1))
+  })
   const [paused, setPaused] = useState(false)
 
-  // 换一批之后条目全变，从第一张重新开始
+  // 换一批之后条目全变，从第一张重新开始；只是从别的页面回来则保留原来那张。
   const first = slides[0]?.key
+  const previousFirst = useRef(first)
   useEffect(() => {
+    if (previousFirst.current === first) return
+    previousFirst.current = first
     setIndex(0)
   }, [first])
+
+  useEffect(() => {
+    carouselMemory.first = slides[0]?.key ?? null
+    carouselMemory.index = index
+  }, [index, slides])
 
   useEffect(() => {
     if (paused || slides.length < 2) return
@@ -99,6 +113,7 @@ export function HeroBanner({ tracks, onOpen }: { tracks: Track[]; onOpen: (track
       <button
         type="button"
         onClick={() => onOpen(current)}
+        data-focus-id={`hero:${current.key}`}
         aria-label={`观看 ${current.title}`}
         className="absolute inset-0 text-left"
       >
