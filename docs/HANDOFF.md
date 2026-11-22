@@ -277,6 +277,9 @@ Bundle identifier `dev.bilimusic.app`、Cargo 包名和 `~/Music/BiliMusic` 下�
 81. **列表局部失败与空态**：热门下一页失败保留已加载卡片和滚动位置，底部原地重试只追加一次；空曲库用完整 2233 空态
     和新建入口，窄窗不横向溢出；单歌单失败与空歌单沿用曲库卡片的局部重试。回归见 `--popular-paging-only`、
     `--library-empty-only` 与 `--library-partial`。
+82. **我的与设置**：「我的」是个人中心，账号、个人空间、同步/退出和六项个人内容在同一页；窄窗底部「我的」进这里，
+    桌面侧栏也有「个人中心」。设置只留播放/弹幕开关、快捷键参考和版本，快捷键排在常用开关之后；从设置或收藏夹
+    返回仍落在个人中心。回归见 `watch-smoke --profile-only`。
 
 34. **多 P 的 cid 约定**：观看页里所有「按 P 分」的资源都必须带当前 P 的 cid——
     音轨（`open_watch_page` 把当前 cid 记进引擎的 `watch_cid`，`fetch_and_load` 取流时覆盖 `detail.cid`）、

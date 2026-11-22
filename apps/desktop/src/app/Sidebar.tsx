@@ -30,6 +30,7 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
   {
     title: '我的',
     items: [
+      { view: { kind: 'profile' }, label: '个人中心', icon: 'user' },
       { view: { kind: 'history' }, label: '历史', icon: 'clock' },
       { view: { kind: 'favs' }, label: '收藏夹', icon: 'bookmarkStar' },
       { view: { kind: 'watchLater' }, label: '稍后再看', icon: 'watchLater' },

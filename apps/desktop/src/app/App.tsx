@@ -13,6 +13,7 @@ import { PlayerBar } from '../features/player/PlayerBar'
 import { useHasSession, useIsListening, usePlayerStore } from '../features/player/playerStore'
 import { SearchPanel } from '../features/search/SearchPanel'
 import { SettingsView } from '../features/settings/SettingsView'
+import { ProfileView } from '../features/profile/ProfileView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
 import { glideCards, useAppStore } from './appStore'
@@ -79,6 +80,8 @@ function viewTitle(view: View): string {
       return `UP 主：${view.name}`
     case 'settings':
       return '设置'
+    case 'profile':
+      return '我的'
     case 'watch':
       return `观看：${view.track.title}`
     case 'watchLater':
@@ -124,6 +127,8 @@ function CurrentView({ view }: { view: View }) {
       return <AuthorView name={view.name} mid={view.mid ?? null} />
     case 'settings':
       return <SettingsView />
+    case 'profile':
+      return <ProfileView />
     case 'watch':
       return <WatchView key={view.track.key} track={view.track} />
     case 'watchLater':

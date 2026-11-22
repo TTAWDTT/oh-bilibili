@@ -15,7 +15,7 @@ const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
   { kind: 'dynamic', label: '动态', icon: 'dynamic' },
   { kind: 'library', label: '曲库', icon: 'library' },
   { kind: 'liked', label: '喜欢', icon: 'heart' },
-  { kind: 'settings', label: '我的', icon: 'user' },
+  { kind: 'profile', label: '我的', icon: 'user' },
 ]
 
 export function MobileTabBar() {

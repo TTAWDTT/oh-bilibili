@@ -18,6 +18,7 @@ const tripleOnly = process.argv.includes('--triple-only')
 const rankingSkeletonOnly = process.argv.includes('--ranking-skeleton-only')
 const popularPagingOnly = process.argv.includes('--popular-paging-only')
 const libraryEmptyOnly = process.argv.includes('--library-empty-only')
+const profileOnly = process.argv.includes('--profile-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -3996,6 +3997,128 @@ async function checkLibraryEmpty(page) {
   if (!ok) console.log({ emptyReady, inputReady, narrowReady, wide, narrow })
 }
 
+/** 「我的」是个人中心，设置是次级页；宽窄窗都能回到原层级。 */
+async function checkProfileSettings(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(120)
+    }
+    return false
+  }
+  const profileState = () =>
+    page.evaluate(`(() => ({
+      account: !!document.querySelector('[data-profile-account]'),
+      services: document.querySelectorAll('[data-profile-service]').length,
+      settings: !!document.querySelector('[data-profile-settings]'),
+      heading: document.querySelector('h1')?.textContent?.trim() ?? '',
+    }))()`)
+  const settingsState = () =>
+    page.evaluate(`(() => {
+      const section = (title) => [...document.querySelectorAll('section')]
+        .find((node) => node.querySelector('h2')?.textContent === title)
+      return {
+        heading: document.querySelector('h1')?.textContent?.trim() ?? '',
+        playTop: Math.round(section('播放')?.getBoundingClientRect().top ?? -1),
+        shortcutTop: Math.round(section('快捷键')?.getBoundingClientRect().top ?? -1),
+        shortcutVisible: (section('快捷键')?.getClientRects().length ?? 0) > 0,
+        switches: document.querySelectorAll('section [role="switch"]').length,
+      }
+    })()`)
+  const openMine = async () => {
+    const ok = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主要导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '我的') : null
+      hit?.click()
+      return !!hit
+    })()`)
+    return ok && await waitFor(`!!document.querySelector('[data-profile-account]')`)
+  }
+  const backToProfile = async () => {
+    const ok = await page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主要导航"]')
+      const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '我的') : null
+      hit?.click()
+      return !!hit
+    })()`)
+    return ok && await waitFor(`!!document.querySelector('[data-profile-account]')`)
+  }
+
+  await page.viewport(380, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+  await sleep(2200)
+  const mineOpened = await openMine()
+  const profile = await profileState()
+  check(
+    '窄窗「我的」进入个人中心',
+    mineOpened && profile.account && profile.services === 6 && profile.settings && profile.heading === '我的',
+  )
+
+  const settingsClicked = await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-profile-settings]')
+    hit?.click()
+    return !!hit
+  })()`)
+  const settingsReady = settingsClicked && await waitFor(`document.querySelector('h1')?.textContent?.trim() === '设置'`)
+  const narrowSettings = await settingsState()
+  check(
+    '设置的播放开关在窄窗首屏，快捷键不在前面',
+    settingsReady && narrowSettings.switches >= 2 && narrowSettings.playTop > 0 && !narrowSettings.shortcutVisible,
+  )
+  if (!(settingsReady && narrowSettings.switches >= 2 && narrowSettings.playTop > 0)) {
+    console.log({ settingsReady, narrowSettings })
+  }
+  const backProfile = await backToProfile()
+  check('从设置返回仍在个人中心', backProfile)
+  if (!backProfile) console.log({ step: 'back-settings', backProfile })
+
+  const favsClicked = await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-profile-service="favs"]')
+    hit?.click()
+    return !!hit
+  })()`)
+  const favsReady = favsClicked && await waitFor(`document.querySelector('h1')?.textContent?.trim() === '收藏夹'`)
+  const backFromFavs = await backToProfile()
+  check('从收藏夹返回仍在个人中心', favsReady && backFromFavs)
+  if (!favsReady || !backFromFavs) console.log({ step: 'back-favs', favsReady, backFromFavs })
+
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(1800)
+  const unloggedOpened = await openMine()
+  const unlogged = await page.evaluate(`document.body.innerText.includes('未登录') && document.body.innerText.includes('扫码登录')`)
+  const authOpened = unloggedOpened && await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '扫码登录')
+    hit?.click()
+    return !!hit
+  })()`)
+  await page.keyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+  await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+  await sleep(300)
+  const stillProfile = await page.evaluate(`!!document.querySelector('[data-profile-account]')`)
+  check('未登录个人中心可打开登录，取消后仍在原页', unloggedOpened && unlogged && authOpened && stillProfile)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+  await sleep(1800)
+  const desktopProfile = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '个人中心') : null
+    hit?.click()
+    return !!hit
+  })()`)
+  const desktopReady = desktopProfile && await waitFor(`!!document.querySelector('[data-profile-account]')`)
+  await page.evaluate(`document.querySelector('[data-profile-settings]')?.click()`)
+  const desktopSettingsReady = await waitFor(`document.querySelector('h1')?.textContent?.trim() === '设置'`)
+  const desktopSettings = await settingsState()
+  check(
+    '宽窗个人中心与设置入口稳定，快捷键在播放之后',
+    desktopReady && desktopSettingsReady && desktopSettings.playTop > 0 &&
+      desktopSettings.shortcutVisible && desktopSettings.shortcutTop > desktopSettings.playTop,
+  )
+  await page.viewport(1320, 900)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -4039,6 +4162,10 @@ async function main() {
       await checkLibraryEmpty(page)
       return
     }
+    if (profileOnly) {
+      await checkProfileSettings(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -4060,6 +4187,7 @@ async function main() {
     await checkRankingSkeleton(page)
     await checkPopularPaging(page)
     await checkLibraryEmpty(page)
+    await checkProfileSettings(page)
     await checkChannelNav(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)
