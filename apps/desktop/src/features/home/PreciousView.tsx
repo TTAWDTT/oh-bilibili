@@ -1,22 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { PreciousView as PreciousData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { useAppStore } from '../../app/appStore'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { WideCard } from '../tracks/WideCard'
 import { HotPageHeader } from './HotPageHeader'
+import { PreciousExhibit } from './PreciousExhibit'
 
 /**
  * 入站必刷。B 站给新用户的首屏片单：一次返回全部条目，每条配一句官方推荐语。
- * 标题与标题下面那行文案都来自接口，不要改写成我们自己的说法。
+ * 展墙按服务端顺序：每组一件宽展位加最多四件紧凑展位，只调整阅读节奏。
  */
 export function PreciousView() {
   const [data, setData] = useState<PreciousData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
-  const navigate = useAppStore((state) => state.navigate)
+  const [openNotes, setOpenNotes] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -35,10 +34,22 @@ export function PreciousView() {
     }
   }, [nonce])
 
-  const noteMap = useMemo(
-    () => new Map((data?.items ?? []).map((item) => [item.track.key, item.note])),
-    [data],
-  )
+  const toggleNote = (key: string): void => {
+    setOpenNotes((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // 每五件一组：第一件宽展位，其余四件紧凑。最后一组不足五件也按同一顺序排。
+  const groups: PreciousData['items'][] = []
+  for (const item of data?.items ?? []) {
+    const last = groups.at(-1)
+    if (!last || last.length >= 5) groups.push([item])
+    else last.push(item)
+  }
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
@@ -62,14 +73,29 @@ export function PreciousView() {
         ) : data.items.length === 0 ? (
           <EmptyState mascot="missYou" icon="biliTv" title="这个片单暂时是空的" action={null} />
         ) : (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
-            {data.items.map((item) => (
-              <WideCard
-                key={item.track.key}
-                track={item.track}
-                note={noteMap.get(item.track.key) ?? null}
-                onOpen={() => navigate({ kind: 'watch', track: item.track }, undefined, `wide:${item.track.key}`)}
-              />
+          <div className="flex flex-col gap-8">
+            {groups.map((group, index) => (
+              <section key={group[0]!.track.key} aria-label={`第 ${index + 1} 组`}>
+                <PreciousExhibit
+                  item={group[0]!}
+                  hero
+                  expanded={openNotes.has(group[0]!.track.key)}
+                  onToggleNote={() => toggleNote(group[0]!.track.key)}
+                />
+                {group.length > 1 ? (
+                  <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
+                    {group.slice(1).map((item) => (
+                      <PreciousExhibit
+                        key={item.track.key}
+                        item={item}
+                        hero={false}
+                        expanded={openNotes.has(item.track.key)}
+                        onToggleNote={() => toggleNote(item.track.key)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
             ))}
           </div>
         )}

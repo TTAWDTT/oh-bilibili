@@ -442,7 +442,15 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return {
         title: '入站必刷',
         explain: '预览模式',
-        items: CATALOG.slice(0, 12).map((track) => ({ track, note: '预览模式的推荐语' })),
+        items: CATALOG.slice(0, 12).map((track, index) => ({
+          track,
+          note:
+            index === 0
+              ? '预览模式的长推荐语：它把现场录音、乐手调度和镜头运动放在同一条叙事里，从第一句就能听出空间感；副歌之后没有急着堆情绪，而是把音量收回来，让最后一分钟真正落地。这条足够长，用来检查展开理由不会压住封面，也不会触发播放。'
+              : index === 2
+                ? ''
+                : '预览模式的推荐语',
+        })),
       }
     case 'video_shots':
       return {
