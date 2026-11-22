@@ -6,7 +6,7 @@ import { useAppStore } from '../../app/appStore'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { WideCard } from '../tracks/WideCard'
-import { HotTabs } from './HotTabs'
+import { HotPageHeader } from './HotPageHeader'
 
 /**
  * 入站必刷。B 站给新用户的首屏片单：一次返回全部条目，每条配一句官方推荐语。
@@ -42,7 +42,7 @@ export function PreciousView() {
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      <HotTabs
+      <HotPageHeader
         active="precious"
         title={data?.title ?? '入站必刷'}
         extra={data ? String(data.items.length) : undefined}

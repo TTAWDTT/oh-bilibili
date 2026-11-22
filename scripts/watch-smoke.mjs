@@ -11,6 +11,7 @@ import { join } from 'node:path'
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
 const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
 const libraryPartialOnly = process.argv.includes('--library-partial')
+const channelOnly = process.argv.includes('--channel-nav')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
   ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
@@ -1267,7 +1268,7 @@ async function checkRanking(page) {
   await sleep(4000)
   await page.evaluate(`(() => {
     const nav = document.querySelector('nav[aria-label="主导航"]')
-    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '排行') : null
+    const hit = nav ? [...nav.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '排行榜') : null
     hit?.click()
   })()`)
   let ready = false
@@ -1385,6 +1386,461 @@ async function checkRanking(page) {
     narrow.cover > 0 && narrow.cover <= 120 && narrow.rightStats === 'none' && narrow.overflow !== null && narrow.overflow <= 0,
   )
   await page.viewport(1440, 900)
+}
+
+/** 四个热门频道：桌面只由左栏切页，窄窗换成标题旁的选择器；排行分区与周刊换期各自留在内容里。 */
+async function checkChannelNav(page) {
+  const NAMES = ['排行榜', '综合热门', '入站必刷', '每周必看']
+  const KINDS = ['ranking', 'popular', 'precious', 'weekly']
+  const waitFor = async (expression, timeout = 6000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(100)
+    }
+    return false
+  }
+  const clickSidebar = (name) =>
+    page.evaluate(`(() => {
+      const nav = document.querySelector('nav[aria-label="主导航"]')
+      const hit = [...(nav?.querySelectorAll('[data-hot-channel]') ?? [])]
+        .find((button) => (button.getAttribute('aria-label') || button.textContent.trim()) === ${JSON.stringify(name)})
+      hit?.click()
+      return !!hit
+    })()`)
+  const activeSidebar = () =>
+    page.evaluate(`(() => {
+      const hit = document.querySelector('nav[aria-label="主导航"] [data-hot-channel][aria-current="page"]')
+      return hit ? (hit.getAttribute('aria-label') || hit.textContent.trim()) : ''
+    })()`)
+  const selectChannel = (kind) =>
+    page.evaluate(`(() => {
+      const select = document.querySelector('[data-hot-channel-select]')
+      if (!select) return false
+      select.value = ${JSON.stringify(kind)}
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      return true
+    })()`)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(4000)
+  const wideNav = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const buttons = [...(nav?.querySelectorAll('[data-hot-channel]') ?? [])]
+      .filter((button) => button.getClientRects().length > 0)
+    return {
+      labels: buttons.map((button) => button.getAttribute('aria-label') || button.textContent.trim()),
+      select: [...document.querySelectorAll('[data-hot-channel-select]')]
+        .filter((select) => select.getClientRects().length > 0).length,
+    }
+  })()`)
+  check(
+    '宽窗左栏按统一顺序列出四个频道，正文不再重复',
+    JSON.stringify(wideNav.labels) === JSON.stringify(NAMES) && wideNav.select === 0,
+  )
+
+  const wideStates = []
+  for (let i = 0; i < NAMES.length; i += 1) {
+    const clicked = await clickSidebar(NAMES[i])
+    const ready = clicked && await waitFor(
+      `document.querySelector('[data-hot-page]')?.dataset.hotPage === ${JSON.stringify(KINDS[i])}`,
+    )
+    const state = ready && await page.evaluate(`(() => ({
+      pages: document.querySelectorAll('[data-hot-page]').length,
+      select: [...document.querySelectorAll('[data-hot-channel-select]')]
+        .filter((select) => select.getClientRects().length > 0).length,
+    }))()`)
+    wideStates.push({ ready, active: ready ? await activeSidebar() : '', ...state })
+  }
+  const wideOk = wideStates.every((state, i) =>
+    state.ready && state.active === NAMES[i] && state.pages === 1 && state.select === 0)
+  check('宽窗依次进入四页，每页只出现一组频道导航', wideOk)
+  if (!wideOk) console.log(wideStates)
+
+  const collapsed = await page.evaluate(`(() => {
+    const hit = document.querySelector('nav[aria-label="主导航"] button[aria-label="收起侧边栏"]')
+    hit?.click()
+    return !!hit
+  })()`)
+  await sleep(400)
+  const railNav = await page.evaluate(`(() => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    return {
+      width: nav ? Math.round(nav.getBoundingClientRect().width) : 0,
+      labels: [...(nav?.querySelectorAll('[data-hot-channel]') ?? [])]
+        .filter((button) => button.getClientRects().length > 0)
+        .map((button) => button.getAttribute('aria-label') || button.textContent.trim()),
+      select: [...document.querySelectorAll('[data-hot-channel-select]')]
+        .filter((select) => select.getClientRects().length > 0).length,
+    }
+  })()`)
+  check(
+    '图标侧栏仍保留同一组频道与顺序',
+    collapsed && railNav.width <= 64 && JSON.stringify(railNav.labels) === JSON.stringify(NAMES) && railNav.select === 0,
+  )
+  const railStates = []
+  for (let i = 0; i < NAMES.length; i += 1) {
+    const clicked = await clickSidebar(NAMES[i])
+    const ready = clicked && await waitFor(
+      `document.querySelector('[data-hot-page]')?.dataset.hotPage === ${JSON.stringify(KINDS[i])}`,
+    )
+    railStates.push({ ready, active: ready && await activeSidebar() })
+  }
+  check(
+    '图标侧栏可以依次进入四页',
+    railStates.every((state, i) => state.ready && state.active === NAMES[i]),
+  )
+  await page.evaluate(`document.querySelector('nav[aria-label="主导航"] button[aria-label="展开侧边栏"]')?.click()`)
+  await sleep(300)
+
+  await page.viewport(380, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(3500)
+  const homeEntry = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '热门')
+    hit?.click()
+    return !!hit
+  })()`)
+  const popularReady = homeEntry && await waitFor(
+    `document.querySelector('[data-hot-page]')?.dataset.hotPage === 'popular'`,
+  )
+  const narrowNav = await page.evaluate(`(() => {
+    const select = document.querySelector('[data-hot-channel-select]')
+    const sidebar = document.querySelector('nav[aria-label="主导航"]')
+    return {
+      visible: !!select && select.getClientRects().length > 0,
+      options: select ? [...select.options].map((option) => option.textContent) : [],
+      sidebar: sidebar ? sidebar.getClientRects().length : 0,
+    }
+  })()`)
+  check(
+    '窄窗没有左栏，页标题旁的频道选择器列出四页',
+    popularReady && narrowNav.visible && narrowNav.sidebar === 0 &&
+      JSON.stringify(narrowNav.options) === JSON.stringify(NAMES),
+  )
+  const narrowStates = []
+  for (let i = 0; i < KINDS.length; i += 1) {
+    const changed = await selectChannel(KINDS[i])
+    const ready = changed && await waitFor(
+      `document.querySelector('[data-hot-page]')?.dataset.hotPage === ${JSON.stringify(KINDS[i])}`,
+    )
+    const state = ready && await page.evaluate(`(() => ({
+      value: document.querySelector('[data-hot-channel-select]')?.value ?? '',
+      pages: document.querySelectorAll('[data-hot-page]').length,
+      select: [...document.querySelectorAll('[data-hot-channel-select]')]
+        .filter((select) => select.getClientRects().length > 0).length,
+    }))()`)
+    narrowStates.push({ ready, ...state })
+  }
+  const narrowOk = narrowStates.every((state, i) =>
+    state.ready && state.value === KINDS[i] && state.pages === 1 && state.select === 1)
+  check('窄窗用页标题选择器走遍四页', narrowOk)
+  if (!narrowOk) console.log(narrowStates)
+
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(3500)
+  await clickSidebar('排行榜')
+  await waitFor(`document.querySelector('[data-hot-page]')?.dataset.hotPage === 'ranking'`)
+  await waitFor(`document.querySelectorAll('[data-rank-row]').length >= 9`, 8000)
+  const musicClicked = await page.evaluate(`(() => {
+    const row = document.querySelector('[data-hot-page="ranking"] [role="group"]')
+    const hit = [...(row?.querySelectorAll('button') ?? [])].find((button) => button.textContent.trim() === '音乐')
+    hit?.click()
+    return !!hit
+  })()`)
+  const musicReady = musicClicked && await waitFor(`(() => {
+    const page = document.querySelector('[data-hot-page="ranking"]')
+    return page?.querySelector('[aria-pressed="true"]')?.textContent.trim() === '音乐' &&
+      document.querySelectorAll('[data-rank-row]').length >= 9
+  })()`, 8000)
+  const openedRank = await page.evaluate(`(() => {
+    const row = document.querySelector('[data-rank-row]')
+    const hit = row?.querySelector('button')
+    hit?.click()
+    return !!hit
+  })()`)
+  let rankingVideo = false
+  for (let i = 0; i < 24 && !rankingVideo; i += 1) {
+    await sleep(250)
+    rankingVideo = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  const rankingBack = await waitFor(`(() => {
+    const page = document.querySelector('[data-hot-page="ranking"]')
+    return page?.querySelector('[aria-pressed="true"]')?.textContent.trim() === '音乐' &&
+      document.querySelectorAll('[data-rank-row]').length >= 9
+  })()`, 8000)
+  const rankingState = rankingBack && await page.evaluate(`(() => ({
+    page: document.querySelector('[data-hot-page]')?.dataset.hotPage ?? '',
+    part: document.querySelector('[data-hot-page="ranking"] [aria-pressed="true"]')?.textContent.trim() ?? '',
+    rows: document.querySelectorAll('[data-rank-row]').length,
+    select: [...document.querySelectorAll('[data-hot-channel-select]')]
+      .filter((select) => select.getClientRects().length > 0).length,
+  }))()`)
+  check(
+    '排行榜切音乐后打开视频返回仍在音乐榜，且只有一排分区',
+    musicReady && openedRank && rankingVideo && rankingBack &&
+      rankingState.page === 'ranking' && rankingState.part === '音乐' &&
+      rankingState.rows >= 9 && rankingState.select === 0,
+  )
+
+  await page.viewport(768, 820)
+  await sleep(500)
+  const overflow = await page.evaluate(`(() => {
+    const row = document.querySelector('[data-hot-page="ranking"] [role="group"]')
+    const buttons = [...(row?.querySelectorAll('button') ?? [])]
+    buttons[0]?.focus()
+    return row
+      ? {
+        overflow: row.scrollWidth - row.clientWidth,
+        first: buttons[0]?.textContent.trim() ?? '',
+        last: buttons.at(-1)?.textContent.trim() ?? '',
+      }
+      : null
+  })()`)
+  let tabbed = null
+  for (let i = 0; i < 16; i += 1) {
+    await page.keyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 })
+    await page.keyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 })
+    await sleep(60)
+    tabbed = await page.evaluate(`(() => {
+      const row = document.querySelector('[data-hot-page="ranking"] [role="group"]')
+      const active = document.activeElement
+      if (!row || !active || !row.contains(active)) return null
+      const box = row.getBoundingClientRect()
+      const rect = active.getBoundingClientRect()
+      return {
+        text: (active.textContent || '').trim(),
+        inside: rect.left >= box.left - 0.5 && rect.right <= box.right + 0.5,
+        scrollLeft: Math.round(row.scrollLeft),
+      }
+    })()`)
+    if (tabbed?.text === '汽车') break
+  }
+  check(
+    '键盘可以走到横向溢出的最后一个排行分区',
+    overflow?.overflow > 0 && tabbed?.text === '汽车' && tabbed.inside && tabbed.scrollLeft > 0,
+  )
+
+  await page.viewport(1440, 900)
+  await sleep(300)
+  await clickSidebar('每周必看')
+  await waitFor(`document.querySelector('[data-hot-page]')?.dataset.hotPage === 'weekly'`)
+  await waitFor(`!!document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')`, 8000)
+  await waitFor(`!!document.querySelector('[data-weekly-issue] .bili-card')`, 8000)
+  const weeklyLayout = await page.evaluate(`(() => {
+    const header = document.querySelector('[data-hot-page="weekly"]')
+    const rect = (element) => {
+      const box = element?.getBoundingClientRect()
+      return box ? { top: box.top, bottom: box.bottom, left: box.left, right: box.right } : null
+    }
+    return {
+      header: rect(header),
+      title: rect(header?.querySelector('h2')),
+      prev: rect(header?.querySelector('button[aria-label="上一期"]')),
+      picker: rect(header?.querySelector('[aria-haspopup="listbox"]')),
+      next: rect(header?.querySelector('button[aria-label="下一期"]')),
+      first: rect(document.querySelector('[data-weekly-issue] .bili-card')),
+      cards: document.querySelectorAll('[data-weekly-issue] .bili-card').length,
+      select: [...document.querySelectorAll('[data-hot-channel-select]')]
+        .filter((select) => select.getClientRects().length > 0).length,
+    }
+  })()`)
+  check(
+    '每周必看换期组紧邻标题、紧接作品，中间没有跨频道入口',
+    weeklyLayout.title && weeklyLayout.prev && weeklyLayout.picker && weeklyLayout.next &&
+      weeklyLayout.prev.top >= weeklyLayout.title.top - 4 &&
+      weeklyLayout.prev.top <= weeklyLayout.title.bottom &&
+      weeklyLayout.prev.right <= weeklyLayout.picker.left + 1 &&
+      weeklyLayout.picker.right <= weeklyLayout.next.left + 1 &&
+      weeklyLayout.prev.left - weeklyLayout.title.right <= 24 &&
+      weeklyLayout.first.top >= weeklyLayout.header.bottom - 1 &&
+      weeklyLayout.first.top - weeklyLayout.header.bottom <= 24 &&
+      weeklyLayout.cards > 0 && weeklyLayout.select === 0,
+  )
+
+  const initial = await page.evaluate(`(() => ({
+    label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+    prev: document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')?.disabled,
+    next: document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')?.disabled,
+  }))()`)
+  check('最新一期禁用下一期', initial.prev === false && initial.next === true)
+
+  const prevClicked = await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')
+    hit?.click()
+    return !!hit
+  })()`)
+  const prevReady = prevClicked && await waitFor(`(() => {
+    const label = document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim()
+    const grid = document.querySelector('[data-weekly-issue]')
+    return label === '第398期' && grid?.dataset.weeklyIssue === '398'
+  })()`, 8000)
+  const afterPrev = prevReady && await page.evaluate(`(() => ({
+    label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+    issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
+    cards: document.querySelectorAll('[data-weekly-issue] .bili-card').length,
+    next: document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')?.disabled,
+  }))()`)
+  check(
+    '上一期按钮换期，期号与作品一起更新',
+    afterPrev.label === '第398期' && afterPrev.issue === '398' && afterPrev.cards > 0 && afterPrev.next === false,
+  )
+
+  await page.evaluate(`document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')?.focus()`)
+  await page.pressSpace()
+  await sleep(700)
+  await page.pressSpace()
+  await sleep(700)
+  const afterKeys = await page.evaluate(`(() => ({
+    label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+    issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
+    focus: document.activeElement?.getAttribute('aria-label') ?? '',
+  }))()`)
+  check(
+    '只用键盘连续按两次上一期',
+    afterKeys.label === '第396期' && afterKeys.issue === '396' && afterKeys.focus === '上一期',
+  )
+
+  const openedPicker = await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')
+    hit?.click()
+    return !!hit
+  })()`)
+  await waitFor(`!!document.querySelector('[role="listbox"]')`)
+  const pickerFocus = await page.evaluate(`(() => ({
+    role: document.activeElement?.getAttribute('role') ?? '',
+    text: (document.activeElement?.textContent || '').trim(),
+  }))()`)
+  check(
+    '期数下拉打开后焦点落在当前期',
+    openedPicker && pickerFocus.role === 'option' && pickerFocus.text.startsWith('第 396 期'),
+  )
+  const end = { key: 'End', code: 'End', windowsVirtualKeyCode: 35 }
+  await page.keyEvent({ type: 'keyDown', ...end })
+  await page.keyEvent({ type: 'keyUp', ...end })
+  await sleep(100)
+  const atEnd = await page.evaluate(`(document.activeElement?.textContent || '').trim()`)
+  await page.pressSpace()
+  const oldestReady = await waitFor(`(() => {
+    const label = document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim()
+    const grid = document.querySelector('[data-weekly-issue]')
+    return label === '第392期' && grid?.dataset.weeklyIssue === '392'
+  })()`, 8000)
+  const oldest = oldestReady && await page.evaluate(`(() => ({
+    label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+    issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
+    prev: document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')?.disabled,
+    next: document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')?.disabled,
+    list: !!document.querySelector('[role="listbox"]'),
+    focus: document.activeElement?.getAttribute('aria-haspopup') ?? '',
+  }))()`)
+  check(
+    '键盘在下拉里选到最早一期，上一期随即禁用',
+    atEnd.startsWith('第 392 期') && oldest.label === '第392期' && oldest.issue === '392' &&
+      oldest.prev === true && oldest.next === false && !oldest.list && oldest.focus === 'listbox',
+  )
+
+  const nextClicked = await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')
+    hit?.focus()
+    return !!hit
+  })()`)
+  await page.pressSpace()
+  await sleep(700)
+  await page.pressSpace()
+  await sleep(700)
+  const afterNext = await page.evaluate(`(() => ({
+    label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+    issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
+    focus: document.activeElement?.getAttribute('aria-label') ?? '',
+  }))()`)
+  check(
+    '下一期按钮也能用键盘连续换期',
+    nextClicked && afterNext.label === '第394期' && afterNext.issue === '394' && afterNext.focus === '下一期',
+  )
+
+  await page.evaluate(`document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.click()`)
+  await waitFor(`!!document.querySelector('[role="listbox"]')`)
+  const esc = { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }
+  await page.keyEvent({ type: 'keyDown', ...esc })
+  await page.keyEvent({ type: 'keyUp', ...esc })
+  await sleep(300)
+  const afterEsc = await page.evaluate(`(() => ({
+    list: !!document.querySelector('[role="listbox"]'),
+    focus: document.activeElement?.getAttribute('aria-haspopup') ?? '',
+  }))()`)
+  check('期数下拉按 Esc 收起，焦点回到触发按钮', !afterEsc.list && afterEsc.focus === 'listbox')
+
+  const weeklyOpened = await page.evaluate(`(() => {
+    const card = document.querySelector('[data-weekly-issue] .bili-card')
+    if (!card) return ''
+    const focusId = card.dataset.focusId ?? ''
+    card.click()
+    return focusId
+  })()`)
+  let weeklyVideo = false
+  for (let i = 0; i < 60 && !weeklyVideo; i += 1) {
+    await sleep(250)
+    weeklyVideo = await page.evaluate(`!!document.querySelector('video')`)
+  }
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
+  const weeklyBack = await waitFor(`(() => {
+    const label = document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim()
+    return label === '第394期' && !!document.querySelector('[data-weekly-issue="394"]')
+  })()`, 12000)
+  await sleep(600)
+  const weeklyFocus = await page.evaluate(`document.activeElement?.dataset?.focusId ?? ''`)
+  check(
+    '从每周作品返回仍在这一期，焦点回到入口卡',
+    weeklyVideo && weeklyBack && weeklyOpened.length > 0 && weeklyFocus === weeklyOpened,
+  )
+  if (weeklyFocus !== weeklyOpened) console.log({ weeklyVideo, weeklyBack, weeklyOpened, weeklyFocus })
+
+  await page.viewport(380, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await sleep(3500)
+  await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '热门')
+    hit?.click()
+  })()`)
+  await waitFor(`document.querySelector('[data-hot-page]')?.dataset.hotPage === 'popular'`)
+  await selectChannel('weekly')
+  await waitFor(`document.querySelector('[data-hot-page]')?.dataset.hotPage === 'weekly'`)
+  await waitFor(`!!document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')`, 8000)
+  await waitFor(`!!document.querySelector('[data-weekly-issue] .bili-card')`, 8000)
+  const narrowWeekly = await page.evaluate(`(() => {
+    const header = document.querySelector('[data-hot-page="weekly"]')
+    const rect = (element) => {
+      const box = element?.getBoundingClientRect()
+      return box ? { top: box.top, bottom: box.bottom, left: box.left, right: box.right } : null
+    }
+    return {
+      header: rect(header),
+      title: rect(header?.querySelector('h2')),
+      select: rect(header?.querySelector('[data-hot-channel-select]')),
+      prev: rect(header?.querySelector('button[aria-label="上一期"]')),
+      picker: rect(header?.querySelector('[aria-haspopup="listbox"]')),
+      next: rect(header?.querySelector('button[aria-label="下一期"]')),
+      first: rect(document.querySelector('[data-weekly-issue] .bili-card')),
+    }
+  })()`)
+  const narrowAdjacent =
+    narrowWeekly.prev && narrowWeekly.picker && narrowWeekly.next &&
+    narrowWeekly.prev.right <= narrowWeekly.picker.left + 1 &&
+    narrowWeekly.picker.right <= narrowWeekly.next.left + 1
+  check(
+    '窄窗换期组整组落在标题下，仍在作品之前',
+    narrowWeekly.title && narrowWeekly.select && narrowAdjacent &&
+      narrowWeekly.prev.top >= narrowWeekly.title.bottom - 1 &&
+      narrowWeekly.select.bottom <= narrowWeekly.prev.top + 1 &&
+      narrowWeekly.next.right <= 380 &&
+      narrowWeekly.first.top >= narrowWeekly.header.bottom - 1,
+  )
+  if (!narrowAdjacent) console.log(narrowWeekly)
+  await page.viewport(1320, 900)
 }
 
 /** 右栏只服务「听」的页面：在发现页开始播放不该自动拉出一栏歌词。 */
@@ -1873,6 +2329,10 @@ async function main() {
 
   const page = await connect()
   try {
+    if (channelOnly) {
+      await checkChannelNav(page)
+      return
+    }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
     await checkLibraryShelf(page)
@@ -1882,6 +2342,7 @@ async function main() {
     await checkHomeResume(page)
     await checkNavConventions(page)
     await checkRanking(page)
+    await checkChannelNav(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)
     await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)

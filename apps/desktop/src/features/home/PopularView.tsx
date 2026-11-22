@@ -7,7 +7,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { WideCard } from '../tracks/WideCard'
-import { HotTabs } from './HotTabs'
+import { HotPageHeader } from './HotPageHeader'
 
 /**
  * 热门。B 站的综合热门（popular/all）：按时间往下翻，一次 50 条，没有名次。
@@ -106,9 +106,9 @@ export function PopularView() {
 
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
-      <HotTabs
+      <HotPageHeader
         active="popular"
-        title="热门"
+        title="综合热门"
         extra={tracks ? String(tracks.length) : undefined}
         aside={
           <button
