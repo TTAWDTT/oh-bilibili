@@ -3702,6 +3702,107 @@ async function checkTriple(page) {
     `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
   )
   check('三连部分失败列出未确认项，不播完成提示', failClicked && partial)
+
+  const resetWatch = async () => {
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+    await sleep(2200)
+    const openedCard = await page.evaluate(`(() => {
+      const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
+      hit?.click()
+      return !!hit
+    })()`)
+    const ready = openedCard && await waitFor(`!!document.querySelector('[data-triple]')`)
+    await sleep(500)
+    return ready
+  }
+  const likePoint = () =>
+    page.evaluate(`(() => {
+      const box = document.querySelector('button[aria-label="点赞"]')?.getBoundingClientRect()
+      return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null
+    })()`)
+  const press = (point) =>
+    page.mouseEvent({ type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 })
+  const release = (point) =>
+    page.mouseEvent({ type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 })
+  const tripleState = () =>
+    page.evaluate(`(() => ({
+      like: document.querySelector('button[aria-label="取消点赞"]') !== null,
+      coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
+      fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
+      toast: document.body.innerText.includes('点赞、投币、收藏都已确认'),
+    }))()`)
+
+  const shortReady = await resetWatch()
+  const shortPoint = await likePoint()
+  if (shortPoint) {
+    await press(shortPoint)
+    await sleep(180)
+    await release(shortPoint)
+  }
+  await sleep(700)
+  const shortState = await tripleState()
+  check(
+    '阈值前松手只点赞',
+    shortReady && shortPoint && shortState.like && !shortState.coin && !shortState.fav && !shortState.toast,
+  )
+
+  const longReady = await resetWatch()
+  const longPoint = await likePoint()
+  if (longPoint) {
+    await press(longPoint)
+    await sleep(650)
+    await release(longPoint)
+  }
+  const longConfirmed = await waitFor(
+    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  )
+  const longState = await tripleState()
+  check(
+    '按住越过 550ms 触发三连，松手不会取消点赞',
+    longReady && longPoint && longConfirmed && longState.like && longState.coin && longState.fav,
+  )
+
+  const cancelReady = await resetWatch()
+  const cancelPoint = await likePoint()
+  if (cancelPoint) {
+    await press(cancelPoint)
+    await sleep(80)
+    await page.mouseEvent({ type: 'mouseMoved', x: 800, y: 220, button: 'none', buttons: 1 })
+    await sleep(650)
+    await release({ x: 800, y: 220 })
+  }
+  await sleep(700)
+  const cancelState = await tripleState()
+  check(
+    '按住移出后松手不提交任何互动',
+    cancelReady && cancelPoint && !cancelState.like && !cancelState.coin && !cancelState.fav && !cancelState.toast,
+  )
+
+  const changedReady = await resetWatch()
+  const changed = await page.evaluate(`(() => {
+    const like = document.querySelector('button[aria-label="点赞"]')
+    const next = document.querySelector('[data-related-item]')
+    like?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+    next?.click()
+    return !!like && !!next
+  })()`)
+  await sleep(900)
+  const changedToast = await page.evaluate(
+    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  )
+  check('按住时换稿取消本次三连', changedReady && changed && !changedToast)
+
+  const keyboardReady = await resetWatch()
+  const keyboardClicked = keyboardReady && await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-triple]')
+    hit?.focus()
+    return document.activeElement === hit
+  })()`)
+  await page.pressSpace()
+  const keyboardConfirmed = await waitFor(
+    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  )
+  check('键盘可在三连按钮上直接触发', keyboardClicked && keyboardConfirmed)
 }
 
 async function main() {
