@@ -22,6 +22,7 @@ export function WeeklyView() {
   const [page, setPage] = useState<ipc.WeeklyPage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [periodNonce, setPeriodNonce] = useState(0)
   const [picking, setPicking] = useState(false)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const pickerRef = useRef<HTMLDivElement | null>(null)
@@ -72,7 +73,10 @@ export function WeeklyView() {
   useEffect(() => {
     if (!picking) return
     const onDown = (event: PointerEvent): void => {
-      if (!pickerRef.current?.contains(event.target as Node)) setPicking(false)
+      const target = event.target as Node
+      // 触发按钮自己交给 onClick 取反；这里再关一次会被紧接着的 click 重新打开。
+      if (pickerRef.current?.contains(target) || triggerRef.current?.contains(target)) return
+      setPicking(false)
     }
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
@@ -96,7 +100,7 @@ export function WeeklyView() {
     return () => {
       cancelled = true
     }
-  }, [number])
+  }, [number, periodNonce])
 
   const index = issues && number !== null ? issues.findIndex((i) => i.number === number) : -1
   // 列表按新到旧排：下一期是更早的那一条，上一期是更新的那一条。
@@ -151,6 +155,13 @@ export function WeeklyView() {
                   ref={pickerRef}
                   role="listbox"
                   aria-label="选择期数"
+                  onBlur={(event) => {
+                    const next = event.relatedTarget as Node | null
+                    // 点触发器时焦点会先离开弹层；这次点击由按钮自己收起，别在这里抢着关掉再被 click 打开。
+                    if (event.currentTarget.contains(next) || triggerRef.current?.contains(next)) return
+                    // Tab 离开弹层就收起；焦点已经往前走了，不要再抢回来。
+                    setPicking(false)
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') {
                       event.preventDefault()
@@ -182,6 +193,7 @@ export function WeeklyView() {
                       key={issue.number}
                       type="button"
                       role="option"
+                      tabIndex={-1}
                       aria-selected={issue.number === number}
                       data-active={issue.number === number}
                       title={issue.name}
@@ -222,7 +234,14 @@ export function WeeklyView() {
           icon="alert"
           title="每周必看没取到"
           detail={error}
-          action={{ label: '重试', onClick: () => setNonce((n) => n + 1) }}
+          action={{
+            label: '重试',
+            onClick: () => {
+              // 期数列表与当前期都可能失败；一次重试把两边都重新拉一遍。
+              setNonce((n) => n + 1)
+              setPeriodNonce((n) => n + 1)
+            },
+          }}
         />
       ) : issues === null || (number !== null && page === null) ? (
         <BiliLoader label="正在取本期…" />

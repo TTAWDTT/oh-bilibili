@@ -1,7 +1,11 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { Icon } from '../../shared/ui/Icon'
 import { HOT_CHANNELS, type HotChannel } from '../../shared/lib/biliChannels'
+
+/** 窄窗用选择器换页会让整页重挂，焦点先记在模块里，新页挂载时再交给它的选择器。 */
+let focusChannelSelect = false
 
 /**
  * 四个热门频道共用的页首：标题、右侧操作和可选的第二行（排行榜分区）。
@@ -26,6 +30,14 @@ export function HotPageHeader({
   below?: ReactNode
 }) {
   const navigate = useAppStore((state) => state.navigate)
+  const selectRef = useRef<HTMLSelectElement | null>(null)
+
+  useEffect(() => {
+    if (!focusChannelSelect) return
+    focusChannelSelect = false
+    // 桌面没有这个选择器，别把焦点塞给隐藏控件。
+    if (window.matchMedia('(max-width: 767px)').matches) selectRef.current?.focus({ preventScroll: true })
+  }, [])
 
   return (
     <header
@@ -46,12 +58,15 @@ export function HotPageHeader({
           {aside}
           <span className="relative md:hidden">
             <select
+              ref={selectRef}
               data-hot-channel-select
               aria-label="切换频道"
               value={active}
               onChange={(event) => {
                 const next = event.target.value as HotChannel
-                if (next !== active) navigate({ kind: next })
+                if (next === active) return
+                focusChannelSelect = true
+                navigate({ kind: next })
               }}
               className="t h-8 appearance-none rounded-[6px] border border-[var(--line)] bg-[var(--panel)] pl-2.5 pr-7 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >

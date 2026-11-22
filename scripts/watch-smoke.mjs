@@ -1450,11 +1450,19 @@ async function checkChannelNav(page) {
       pages: document.querySelectorAll('[data-hot-page]').length,
       select: [...document.querySelectorAll('[data-hot-channel-select]')]
         .filter((select) => select.getClientRects().length > 0).length,
+      navs: document.querySelectorAll('main nav').length,
+      channelButtons: [...document.querySelectorAll('main button')]
+        .filter((button) => ${JSON.stringify(NAMES)}.includes((button.textContent || '').trim())).length,
     }))()`)
     wideStates.push({ ready, active: ready ? await activeSidebar() : '', ...state })
   }
   const wideOk = wideStates.every((state, i) =>
-    state.ready && state.active === NAMES[i] && state.pages === 1 && state.select === 0)
+    state.ready &&
+    state.active === NAMES[i] &&
+    state.pages === 1 &&
+    state.select === 0 &&
+    state.navs === 0 &&
+    state.channelButtons === 0)
   check('宽窗依次进入四页，每页只出现一组频道导航', wideOk)
   if (!wideOk) console.log(wideStates)
 
@@ -1531,10 +1539,15 @@ async function checkChannelNav(page) {
       select: [...document.querySelectorAll('[data-hot-channel-select]')]
         .filter((select) => select.getClientRects().length > 0).length,
     }))()`)
-    narrowStates.push({ ready, ...state })
+    // 换页后整页重挂，焦点应该落在新页的频道选择器上，而不是掉回 body。
+    const focusReady = ready && await waitFor(
+      `document.activeElement === document.querySelector('[data-hot-channel-select]')`,
+      2000,
+    )
+    narrowStates.push({ ready, focusReady, ...state })
   }
   const narrowOk = narrowStates.every((state, i) =>
-    state.ready && state.value === KINDS[i] && state.pages === 1 && state.select === 1)
+    state.ready && state.focusReady && state.value === KINDS[i] && state.pages === 1 && state.select === 1)
   check('窄窗用页标题选择器走遍四页', narrowOk)
   if (!narrowOk) console.log(narrowStates)
 
@@ -1544,6 +1557,9 @@ async function checkChannelNav(page) {
   await clickSidebar('排行榜')
   await waitFor(`document.querySelector('[data-hot-page]')?.dataset.hotPage === 'ranking'`)
   await waitFor(`document.querySelectorAll('[data-rank-row]').length >= 9`, 8000)
+  const rankFirstTitle = () =>
+    page.evaluate(`(document.querySelector('[data-rank-row] [data-rank-title]')?.textContent || '').trim()`)
+  const allTitle = await rankFirstTitle()
   const musicClicked = await page.evaluate(`(() => {
     const row = document.querySelector('[data-hot-page="ranking"] [role="group"]')
     const hit = [...(row?.querySelectorAll('button') ?? [])].find((button) => button.textContent.trim() === '音乐')
@@ -1555,6 +1571,16 @@ async function checkChannelNav(page) {
     return page?.querySelector('[aria-pressed="true"]')?.textContent.trim() === '音乐' &&
       document.querySelectorAll('[data-rank-row]').length >= 9
   })()`, 8000)
+  const musicTitle = await rankFirstTitle()
+  const rankParts = await page.evaluate(`(() => {
+    const groups = document.querySelectorAll('[data-hot-page="ranking"] [role="group"][aria-label="榜单分区"]')
+    const pressed = [...document.querySelectorAll('[data-hot-page="ranking"] [role="group"] [aria-pressed]')]
+    return {
+      groups: groups.length,
+      pressed: pressed.length,
+      trueCount: pressed.filter((button) => button.getAttribute('aria-pressed') === 'true').length,
+    }
+  })()`)
   const openedRank = await page.evaluate(`(() => {
     const row = document.querySelector('[data-rank-row]')
     const hit = row?.querySelector('button')
@@ -1576,6 +1602,7 @@ async function checkChannelNav(page) {
     page: document.querySelector('[data-hot-page]')?.dataset.hotPage ?? '',
     part: document.querySelector('[data-hot-page="ranking"] [aria-pressed="true"]')?.textContent.trim() ?? '',
     rows: document.querySelectorAll('[data-rank-row]').length,
+    title: (document.querySelector('[data-rank-row] [data-rank-title]')?.textContent || '').trim(),
     select: [...document.querySelectorAll('[data-hot-channel-select]')]
       .filter((select) => select.getClientRects().length > 0).length,
   }))()`)
@@ -1583,8 +1610,12 @@ async function checkChannelNav(page) {
     '排行榜切音乐后打开视频返回仍在音乐榜，且只有一排分区',
     musicReady && openedRank && rankingVideo && rankingBack &&
       rankingState.page === 'ranking' && rankingState.part === '音乐' &&
-      rankingState.rows >= 9 && rankingState.select === 0,
+      rankingState.rows >= 9 && rankingState.select === 0 &&
+      rankParts.groups === 1 && rankParts.pressed === 13 && rankParts.trueCount === 1 &&
+      allTitle.includes('分区 0') && musicTitle.includes('分区 3') &&
+      rankingState.title === musicTitle,
   )
+  if (rankParts.groups !== 1 || rankParts.pressed !== 13 || rankParts.trueCount !== 1) console.log(rankParts)
 
   await page.viewport(768, 820)
   await sleep(500)
@@ -1655,6 +1686,7 @@ async function checkChannelNav(page) {
       weeklyLayout.prev.top <= weeklyLayout.title.bottom &&
       weeklyLayout.prev.right <= weeklyLayout.picker.left + 1 &&
       weeklyLayout.picker.right <= weeklyLayout.next.left + 1 &&
+      weeklyLayout.prev.left >= weeklyLayout.title.right &&
       weeklyLayout.prev.left - weeklyLayout.title.right <= 24 &&
       weeklyLayout.first.top >= weeklyLayout.header.bottom - 1 &&
       weeklyLayout.first.top - weeklyLayout.header.bottom <= 24 &&
@@ -1667,6 +1699,25 @@ async function checkChannelNav(page) {
     next: document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')?.disabled,
   }))()`)
   check('最新一期禁用下一期', initial.prev === false && initial.next === true)
+
+  // 真鼠标点两下触发按钮：第一次开，第二次关（pointerdown 提前关、click 再开是回归点）。
+  const triggerBox = await page.evaluate(`(() => {
+    const box = document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.getBoundingClientRect()
+    return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null
+  })()`)
+  const clickAt = async (point) => {
+    await page.mouseEvent({ type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 })
+    await page.mouseEvent({ type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 })
+  }
+  let mouseOpened = false
+  if (triggerBox) {
+    await clickAt(triggerBox)
+    mouseOpened = await waitFor(`!!document.querySelector('[role="listbox"]')`, 2000)
+    await clickAt(triggerBox)
+    await sleep(250)
+  }
+  const mouseClosed = await page.evaluate(`!document.querySelector('[role="listbox"]')`)
+  check('鼠标点触发按钮可以展开和收起期数下拉', mouseOpened && mouseClosed)
 
   const prevClicked = await page.evaluate(`(() => {
     const hit = document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')
@@ -1683,10 +1734,12 @@ async function checkChannelNav(page) {
     issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
     cards: document.querySelectorAll('[data-weekly-issue] .bili-card').length,
     next: document.querySelector('[data-hot-page="weekly"] button[aria-label="下一期"]')?.disabled,
+    body: (document.querySelector('[data-weekly-issue] .bili-card')?.textContent || '').trim(),
   }))()`)
   check(
     '上一期按钮换期，期号与作品一起更新',
-    afterPrev.label === '第398期' && afterPrev.issue === '398' && afterPrev.cards > 0 && afterPrev.next === false,
+    afterPrev.label === '第398期' && afterPrev.issue === '398' && afterPrev.cards > 0 &&
+      afterPrev.next === false && afterPrev.body.includes('第 398 期'),
   )
 
   await page.evaluate(`document.querySelector('[data-hot-page="weekly"] button[aria-label="上一期"]')?.focus()`)
@@ -1764,6 +1817,18 @@ async function checkChannelNav(page) {
 
   await page.evaluate(`document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.click()`)
   await waitFor(`!!document.querySelector('[role="listbox"]')`)
+  const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 }
+  await page.keyEvent({ type: 'keyDown', ...tab })
+  await page.keyEvent({ type: 'keyUp', ...tab })
+  await sleep(300)
+  const afterTab = await page.evaluate(`({
+    list: !!document.querySelector('[role="listbox"]'),
+    role: document.activeElement?.getAttribute('role') ?? '',
+  })`)
+  check('期数下拉按 Tab 离开就收起，不会逐项走过几百期', !afterTab.list && afterTab.role !== 'option')
+
+  await page.evaluate(`document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.click()`)
+  await waitFor(`!!document.querySelector('[role="listbox"]')`)
   const esc = { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }
   await page.keyEvent({ type: 'keyDown', ...esc })
   await page.keyEvent({ type: 'keyUp', ...esc })
@@ -1825,6 +1890,13 @@ async function checkChannelNav(page) {
       picker: rect(header?.querySelector('[aria-haspopup="listbox"]')),
       next: rect(header?.querySelector('button[aria-label="下一期"]')),
       first: rect(document.querySelector('[data-weekly-issue] .bili-card')),
+      label: document.querySelector('[data-hot-page="weekly"] [aria-haspopup="listbox"]')?.textContent.trim() ?? '',
+      issue: document.querySelector('[data-weekly-issue]')?.dataset.weeklyIssue ?? '',
+      body: (document.querySelector('[data-weekly-issue] .bili-card')?.textContent || '').trim(),
+      overflow: (() => {
+        const box = document.getElementById('scroll-main')
+        return box ? box.scrollWidth - box.clientWidth : -1
+      })(),
     }
   })()`)
   const narrowAdjacent =
@@ -1837,8 +1909,16 @@ async function checkChannelNav(page) {
       narrowWeekly.prev.top >= narrowWeekly.title.bottom - 1 &&
       narrowWeekly.select.bottom <= narrowWeekly.prev.top + 1 &&
       narrowWeekly.next.right <= 380 &&
-      narrowWeekly.first.top >= narrowWeekly.header.bottom - 1,
+      narrowWeekly.first.top >= narrowWeekly.header.bottom - 1 &&
+      Number(narrowWeekly.issue) > 0 &&
+      narrowWeekly.label.includes(narrowWeekly.issue) &&
+      narrowWeekly.body.includes(`第 ${narrowWeekly.issue} 期`) &&
+      narrowWeekly.overflow >= 0 &&
+      narrowWeekly.overflow <= 0,
   )
+  if (narrowWeekly.overflow > 0 || !narrowWeekly.body.includes(`第 ${narrowWeekly.issue} 期`)) {
+    console.log({ issue: narrowWeekly.issue, label: narrowWeekly.label, overflow: narrowWeekly.overflow })
+  }
   if (!narrowAdjacent) console.log(narrowWeekly)
   await page.viewport(1320, 900)
 }
