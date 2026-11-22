@@ -1030,7 +1030,6 @@ async function checkHomeResume(page) {
   await page.evaluate(`(() => {
     const key = ${JSON.stringify(resumeKey)}
     if (!key) return
-    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
     localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
     localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
   })()`)
@@ -1043,9 +1042,16 @@ async function checkHomeResume(page) {
       return { text: (card?.textContent || '').trim() }
     })()`)
   }
+  const watchBar = await page.evaluate(`(() => {
+    const card = document.querySelector('[data-home-resume="wide"]')
+    const bar = card?.querySelector('[aria-hidden] > span')
+    return bar ? (bar.style.width || '') : ''
+  })()`)
   check(
     '有本地观看记录时按分 P 的进度显示继续观看',
-    watchCard.text.includes('继续观看') && watchCard.text.includes('已看 0:08'),
+    watchCard.text.includes('继续观看') &&
+      watchCard.text.includes('已看 0:08') &&
+      watchBar.startsWith('30'),
   )
   await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
   let watchReady = false
@@ -1063,8 +1069,12 @@ async function checkHomeResume(page) {
   await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(300)
-  // 上一次运行留下的观看记录会让这条卡变成「继续观看」，这里从干净状态开始。
-  await page.evaluate(`localStorage.clear()`)
+  // 上一次运行留下的观看记录会让这条卡变成「继续观看」，这里只清掉观看记录。
+  await page.evaluate(`(() => {
+    for (const name of Object.keys(localStorage)) {
+      if (name.startsWith('oh-bilibili:watch-')) localStorage.removeItem(name)
+    }
+  })()`)
   await page.evaluate(`location.reload()`)
   let ready = false
   for (let i = 0; i < 40 && !ready; i += 1) {
