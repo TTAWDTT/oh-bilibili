@@ -1077,7 +1077,32 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       const size = 50
       const start = (page - 1) * size
-      return [CATALOG.slice(start, start + size), CATALOG.length]
+      // 空间接口按 mid 返回自己的投稿；排序参数要真的改变顺序，
+      // 否则「切排序不换页首」这类测试永远是假通过。
+      const mid = num(args, 'mid')
+      const order = str(args, 'order')
+      let owned = CATALOG.filter((track) => !mid || track.up_mid === mid)
+      // 预览里有一位「多页作者」：用来验证翻页、切排序后页码和总数不丢。
+      const longAuthor =
+        import.meta.env.DEV && new URLSearchParams(window.location.search).has('authorLong')
+      if (longAuthor && mid) {
+        const base = owned.length > 0 ? owned : CATALOG.slice(0, 5)
+        owned = Array.from({ length: 125 }, (_, index) => {
+          const seed = base[index % base.length]!
+          return {
+            ...seed,
+            key: `${seed.key}-long-${index}`,
+            title: `${seed.title} 第 ${index + 1} 期`,
+            // 播放量随期数递增：切「最多播放」后第一张卡必须真的换人，
+            // 否则「切排序不换页首」验的是假数据。
+            views: 1_000_000 + index * 1000,
+          }
+        })
+      }
+      const sorted = [...owned]
+      if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+      if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))
+      return [sorted.slice(start, start + size), sorted.length]
     }
     case 'space_stat':
       return [36, 1_240_000]
