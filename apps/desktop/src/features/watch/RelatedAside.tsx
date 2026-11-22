@@ -65,6 +65,7 @@ export function RelatedAside({ items }: { items: Track[] }) {
           <button
             key={item.key}
             type="button"
+            data-related-item={item.key}
             onClick={() => replace({ kind: 'watch', track: item })}
             title={item.title}
             className="group flex items-start gap-2 text-left"
