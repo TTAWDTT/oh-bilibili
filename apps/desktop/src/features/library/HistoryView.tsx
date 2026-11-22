@@ -82,7 +82,7 @@ export function HistoryView() {
     void ipc
       .libraryHistoryTimed(HISTORY_PAGE)
       .then((list) => {
-        if (!cancelled) void applyFirstPage(list)
+        return applyFirstPage(list)
       })
       .catch((e) => {
         if (!cancelled) setError(toWireError(e).message)
@@ -179,6 +179,7 @@ export function HistoryView() {
   const clearAll = async (): Promise<void> => {
     try {
       await ipc.historyClear()
+      focusRequest.current = { key: null }
       setEntries([])
       setCursor(null)
       setHasMore(false)
@@ -235,7 +236,7 @@ export function HistoryView() {
           }
         }}
         tabIndex={-1}
-        className="outline-none"
+        className="rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       >
         <EmptyState
           mascot="heart"
@@ -316,7 +317,10 @@ export function HistoryView() {
                       // 它会按真实记录挪到「今天」。
                       // 历史由引擎的 watchdog 写入，等它落库再拉一次，并盯住这一行。
                       window.setTimeout(() => {
-                        focusRequest.current = { key: entry.track.key }
+                        // 用户可能已经去点别的行了；焦点还在这一行时才交回来。
+                        if (historyMemory.focusKey === entry.track.key) {
+                          focusRequest.current = { key: entry.track.key }
+                        }
                         void ipc
                           .libraryHistoryTimed(HISTORY_PAGE)
                           .then(applyFirstPage)
@@ -532,7 +536,6 @@ function focusRow(box: HTMLElement, key: string | null, mode: 'anchor' | 'reveal
  */
 async function mergeFirstPage(older: Entry[], fresh: Entry[]): Promise<Entry[] | null> {
   if (older.length === 0 || fresh.length < HISTORY_PAGE) return fresh
-  if (older.length <= fresh.length) return fresh
   const last = fresh[fresh.length - 1]
   if (!last) return fresh
   const seen = new Set(fresh.map((entry) => entry.track.key))
@@ -544,8 +547,8 @@ async function mergeFirstPage(older: Entry[], fresh: Entry[]): Promise<Entry[] |
   const head = tail[0]
   if (!head) return fresh
   // 只看新旧顺序不够：离开期间可能又播了超过一页，旧尾巴跟第一页之间会断层。
-  // 用第一页最后一条取下一页，和旧尾巴的头对上了才敢拼。
+  // 用第一页最后一条取下一页，旧尾巴的头必须是这页第一条，中间才没有漏项。
   const next = await ipc.libraryHistoryTimed(HISTORY_PAGE, { played_at: last.played_at, id: last.id })
-  if (!next.some((entry) => entry.id === head.id)) return null
+  if (next[0]?.id !== head.id) return null
   return [...fresh, ...tail]
 }
