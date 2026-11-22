@@ -46,8 +46,8 @@ export function HotPageHeader({
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 md:grid-cols-[auto_minmax(0,1fr)_auto]">
         <div className="flex min-w-0 items-baseline gap-2">
-          <h2 className="text-[20px] font-medium leading-[28px] text-[var(--text-1)]">{title}</h2>
-          {extra ? <span className="num text-[12px] text-[var(--text-3)]">{extra}</span> : null}
+          <h2 className="text-page-title text-[var(--text-1)]">{title}</h2>
+          {extra ? <span className="num text-page-meta text-[var(--text-3)]">{extra}</span> : null}
         </div>
         {children ? (
           <div className="col-span-2 col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-2 md:col-span-1 md:col-start-2 md:row-start-1">

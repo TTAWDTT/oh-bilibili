@@ -446,8 +446,9 @@
 }
 
 .bili-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.25);
+  /* 普通作品卡只让封面和标题响应，不再整块上浮：密集网格里一屏十几张卡同时被抬起会晃。 */
+  transform: none;
+  box-shadow: none;
 }
 
 .bili-playlist-play {
@@ -1160,4 +1161,20 @@ select:focus-visible {
 /* 底部标签栏与播放条要同时避开指示条 */
 .safe-bottom-bar {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.5);
+}
+
+/*
+ * 排版层级（#258）：页标题、正文、辅助信息各只有一个来源。
+ * 三个样本页（关注、动态、每周必看）先用同一组，其他页继续复用。
+ */
+.text-page-title {
+  font-size: 26px;
+  line-height: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-page-meta {
+  font-size: 12.5px;
+  line-height: 18px;
 }
