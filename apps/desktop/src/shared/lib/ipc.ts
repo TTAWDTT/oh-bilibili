@@ -529,6 +529,11 @@ export function videoMeta(key: string): Promise<import('./contract').VideoMeta> 
   return call<import('./contract').VideoMeta>('video_meta', { key })
 }
 
+/** 简介里的站内素材预览：标题、封面与 UP。 */
+export function videoBrief(key: string): Promise<Track> {
+  return call<Track>('video_brief', { key })
+}
+
 /** 相关推荐。 */
 export function related(key: string): Promise<Track[]> {
   return call<Track[]>('related', { key })

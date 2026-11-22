@@ -86,6 +86,15 @@ async fn video_meta(
     })
 }
 
+/// 简介里的站内素材只需要列表级信息。
+#[tauri::command(rename_all = "snake_case")]
+async fn video_brief(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Track, WireError> {
+    engine.video_brief(&TrackKey::from_provider(key)).await
+}
+
 /// 相关推荐。
 #[tauri::command(rename_all = "snake_case")]
 async fn related(
@@ -1207,6 +1216,7 @@ pub fn run() {
             danmaku_heat,
             related,
             video_meta,
+            video_brief,
             mv_source,
             watch_open,
             watch_comments,

@@ -3321,6 +3321,11 @@ impl Engine {
         Ok(self.source.detail(key).await?)
     }
 
+    /// 只取列表级信息（标题/封面/UP），给简介里的站内素材做紧凑预览。
+    pub async fn video_brief(&self, key: &TrackKey) -> Result<Track, WireError> {
+        Ok(self.source.detail(key).await?.track)
+    }
+
     pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, WireError> {
         if self.is_local_track(key) {
             return Ok(Vec::new());

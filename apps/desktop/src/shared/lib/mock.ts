@@ -1233,6 +1233,18 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         season: null,
       }
     }
+    case 'video_brief': {
+      const key = str(args, 'key')
+      const found = CATALOG.find((track) => track.key === key)
+      if (found) return found
+      return {
+        key,
+        title: '站内素材预览',
+        artist: '预览 UP',
+        duration_ms: 180_000,
+        cover: CATALOG[0]?.cover ?? null,
+      }
+    }
     case 'danmaku_heat':
       return []
     case 'mv_port':
