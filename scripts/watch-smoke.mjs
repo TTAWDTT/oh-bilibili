@@ -14,6 +14,7 @@ const libraryPartialOnly = process.argv.includes('--library-partial')
 const channelOnly = process.argv.includes('--channel-nav')
 const topbarOnly = process.argv.includes('--topbar-only')
 const liveOnly = process.argv.includes('--live-only')
+const tripleOnly = process.argv.includes('--triple-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
 const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
@@ -3643,6 +3644,66 @@ async function checkLiveRooms(page) {
   if (unique.size !== allRooms.length) console.log({ firstPage, allRooms })
 }
 
+/** 三连要等三项真实回执都确认后才报完成；这里用 mock 的关系状态验成功路径。 */
+async function checkTriple(page) {
+  const waitFor = async (expression, timeout = 8000) => {
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return true
+      await sleep(120)
+    }
+    return false
+  }
+  await page.viewport(1440, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
+  await sleep(2200)
+  const opened = await page.evaluate(`(() => {
+    const cards = [...document.querySelectorAll('[data-track-card]')]
+    const card = cards[1]
+    const hit = card?.querySelector('button')
+    hit?.click()
+    return !!hit
+  })()`)
+  const ready = opened && await waitFor(`!!document.querySelector('[data-triple]')`)
+  const clicked = ready && await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-triple]')
+    hit?.click()
+    return !!hit
+  })()`)
+  const confirmed = await waitFor(
+    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  )
+  const state = await page.evaluate(`(() => ({
+    like: document.querySelector('button[aria-label="取消点赞"]') !== null,
+    coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
+    fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
+    tripleFocusable: document.querySelector('[data-triple]')?.tabIndex === 0,
+  }))()`)
+  check(
+    '三连三项都确认后才显示完成',
+    clicked && confirmed && state.like && state.coin && state.fav && state.tripleFocusable,
+  )
+  if (!confirmed || !state.like || !state.coin || !state.fav) console.log(state)
+
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&failCoin=1`)}`)
+  await sleep(2200)
+  const openedFail = await page.evaluate(`(() => {
+    const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
+    hit?.click()
+    return !!hit
+  })()`)
+  const failReady = openedFail && await waitFor(`!!document.querySelector('[data-triple]')`)
+  const failClicked = failReady && await page.evaluate(`(() => {
+    const hit = document.querySelector('[data-triple]')
+    hit?.click()
+    return !!hit
+  })()`)
+  const partial = await waitFor(
+    `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
+  )
+  check('三连部分失败列出未确认项，不播完成提示', failClicked && partial)
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -3670,6 +3731,10 @@ async function main() {
       await checkLiveRooms(page)
       return
     }
+    if (tripleOnly) {
+      await checkTriple(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -3683,6 +3748,7 @@ async function main() {
     await checkAuthorHero(page)
     await checkTopbarSites(page)
     await checkLiveRooms(page)
+    await checkTriple(page)
     await checkFollowingDirectory(page)
     await checkHomeResume(page)
     await checkNavConventions(page)

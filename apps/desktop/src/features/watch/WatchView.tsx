@@ -6,7 +6,7 @@ import { toWireError } from '../../shared/lib/errors'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
-import { toastDone } from '../../app/notice'
+import { toastDone, toastWarn } from '../../app/notice'
 import { Icon } from '../../shared/ui/Icon'
 import { CommentsPanel } from './CommentsPanel'
 import { ChapterList } from './ChapterList'
@@ -117,6 +117,9 @@ export function WatchView({ track }: { track: Track }) {
   const [fansDelta, setFansDelta] = useState(0)
   // 三连庆祝的场次：自增一次播一遍，0 表示还没播过。
   const [burst, setBurst] = useState(0)
+  const trackKeyRef = useRef(track.key)
+  trackKeyRef.current = track.key
+  const tripleBusy = useRef(false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
@@ -346,22 +349,63 @@ export function WatchView({ track }: { track: Track }) {
       })
   }
 
-  /** 长按点赞：把三连补成「都有了」。已经点过的不重复点，避免把点赞点成取消。 */
-  const triple = (): void => {
+  /** 长按点赞：把三连补成「都有了」，三项回执都确认后才播放完成动画。 */
+  const triple = async (): Promise<void> => {
+    if (tripleBusy.current) return
+    const key = track.key
     const st = useReactionStore.getState()
     const needLike = !(st.liked[track.key] ?? false)
     const needFav = !(st.faved[track.key] ?? false)
-    const needCoin = (st.coins[track.key] ?? 0) < 2
+    const haveCoins = st.coins[track.key] ?? 0
+    const needCoin = haveCoins < 2
     if (!needLike && !needFav && !needCoin) {
       toastDone('已经三连过了')
       return
     }
-    if (needLike) like()
-    // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
-    if (needCoin) coin(2 - (st.coins[track.key] ?? 0), true, true)
-    if (needFav) fav()
-    setBurst((n) => n + 1)
-    toastDone('一键三连', '点赞、投币、收藏都点上了')
+    tripleBusy.current = true
+    const results: { label: string; ok: boolean }[] = []
+    try {
+      if (needLike) {
+        const next = await st.toggleLike(track)
+        results.push({ label: '点赞', ok: next === true })
+      } else {
+        results.push({ label: '点赞', ok: true })
+      }
+      if (needCoin) {
+        // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
+        const ok = await st.addCoin(track, 2 - haveCoins, true)
+        results.push({ label: '投币', ok })
+      } else {
+        results.push({ label: '投币', ok: true })
+      }
+      if (needFav) {
+        const next = await st.toggleFav(track)
+        results.push({ label: '收藏', ok: next === true })
+      } else {
+        results.push({ label: '收藏', ok: true })
+      }
+      if (trackKeyRef.current !== key) return
+      const failed = results.filter((item) => !item.ok).map((item) => item.label)
+      if (failed.length === 0) {
+        if (needLike) setLikeDelta((n) => n + 1)
+        if (needCoin) setCoinDelta((n) => n + (2 - haveCoins))
+        if (needFav) setFavDelta((n) => n + 1)
+        setBurst((n) => n + 1)
+        toastDone('一键三连', '点赞、投币、收藏都已确认')
+        return
+      }
+      // 失败可能是服务端拒绝，也可能是回执未知。先以账号关系为准，
+      // 避免界面亮着实际没生效，也避免用户重试时重复投币。
+      await useReactionStore.getState().refresh([key]).catch(() => {})
+      if (trackKeyRef.current !== key) return
+      const done = results.filter((item) => item.ok).map((item) => item.label)
+      toastWarn(
+        `未确认：${failed.join('、')}`,
+        done.length > 0 ? `已确认：${done.join('、')}` : '这次没有动作确认成功',
+      )
+    } finally {
+      tripleBusy.current = false
+    }
   }
 
   const fav = (): void => {

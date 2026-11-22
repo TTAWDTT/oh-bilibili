@@ -774,7 +774,8 @@
   .triple-pop,
   .triple-label,
   .triple-ring,
-  .triple-title {
+  .triple-title,
+  .bili-hold-bar {
     animation: none;
   }
 }
