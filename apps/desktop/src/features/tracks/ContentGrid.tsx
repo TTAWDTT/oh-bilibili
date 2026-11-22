@@ -260,6 +260,7 @@ const TrackCard = memo(function TrackCard({
       <div className="mt-1 flex items-center gap-1.5 text-[13px] text-[var(--text-3)]">
         <button
           type="button"
+          aria-label={`UP ${track.artist}`}
           title={`看 ${track.artist} 的更多视频`}
           onClick={() => onAuthor(track)}
           className="flex min-w-0 items-center gap-1 hover:text-[var(--accent-strong-hover)]"

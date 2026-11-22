@@ -1465,6 +1465,7 @@ async function checkAuthorHero(page) {
     const heroKey = hero?.dataset.focusKey ?? ''
     const heroTitle = hero?.querySelector('.line-clamp-2')?.textContent?.trim() ?? ''
     const firstCardTitle = row?.dataset.trackTitle ?? ''
+    const upButton = row?.querySelector('button[aria-label^="UP "]')
     return {
       header: header ? Math.round(header.getBoundingClientRect().height) : 0,
       title: (hero?.textContent || '').trim(),
@@ -1474,7 +1475,9 @@ async function checkAuthorHero(page) {
       heroTitle,
       firstCardTitle,
       name: document.querySelector('header h2')?.textContent ?? '',
-      author: hero?.querySelector('.num')?.textContent ?? '',
+      heroMid: hero?.dataset.upMid ?? '',
+      headerMid: header?.dataset.upMid ?? '',
+      firstCardAuthor: (upButton?.textContent ?? '').trim().replace(/^UP\\s*/, ''),
       cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
       coverHeight: cover ? Math.round(cover.getBoundingClientRect().height) : 0,
       firstRow: row ? Math.round(row.getBoundingClientRect().top) : null,
@@ -1489,14 +1492,29 @@ async function checkAuthorHero(page) {
       wide.heroKey !== '' && wide.heroTitle !== '' && wide.heroTitle === wide.firstCardTitle &&
       wide.firstRow !== null && wide.firstRow < 900,
   )
+  check(
+    `页首作品与作者头是同一个 UP 主 ${JSON.stringify({ heroMid: wide.heroMid, headerMid: wide.headerMid })}`,
+    wide.heroMid !== '' && wide.heroMid === wide.headerMid,
+  )
+  check(
+    `列表第一张卡属于页首作者 ${JSON.stringify({ firstCardAuthor: wide.firstCardAuthor, name: wide.name })}`,
+    wide.firstCardAuthor !== '' && wide.firstCardAuthor === wide.name.trim(),
+  )
   const beforeSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
   await page.evaluate(`(() => {
     const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多播放')
     hit?.click()
   })()`)
   await sleep(1500)
-  const afterSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
-  check('切换排序不换页首作品', !!beforeSort && afterSort === beforeSort)
+  const afterSort = await page.evaluate(`(() => ({
+    heroKey: document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key') ?? '',
+    firstCardTitle: document.querySelector('#scroll-main [data-track-card]')?.dataset.trackTitle ?? '',
+  }))()`)
+  check(
+    `切「最多播放」后列表首位换人、页首作品不换 ${JSON.stringify({ before: wide.firstCardTitle, afterSort, beforeSort })}`,
+    !!beforeSort && afterSort.heroKey === beforeSort &&
+      afterSort.firstCardTitle !== '' && afterSort.firstCardTitle !== wide.firstCardTitle,
+  )
 
   // 切排序时列表可以短暂 loading，但页首必须一直留在 DOM 里，页面也不能回顶。
   await page.evaluate(`document.getElementById('scroll-main')?.scrollTo({ top: 380 })`)

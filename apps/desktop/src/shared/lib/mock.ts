@@ -1093,7 +1093,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             ...seed,
             key: `${seed.key}-long-${index}`,
             title: `${seed.title} 第 ${index + 1} 期`,
-            views: 1_000_000 - index * 1000,
+            // 播放量随期数递增：切「最多播放」后第一张卡必须真的换人，
+            // 否则「切排序不换页首」验的是假数据。
+            views: 1_000_000 + index * 1000,
           }
         })
       }

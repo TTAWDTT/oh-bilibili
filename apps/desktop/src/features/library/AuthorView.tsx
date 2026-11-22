@@ -81,20 +81,13 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }, [mid])
 
-  /** 关注是真接口：写进你的 B 站关注列表，取关同理。 */
+  /** 关注是真接口：写进你的 B 站关注列表，取关同理。没有 mid 就没有关注按钮。 */
   const follow = async (): Promise<void> => {
-    // 页面本身就带着 mid（从搜索结果、关注列表点进来时都有），
-    // 不该再从投稿列表里反推：列表是「按作者名搜索」的兜底时，条目可能不带 mid。
-    const ownerMid = mid ?? tracks?.find((t) => t.up_mid)?.up_mid
-    if (!ownerMid) {
-      toastFailure('关注', { class: 'input', message: '这条结果没带 UP 主的 uid' })
-      return
-    }
-    if (followed === null) return
+    if (!mid || followed === null) return
     const next = !followed
     setFollowed(next)
     try {
-      await ipc.followSet(ownerMid, next)
+      await ipc.followSet(mid, next)
       toastDone(next ? '已关注' : '已取消关注')
     } catch (e) {
       setFollowed(!next)
@@ -240,8 +233,16 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       id="scroll-main"
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
-      <header className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <div className="grid min-w-0 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <header
+        data-up-mid={mid == null ? undefined : String(mid)}
+        className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+      >
+        <div
+          className={[
+            'grid min-w-0 gap-4 p-4 sm:p-5 lg:items-start',
+            hero ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'lg:grid-cols-1',
+          ].join(' ')}
+        >
           {/* 左半：作者本人。渐变只留头像后面一小块，不再用整条装饰吃掉首屏高度。 */}
           <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 items-start gap-4">
@@ -315,7 +316,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                     </button>
                   </>
                 ) : null}
-                {mid || tracks.some((item) => item.up_mid) ? (
+                {mid ? (
                   <button
                     type="button"
                     disabled={followed === null}
@@ -347,6 +348,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               type="button"
               data-author-hero
               data-focus-key={hero.key}
+              data-up-mid={mid == null ? undefined : String(mid)}
               aria-label={`观看 ${hero.title}`}
               onClick={() => navigate({ kind: 'watch', track: hero })}
               className="group flex min-w-0 items-stretch gap-3 text-left lg:flex-col lg:gap-0"
