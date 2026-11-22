@@ -5,7 +5,6 @@ import type { DynamicReturn, DynamicTab } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
 import type { Followed } from '../../shared/lib/contract'
-import { useAuthStore } from '../auth/authStore'
 import { toWireError } from '../../shared/lib/errors'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -503,8 +502,6 @@ export function DynamicView() {
   const dynamicReturn = useAppStore((state) => state.dynamicReturn)
   const [returnPosition, setReturnPosition] = useState(dynamicReturn)
   const loadedPages = useRef(0)
-  const auth = useAuthStore((state) => state.auth)
-  const me = auth?.logged_in ? auth.user : null
   const [following, setFollowing] = useState<Followed[] | null>(null)
   const authorHover = useAuthorHover()
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
@@ -662,6 +659,18 @@ export function DynamicView() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
+              onClick={() =>
+                void ipc
+                  .openExternal('https://t.bilibili.com/')
+                  .catch((cause) => toastFailure('打开发布页', cause))
+              }
+              className="t press flex h-8 items-center gap-1.5 rounded-full border border-[var(--line)] px-3 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              去 B 站发布
+              <Icon name="external" size={12} />
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setReturnPosition(undefined)
                 void load(null, false)
@@ -698,29 +707,19 @@ export function DynamicView() {
           </nav>
         </div>
       </header>
-      <div className={`${FEED} pt-4`}>
-        <button
-          type="button"
-          onClick={() =>
-            void ipc
-              .openExternal('https://t.bilibili.com/')
-              .catch((cause) => toastFailure('打开发布页', cause))
-          }
-          aria-label="发布动态"
-          title="在 B 站发布动态"
-          className="group flex w-full items-center gap-3 rounded-[6px] bg-[var(--panel)] px-4 py-3 text-left"
-        >
-          <Avatar src={me?.avatar ?? null} alt={me?.uname ?? '我'} size={44} />
-          <span className="min-w-0 flex-1 truncate rounded-[6px] bg-[var(--ga1)] px-3 py-2 text-[14px] text-[var(--text-3)] transition-colors group-hover:bg-[var(--ga2)] group-hover:text-[var(--text-2)]">
-            分享新鲜事…
-          </span>
-          <span className="shrink-0 rounded-[6px] bg-[var(--accent)] px-4 py-1.5 text-[13px] text-white transition-opacity group-hover:opacity-90">
-            发布
-          </span>
-        </button>
-      </div>
       {following?.length ? (
         <div className={`${FEED} pt-4`}>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-[12.5px] text-[var(--text-3)]">关注的人</h3>
+            <button
+              type="button"
+              onClick={() => navigate({ kind: 'following' })}
+              className="t flex items-center gap-1 text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              全部关注
+              <Icon name="chevronRight" size={12} />
+            </button>
+          </div>
           <div
             onScroll={authorHover.hide}
             className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3"
