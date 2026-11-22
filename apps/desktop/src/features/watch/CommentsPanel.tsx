@@ -14,6 +14,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
+import { clearRecentEmote, readRecentEmote, type RecentEmote, writeRecentEmote } from './recentEmote'
 
 /** 对话页大小，与后端 `reply/dialog/cursor` 的 `size` 参数一致。 */
 const DIALOG_PAGE_SIZE = 20
@@ -976,8 +977,12 @@ export function CommentsPanel({
   /** 「只看 UP 主」已经自动补翻了几页；到上限就交回手动按钮。 */
   const scannedRef = useRef(0)
   const me = useAuthStore((s) => s.auth?.user ?? null)
+  const [recent, setRecent] = useState<RecentEmote | null>(() => readRecentEmote(me?.mid ?? null))
+  const [recentBroken, setRecentBroken] = useState(false)
   const authorHover = useAuthorHover()
   const visible = onlyUp && ownerMid !== null ? items.filter((c) => c.mid === ownerMid) : items
+  const recentShown =
+    recent && recent.mid === (me?.mid ?? 0) && !recentBroken ? recent : null
   const showAuthorCard = (c: Comment, el: HTMLElement): void => {
     if (c.mid <= 0) return
     authorHover.show(
@@ -999,11 +1004,29 @@ export function CommentsPanel({
 
   useEffect(() => {
     if (!emojiOpen || emotes !== null) return
+    const mid = me?.mid ?? 0
     let alive = true
     void ipc
       .commentEmotes()
       .then((list) => {
-        if (alive) setEmotes(list)
+        if (!alive) return
+        setEmotes(list)
+        // 只有拿到了有效列表才校对：请求失败时的空列表不能当成「表情下架」。
+        if (list.length === 0 || mid <= 0) return
+        const saved = readRecentEmote(mid)
+        if (!saved) return
+        const hit = list.find(([code]) => code === saved.code)
+        if (!hit) {
+          clearRecentEmote(mid)
+          if ((useAuthStore.getState().auth?.user?.mid ?? 0) === mid) setRecent(null)
+          return
+        }
+        if (hit[1] !== saved.url) {
+          writeRecentEmote(mid, hit[0], hit[1])
+          if ((useAuthStore.getState().auth?.user?.mid ?? 0) === mid) {
+            setRecent({ mid, code: hit[0], url: hit[1] })
+          }
+        }
       })
       .catch(() => {
         if (alive) setEmotes([])
@@ -1011,7 +1034,15 @@ export function CommentsPanel({
     return () => {
       alive = false
     }
-  }, [emojiOpen, emotes])
+  }, [emojiOpen, emotes, me?.mid])
+
+  // 换号、登出先清掉上一位账号的面板和入口图；各自账号的记录留在本地，回来还能取到。
+  useEffect(() => {
+    setRecent(readRecentEmote(me?.mid ?? null))
+    setRecentBroken(false)
+    setEmotes(null)
+    setBrokenEmotes(new Set())
+  }, [me?.mid])
 
   // 评论区跟着整页一起滚时不能再自己滚一屏，否则是「滚动里套滚动」。
   // 到底没有交给 IntersectionObserver：哨兵进入整页滚动容器的可视区就取下一页。
@@ -1263,7 +1294,21 @@ export function CommentsPanel({
                 : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]'
             }`}
           >
-            <Icon name="emoji" size={15} />
+            {recentShown ? (
+              <img
+                src={recentShown.url}
+                alt=""
+                aria-hidden
+                referrerPolicy="no-referrer"
+                onError={() => {
+                  setRecentBroken(true)
+                  clearRecentEmote(me?.mid ?? 0)
+                }}
+                className="h-[18px] w-[18px] object-contain"
+              />
+            ) : (
+              <Icon name="emoji" size={15} />
+            )}
           </button>
           {emojiOpen ? (
             <div className="absolute bottom-10 right-0 z-30 w-[304px] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-2 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
@@ -1281,7 +1326,16 @@ export function CommentsPanel({
                         type="button"
                         title={code}
                         aria-label={code}
-                        onClick={() => setDraft((draft) => draft + code)}
+                        onClick={() => {
+                          setDraft((draft) => draft + code)
+                          const mid = me?.mid ?? 0
+                          writeRecentEmote(mid, code, url)
+                          if (mid > 0) {
+                            setRecent({ mid, code, url })
+                            setRecentBroken(false)
+                          }
+                          inputRef.current?.focus()
+                        }}
                         className="flex h-8 items-center justify-center rounded-[4px] hover:bg-[var(--panel-alt)]"
                       >
                         <img
