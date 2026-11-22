@@ -4828,6 +4828,23 @@ async function main() {
         historySpacing.headingInside &&
         historySpacing.heights.every((height) => height >= 60 && height <= 100),
     )
+    const startedFromHistory = await page.evaluate(`(() => {
+      const button = document.querySelector('[data-history-row] button[data-history-play]')
+      button?.click()
+      return !!button
+    })()`)
+    await sleep(1400)
+    const liveHistory = await page.evaluate(`(() => {
+      const row = document.querySelector('[data-history-row][aria-current="true"]')
+      return {
+        active: !!row,
+        label: (row?.querySelector('[data-history-progress]')?.textContent || '').trim(),
+      }
+    })()`)
+    check(
+      '历史当前行显示实时进度，不再停在已播完',
+      startedFromHistory && liveHistory.active && liveHistory.label.startsWith('播至'),
+    )
     await page.clickExactText('加载更早记录')
     let loadedAll = false
     for (let i = 0; i < 20 && !loadedAll; i += 1) {

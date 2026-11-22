@@ -454,11 +454,11 @@ function HistoryRow({
           {active && playing ? <span className="shrink-0 text-[var(--accent)]">正在播放</span> : null}
         </div>
         <div className="sm:hidden">
-          <HistoryProgress entry={entry} />
+          <HistoryProgress entry={entry} live={active} playing={playing} />
         </div>
       </div>
       <div className="hidden w-[140px] shrink-0 sm:block">
-        <HistoryProgress entry={entry} />
+        <HistoryProgress entry={entry} live={active} playing={playing} />
       </div>
       <button
         ref={triggerRef}
@@ -493,15 +493,35 @@ function HistoryRow({
   )
 }
 
-function HistoryProgress({ entry }: { entry: Entry }) {
-  const position = entry.position_ms
+function HistoryProgress({ entry, live, playing }: { entry: Entry; live: boolean; playing: boolean }) {
+  if (live) return <LiveHistoryProgress entry={entry} playing={playing} />
+  return <ProgressLine entry={entry} position={entry.position_ms} finished={finishedEntry(entry)} />
+}
+
+/** 当前曲目直接读播放器进度；列表里的 position_ms 要等 watchdog 落库，会晚几秒。 */
+function LiveHistoryProgress({ entry, playing }: { entry: Entry; playing: boolean }) {
+  const position = usePlayerStore((state) => state.progress.position_ms)
+  const duration = entry.track.duration_ms ?? 0
+  const finished = !playing && duration > 0 && position >= duration - 1_000
+  return <ProgressLine entry={entry} position={position} finished={finished} />
+}
+
+function ProgressLine({
+  entry,
+  position,
+  finished,
+}: {
+  entry: Entry
+  position: number
+  finished: boolean
+}) {
   if (!(position > 0)) return null
   const duration = entry.track.duration_ms ?? 0
   const ratio = duration > 0 ? Math.min(1, position / duration) : null
   return (
-    <div className="mt-1.5 min-w-0">
+    <div data-history-progress className="mt-1.5 min-w-0">
       <div className="num text-[12px] text-[var(--text-2)]">
-        {finishedEntry(entry) ? '已播完' : `播至 ${formatTime(position)}`}
+        {finished ? '已播完' : `播至 ${formatTime(position)}`}
       </div>
       {ratio !== null ? (
         <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[var(--line)]">
