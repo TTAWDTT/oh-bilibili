@@ -40,7 +40,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
     <div
       data-rank-row
       data-rank={rank}
-      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 sm:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] sm:gap-x-4"
+      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 lg:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] lg:gap-x-4"
     >
       <span className="pt-1 text-right">
         <span className="sr-only">第 {rank} 名</span>
@@ -58,7 +58,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
         type="button"
         onClick={onOpen}
         aria-label={track.title}
-        className={`relative w-[7rem] shrink-0 ${first ? 'sm:w-[13.5rem]' : 'sm:w-[10.5rem]'}`}
+        className={`relative w-[7rem] shrink-0 ${first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'}`}
         title={track.title}
       >
         <span className="relative block aspect-video overflow-hidden rounded-[6px]">
@@ -77,7 +77,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           onClick={onOpen}
           title={track.title}
           className={`w-full text-left font-medium hover:text-[var(--accent)] ${
-            first ? 'text-[17px] leading-[24px] sm:text-[18px] sm:leading-[26px]' : 'text-[15px] leading-[22px]'
+            first ? 'text-[17px] leading-[24px] lg:text-[18px] lg:leading-[26px]' : 'text-[15px] leading-[22px]'
           } ${
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
           }`}
@@ -85,8 +85,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           {/* 最多两行：按行高钉死高度，不依赖 -webkit-box（按钮/span 的 display 会被浏览器重算） */}
           <span
             data-rank-title
-            className="block overflow-hidden"
-            style={{ maxHeight: first ? 52 : 44 }}
+            className={`block overflow-hidden ${first ? 'max-h-12 lg:max-h-[52px]' : 'max-h-11'}`}
           >
             {track.title}
           </span>
@@ -94,13 +93,13 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
         <button
           type="button"
           onClick={onAuthor}
-          className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+          className="mt-1.5 flex w-full min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
         >
           <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
           <span className="truncate">{track.artist}</span>
         </button>
         {/* 窄窗把统计挪到标题下面，先保住名次、标题和封面的宽度。 */}
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] sm:hidden">
+        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] lg:hidden">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -115,7 +114,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           ) : null}
         </span>
       </div>
-      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] sm:flex">
+      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] lg:flex">
         {track.views ? (
           <span className="flex w-16 items-center justify-end gap-1">
             <Icon name="play" size={11} />

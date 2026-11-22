@@ -1197,19 +1197,54 @@ async function checkRanking(page) {
     '第一名封面更大，宽窗没有横向滚动',
     wide.firstCover > wide.nextCover && wide.overflow !== null && wide.overflow <= 0,
   )
+  // 用一条真实长度的长标题压一下，标题列不能把行撑高。
+  const originalTitle = await page.evaluate(`document.querySelector('[data-rank-title]')?.textContent ?? ''`)
   const clamp = await page.evaluate(`(() => {
     const rows = [...document.querySelectorAll('[data-rank-row]')]
     const title = rows[0]?.querySelector('[data-rank-title]')
+    const probe = '一场酣畅淋漓的人类高质量灵魂对话，从北疆的雪到南方的雨，我们把这一路的见闻都记了下来，顺便聊聊为什么大家都在讨论这件事'
+    if (title) title.textContent = probe + probe
     const heights = rows.slice(0, 12).map((row) => Math.round(row.getBoundingClientRect().height))
     return {
       height: title ? Math.round(title.getBoundingClientRect().height) : 0,
       tallest: heights.length > 0 ? Math.max(...heights) : 0,
+      first: Math.round(rows[0]?.getBoundingClientRect().height ?? 0),
+      second: Math.round(rows[1]?.getBoundingClientRect().height ?? 0),
     }
   })()`)
   check(
     '长标题最多两行，行高不被撑开',
-    clamp.height > 0 && clamp.height <= 52 && clamp.tallest > 0 && clamp.tallest <= 150,
+    clamp.height > 0 && clamp.height <= 52 && clamp.first > 0 && clamp.first <= 140 && clamp.tallest <= 150,
   )
+  // 768–1023 有侧栏时，标题列不能被统计列挤成一条缝。
+  const midWidths = []
+  for (const width of [768, 900]) {
+    await page.viewport(width, 820)
+    await sleep(500)
+    midWidths.push(
+      await page.evaluate(`(() => {
+        const row = document.querySelector('[data-rank-row]')
+        const titleButton = row?.querySelector('[data-rank-title]')?.closest('button')
+        const box = document.getElementById('scroll-main')
+        return {
+          width: window.innerWidth,
+          title: titleButton ? Math.round(titleButton.getBoundingClientRect().width) : 0,
+          stats: row ? getComputedStyle(row.lastElementChild).display : '',
+          overflow: box ? box.scrollWidth - box.clientWidth : null,
+        }
+      })()`),
+    )
+  }
+  check(
+    `768 与 900 下标题列仍有足够宽度 ${JSON.stringify(midWidths)}`,
+    midWidths.every((item) => item.title >= 150 && item.stats === 'none' && item.overflow !== null && item.overflow <= 0),
+  )
+  await page.evaluate(`(() => {
+    const title = document.querySelector('[data-rank-title]')
+    if (title) title.textContent = ${JSON.stringify(originalTitle)}
+  })()`)
+  await page.viewport(1440, 900)
+  await sleep(400)
 
   await page.evaluate(`document.getElementById('scroll-main').scrollTop = 400`)
   await sleep(300)
