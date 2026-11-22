@@ -51,6 +51,7 @@ export function Cover({ cover, title, className, width }: CoverProps) {
       alt=""
       draggable={false}
       aria-hidden
+      data-cover-fallback
       className={`${className} cover-frame object-cover`}
       title={title}
     />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import { useSmoothIndex } from '../../shared/lib/useSmoothIndex'
@@ -16,6 +16,7 @@ import { PlaybackProgress } from './PlaybackProgress'
 import { usePlayerStore } from './playerStore'
 import { thumbWide } from '../../shared/lib/thumb'
 import { StageLyrics } from './StageLyrics'
+import { useStageCoverMorph } from './stageCoverMorph'
 import { VolumeControl } from './VolumeControl'
 
 /**
@@ -45,9 +46,18 @@ export function StageView() {
   const [lyricsAttempt, setLyricsAttempt] = useState(0)
   const [relatedOpen, setRelatedOpen] = useState(false)
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const vinylRef = useRef<HTMLDivElement | null>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const track = snapshot?.track ?? null
   const local = snapshot?.local ?? false
+  const exitStage = useCallback(() => setStage(false), [setStage])
+  const { requestClose, closeNow } = useStageCoverMorph({
+    open,
+    track,
+    stageRef,
+    vinylRef,
+    onExit: exitStage,
+  })
 
   useEffect(() => {
     if (!open || !track) return
@@ -102,20 +112,24 @@ export function StageView() {
       stageRef.current?.querySelector<HTMLButtonElement>('button[aria-label="退出舞台"]')?.focus()
     })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setStage(false)
+      if (e.key === 'Escape' && !e.defaultPrevented) requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => {
       cancelAnimationFrame(frame)
       window.removeEventListener('keydown', onKey)
       const fallback = document.querySelector<HTMLButtonElement>('button[aria-label="打开播放舞台"]')
-      const restore =
-        previousFocus.current?.isConnected && previousFocus.current !== document.body
-          ? previousFocus.current
-          : fallback
-      restore?.focus()
+      const restore = [previousFocus.current, fallback].find(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          element !== document.body &&
+          element.isConnected &&
+          element.getClientRects().length > 0 &&
+          getComputedStyle(element).visibility !== 'hidden',
+      )
+      ;(restore ?? document.getElementById('main-content'))?.focus()
     }
-  }, [open, setStage])
+  }, [open, requestClose])
 
   useEffect(() => {
     if (!open) setRelatedOpen(false)
@@ -184,7 +198,7 @@ export function StageView() {
 
       <button
         type="button"
-        onClick={() => setStage(false)}
+        onClick={requestClose}
         aria-label="退出舞台"
         /* 舞台铺满整窗，左上角是系统红绿灯：按钮要落在它们右侧，不能压上去 */
         className="t press absolute left-24 top-3 z-20 flex h-8 items-center gap-1 rounded-full bg-[var(--panel)]/85 pl-2 pr-3.5 text-[13px] text-[var(--text-2)] shadow-[0_2px_10px_rgba(0,0,0,0.08)] backdrop-blur hover:text-[var(--text-1)]"
@@ -199,7 +213,11 @@ export function StageView() {
         <div className="grid min-h-0 flex-1 content-start items-start gap-5 lg:content-center lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
           <div className="flex min-h-0 flex-col items-center justify-center">
             <div className="stage-disc" data-playing={snapshot?.phase === 'playing'}>
-              <div className="stage-vinyl flex h-[116px] w-[116px] items-center justify-center rounded-full sm:h-[168px] sm:w-[168px] lg:h-[236px] lg:w-[236px]">
+              <div
+                ref={vinylRef}
+                data-stage-cover={track.key}
+                className="stage-vinyl flex h-[116px] w-[116px] items-center justify-center rounded-full sm:h-[168px] sm:w-[168px] lg:h-[236px] lg:w-[236px]"
+              >
                 <Cover
                   cover={track.cover}
                   title={track.title}
@@ -266,7 +284,7 @@ export function StageView() {
                       type="button"
                       data-focus-id={`stage:${item.key}`}
                       onClick={() => {
-                        setStage(false)
+                        closeNow()
                         navigate({ kind: 'watch', track: item }, undefined, `stage:${item.key}`)
                       }}
                       title={item.title}
