@@ -802,7 +802,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         },
         // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
         manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
-        duration_ms: track.duration_ms ?? 30_000,
+        // 观看页拿到的 duration 是当前这一 P 的时长，不是整条投稿的总长。
+        duration_ms: pages.find((entry) => entry.no === currentPage)?.duration_ms ?? track.duration_ms ?? 30_000,
         qualities: [{ id: 80, label: '1080P', height: 1080, bandwidth: 2_400_000 }],
         audio_quality: 192,
       }

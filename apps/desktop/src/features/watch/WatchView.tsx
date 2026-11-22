@@ -26,7 +26,16 @@ import { Modal } from '../../shared/ui/Modal'
 function loadWatchPage(key: string): number | null {
   try {
     const page = Number(localStorage.getItem(`oh-bilibili:watch-page:${key}`))
-    return Number.isInteger(page) && page > 0 ? page : null
+    if (Number.isInteger(page) && page > 0) return page
+    // 单 P 视频从不写 watch-page，只有按页的进度；按它把页号找回来。
+    const prefix = `oh-bilibili:watch-pos:${key}:`
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const name = localStorage.key(i)
+      if (!name?.startsWith(prefix)) continue
+      const found = Number(name.slice(prefix.length))
+      if (Number.isInteger(found) && found > 0) return found
+    }
+    return null
   } catch {
     return null
   }
@@ -52,6 +61,15 @@ function loadPagePos(key: string, page: number): number | null {
 function savePagePos(key: string, page: number, at: number): void {
   try {
     localStorage.setItem(`oh-bilibili:watch-pos:${key}:${page}`, String(Math.round(at)))
+  } catch {
+    // 隐私模式写不进去，只影响这次会话
+  }
+}
+
+/** 分 P 的真实时长单独记一份：历史里那条 track 的 duration 是整条投稿的总长。 */
+function savePageLen(key: string, page: number, duration: number): void {
+  try {
+    localStorage.setItem(`oh-bilibili:watch-len:${key}:${page}`, String(Math.round(duration)))
   } catch {
     // 隐私模式写不进去，只影响这次会话
   }
@@ -128,6 +146,12 @@ export function WatchView({ track }: { track: Track }) {
     if (page === undefined) return
     document.getElementById('scroll-main')?.scrollTo({ top: 0 })
   }, [page])
+
+  // 老版本只写过按页进度；拿到这一页的时长就补写一份，续播卡从此有页级时长可用。
+  useEffect(() => {
+    if (!data || data.duration_ms <= 0) return
+    savePageLen(track.key, data.current_page, data.duration_ms)
+  }, [data, track.key])
   /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
   const changePage = (no: number): void => {
     const from = page ?? data?.current_page
@@ -136,6 +160,8 @@ export function WatchView({ track }: { track: Track }) {
     const now = usePlayerStore.getState().progress.position_ms
     if (from !== undefined && snap?.track?.key === track.key && now >= 5000) {
       savePagePos(track.key, from, now)
+      // 历史里的 duration 是整条投稿总长，分 P 要看观看数据里这一页的时长。
+      if ((data?.duration_ms ?? 0) > 0) savePageLen(track.key, from, data!.duration_ms)
     }
     const at = loadPagePos(track.key, no)
     setResume(at ? { key: track.key, at } : null)
@@ -247,9 +273,11 @@ export function WatchView({ track }: { track: Track }) {
         return
       }
       const at = usePlayerStore.getState().progress.position_ms
+      const duration = data.duration_ms
+      if (duration > 0) savePageLen(track.key, no, duration)
       // 刚切 P 时声音还没起来，进度会短暂为 0；这时不能清掉这一 P 的记录。
       if (at < 5000) return
-      if (data.duration_ms > 0 && at > data.duration_ms - 10_000) return
+      if (duration > 0 && at > duration - 10_000) return
       savePagePos(track.key, no, at)
     }
     const timer = window.setInterval(save, 5000)

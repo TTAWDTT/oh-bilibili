@@ -14,6 +14,7 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
 import { formatCount, formatDuration } from '../../shared/lib/format'
+import { ResumeCard, resumeFrom, type Resume } from './ResumeCard'
 
 const PARTITION_FLOORS = [
   { rid: 1, title: '动画' },
@@ -53,11 +54,40 @@ export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
+  const playContext = usePlayerStore((s) => s.playContext)
   const [hoverPart, setHoverPart] = useState<{ name: string; left: number; top: number } | null>(null)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
+  const [resume, setResume] = useState<Resume | null>(null)
+
+  // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
+  useEffect(() => {
+    let alive = true
+    void ipc
+      .libraryHistoryTimed(12)
+      .then((list) => {
+        if (alive) setResume(resumeFrom(list))
+      })
+      .catch(() => {
+        // 历史读不到就让推荐占满首屏
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const openResume = (item: Resume): void => {
+    if (item.watching) {
+      // 观看页自己会从本地记录恢复到分 P 与位置。
+      navigate({ kind: 'watch', track: item.entry.track })
+      return
+    }
+    void playContext([item.entry.track.key], 0).then(() => {
+      void usePlayerStore.getState().seek(item.position)
+    })
+  }
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
   const itemsRef = useRef<Track[]>(feedMemory.items)
   const heroRef = useRef<Track[]>(feedMemory.hero)
@@ -109,11 +139,26 @@ export function HomeView() {
     }
   }, [])
 
+  const resumeKey = resume?.entry.track.key ?? null
+  /** 续播那一条不再出现在推荐里，宽窄窗都一样。 */
+  const heroPool = resumeKey ? hero.filter((track) => track.key !== resumeKey) : hero
+  /** 续播卡占了轮播的位置时，右边从推荐第一批的开头取六张，剩下的接进下方推荐流。 */
+  const heroCards = resume ? heroPool.slice(0, 6) : heroPool.slice(5, 11)
   const heroKeys = new Set(hero.map((track) => track.key))
-  const feedRemainder = items.filter((track) => !heroKeys.has(track.key))
+  const cardKeys = new Set(heroCards.map((track) => track.key))
+  const feedRemainder = items.filter((track) => !heroKeys.has(track.key) && track.key !== resumeKey)
   const feedTracks = wideHero
-    ? feedRemainder
-    : [...new Map([...hero.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
+    ? resume
+      ? [
+          ...new Map(
+            [
+              ...heroPool.slice(6),
+              ...items.filter((track) => !cardKeys.has(track.key) && track.key !== resumeKey),
+            ].map((track) => [track.key, track]),
+          ).values(),
+        ]
+      : feedRemainder
+    : [...new Map([...heroPool.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
@@ -423,6 +468,21 @@ export function HomeView() {
       ) : null}
       {slow && !attempt.current.append ? slowNotice : null}
 
+      {resume ? (
+        <div className="px-4 pt-4 md:px-8 lg:hidden">
+          <ResumeCard compact resume={resume} onOpen={openResume} />
+        </div>
+      ) : null}
+
+      {/* 推荐单独失败时，续播卡不跟着消失。 */}
+      {resume && hero.length === 0 ? (
+        <div className="px-4 pt-4 md:px-8">
+          <div className="hidden max-w-[560px] lg:block">
+            <ResumeCard resume={resume} onOpen={openResume} />
+          </div>
+        </div>
+      ) : null}
+
       {/*
        * B 站首页首屏是「大轮播 + 右侧卡片网格」：右侧给四张带封面的卡，
        * 而不是一列文字条目。轮播用前 5 条、右栏接 6 条，下面网格从第 11 条开始，
@@ -449,11 +509,17 @@ export function HomeView() {
            * 45/55 下右栏每张约 186 宽，轮播 7:5 与两行卡片正好等高，不用给哪一边留空。
            */}
           <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
-          <HeroBanner tracks={hero.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
-          {hero.length > 5 && wideHero ? (
+          {resume && wideHero ? (
+            <div className="hidden lg:block">
+              <ResumeCard resume={resume} onOpen={openResume} />
+            </div>
+          ) : (
+            <HeroBanner tracks={heroPool.slice(0, 5)} onOpen={(track) => navigate({ kind: 'watch', track })} />
+          )}
+          {(resume ? heroCards.length > 0 : hero.length > 5) && wideHero ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
-            <div key={hero[0]?.key} data-home-hero-grid className="bili-hero-swap grid grid-cols-3 gap-3">
-              {hero.slice(5, 11).map((track) => (
+            <div key={heroCards[0]?.key} data-home-hero-grid className="bili-hero-swap grid grid-cols-3 gap-3">
+              {heroCards.map((track) => (
                 <button
                   key={track.key}
                   type="button"
