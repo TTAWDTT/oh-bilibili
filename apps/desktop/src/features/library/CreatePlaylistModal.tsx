@@ -36,7 +36,7 @@ export function CreatePlaylistModal({ open, onClose }: CreatePlaylistModalProps)
     <Modal
       open={open}
       title="新建歌单"
-      description="歌单只存在本机；登录后喜欢与收藏会同步到 B 站账号。"
+      description="歌单只存在本机；登录后点赞与收藏会同步到 B 站账号。"
       onClose={onClose}
     >
       <form

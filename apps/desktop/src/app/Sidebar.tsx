@@ -35,13 +35,13 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'favs' }, label: '收藏夹', icon: 'bookmarkStar' },
       { view: { kind: 'watchLater' }, label: '稍后再看', icon: 'watchLater' },
       { view: { kind: 'following' }, label: '关注', icon: 'user' },
+      { view: { kind: 'liked' }, label: '赞过的视频', icon: 'heartFilled' },
     ],
   },
   {
     title: '音乐',
     items: [
       { view: { kind: 'library' }, label: '曲库', icon: 'library' },
-      { view: { kind: 'liked' }, label: '喜欢', icon: 'heartFilled' },
       { view: { kind: 'downloads' }, label: '已下载', icon: 'download' },
     ],
   },

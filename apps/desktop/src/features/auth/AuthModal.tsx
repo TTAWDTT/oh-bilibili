@@ -67,7 +67,7 @@ export function AuthModal() {
             } catch {
               if (result.auth) useAuthStore.getState().apply(result.auth)
             }
-            toastDone('已登录', '喜欢与收藏现在会同步到 B 站。')
+            toastDone('已登录', '点赞与收藏现在会同步到 B 站。')
             window.setTimeout(() => useAppStore.getState().setAuthOpen(false), 1200)
           }
         })

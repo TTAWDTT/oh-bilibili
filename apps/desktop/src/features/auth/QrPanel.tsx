@@ -19,7 +19,7 @@ const STATUS: Record<QrStatus['state'], { title: string; detail: string; tone: s
   },
   confirmed: {
     title: '登录成功',
-    detail: '喜欢与收藏现在会同步到这个账号。',
+    detail: '点赞与收藏现在会同步到这个账号。',
     tone: 'text-[var(--ok)]',
     icon: 'check',
   },
