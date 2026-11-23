@@ -906,6 +906,72 @@ mod queue_restore_tests {
         }
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "真实网络与声卡"]
+    async fn 临时观看后继续听原分集() {
+        use super::{lock, WatchOptions};
+        use crate::wire::PlayMode;
+        use std::time::Duration;
+
+        let saved = SavedQueue::new(&[]);
+        let engine = Engine::new(&saved.db()).unwrap();
+        engine.set_volume(0.0);
+        let x = TrackKey::from_provider("BV1ZRihBkE8m");
+        let y = TrackKey::from_provider("BV1GJ411x7h7");
+        let origin = "http://127.0.0.1:9";
+        let wait_for_phase = |phase| {
+            let engine = engine.clone();
+            async move {
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    while engine.snapshot().phase != phase {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                })
+                .await
+                .unwrap();
+            }
+        };
+        let view = engine
+            .open_watch_page_with_pause(&x, origin, Some(2), Some(193_000), true)
+            .await
+            .unwrap();
+        let p2 = view.pages.iter().find(|p| p.no == 2).unwrap();
+        assert_ne!(p2.cid, view.pages[0].cid);
+        wait_for_phase("paused").await;
+        engine
+            .set_mode(PlayMode::Listen, Some(193_000), Some(&x))
+            .await
+            .unwrap();
+        engine.close_watch(Some(&x));
+
+        let temporary = engine
+            .open_watch_page_with_options(
+                &y,
+                origin,
+                None,
+                Some(10_000),
+                WatchOptions { paused: true, preserve_listen_queue: true },
+            )
+            .await
+            .unwrap();
+        wait_for_phase("paused").await;
+        assert_eq!(lock(&engine.watch_cid).as_ref().unwrap().1, temporary.pages[0].cid);
+        let restored = engine.close_watch(Some(&y));
+        assert_eq!(restored.track.unwrap().key, x);
+        assert_eq!(restored.position_ms, 193_000);
+
+        engine.toggle_or_load().await.unwrap();
+        wait_for_phase("playing").await;
+        let resumed = engine.pause();
+        assert_eq!(resumed.track.unwrap().key, x);
+        assert!((193_000..=196_000).contains(&resumed.position_ms));
+        assert_eq!(*lock(&engine.watch_cid), Some((x.as_opaque().into(), p2.cid)));
+        println!(
+            "X P1={} P2={} / Y={} / 恢复位置={}ms",
+            view.pages[0].cid, p2.cid, temporary.pages[0].cid, resumed.position_ms
+        );
+    }
+
     #[test]
     fn 播放前重排其他曲目保持续播点() {
         let a = track("BV1");
@@ -1151,6 +1217,7 @@ pub struct WatchOptions {
 
 struct QueueBookmark {
     current: Option<(TrackKey, u64)>,
+    watch_cid: Option<(String, u64)>,
 }
 
 pub struct Engine {
@@ -1781,13 +1848,17 @@ impl Engine {
                 let at = self.listen_queue_position(&key);
                 (key, at)
             });
-            QueueBookmark { current }
+            QueueBookmark {
+                current,
+                watch_cid: lock(&self.watch_cid).clone(),
+            }
         });
     }
 
     fn restore_queue_bookmark(&self) -> bool {
         if let Some(bookmark) = lock(&self.listen_bookmark).take() {
             *lock(&self.pending_resume) = bookmark.current;
+            *lock(&self.watch_cid) = bookmark.watch_cid;
             true
         } else {
             false
@@ -1829,7 +1900,6 @@ impl Engine {
         if closing_current && self.restore_queue_bookmark() {
             *lock(&self.state) = PlayerState::Idle;
             *lock(&self.mode) = crate::wire::PlayMode::Listen;
-            *lock(&self.watch_cid) = None;
         } else {
             let mut st = lock(&self.state);
             *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
