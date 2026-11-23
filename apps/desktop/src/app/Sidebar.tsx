@@ -36,11 +36,8 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
       { view: { kind: 'watchLater' }, label: '稍后再看', icon: 'watchLater' },
       { view: { kind: 'following' }, label: '关注', icon: 'user' },
       { view: { kind: 'liked' }, label: '赞过的视频', icon: 'heartFilled' },
-    ],
-  },
-  {
-    title: '音乐',
-    items: [
+      // 曲库与下载是「我的」里的两项，不是并列于整站的第二个产品：
+      // 单开一个「音乐」分组会让每个页面都先看到听歌入口。
       { view: { kind: 'library' }, label: '曲库', icon: 'library' },
       { view: { kind: 'downloads' }, label: '已下载', icon: 'download' },
     ],
