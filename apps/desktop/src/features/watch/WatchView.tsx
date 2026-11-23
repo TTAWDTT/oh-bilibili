@@ -3,6 +3,7 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
+import { formatTime } from '../../shared/lib/format'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
@@ -181,7 +182,7 @@ export function WatchView({
     savePageLen(track.key, data.current_page, data.duration_ms)
   }, [data, track.key])
   /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
-  const changePage = (no: number): void => {
+  const changePage = (no: number, resumeAtMs?: number): void => {
     const from = page ?? data?.current_page
     const snap = usePlayerStore.getState().snapshot
     // 快照只在命令时更新，真实播放位置在 progress 切片里（10Hz）。
@@ -191,11 +192,32 @@ export function WatchView({
       // 历史里的 duration 是整条投稿总长，分 P 要看观看数据里这一页的时长。
       if ((data?.duration_ms ?? 0) > 0) savePageLen(track.key, from, data!.duration_ms)
     }
-    const at = loadPagePos(track.key, no)
+    const at = resumeAtMs ?? loadPagePos(track.key, no)
     setResume(at ? { key: track.key, at } : null)
     setPendingResume(at)
     setPage(no)
     saveWatchPage(track.key, no)
+  }
+  /** 评论里的时间点：写明了别的 P 就先切过去，加载后落在同一毫秒。 */
+  const seekFromComment = (ms: number, pageNo?: number): void => {
+    const current = page ?? data?.current_page ?? 1
+    if (pageNo !== undefined && pageNo !== current) {
+      const target = data?.pages.find((entry) => entry.no === pageNo)
+      if (!target) {
+        toastWarn('这个分 P 不存在', `评论写的是 P${pageNo}`)
+        return
+      }
+      if (ms > target.duration_ms) {
+        toastWarn(
+          '这个时间点超出分 P',
+          `P${pageNo} 只有 ${formatTime(target.duration_ms)}，评论写的是 ${formatTime(ms)}`,
+        )
+        return
+      }
+      changePage(pageNo, ms)
+      return
+    }
+    seekTo(ms)
   }
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
   const lastTrackRef = useRef<string | null>(null)
@@ -870,7 +892,12 @@ export function WatchView({
           ) : null}
           {!cinema ? (
             <div className="border-t border-hairline">
-              <CommentsPanel trackKey={track.key} ownerMid={data?.owner_mid ?? null} flow />
+              <CommentsPanel
+                trackKey={track.key}
+                ownerMid={data?.owner_mid ?? null}
+                onSeek={seekFromComment}
+                flow
+              />
             </div>
           ) : null}
         </div>

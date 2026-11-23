@@ -23,6 +23,13 @@ const COMMENT_SEEDS: { author: string; mid: number; text: string; level: number;
     level: 3,
     medal: null,
   },
+  {
+    author: '课代表',
+    mid: 90004,
+    text: 'P2 00:12 花絮从这里开始；P1 00:05 是正片的高能段。',
+    level: 4,
+    medal: null,
+  },
 ]
 
 type FollowSeed = {
