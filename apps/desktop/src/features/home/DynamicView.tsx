@@ -33,13 +33,49 @@ type OpenDynamic = (event: DynamicOpenEvent) => void
 type OpenDynamicItem = (item: ipc.DynamicItem, event: DynamicOpenEvent) => void
 type DynamicBody = { id: string; initiallyExpanded: boolean }
 
+function discussionUrl(id: string): string {
+  return `https://t.bilibili.com/${id}`
+}
+
+function openDiscussion(id: string): void {
+  void ipc.openExternal(discussionUrl(id)).catch((cause) => toastFailure('打开动态讨论', cause))
+}
+
+function DiscussionLink({ item }: { item: ipc.DynamicItem }) {
+  return (
+    <a
+      href={discussionUrl(item.id)}
+      onClick={(event) => { event.preventDefault(); openDiscussion(item.id) }}
+      aria-label={`在浏览器查看${item.author}的动态讨论`}
+      className="t inline-flex items-center gap-1 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]"
+    >
+      查看讨论 <Icon name="external" size={11} />
+    </a>
+  )
+}
+
 /** 动态正文：超过六行折起来，B 站卡片也是先露出前几行再给「展开」。 */
-function RichText({ text, body }: { text: string; body: DynamicBody }) {
+function RichText({ text, body, discuss }: { text: string; body: DynamicBody; discuss?: string }) {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const [expanded, setExpanded] = useState(body.initiallyExpanded)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
-  const bodyNodes = text.split(/(#[^#\s]{1,40}#)/g).map((part, index) => {
+  const bodyNodes = text.split(/(https?:\/\/[^\s<>，。]+|#[^#\s]{1,40}#)/g).map((part, index) => {
+    if (/^https?:\/\//.test(part)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          onClick={(event) => {
+            event.preventDefault()
+            void ipc.openExternal(part).catch((cause) => toastFailure('打开链接', cause))
+          }}
+          className="t break-all text-[var(--accent)] hover:underline"
+        >
+          {part}<Icon name="external" size={10} className="inline" />
+        </a>
+      )
+    }
     if (!part.startsWith('#') || !part.endsWith('#') || part.length < 3) return part
     return (
       <button
@@ -70,7 +106,11 @@ function RichText({ text, body }: { text: string; body: DynamicBody }) {
     <div className="mb-3">
       <p
         ref={textRef}
-        className={`whitespace-pre-wrap break-words text-reading-body text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
+        onClick={discuss ? (event) => {
+          if ((event.target as HTMLElement).closest('button,a') || window.getSelection()?.toString()) return
+          openDiscussion(discuss)
+        } : undefined}
+        className={`select-text whitespace-pre-wrap break-words text-reading-body text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
       >
         {bodyNodes}
       </p>
@@ -110,27 +150,16 @@ function DynamicVideo({
   }
 
   return (
-    <div
-      role="button"
-      data-dynamic-open="video"
-      tabIndex={0}
-      onClick={(event) => {
-        // 封面右下角的「稍后再看」自己处理点击，别让整卡跟着进视频。
-        if ((event.target as HTMLElement).closest('button')) return
-        event.stopPropagation()
-        onOpen(event)
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        if (event.target !== event.currentTarget) return
-        event.preventDefault()
-        event.stopPropagation()
-        onOpen(event)
-      }}
-      className="group/video t flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
-    >
+    <div className="group/video t relative flex w-full overflow-hidden rounded-[6px] bg-[var(--ga1)] text-left transition-colors duration-150 hover:bg-[var(--ga2)]">
+      <button
+        type="button"
+        data-dynamic-open="video"
+        aria-label={`观看 ${item.title}`}
+        onClick={onOpen}
+        className="absolute inset-0 rounded-[6px] focus-visible:outline-offset-[-2px]"
+      />
       <span
-        className="relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
+        className="pointer-events-none relative w-[38%] max-w-[212px] min-w-[128px] shrink-0 overflow-hidden bg-[var(--ga2)]"
         style={{ aspectRatio: '16 / 9' }}
       >
         <Cover
@@ -156,12 +185,12 @@ function DynamicVideo({
           onClick={later}
           aria-label="稍后再看"
           title="稍后再看"
-          className="t absolute bottom-1.5 right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-[3px] bg-black/65 text-white opacity-0 transition-opacity duration-150 hover:bg-[var(--accent)] focus-visible:opacity-100 group-hover/video:opacity-100"
+          className="t pointer-events-auto absolute bottom-1.5 right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-[3px] bg-black/65 text-white opacity-0 transition-opacity duration-150 hover:bg-[var(--accent)] focus-visible:opacity-100 group-hover/video:opacity-100"
         >
           <Icon name="watchLater" size={12} />
         </button>
       </span>
-      <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
+      <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col px-4 py-3">
         <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent-strong-hover)]">
           {item.title}
         </span>
@@ -199,7 +228,7 @@ function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenD
         ) : null}
         <span className="mt-auto pt-2">
           <span className="rounded-[2px] bg-[var(--accent-soft)] px-1 text-[11px] leading-[16px] text-[var(--accent)]">
-            专栏
+            专栏 <Icon name="external" size={10} className="inline" />
           </span>
         </span>
       </span>
@@ -226,7 +255,7 @@ function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyna
       >
         <Cover cover={item.cover} title={item.title} width={168} className="h-full w-full" />
         <span className="absolute left-1 top-1 rounded-[2px] bg-[var(--accent)] px-1 text-[10px] font-medium leading-[15px] text-white">
-          LIVE
+          LIVE <Icon name="external" size={10} className="inline" />
         </span>
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
@@ -261,9 +290,9 @@ function DynamicContent({
   return (
     <>
       {item.kind === 'opus' && item.title ? (
-        <p className="mb-2 break-words text-[15px] font-medium leading-[24px] text-[var(--text-1)]">
-          {item.title}
-        </p>
+        <button type="button" onClick={onOpen} className="t mb-2 block break-words text-left text-work-name hover:text-[var(--accent-strong-hover)]">
+          {item.title} <Icon name="external" size={11} className="inline" />
+        </button>
       ) : null}
       {text ? <RichText text={text} body={body} /> : null}
       {item.kind === 'video' ? (
@@ -278,7 +307,7 @@ function DynamicContent({
               key={`${url}-${index}`}
               type="button"
               onClick={onOpen}
-              aria-label={`打开第 ${index + 1} 张图片`}
+              aria-label={`在浏览器打开原图文，第 ${index + 1} 张图片`}
               className={`t relative flex items-center justify-center overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? 'min-h-[180px]' : 'aspect-square'}`}
             >
               <Icon name="biliTv" size={22} className="absolute text-[var(--ga3)]" />
@@ -306,107 +335,96 @@ function DynamicContent({
   )
 }
 
-/** 转发动态里被转的那条。再套转发只画到这里，不再往下一层。 */
-function OrigCard({
-  orig,
-  body,
-  onOpenVideo,
-  onAuthor,
-}: {
-  orig: ipc.DynamicItem
-  body: DynamicBody
-  onOpenVideo: OpenDynamicItem
+function ForwardByline({ item, onAuthor }: { item: ipc.DynamicItem; onAuthor: OpenDynamicItem }) {
+  const byline = (
+    <>
+      <Avatar src={item.face} alt="" size={22} />
+      <span className="truncate">{item.author}</span>
+    </>
+  )
+  if (!item.author) return null
+  return item.mid > 0 ? (
+    <button
+      type="button"
+      data-dynamic-open={`forward-author-${item.id}`}
+      aria-label={`进入 ${item.author} 的主页`}
+      onClick={(event) => onAuthor(item, event)}
+      className="t pointer-events-auto inline-flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]"
+    >
+      {byline}
+    </button>
+  ) : <span className="pointer-events-auto inline-flex min-w-0 items-center gap-1.5 text-[12px]">{byline}</span>
+}
+
+function ForwardContent({ item, expandedBodies, onOpen, onAuthor }: {
+  item: ipc.DynamicItem
+  expandedBodies: readonly string[]
+  onOpen: OpenDynamicItem
   onAuthor: OpenDynamicItem
 }) {
-  const open: OpenDynamic = (event) => {
-    if (orig.kind === 'video' && orig.bvid) {
-      onOpenVideo(orig, event)
-    } else if (orig.kind === 'article' && orig.article_id) {
-      void ipc
-        .openExternal(`https://www.bilibili.com/read/cv${orig.article_id}`)
-        .catch((cause) => toastFailure('打开专栏', cause))
-    } else if (orig.kind === 'live' && orig.room_id) {
-      void ipc
-        .openExternal(`https://live.bilibili.com/${orig.room_id}`)
-        .catch((cause) => toastFailure('打开直播间', cause))
-    } else {
-      void ipc
-        .openExternal(`https://www.bilibili.com/opus/${orig.id}`)
-        .catch((cause) => toastFailure('打开原动态', cause))
-    }
+  const pathId = `${item.id}/path`
+  const [expanded, setExpanded] = useState(expandedBodies.includes(pathId))
+  const body = (id: string): DynamicBody => ({ id, initiallyExpanded: expandedBodies.includes(id) })
+  const path = []
+  let original = item.orig
+  while (original?.kind === 'forward') {
+    path.push(original)
+    original = original.orig
   }
 
-  // 视频引用的署名进作品落款，这里就不再单独占一行，同一个引用里乙只出现一次。
-  const inlineAuthor = orig.kind === 'video'
-
   return (
-    <div
-      role="button"
-      data-dynamic-open="forward"
-      tabIndex={0}
-      onClick={(event) => {
-        if ((event.target as HTMLElement).closest('button')) return
-        open(event)
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        // 内层按钮自己要处理键盘：冒泡上来再整卡打开会抢掉它的动作。
-        if (
-          event.target !== event.currentTarget &&
-          (event.target as HTMLElement).closest('button')
-        ) {
-          return
-        }
-        event.preventDefault()
-        open(event)
-      }}
-      /* 转发只做一层浅底引用，不再套第二道描边：外层是白卡，这里靠底色和缩进分出层级。 */
-      className="mt-1 cursor-pointer rounded-[6px] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
-    >
-      {inlineAuthor ? (
-        <span className="num mb-1 block text-[11px] text-[var(--text-2)]">{orig.pub_time}</span>
-      ) : (
-        <div className="mb-2 flex items-center gap-2">
+    <>
+      {item.text && item.text !== '转发动态' ? <RichText text={item.text} body={body(item.id)} discuss={item.id} /> : null}
+      <DiscussionLink item={item} />
+      {path.length ? (
+        <div className="mt-2">
           <button
             type="button"
-            data-dynamic-open="original-author"
-            onClick={(event) => onAuthor(orig, event)}
-            className="t flex min-w-0 items-center gap-2"
+            name="dynamic-body"
+            value={pathId}
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+            className="t text-[12px] text-[var(--text-2)] hover:underline"
           >
-            <Avatar src={orig.face} alt={orig.author} size={24} />
-            <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]">
-              {orig.author}
-            </span>
+            {expanded ? '收起转发经过' : '查看转发经过'}
           </button>
-          <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-2)]">
-            {orig.pub_time}
-          </span>
+          {expanded ? (
+            <ol className="mt-2 space-y-3 border-l border-[var(--line)] pl-3">
+              {path.reverse().map((step) => (
+                <li key={step.id}>
+                  <div className="flex items-center gap-2">
+                    <ForwardByline item={step} onAuthor={onAuthor} />
+                    <span className="num text-page-meta text-[var(--text-3)]">{step.pub_time}</span>
+                  </div>
+                  {step.text ? <RichText text={step.text} body={body(`${item.id}/${step.id}`)} discuss={step.id} /> : null}
+                  <DiscussionLink item={step} />
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </div>
-      )}
-      <DynamicContent
-        item={orig}
-        body={body}
-        onOpen={open}
-        attribution={
-          inlineAuthor ? (
-            <button
-              type="button"
-              data-dynamic-open="original-author"
-              onClick={(event) => onAuthor(orig, event)}
-              aria-label={`UP ${orig.author}`}
-              title={`看 ${orig.author} 的更多视频`}
-              data-focus-id={`forward-author:${orig.id}`}
-              className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]"
-            >
-              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
-                UP
+      ) : null}
+      {original ? (
+        <div className="mt-2 min-w-0 rounded-[6px] bg-[var(--ga1)] p-3">
+          {original.kind !== 'video' ? (
+            <div className="mb-2 flex min-w-0 items-center gap-2">
+              <ForwardByline item={original} onAuthor={onAuthor} />
+              <span className="num text-page-meta text-[var(--text-3)]">{original.pub_time}</span>
+            </div>
+          ) : null}
+          <DynamicContent
+            item={original} body={body(`${item.id}/original`)} onOpen={(event) => onOpen(original, event)}
+            attribution={
+              <span className="mt-1 flex flex-wrap items-center gap-2">
+                <ForwardByline item={original} onAuthor={onAuthor} />
+                <span className="num text-page-meta text-[var(--text-3)]">{original.pub_time}</span>
               </span>
-              <span className="truncate">{orig.author}</span>
-            </button>
-          ) : undefined
-        }
-      />
-    </div>
+            }
+          />
+          {original.kind === 'opus' ? <DiscussionLink item={original} /> : null}
+        </div>
+      ) : null}
+    </>
   )
 }
 
@@ -424,9 +442,6 @@ function DynamicCard({
   onExternal: () => void
 }) {
   const body = { id: item.id, initiallyExpanded: expandedBodies.includes(item.id) }
-  const originalId = `${item.id}/original`
-  const text =
-    item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
   const kindLabel =
     item.kind === 'video'
       ? '投稿了视频'
@@ -450,6 +465,7 @@ function DynamicCard({
           data-dynamic-open="avatar"
           onClick={(event) => onAuthor(item, event)}
           aria-label={`进入 ${item.author} 的主页`}
+          disabled={!item.mid}
           className="t press shrink-0 rounded-full"
         >
           <Avatar src={item.face} alt={item.author} size={48} />
@@ -459,6 +475,7 @@ function DynamicCard({
             <button
               type="button"
               data-dynamic-open="author"
+              disabled={!item.mid}
               onClick={(event) => onAuthor(item, event)}
               className="t line-clamp-2 min-w-0 break-words text-left text-work-name text-[var(--text-1)] hover:text-[var(--accent-strong-hover)]"
             >
@@ -499,24 +516,14 @@ function DynamicCard({
         </button>
       </div>
 
-      <div className="ml-[60px] mt-3">
+      <div className="mt-3 sm:ml-[60px]">
         {item.kind === 'forward' ? (
-          <>
-            {text ? <RichText text={text} body={body} /> : null}
-            {item.orig ? (
-              <OrigCard
-                orig={item.orig}
-                body={{ id: originalId, initiallyExpanded: expandedBodies.includes(originalId) }}
-                onOpenVideo={onOpen}
-                onAuthor={onAuthor}
-              />
-            ) : null}
-          </>
+          <ForwardContent item={item} expandedBodies={expandedBodies} onOpen={onOpen} onAuthor={onAuthor} />
         ) : (
           <DynamicContent item={item} body={body} onOpen={(event) => onOpen(item, event)} />
         )}
       </div>
-      <footer className="ml-[60px] mt-3 flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
+      <footer className="mt-3 sm:ml-[60px] flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
         <span className="flex items-center gap-1.5" title={`转发 ${formatCount(item.forwards)}`}>
           <Icon name="share" size={15} />
           {formatCount(item.forwards)}

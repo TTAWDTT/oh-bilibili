@@ -660,7 +660,7 @@ export type DynamicItem = {
   room_id?: number
   /** 直播分区名，kind 为 live 时才有。 */
   live_area?: string
-  /** 转发动态里被转的那条，只嵌套一层。 */
+  /** 转发动态里实际可读的被转条目。 */
   orig?: DynamicItem | null
   forwards: number
   comments: number

@@ -285,7 +285,7 @@ pub struct DynamicItem {
     /// 直播分区名，`kind == Live` 时才有。
     #[serde(default)]
     pub live_area: String,
-    /// 转发动态里被转的那条。只解析一层：原动态自己也是转发时留空。
+    /// 上游返回的被转动态。原作删除时仅保留可读的上层。
     #[serde(default)]
     pub orig: Option<Box<DynamicItem>>,
     /// 动态本身的转发 / 评论 / 点赞数，不是稿件统计。
@@ -1657,12 +1657,6 @@ fn duration_text_ms(text: &str) -> Option<u64> {
 }
 
 fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
-    dynamic_item_at(item, 1)
-}
-
-/// `depth` 是还允许往下解析几层转发。B 站的转发可以套转发，
-/// 界面上只画一层原动态，再往里就是一条没有信息的空引用。
-fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
     let major = &item["modules"]["module_dynamic"]["major"];
     let kind = match (item["type"].as_str(), major["type"].as_str()) {
         (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
@@ -1677,6 +1671,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
         // 转发里的原动态常常是直播，信息在 major.live，不走 live_rcmd。
         (Some("DYNAMIC_TYPE_LIVE"), Some("MAJOR_TYPE_LIVE")) => DynamicKind::Live,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
+        (Some("DYNAMIC_TYPE_WORD"), _) => DynamicKind::Opus,
         _ => return None,
     };
     let author = &item["modules"]["module_author"];
@@ -1686,7 +1681,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
             .map(str::to_string)
             .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?,
         kind,
-        mid: dynamic_mid(&author["mid"])?,
+        mid: dynamic_mid(&author["mid"]).unwrap_or(0),
         author: author["name"].as_str().unwrap_or_default().to_string(),
         face: author["face"]
             .as_str()
@@ -1823,11 +1818,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
                 .as_str()
                 .unwrap_or_default()
                 .to_string();
-            if depth > 0 {
-                dynamic.orig = dynamic_item_at(&item["orig"], depth - 1)
-                    .filter(|orig| orig.kind != DynamicKind::Forward)
-                    .map(Box::new);
-            }
+            dynamic.orig = dynamic_item(&item["orig"]).map(Box::new);
         }
     }
     Some(dynamic)
@@ -2182,7 +2173,7 @@ mod dynamic_duration_tests {
     }
 
     #[test]
-    fn 转发套转发只保留一层() {
+    fn 转发套转发保留中间层及原作() {
         let outer = json!({
             "id_str": "4",
             "type": "DYNAMIC_TYPE_FORWARD",
@@ -2212,7 +2203,18 @@ mod dynamic_duration_tests {
         });
         let dynamic = super::dynamic_item(&outer).expect("转发动态应能解析");
         assert_eq!(dynamic.kind, super::DynamicKind::Forward);
-        assert!(dynamic.orig.is_none());
+        let middle = dynamic.orig.unwrap();
+        assert_eq!(middle.id, "5");
+        assert_eq!(middle.text, "再转");
+        assert_eq!(middle.orig.unwrap().text, "原图文");
+
+        let mut deleted = outer;
+        deleted["orig"]["orig"] = json!({ "type": "DYNAMIC_TYPE_NONE" });
+        let dynamic = super::dynamic_item(&deleted).unwrap();
+        assert_eq!(dynamic.text, "转");
+        let middle = dynamic.orig.unwrap();
+        assert_eq!(middle.id, "5");
+        assert!(middle.orig.is_none());
     }
 
     #[test]
