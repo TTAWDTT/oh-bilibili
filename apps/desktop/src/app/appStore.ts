@@ -29,6 +29,8 @@ export type View =
 export type DynamicTab = 'all' | 'video' | 'opus'
 export type DynamicReturn = {
   tab: DynamicTab
+  /** 当时选中的作者；返回时要还原同一个筛选。 */
+  author: number | null
   itemIds: string[]
   index: number
   expandedBodies: string[]
