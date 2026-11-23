@@ -640,6 +640,7 @@ export function WatchInfo({
           value={note}
           onChange={(event) => setNote(event.target.value)}
           rows={10}
+          aria-label="视频笔记"
           placeholder="点「插入当前时间」，把想法和播放位置一起记下来"
           className="w-full resize-y rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13px] leading-[1.6] text-[var(--text-1)] outline-none focus:border-[var(--accent)]"
         />
