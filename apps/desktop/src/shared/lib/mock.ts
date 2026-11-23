@@ -1381,12 +1381,24 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         '这个转场绝了', '单曲循环中', '干杯',
       ]
       // 第 3 条做成顶部弹幕、第 6 条做成底部，用来验证钉住的两种位置。
-      return texts.map((text, i) => ({
+      const base = texts.map((text, i) => ({
         secs: 1 + i * 2,
         text,
         color: i % 4 === 0 ? 0xff6699 : 0xffffff,
         mode: i === 2 ? 5 : i === 5 ? 4 : 1,
       }))
+      // `?mergeDanmaku` 再造三条同句滚动弹幕：10.0 / 10.8 / 11.9 秒在同一窗口，
+      // 12.0 秒那条已经出窗，应该另起一条。
+      if (new URLSearchParams(window.location.search).has('mergeDanmaku')) {
+        base.push(
+          { secs: 10, text: '前方高能', color: 0xffffff, mode: 1 },
+          { secs: 10.8, text: '前方高能', color: 0xffffff, mode: 1 },
+          { secs: 11.9, text: '前方高能', color: 0xffffff, mode: 1 },
+          { secs: 12, text: '前方高能', color: 0xffffff, mode: 1 },
+          { secs: 10.4, text: '前方高能！', color: 0xffffff, mode: 1 },
+        )
+      }
+      return base
     }
     case 'danmaku':
       return ['前面的别走！', '这段真的顶', '爷青回', '耳机党狂喜', '循环第 8 遍了', '这就是 B 站']

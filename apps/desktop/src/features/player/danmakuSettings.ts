@@ -19,16 +19,27 @@ type DanmakuSettings = {
   blockTypes: DanmakuBlockType[]
   /** 发弹幕时上次选的颜色；跨视频沿用。 */
   sendColor: number
+  /** 同一时段完全相同的滚动弹幕合成一条并计数；关掉恢复逐条。 */
+  mergeSame: boolean
   setEnabled: (v: boolean) => void
   patch: (part: Partial<Pick<DanmakuSettings, 'opacity' | 'size' | 'speed' | 'area'>>) => void
   setBlockWords: (words: string[]) => void
   toggleBlockType: (type: DanmakuBlockType) => void
   setSendColor: (color: number) => void
+  setMergeSame: (on: boolean) => void
 }
 
 type Stored = Pick<
   DanmakuSettings,
-  'enabled' | 'opacity' | 'size' | 'speed' | 'area' | 'blockWords' | 'blockTypes' | 'sendColor'
+  | 'enabled'
+  | 'opacity'
+  | 'size'
+  | 'speed'
+  | 'area'
+  | 'blockWords'
+  | 'blockTypes'
+  | 'sendColor'
+  | 'mergeSame'
 >
 
 const KEY = ['bilimusic', 'danmaku'].join('.')
@@ -56,6 +67,7 @@ function load(): Stored {
           typeof v.sendColor === 'number' && v.sendColor >= 0 && v.sendColor <= 0xffffff
             ? v.sendColor
             : 0xffffff,
+        mergeSame: v.mergeSame === true,
       }
     }
   } catch {
@@ -70,6 +82,7 @@ function load(): Stored {
     blockWords: [],
     blockTypes: [],
     sendColor: 0xffffff,
+    mergeSame: false,
   }
 }
 
@@ -91,6 +104,7 @@ function snapshot(state: DanmakuSettings): Stored {
     blockWords: state.blockWords,
     blockTypes: state.blockTypes,
     sendColor: state.sendColor,
+    mergeSame: state.mergeSame,
   }
 }
 
@@ -120,5 +134,9 @@ export const useDanmakuSettings = create<DanmakuSettings>((set, get) => ({
   setSendColor: (sendColor) => {
     set({ sendColor })
     save({ ...snapshot(get()), sendColor })
+  },
+  setMergeSame: (mergeSame) => {
+    set({ mergeSame })
+    save({ ...snapshot(get()), mergeSame })
   },
 }))
