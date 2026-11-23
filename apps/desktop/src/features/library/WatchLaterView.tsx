@@ -330,7 +330,7 @@ function WatchLaterRow({
         <button
           type="button"
           onClick={onStart}
-          className="t press rounded-[4px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--panel)] hover:text-[var(--accent)]"
+          className="t press rounded-[4px] px-2 py-1 text-[12.5px] text-[var(--text-3)] opacity-0 hover:bg-[var(--panel)] hover:text-[var(--accent)] focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100"
         >
           从这里连续观看
         </button>
