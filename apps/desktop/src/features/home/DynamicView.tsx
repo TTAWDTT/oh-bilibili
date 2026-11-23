@@ -578,7 +578,6 @@ export function DynamicView() {
         )
   const visible = author === null ? byTab : byTab.filter((item) => item.mid === author)
   const pickedName = author === null ? null : (following?.find((u) => u.mid === author)?.name ?? null)
-  const tabLabel = TABS.find((entry) => entry.key === tab)?.label ?? ''
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
@@ -639,6 +638,55 @@ export function DynamicView() {
     })
     return () => cancelAnimationFrame(frame)
   }, [loaded, items, following, hasMore, error, returnPosition])
+
+  /**
+   * 关注头像。窄窗排在标题下横向滚动，宽窗在阅读列右侧竖排常驻：
+   * 筛选是这一页的稳定工具，不该随正文一起滚走（#241）。
+   */
+  const authorButton = (user: Followed, vertical: boolean): ReactNode => (
+    <button
+      key={user.mid}
+      type="button"
+      aria-pressed={author === user.mid}
+      title={author === user.mid ? `取消只看 ${user.name}` : `只看 ${user.name} 的动态`}
+      onClick={() => {
+        authorHover.hide()
+        setReturnPosition(undefined)
+        setAuthor((current) => (current === user.mid ? null : user.mid))
+        scrollerRef.current?.scrollTo({ top: 0 })
+      }}
+      onPointerEnter={(event) => authorHover.show(user, event.currentTarget)}
+      onPointerLeave={authorHover.hide}
+      onFocus={(event) => authorHover.show(user, event.currentTarget)}
+      onBlur={authorHover.hide}
+      className={`t press shrink-0 rounded-[6px] ${
+        vertical ? 'flex w-full items-center gap-2 px-2 py-1 text-left' : 'w-[64px] text-center'
+      } ${author === user.mid ? 'text-[var(--accent)]' : ''}`}
+    >
+      <span
+        className={`relative inline-flex rounded-full ${
+          author === user.mid ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--panel)]' : ''
+        }`}
+      >
+        <Avatar src={user.face} alt={user.name} size={vertical ? 32 : 48} />
+        {user.special ? (
+          <span
+            title="特别关注"
+            className="absolute -right-0.5 -top-0.5 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-[var(--panel)] text-[#ffb027]"
+          >
+            <Icon name="star" size={11} />
+          </span>
+        ) : null}
+      </span>
+      <span
+        className={`block truncate ${
+          vertical ? 'min-w-0 flex-1 text-[13px]' : 'mt-1.5 text-[12px] leading-[16px]'
+        } ${author === user.mid ? 'font-medium text-[var(--accent)]' : 'text-[var(--text-2)]'}`}
+      >
+        {user.name}
+      </span>
+    </button>
+  )
 
   const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
     const scroller = scrollerRef.current
@@ -767,7 +815,7 @@ export function DynamicView() {
         </div>
       </header>
       {following?.length ? (
-        <div className={`${FEED} pt-4`}>
+        <div className={`${FEED} pt-4 xl:hidden`}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--text-3)]">
               <span className="shrink-0">关注的人</span>
@@ -804,49 +852,7 @@ export function DynamicView() {
             onScroll={authorHover.hide}
             className="no-scrollbar flex gap-3.5 overflow-x-auto rounded-[6px] bg-[var(--panel)] px-4 py-3"
           >
-            {following.map((user) => (
-              <button
-                key={user.mid}
-                type="button"
-                aria-pressed={author === user.mid}
-                onClick={() => {
-                  authorHover.hide()
-                  setReturnPosition(undefined)
-                  setAuthor((current) => (current === user.mid ? null : user.mid))
-                  scrollerRef.current?.scrollTo({ top: 0 })
-                }}
-                onPointerEnter={(event) => authorHover.show(user, event.currentTarget)}
-                onPointerLeave={authorHover.hide}
-                onFocus={(event) => authorHover.show(user, event.currentTarget)}
-                onBlur={authorHover.hide}
-                className={`t press w-[64px] shrink-0 rounded-[6px] text-center ${
-                  author === user.mid ? 'text-[var(--accent)]' : ''
-                }`}
-              >
-                <span
-                  className={`relative inline-flex rounded-full ${
-                    author === user.mid ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--panel)]' : ''
-                  }`}
-                >
-                  <Avatar src={user.face} alt={user.name} size={48} />
-                  {user.special ? (
-                    <span
-                      title="特别关注"
-                      className="absolute -right-0.5 -top-0.5 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-[var(--panel)] text-[#ffb027]"
-                    >
-                      <Icon name="star" size={11} />
-                    </span>
-                  ) : null}
-                </span>
-                <span
-                  className={`mt-1.5 block truncate text-[12px] leading-[16px] ${
-                    author === user.mid ? 'font-medium text-[var(--accent)]' : 'text-[var(--text-2)]'
-                  }`}
-                >
-                  {user.name}
-                </span>
-              </button>
-            ))}
+            {following.map((user) => authorButton(user, false))}
           </div>
         </div>
       ) : null}
@@ -860,7 +866,8 @@ export function DynamicView() {
           navigate({ kind: 'author', name: user.name, mid: user.mid })
         }}
       />
-      <div className={`${FEED} flex flex-col gap-3 pt-4`}>
+      <div className={`${FEED} pt-4 xl:grid xl:max-w-[980px] xl:grid-cols-[minmax(0,1fr)_200px] xl:items-start xl:gap-6`}>
+        <div className="flex min-w-0 flex-col gap-3">
         {visible.map((item, index) => (
           <DynamicCard
             key={item.id}
@@ -899,40 +906,9 @@ export function DynamicView() {
             }}
           />
         ))}
-        {/* 筛了作者时列表可能只是这一批里没有他：正文先给出范围说明，
-            不在这里等「滑到底」才出现文字，否则整页看起来是空的。 */}
-        {visible.length === 0 && items.length > 0 && !loading && error === null && hasMore && author !== null && pickedName !== null ? (
+        {visible.length === 0 && items.length > 0 && !loading && !hasMore && !error && pickedName === null ? (
           <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
-            已加载的动态里还没有 {pickedName} 在{tabLabel}下的更新
-            <button
-              type="button"
-              onClick={() => {
-                setReturnPosition(undefined)
-                setAuthor(null)
-              }}
-              className="t ml-2 text-[var(--accent)] hover:underline"
-            >
-              看全部关注
-            </button>
-          </p>
-        ) : null}
-        {visible.length === 0 && items.length > 0 && !loading && !hasMore && !error ? (
-          <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
-            {author === null || pickedName === null
-              ? '这个分类还没有动态'
-              : `已加载的动态里没有 ${pickedName} 在${tabLabel}下的更新`}
-            {author !== null && pickedName !== null ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setReturnPosition(undefined)
-                  setAuthor(null)
-                }}
-                className="t ml-2 text-[var(--accent)] hover:underline"
-              >
-                看全部关注
-              </button>
-            ) : null}
+            这个分类还没有动态
           </p>
         ) : null}
         {error && items.length > 0 ? (
@@ -947,13 +923,58 @@ export function DynamicView() {
           </div>
         ) : loading ? (
           <BiliLoader compact label="正在加载动态…" />
-        ) : hasMore ? null : (
+        ) : author !== null && pickedName !== null ? (
           <p className="py-6 text-center text-[12px] text-[var(--text-3)]">
-            {author === null || pickedName === null
-              ? '没有更多了'
-              : `已加载 ${pageCount} 批动态，${pickedName} 的更新看完了`}
+            已加载 {pageCount} 批动态，{pickedName} 的更新
+            {hasMore ? '还没出现' : '看完了'}
+            <button
+              type="button"
+              onClick={() => {
+                setReturnPosition(undefined)
+                setAuthor(null)
+              }}
+              className="t ml-2 text-[var(--accent)] hover:underline"
+            >
+              看全部关注
+            </button>
           </p>
+        ) : hasMore ? null : (
+          <p className="py-6 text-center text-[12px] text-[var(--text-3)]">没有更多了</p>
         )}
+        </div>
+        {following?.length ? (
+          <aside
+            data-dynamic-author-rail
+            aria-label="按作者筛选动态"
+            className="sticky top-[72px] hidden max-h-[calc(100vh-160px)] flex-col gap-0.5 overflow-y-auto rounded-[6px] bg-[var(--panel)] p-2 xl:flex"
+          >
+            <div className="flex items-center justify-between gap-2 px-1 pb-1">
+              <h3 className="text-[12.5px] text-[var(--text-3)]">关注的人</h3>
+              <button
+                type="button"
+                onClick={() => navigate({ kind: 'following' })}
+                className="t flex shrink-0 items-center text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
+                title="查看全部关注"
+              >
+                全部
+                <Icon name="chevronRight" size={11} />
+              </button>
+            </div>
+            {pickedName ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setReturnPosition(undefined)
+                  setAuthor(null)
+                }}
+                className="t mx-1 mb-1 rounded-[4px] bg-[var(--accent-soft)] px-2 py-1 text-left text-[11.5px] text-[var(--accent)] hover:underline"
+              >
+                只看 {pickedName} · 显示全部
+              </button>
+            ) : null}
+            {following.map((user) => authorButton(user, true))}
+          </aside>
+        ) : null}
       </div>
     </div>
   )
