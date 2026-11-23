@@ -78,5 +78,18 @@ const pages = (map) => async (page) => {
   check('达到页数上限时不假装读全', r.tracks.length === 80 && r.complete === false)
 }
 
+{
+  let firstPage = 0
+  const r = await collectFavTracks(
+    async (page) => {
+      if (page === 1) firstPage += 1
+      return page === 2 ? pageOf(40, 40) : pageOf(80, 15)
+    },
+    { initial: pageOf(0, 40), fromPage: 2, expected: 95 },
+  )
+  check('已加载的页不再重读', firstPage === 0 && r.tracks.length === 95 && r.complete)
+  check('沿用旧顺序再接后面的页', r.tracks[0].key === 'BV0000' && r.tracks[94].key === 'BV0094')
+}
+
 if (failed > 0) process.exit(1)
 console.log('fav pages ok')
