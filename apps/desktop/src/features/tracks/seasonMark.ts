@@ -17,9 +17,12 @@ export type SeasonMark = {
 
 const PREFIX = 'oh-bilibili:season-of:'
 
-export function rememberSeason(season: SeasonView | null | undefined): void {
+export function rememberSeason(season: SeasonView | null | undefined, currentKey?: string): void {
   if (!season) return
   const keys = [...new Set(season.episodes.map((episode) => episode.key).filter(Boolean))]
+  // 打开的那一稿本身也算：有的接口只在目录里给别的集，
+  // 或者当前这集被折叠在别的 section 里，漏掉它等于这张卡永远没有入口。
+  if (currentKey && !keys.includes(currentKey)) keys.push(currentKey)
   if (keys.length === 0) return
   const mark: SeasonMark = { id: season.id, title: season.title, count: keys.length }
   try {

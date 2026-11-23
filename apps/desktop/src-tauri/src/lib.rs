@@ -11,7 +11,7 @@ use std::sync::Arc;
 use bilimusic_core::engine::Engine;
 use bilimusic_core::engine::DownloadView;
 use bilimusic_core::lyrics::LyricDoc;
-use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, SyncOutcome, WireError};
+use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, SeasonView, SyncOutcome, WireError};
 use bilimusic_model::{Track, TrackKey};
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -93,6 +93,15 @@ async fn video_brief(
     key: String,
 ) -> Result<Track, WireError> {
     engine.video_brief(&TrackKey::from_provider(key)).await
+}
+
+/// 这一稿所属的合集目录；没有合集时返回空。
+#[tauri::command(rename_all = "snake_case")]
+async fn season_of(
+    engine: tauri::State<'_, Arc<Engine>>,
+    key: String,
+) -> Result<Option<SeasonView>, WireError> {
+    engine.season_of(&TrackKey::from_provider(key)).await
 }
 
 /// 相关推荐。
@@ -1226,6 +1235,7 @@ pub fn run() {
             related,
             video_meta,
             video_brief,
+            season_of,
             mv_source,
             watch_open,
             watch_comments,

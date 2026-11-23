@@ -617,7 +617,7 @@ export function WatchView({
           }
           // 详情里带完整合集目录时记到本地：列表页的书脊靠它，
           // 不必为每个卡片额外请求一次详情。
-          rememberSeason(next.season)
+          rememberSeason(next.season, track.key)
           setData(next)
         }
       } catch (e) {
