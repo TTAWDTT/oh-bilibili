@@ -1,4 +1,4 @@
-import { toastDone } from '../../app/notice'
+import { toastDone, toastWarn } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
@@ -13,6 +13,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
+import { collectFavTracks } from './favPages'
 
 /** 封面拼图按夹子缓存，来回切页不用重取。 */
 const coverCache = new Map<number, string[]>()
@@ -33,6 +34,12 @@ export function FavFoldersView() {
   const [exhausted, setExhausted] = useState(false)
   /** 翻页失败只是这一页没取到，不是到底；给一个原地重试。 */
   const [failed, setFailed] = useState(false)
+  /** 第一页没取到要能和空收藏夹区分开，否则会显示「这个收藏夹是空的」。 */
+  const [trackError, setTrackError] = useState<string | null>(null)
+  const [reload, setReload] = useState(0)
+  /** 「播放全部」先补齐所有页；准备期间只显示进度和取消。 */
+  const [prep, setPrep] = useState<{ loaded: number; page: number } | null>(null)
+  const prepTicket = useRef(0)
   const busy = useRef(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
@@ -84,28 +91,33 @@ export function FavFoldersView() {
     }
   }, [folders])
 
+  const folderId = picked?.id ?? null
   useEffect(() => {
-    if (!picked) {
+    prepTicket.current += 1
+    setPrep(null)
+    if (folderId === null) {
       setTracks(null)
+      setTrackError(null)
       return
     }
     let cancelled = false
     setTracks(null)
+    setTrackError(null)
     setPage(1)
     setExhausted(false)
     setFailed(false)
     void ipc
-      .favTracks(picked.id, 1)
+      .favTracks(folderId, 1)
       .then((list) => {
         if (!cancelled) setTracks(list)
       })
-      .catch(() => {
-        if (!cancelled) setTracks([])
+      .catch((e) => {
+        if (!cancelled) setTrackError(toWireError(e).message)
       })
     return () => {
       cancelled = true
     }
-  }, [picked])
+  }, [folderId, reload])
 
   /** 从当前收藏夹移出一条。成功后从列表里去掉，不用整页刷新。 */
   const removeOne = async (track: Track): Promise<void> => {
@@ -113,10 +125,58 @@ export function FavFoldersView() {
     try {
       await ipc.unfavFrom(track.key, picked.id)
       setTracks((prev) => (prev ?? []).filter((t) => t.key !== track.key))
+      const nextCount = Math.max(0, picked.count - 1)
+      setPicked({ ...picked, count: nextCount })
+      setFolders((prev) => (prev ?? []).map((f) => (f.id === picked.id ? { ...f, count: nextCount } : f)))
       toastDone('已移出收藏夹')
     } catch (e) {
       reportActionError('移出收藏夹', e)
     }
+  }
+
+  /**
+   * 播放全部：先把收藏夹的每一页读完，确认范围后再一次提交队列。
+   * 中途失败、取消或切夹都不改动正在播放的队列。
+   */
+  const playAll = async (): Promise<void> => {
+    if (!picked || prep !== null) return
+    const ticket = ++prepTicket.current
+    setPrep({ loaded: tracks?.length ?? 0, page: 1 })
+    try {
+      const { tracks: all, complete } = await collectFavTracks(
+        (page) => ipc.favTracks(picked.id, page),
+        {
+          expected: picked.count,
+          stopped: () => prepTicket.current !== ticket,
+          onProgress: (loaded, page) => {
+            if (prepTicket.current === ticket) setPrep({ loaded, page })
+          },
+        },
+      )
+      if (prepTicket.current !== ticket) return
+      if (all.length === 0) {
+        toastDone('这个收藏夹里没有可播放的视频')
+        return
+      }
+      await playContext(
+        all.map((t) => t.key),
+        0,
+      )
+      if (!complete) {
+        toastWarn(`按读到的 ${all.length} 项播放`, '收藏夹数量可能过期，没读到的项没有排进队列')
+      }
+    } catch {
+      if (prepTicket.current === ticket) {
+        toastWarn('没能读全这个收藏夹', '这次没有开始播放，稍后再试')
+      }
+    } finally {
+      if (prepTicket.current === ticket) setPrep(null)
+    }
+  }
+
+  const cancelPrep = (): void => {
+    prepTicket.current += 1
+    setPrep(null)
   }
 
   /** 加载收藏夹的下一页。B 站每页 40 条。 */
@@ -175,26 +235,39 @@ export function FavFoldersView() {
               {picked.count} 个视频
             </span>
           </h2>
-          {/* 播放全部：把当前已加载的曲目按顺序塞进队列，从第一首开始放。
-              空收藏夹里它没有可播的东西，摆一个灰按钮只是噪声。 */}
-          {tracks && tracks.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => {
-              if (!tracks || tracks.length === 0) return
-              void playContext(
-                tracks.map((t) => t.key),
-                0,
-              )
-            }}
-            className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white"
-          >
-            <Icon name="play" size={13} />
-            播放全部
-          </button>
+          {/* 播放全部要先把所有页读完，准备期间只显示进度和取消。 */}
+          {prep ? (
+            <span className="flex shrink-0 items-center gap-2 text-[12.5px] text-[var(--text-3)]">
+              <span className="num">
+                已读 {prep.loaded} 项 · 第 {prep.page} 页
+              </span>
+              <button type="button" onClick={cancelPrep} className="t text-[var(--accent)] hover:underline">
+                取消
+              </button>
+            </span>
+          ) : tracks && tracks.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => void playAll()}
+              className="t press flex shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-[13px] text-white"
+            >
+              <Icon name="play" size={13} />
+              播放全部
+            </button>
           ) : null}
         </div>
-        {tracks === null ? (
+        {trackError ? (
+          <div className="flex flex-col items-center gap-2 py-10">
+            <p className="text-[13px] text-[var(--text-3)]">{trackError}</p>
+            <button
+              type="button"
+              onClick={() => setReload((n) => n + 1)}
+              className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              重试
+            </button>
+          </div>
+        ) : tracks === null ? (
           <BiliLoader label="正在取收藏夹…" />
         ) : tracks.length === 0 ? (
           <EmptyState

@@ -315,7 +315,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     }
     case 'fav_folders':
       // 预览用一个两页的收藏夹，方便验证「加载更多」。
-      return [{ id: 1, title: '默认收藏夹', count: 70, cover: CATALOG[0]?.cover ?? null }]
+      return [
+        {
+          id: 1,
+          title: '默认收藏夹',
+          count: new URLSearchParams(window.location.search).has('favThree') ? 95 : 70,
+          cover: CATALOG[0]?.cover ?? null,
+        },
+      ]
     case 'fav_covers': {
       const limit = Math.max(1, Math.trunc(num(args, 'limit')) || 4)
       return CATALOG.slice(0, limit)
@@ -522,8 +529,24 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return keys.slice(0, 2).map((key) => [key, 12_000] as [string, number])
     }
     case 'fav_tracks': {
+      // `?favError` 让第一页失败，用来验「失败」与「空夹」没有混在一起。
+      if (new URLSearchParams(window.location.search).has('favError')) {
+        throw fail('internal', '预览：收藏夹读取失败')
+      }
       const page = Math.max(1, Math.trunc(num(args, 'page')) || 1)
       const size = 40
+      // `?favThree` 造一个 40 + 40 + 15、共 95 项的收藏夹，用来验「播放全部」读全集。
+      if (new URLSearchParams(window.location.search).has('favThree')) {
+        const start = (page - 1) * size
+        const total = 95
+        return Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
+          const n = start + i
+          const base = CATALOG[n % CATALOG.length]!
+          const track = { ...base, key: `${base.key}-fav${n}`, title: `${base.title} · 收藏 ${n + 1}` }
+          registerTrack(track)
+          return track
+        })
+      }
       const start = (page - 1) * size
       return CATALOG.slice(start, start + Math.min(size, CATALOG.length - start))
     }

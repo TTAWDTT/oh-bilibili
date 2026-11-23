@@ -17,6 +17,7 @@
     "verify": "cargo test --workspace --locked --quiet && npm run typecheck && npm run ui:audit && node scripts/ipc-audit.mjs",
     "test:sources": "node scripts/sources-test.mjs",
     "test:watch-session": "node scripts/watch-session-test.mjs",
-    "test:comment-time": "node scripts/comment-time-test.mjs"
+    "test:comment-time": "node scripts/comment-time-test.mjs",
+    "test:fav-pages": "node scripts/fav-pages-test.mjs"
   }
 }
