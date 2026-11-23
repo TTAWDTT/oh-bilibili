@@ -19,6 +19,7 @@
     "test:watch-session": "node scripts/watch-session-test.mjs",
     "test:comment-time": "node scripts/comment-time-test.mjs",
     "test:fav-pages": "node scripts/fav-pages-test.mjs",
-    "test:danmaku-merge": "node scripts/danmaku-merge-test.mjs"
+    "test:danmaku-merge": "node scripts/danmaku-merge-test.mjs",
+    "test:note-reader": "node scripts/note-reader-test.mjs"
   }
 }
