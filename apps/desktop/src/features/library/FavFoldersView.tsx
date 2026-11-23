@@ -53,6 +53,8 @@ export function FavFoldersView() {
   const [prep, setPrep] = useState<{ loaded: number; page: number } | null>(null)
   const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const busy = useRef(false)
+  /** 连点「播放全部」时靠它挡住第二次，状态更新来不及。 */
+  const prepBusy = useRef(false)
   const prepTicket = useRef(0)
   const requestTicket = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -148,6 +150,7 @@ export function FavFoldersView() {
     if (folder.id === pickedId) return
     if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
     prepTicket.current += 1
+    prepBusy.current = false
     setPrep(null)
     setPickedId(folder.id)
     const saved = memory.current.get(folder.id)
@@ -168,6 +171,7 @@ export function FavFoldersView() {
   const closeFolder = (): void => {
     if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
     prepTicket.current += 1
+    prepBusy.current = false
     setPrep(null)
     setPickedId(null)
   }
@@ -237,7 +241,8 @@ export function FavFoldersView() {
    * 中途失败、取消或切夹都不改动正在播放的队列。
    */
   const playAll = async (): Promise<void> => {
-    if (!picked || prep !== null) return
+    if (!picked || prepBusy.current) return
+    prepBusy.current = true
     const ticket = ++prepTicket.current
     setPrep({ loaded: tracks?.length ?? 0, page: 1 })
     try {
@@ -271,12 +276,16 @@ export function FavFoldersView() {
         toastWarn('没能读全这个收藏夹', '这次没有开始播放，稍后再试')
       }
     } finally {
-      if (prepTicket.current === ticket) setPrep(null)
+      if (prepTicket.current === ticket) {
+        prepBusy.current = false
+        setPrep(null)
+      }
     }
   }
 
   const cancelPrep = (): void => {
     prepTicket.current += 1
+    prepBusy.current = false
     setPrep(null)
   }
 
