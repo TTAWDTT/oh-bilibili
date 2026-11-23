@@ -60,6 +60,8 @@ export function HeroBanner({
 
   return (
     <div
+      /* key 绑首条：换一换之后整块重挂载，淡入从第一帧开始，而不是新封面直接顶替。 */
+      key={first}
       className="min-w-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={(event) => setPaused(event.currentTarget.matches(':focus-within'))}
@@ -67,8 +69,6 @@ export function HeroBanner({
       onBlur={(event) => setPaused(event.currentTarget.contains(event.relatedTarget) || event.currentTarget.matches(':hover'))}
     >
     <section
-      /* key 绑首条：换一换之后整块重挂载，淡入从第一帧开始，而不是新封面直接顶替。 */
-      key={slides[0]?.key}
       aria-label="推荐轮播"
       /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
          之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
