@@ -299,44 +299,46 @@ export function TitleBar() {
       onPointerDown={overlayTitleBar ? drag.onPointerDown : undefined}
       className={`safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pr-3 md:gap-4 ${overlayTitleBar ? 'pl-[74px] md:pl-[80px]' : 'pl-3'}`}
     >
-      {viewing ? (
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label="返回"
-          className="t press flex h-8 shrink-0 items-center gap-1 rounded-[6px] pl-1 pr-2.5 text-[14px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
-        >
-          <Icon name="chevronLeft" size={18} />
-          返回
-        </button>
-      ) : (
-        <div className="pointer-events-none flex shrink-0 items-center gap-2">
-          <span className="bili-tv-mark text-[var(--accent)]">
-            <Icon name="biliTv" size={19} />
-          </span>
-          <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
-        </div>
-      )}
+      <div className="flex w-16 shrink-0 items-center gap-2 sm:w-32 md:gap-4 lg:w-52">
+        {viewing ? (
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="返回"
+            className="t press flex h-8 shrink-0 items-center gap-1 rounded-[6px] pl-1 pr-2.5 text-[14px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+          >
+            <Icon name="chevronLeft" size={18} />
+            返回
+          </button>
+        ) : (
+          <div className="pointer-events-none flex shrink-0 items-center gap-2">
+            <span className="bili-tv-mark text-[var(--accent)]">
+              <Icon name="biliTv" size={19} />
+            </span>
+            <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
+          </div>
+        )}
 
-      {/*
-       * 站内导航只由左栏承担；顶栏这一颗只收没有站内实现的外部站点。
-       * 窄窗没有左栏，同一个菜单顺带补上番剧与直播。
-       */}
-      {!viewing ? (
-        <button
-          type="button"
-          data-site-menu-trigger
-          onClick={(event) => siteMenu ? setSiteMenu(null) : openSiteMenu(event.currentTarget)}
-          aria-label="哔哩哔哩网站"
-          aria-expanded={siteMenu !== null}
-          aria-haspopup="dialog"
-          title="哔哩哔哩网站"
-          className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] px-2 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
-        >
-          <Icon name="external" size={15} />
-          <span className="hidden lg:inline">哔哩哔哩网站</span>
-        </button>
-      ) : null}
+        {/*
+         * 站内导航只由左栏承担；顶栏这一颗只收没有站内实现的外部站点。
+         * 窄窗没有左栏，同一个菜单顺带补上番剧与直播。
+         */}
+        {!viewing ? (
+          <button
+            type="button"
+            data-site-menu-trigger
+            onClick={(event) => siteMenu ? setSiteMenu(null) : openSiteMenu(event.currentTarget)}
+            aria-label="哔哩哔哩网站"
+            aria-expanded={siteMenu !== null}
+            aria-haspopup="dialog"
+            title="哔哩哔哩网站"
+            className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] px-2 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
+          >
+            <Icon name="external" size={15} />
+            <span className="hidden lg:inline">哔哩哔哩网站</span>
+          </button>
+        ) : null}
+      </div>
 
       <div
         onBlur={(event) => {
