@@ -7,10 +7,6 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
-/**
- * 首房与同排的两间。封面保持直播源常见的 16:10，不再把 16:9/16:10 的图裁进
- * 3.6:1 的横幅；标题、主播与人气放在图外，避免压住人脸或游戏 HUD。
- */
 function LiveFeature({ room, hero }: { room: ipc.LiveRoom; hero: boolean }) {
   return (
     <button
@@ -23,7 +19,7 @@ function LiveFeature({ room, hero }: { room: ipc.LiveRoom; hero: boolean }) {
     >
       <span
         className="relative block w-full overflow-hidden rounded-[8px] bg-[var(--ga1)]"
-        style={{ aspectRatio: '16 / 10' }}
+        style={{ aspectRatio: '16 / 9' }}
       >
         {room.cover ? (
           <img
@@ -31,7 +27,7 @@ function LiveFeature({ room, hero }: { room: ipc.LiveRoom; hero: boolean }) {
             alt=""
             referrerPolicy="no-referrer"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-[320ms] group-hover:scale-[1.015]"
+            className="h-full w-full object-contain"
           />
         ) : null}
         <span className="absolute left-2 top-2 flex items-center gap-1 rounded-[3px] bg-[var(--accent)] px-1.5 py-0.5 text-[11px] font-medium leading-[16px] text-white">
@@ -76,6 +72,8 @@ export function LiveView() {
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const seen = useRef(new Set<number>())
   const pending = useRef(false)
   const pageRef = useRef(0)
   const boxRef = useRef<HTMLDivElement | null>(null)
@@ -90,13 +88,13 @@ export function LiveView() {
       .then((list) => {
         pageRef.current = next
         setPage(next)
-        setRooms((prev) => {
-          const base = next === 1 ? [] : prev
-          // 接口偶尔会在下一页重复上一页的房间；按 room_id 去重，既避免重复卡片，
-          // 也不让 React 收到重复 key。
-          const seen = new Set(base.map((room) => room.room_id))
-          return [...base, ...list.filter((room) => !seen.has(room.room_id))]
+        const fresh = list.filter((room) => {
+          if (seen.current.has(room.room_id)) return false
+          seen.current.add(room.room_id)
+          return true
         })
+        setHasMore(fresh.length > 0)
+        setRooms((prev) => [...prev, ...fresh])
       })
       .catch((cause) => setError(toWireError(cause).message))
       .finally(() => {
@@ -112,13 +110,13 @@ export function LiveView() {
   // 一屏装得下 12 个房间时滚动事件永远触发不了，取回一页后按剩余高度自己续。
   useEffect(() => {
     const box = boxRef.current
-    if (!box || page === 0 || loading) return
+    if (!box || page === 0 || loading || error || !hasMore) return
     if (box.scrollHeight - box.scrollTop - box.clientHeight < 200) load(page + 1)
-  }, [page, loading, load, rooms.length])
+  }, [page, loading, load, error, hasMore])
 
   const more = (): void => {
     const box = boxRef.current
-    if (!box || loading) return
+    if (!box || loading || error || !hasMore) return
     if (box.scrollHeight - box.scrollTop - box.clientHeight > 600) return
     load(pageRef.current + 1)
   }
@@ -165,6 +163,7 @@ export function LiveView() {
           </button>
         </div>
       </nav>
+      {!lead && !loading && !error ? <EmptyState icon="biliTv" title="暂时没有直播间" action={null} /> : null}
       {lead ? (
         <div className="mb-5 px-4 md:px-8">
           <div
