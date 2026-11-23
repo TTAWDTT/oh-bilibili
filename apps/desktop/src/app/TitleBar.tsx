@@ -185,7 +185,6 @@ function SearchSuggest({ query, onPick }: { query: string; onPick: (word: string
 export function TitleBar() {
   const focusNonce = useAppStore((state) => state.searchFocus)
   const setQuery = useAppStore((state) => state.setHeroQuery)
-  const closeSearch = useAppStore((state) => state.closeSearch)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const navigate = useAppStore((state) => state.navigate)
   const goBack = useAppStore((state) => state.goBack)
@@ -359,9 +358,7 @@ export function TitleBar() {
             event.stopPropagation()
             setFocused(false)
             inputRef.current?.blur()
-            // 结果面板没开时 Esc 只收联想；这里清 searchReturn 会让
-            // 从搜索结果进入的视频失去返回目标。
-            if (useAppStore.getState().searchOpen) closeSearch()
+            // Esc 只收联想；结果页是独立页面，留在原处。
             return
           }
           if (event.key !== 'ArrowDown' || event.target !== inputRef.current) return
@@ -396,7 +393,8 @@ export function TitleBar() {
               title="清空"
               onClick={() => {
                 setText('')
-                closeSearch()
+                // 结果页上清空输入等于退出这次搜索；只是打字时不动页面。
+                if (useAppStore.getState().view.kind === 'search') goBack()
                 inputRef.current?.focus()
               }}
               className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"

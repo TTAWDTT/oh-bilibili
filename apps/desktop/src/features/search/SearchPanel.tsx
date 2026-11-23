@@ -75,7 +75,7 @@ export function SearchPanel() {
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
   const skipFirstFetch = useRef(restored !== null)
-  const scrollerRef = useRef<HTMLElement | null>(null)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState(false)
   /** 这一批 UP 主里已经点过关注的人。只单向关注，不提供取关，避免误触。 */
@@ -114,7 +114,7 @@ export function SearchPanel() {
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
   const setSearchFilters = useAppStore((state) => state.setSearchFilters)
-  const closeSearch = useAppStore((state) => state.closeSearch)
+  const goBack = useAppStore((state) => state.goBack)
   const searchFocusResult = useAppStore((state) => state.searchFocusResult)
   const clearSearchFocusResult = useAppStore((state) => state.clearSearchFocusResult)
 
@@ -363,20 +363,23 @@ export function SearchPanel() {
   }
 
   return (
-    <div className="bili-search-overlay">
-      {/* 点面板外收起。压一层半透明底色，页面退后一步，面板才是焦点。 */}
-      <div
-        aria-hidden
-        onClick={closeSearch}
-        className="absolute inset-0 bg-[color-mix(in_oklab,var(--text-1)_10%,transparent)]"
-      />
-      <section
-        role="dialog"
-        aria-label="搜索结果"
-        ref={scrollerRef}
-        id="search-scroll"
-        className="bili-search-sheet absolute inset-x-0 top-0 mx-auto h-[calc(100%-10px)] w-[min(1240px,calc(100%-24px))] overflow-y-auto rounded-b-[12px] border border-t-0 border-[var(--line)] bg-[var(--panel)] px-5 pb-10 pt-4"
-      >
+    <div
+      ref={scrollerRef}
+      id="scroll-main"
+      className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+    >
+      <div className="mb-3 flex items-center gap-3">
+        <h2 className="min-w-0 flex-1 truncate text-page-title text-[var(--text-1)]" title={trimmed}>
+          搜索 “{trimmed}”
+        </h2>
+        <button
+          type="button"
+          onClick={goBack}
+          className="t press shrink-0 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]"
+        >
+          返回
+        </button>
+      </div>
         {trimmed.length === 0 ? (
           <div className="flex min-h-[320px] items-center justify-center text-[13px] text-[var(--text-3)]">
             在顶部搜索栏输入关键词
@@ -386,7 +389,7 @@ export function SearchPanel() {
             {/* B 站搜索页的分类 tab：综合里同时有 UP 主和视频，也可以只看其中一类。 */}
             <nav
               aria-label="搜索结果分类"
-              className="sticky top-0 z-10 -mx-5 mb-3 flex gap-6 border-b border-[var(--line)] bg-[var(--panel)] px-5"
+              className="sticky top-0 z-10 -mx-4 mb-3 flex gap-6 border-b border-[var(--line)] bg-[var(--color-ink)] px-4 md:-mx-8 md:px-8"
             >
               {(
                 [
@@ -412,15 +415,6 @@ export function SearchPanel() {
                   {label}
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={closeSearch}
-                aria-label="关闭搜索"
-                title="关闭搜索"
-                className="t press mb-2 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"
-              >
-                <Icon name="close" size={15} />
-              </button>
             </nav>
             {tab !== 'video' && usersReady && users.length > 0 ? (
               <div className="mb-4">
@@ -571,14 +565,16 @@ export function SearchPanel() {
               </span>
             </div>
 
-            {tracks.length > 0 ? (
-              <div className="mb-2 flex flex-col gap-2">
+            {/* 筛选条常驻：加载中、零结果时也能就地改条件，不必先清空关键词。 */}
+            <div className="mb-2 flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <DurationFilter
                     active={duration}
                     onChange={(key) => {
                       setDuration(key)
+                      setSearchFilters(partition, order, key)
                       setPage(1)
+                      scrollerRef.current?.scrollTo({ top: 0 })
                     }}
                   />
                   <div className="flex items-center gap-1">
@@ -591,7 +587,12 @@ export function SearchPanel() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setOrder(value)}
+                      onClick={() => {
+                        setOrder(value)
+                        setSearchFilters(partition, value, duration)
+                        setPage(1)
+                        scrollerRef.current?.scrollTo({ top: 0 })
+                      }}
                       aria-pressed={order === value}
                       className={[
                         't rounded-[4px] px-2 py-1 text-[13px]',
@@ -610,12 +611,13 @@ export function SearchPanel() {
                   active={partition}
                   onChange={(label) => {
                     setPartition(label)
+                    setSearchFilters(label, order, duration)
                     // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
                     setPage(1)
+                    scrollerRef.current?.scrollTo({ top: 0 })
                   }}
                 />
-              </div>
-            ) : null}
+            </div>
 
             {status === 'loading' && tracks.length === 0 ? <BiliLoader label="正在 B 站里翻…" /> : null}
 
@@ -648,7 +650,7 @@ export function SearchPanel() {
                   action={
                     selectedPartition.tid
                       ? { label: '全站搜这个词', onClick: () => setPartition('全部') }
-                      : { label: '清空条件', onClick: () => setQuery('') }
+                      : { label: '返回', onClick: goBack }
                   }
                 />
 
@@ -724,7 +726,6 @@ export function SearchPanel() {
             )}
           </section>
         )}
-      </section>
     </div>
   )
 }
