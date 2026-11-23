@@ -17,6 +17,7 @@ const RELATIONS = [
 
 const URL_RE = /https?:\/\/[^\s]+/g
 const BV_RE = /\bBV[0-9A-Za-z]{10}\b/
+const BARE_BV_RE = /\bBV[0-9A-Za-z]{10}\b/g
 
 export type SourceEntry = {
   id: string
@@ -35,9 +36,22 @@ function cleanUrl(raw: string): string {
   return raw.replace(/[)。，、；：!?.,;:)\]】]+$/u, '')
 }
 
+/**
+ * 同一行里的目标：完整链接，加上写在正文里的裸 BV 号（「原曲：BV1xx」很常见）。
+ * 链接里带的 BV 已在 URL 里算过，先从正文里剔掉，免得一条算成两条。
+ */
 function linksIn(line: string): string[] {
-  const urls = line.match(URL_RE) ?? []
-  return urls.map(cleanUrl)
+  const urls = (line.match(URL_RE) ?? []).map(cleanUrl)
+  const bare = [...line.replace(URL_RE, ' ').matchAll(BARE_BV_RE)].map((match) => match[0])
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const link of [...urls, ...bare]) {
+    const id = bvidOf(link) ?? link
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(link)
+  }
+  return out
 }
 
 function relationsIn(line: string): string[] {
@@ -90,7 +104,8 @@ export function parseSources(desc: string, currentKey: string): SourceEntry[] {
     // 关系词一行、链接单独一行：只接受下一行除了一个链接没有别的正文。
     const next = (lines[i + 1] ?? '').trim()
     const nextLinks = [...new Set(linksIn(next))]
-    if (nextLinks.length === 1 && next.replace(URL_RE, '').trim() === '') {
+    const leftover = next.replace(URL_RE, ' ').replace(BARE_BV_RE, ' ').trim()
+    if (nextLinks.length === 1 && leftover === '') {
       push(line, relations, nextLinks[0]!)
       i += 1
     }

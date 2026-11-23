@@ -45,7 +45,13 @@ function useBrief(bvid: string | undefined): Track | null {
   return brief
 }
 
-function SourceRow({ entry, onOpen }: { entry: SourceEntry; onOpen: (entry: SourceEntry) => void }) {
+function SourceRow({
+  entry,
+  onOpen,
+}: {
+  entry: SourceEntry
+  onOpen: (entry: SourceEntry, brief: Track | null) => void
+}) {
   const brief = useBrief(entry.kind === 'video' ? entry.bvid : undefined)
   const label =
     entry.kind === 'video' ? (brief?.title ?? `站内视频 ${entry.bvid}`) : `外部资源 · ${hostOf(entry.url!)}`
@@ -65,7 +71,7 @@ function SourceRow({ entry, onOpen }: { entry: SourceEntry; onOpen: (entry: Sour
             </span>
             <button
               type="button"
-              onClick={() => onOpen(entry)}
+              onClick={() => onOpen(entry, brief)}
               data-focus-id={entry.kind === 'video' ? `source:${entry.bvid}` : undefined}
               className="t flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
             >
@@ -93,9 +99,10 @@ export function SourceLinks({ entries }: { entries: SourceEntry[] }) {
   const navigate = useAppStore((state) => state.navigate)
   if (entries.length === 0) return null
 
-  const open = (entry: SourceEntry): void => {
+  const open = (entry: SourceEntry, brief: Track | null): void => {
     if (entry.kind === 'video' && entry.bvid) {
-      const track: Track = {
+      // 列表里已经取到过这条素材的标题和封面，直接用上，免得进观看页前闪一下 BV 号。
+      const track: Track = brief ?? {
         key: entry.bvid,
         title: entry.bvid,
         artist: '',
