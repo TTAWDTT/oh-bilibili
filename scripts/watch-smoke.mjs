@@ -1522,7 +1522,7 @@ async function checkHeroAllocation(page) {
   for (let i = 0; i < 40 && !ready; i += 1) {
     await sleep(250)
     ready = await page.evaluate(
-      `document.querySelectorAll('[data-home-hero-grid] > button').length === 6 &&
+      `document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6 &&
        document.querySelectorAll('[data-home-feed] [data-track-card]').length >= 5`,
     )
   }
@@ -1530,7 +1530,7 @@ async function checkHeroAllocation(page) {
     page.evaluate(`(() => {
       const carousel = [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
         .map((image) => image.dataset.trackTitle ?? '')
-      const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
+      const grid = [...document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]')]
         .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
       const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
         .map((card) => card.dataset.trackTitle ?? '')
@@ -1579,7 +1579,7 @@ async function checkHeroAllocation(page) {
   for (let i = 0; i < 20 && !refreshedReady; i += 1) {
     await sleep(200)
     refreshedReady = await page.evaluate(
-      `[...document.querySelectorAll('[data-home-hero-grid] > button')].some((card) =>
+      `[...document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]')].some((card) =>
         card.textContent.includes('首页分配 12'))`,
     )
   }
@@ -1681,7 +1681,7 @@ async function checkHomeResume(page) {
     await sleep(250)
     ready = await page.evaluate(
       `!!document.querySelector('[data-home-resume="wide"]') &&
-       document.querySelectorAll('[data-home-hero-grid] > button').length === 6`,
+       document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6`,
     )
   }
   const wide = await page.evaluate(`(() => {
@@ -1689,7 +1689,7 @@ async function checkHomeResume(page) {
     return {
       text: (card?.textContent || '').trim(),
       carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-      grid: document.querySelectorAll('[data-home-hero-grid] > button').length,
+      grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
     }
   })()`)
   check(
@@ -1754,7 +1754,7 @@ async function checkHomeResume(page) {
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(1200)
   const recovered = await page.evaluate(`({
-    grid: document.querySelectorAll('[data-home-hero-grid] > button').length,
+    grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
     error: document.body.innerText.includes('连不上 B 站'),
   })`)
   check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
@@ -4937,6 +4937,20 @@ async function main() {
       '返回后保留关键词、分区、排序和时长',
       filtersSelected && returnedMany.query === '周杰伦' && filters.every((filter) => returnedMany.filters.includes(filter)),
     )
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '尚未提交的词')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await page.evaluate(`document.querySelector('button[aria-label="清空搜索"]')?.click()`)
+    check('清空草稿保留已提交的结果与阅读位置', await page.evaluate(`(() => {
+      const results = document.querySelector('[data-search-results]')
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      return input?.value === '' && document.activeElement === input &&
+        results?.querySelector('h2')?.textContent.includes('周杰伦') &&
+        results.scrollTop === ${returnedMany.scrollTop}
+    })()`))
     await page.evaluate(`[...document.querySelectorAll('[data-search-results] button')].find(b => b.textContent.trim() === '返回')?.click()`)
     check(
       '主动关闭搜索后露出原页面',

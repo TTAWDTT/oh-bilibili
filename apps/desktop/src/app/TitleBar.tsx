@@ -391,8 +391,6 @@ export function TitleBar() {
               title="清空"
               onClick={() => {
                 setText('')
-                // 结果页上清空输入等于退出这次搜索；只是打字时不动页面。
-                if (useAppStore.getState().view.kind === 'search') goBack()
                 inputRef.current?.focus()
               }}
               className="t flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[var(--text-3)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]"

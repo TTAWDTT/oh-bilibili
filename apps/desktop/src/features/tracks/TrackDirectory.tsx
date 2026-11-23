@@ -11,7 +11,7 @@ import { readSeasonMark, seasonLabel } from './seasonMark'
 type DirectoryItem = { track: Track; page?: number; current: boolean }
 type Directory = { title: string; items: DirectoryItem[] }
 
-export function TrackDirectory({ track }: { track: Track }) {
+export function TrackDirectory({ track, sourceId = track.key }: { track: Track; sourceId?: string }) {
   const count = knownPageCount(track.key, track.pages)
   const resume = count && count > 1 ? readResumePage(track.key) : null
   const parts = spineLabel(count, resume)
@@ -21,28 +21,29 @@ export function TrackDirectory({ track }: { track: Track }) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
       {parts && (
-        <DirectoryButton track={track} kind="parts" label={parts}
+        <DirectoryButton track={track} kind="parts" sourceId={sourceId} label={parts}
           name={`查看分 P，本稿 ${count} 个分 P${continued ? `，上次看到 P${resume}` : ''}`} />
       )}
       {season && (
-        <DirectoryButton track={track} kind="season" label={parts ? '所属合集' : seasonLabel(season) ?? '合集'}
+        <DirectoryButton track={track} kind="season" sourceId={sourceId} label={parts ? '所属合集' : seasonLabel(season) ?? '合集'}
           name={`查看合集，${season.title}`} />
       )}
     </div>
   )
 }
 
-function DirectoryButton({ track, kind, label, name }: {
+function DirectoryButton({ track, kind, label, name, sourceId }: {
   track: Track
   kind: 'parts' | 'season'
   label: string
   name: string
+  sourceId: string
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [anchor, setAnchor] = useState<Anchor | null>(null)
   const [directory, setDirectory] = useState<Directory | null>(null)
   const [failed, setFailed] = useState(false)
-  const focusId = `directory:${kind}:${track.key}`
+  const focusId = `directory:${kind}:${sourceId}`
   const load = async (): Promise<void> => {
     setFailed(false)
     try {

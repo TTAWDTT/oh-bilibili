@@ -1,4 +1,5 @@
 import { TrackByline } from '../tracks/TrackByline'
+import { TrackDirectory } from '../tracks/TrackDirectory'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
@@ -110,6 +111,7 @@ export function PartitionRow({ rid, title }: PartitionRowProps) {
                 {track.title}
               </span>
             </button>
+            <TrackDirectory track={track} sourceId={`partition:${rid}:${track.key}`} />
             <div className="mt-1 text-[12px] text-[var(--text-3)]">
               <TrackByline track={track} focusId={`partition-author:${rid}:${track.key}`} />
             </div>

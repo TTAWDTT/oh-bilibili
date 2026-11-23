@@ -599,7 +599,7 @@ export function SearchPanel({ query }: { query: string }) {
               </div>
             ) : null}
 
-            {status === 'ready' && tracks.length === 0 ? (
+            {status === 'ready' && ended && tracks.length === 0 ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center gap-1">
                 <EmptyState
                   mascot="missYou"
@@ -665,9 +665,9 @@ export function SearchPanel({ query }: { query: string }) {
               />
             ) : null}
 
-            {status === 'ready' && tracks.length > 0 ? (
+            {status === 'ready' && (!ended || tracks.length > 0) ? (
               <div ref={sentinel} className="mt-6 flex items-center justify-center gap-2 text-[13px] text-[var(--text-3)]">
-                {loadingMore ? (
+                {loadingMore || (tracks.length === 0 && !moreError) ? (
                   <BiliLoader compact label="正在加载更多…" />
                 ) : moreError ? (
                   <button

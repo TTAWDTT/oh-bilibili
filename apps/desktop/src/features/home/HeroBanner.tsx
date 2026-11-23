@@ -4,6 +4,7 @@ import { thumbWide } from '../../shared/lib/thumb'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
+import { TrackDirectory } from '../tracks/TrackDirectory'
 import { HeroQuoteLine, quoteLabel, useHeroQuote } from './HeroQuote'
 
 const SLIDE_MS = 6000
@@ -58,15 +59,17 @@ export function HeroBanner({
   const current = slides[Math.min(index, slides.length - 1)]!
 
   return (
-    <div className="min-w-0">
+    <div
+      className="min-w-0"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={(event) => setPaused(event.currentTarget.matches(':focus-within'))}
+      onFocus={() => setPaused(true)}
+      onBlur={(event) => setPaused(event.currentTarget.contains(event.relatedTarget) || event.currentTarget.matches(':hover'))}
+    >
     <section
       /* key 绑首条：换一换之后整块重挂载，淡入从第一帧开始，而不是新封面直接顶替。 */
       key={slides[0]?.key}
       aria-label="推荐轮播"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
       /* 16:9：B 站首屏轮播实测 563×322，正好是这个比例。
          之前宽屏让它撑满整列高度，列一窄就变成竖版，封面被裁得只剩中间一条。 */
       className="bili-hero-swap relative mb-0 aspect-video overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ga1)] lg:aspect-[7/5]"
@@ -178,6 +181,7 @@ export function HeroBanner({
         荐
       </span>
     </section>
+    <TrackDirectory key={current.key} track={current} sourceId={`hero:${current.key}`} />
     {quote ? (
       <div className="md:hidden">
         <HeroQuoteLine

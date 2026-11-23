@@ -1,4 +1,5 @@
 import { TrackByline } from '../tracks/TrackByline'
+import { TrackDirectory } from '../tracks/TrackDirectory'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
@@ -39,6 +40,7 @@ const FEED_SLOW_MS = 8000
 /** 按会话记住这一屏：从视频页返回时，推荐流和滚动位置都要原样回来。 */
 const feedMemory: {
   items: Track[]
+  resume: Resume | null
   /** 首屏那十一条（轮播 5 + 右侧 6）。它可以被「换一换」单独换掉，下面推荐流不动。 */
   hero: Track[]
   fresh: number
@@ -47,6 +49,7 @@ const feedMemory: {
   index: number
 } = {
   items: [],
+  resume: null,
   hero: [],
   fresh: 1,
   nextFresh: 2,
@@ -64,14 +67,20 @@ export function HomeView() {
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
-  const [resume, setResume] = useState<Resume | null>(null)
+  const directoryReturn = useRef(useAppStore.getState().returnFocus?.id.startsWith('directory:')).current
+  const [resume, setResume] = useState<Resume | null>(directoryReturn ? feedMemory.resume : null)
   // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
   useEffect(() => {
+    if (directoryReturn) return
+    feedMemory.resume = null
     let alive = true
     void ipc
       .libraryHistoryTimed(12)
       .then((list) => {
-        if (alive) setResume(resumeFrom(list))
+        if (alive) {
+          feedMemory.resume = resumeFrom(list)
+          setResume(feedMemory.resume)
+        }
       })
       .catch(() => {
         // 历史读不到就让推荐占满首屏
@@ -79,7 +88,7 @@ export function HomeView() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [directoryReturn])
 
   const openResume = (item: Resume): void => {
     if (item.watching) {
@@ -543,6 +552,7 @@ export function HomeView() {
                     {track.title}
                   </span>
                 </button>
+                <TrackDirectory track={track} sourceId={`herocard:${track.key}`} />
                 <div className="mt-1 text-[12px] text-[var(--text-3)]">
                   <TrackByline track={track} focusId={`hero-author:${track.key}`} />
                 </div>
