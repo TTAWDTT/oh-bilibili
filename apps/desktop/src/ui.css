@@ -423,32 +423,12 @@
  * 全部用 transform 与 opacity，不动布局，所以不会掉帧。
  */
 
-/* 卡片：hover 抬起 2px 并加深阴影，像被手指按住又松开 */
-.bili-card {
-  transition:
-    transform var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease);
-}
-
-/*
- * 封面卡片的标题在 hover 时变 B 站的链接蓝（#00AEEC）。
- *
- * 网页端就是这么做的：整屏深灰文字里，鼠标扫到的那一条标题先亮成蓝色。
- * 主色只有这一种蓝，不再混第二种主色。
- */
-.bili-card .bili-card-title {
+.bili-card-title button {
   transition: color 120ms var(--ease);
 }
 
-.bili-card:hover .bili-card-title,
-.bili-card:focus-within .bili-card-title {
-  color: var(--accent);
-}
-
-.bili-card:hover {
-  /* 普通作品卡只让封面和标题响应，不再整块上浮：密集网格里一屏十几张卡同时被抬起会晃。 */
-  transform: none;
-  box-shadow: none;
+.bili-card-title button:is(:hover, :focus-visible) {
+  color: var(--accent-strong);
 }
 
 .bili-playlist-play {
@@ -930,8 +910,10 @@
   background: var(--panel-raised);
 }
 
-.bili-card:hover .bili-card-cover {
-  transform: scale(1.04);
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  button:hover .bili-card-cover {
+    transform: scale(1.04);
+  }
 }
 
 /*

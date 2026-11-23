@@ -247,16 +247,35 @@ export function WeeklyView() {
         <BiliLoader label="正在取本期…" />
       ) : page && page.tracks.length > 0 ? (
         <div data-weekly-issue={number ?? ''} className="@container">
-          <div className="grid grid-cols-1 gap-x-8 gap-y-6 @card:grid-cols-2">
-            {page.tracks.map((track) => (
-              <WideCard
-                key={track.key}
-                track={track}
-                note={page.notes[track.key] ?? null}
-                onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
-              />
+          {page.subject && page.subject !== page.label ? (
+            <h3 className="mb-4 text-[26px] font-semibold leading-tight text-[var(--text-1)] @card:text-[36px]">
+              {page.subject}
+            </h3>
+          ) : null}
+          <div className="grid items-start gap-5 @card:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            {page.tracks.slice(0, 3).map((track, index) => (
+              <div key={track.key} className={index === 0 && page.tracks.length > 1 ? '@card:row-span-2' : ''}>
+                <WideCard
+                  track={track}
+                  lead={index === 0}
+                  note={page.notes[track.key] ?? null}
+                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+                />
+              </div>
             ))}
           </div>
+          {page.tracks.length > 3 ? (
+            <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 border-t border-[var(--line)] pt-6 @card:grid-cols-2">
+              {page.tracks.slice(3).map((track) => (
+                <WideCard
+                  key={track.key}
+                  track={track}
+                  note={page.notes[track.key] ?? null}
+                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         <EmptyState mascot="missYou" icon="biliTv" title="这一期暂时是空的" action={null} />

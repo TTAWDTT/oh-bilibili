@@ -1,17 +1,10 @@
-/** tid 是 B 站的一级分区 id（tids 参数用它）；ids 保留做展示与未来细化。 */
-export type Partition = { label: string; tid?: number; ids: number[] }
+import { PARTS } from '../../shared/lib/biliParts'
 
-export const PARTITIONS: Partition[] = [
-  { label: '全部', ids: [] },
-  // B 站音乐区用子分区 id，主类目 3 反而很少出现
-  { label: '音乐', tid: 3, ids: [3, 28, 29, 30, 31, 59, 130, 193, 171] },
-  { label: '舞蹈', tid: 129, ids: [129] },
-  { label: '游戏', tid: 4, ids: [4, 17, 65, 136] },
-  { label: '鬼畜', tid: 119, ids: [119] },
-  { label: '动画', tid: 1, ids: [1, 24, 25, 47, 210] },
-  { label: '生活', tid: 21, ids: [21, 76, 75, 160, 211, 217] },
-  { label: '影视', tid: 181, ids: [181, 23, 11, 13] },
-]
+export type Partition = { label: string; tid?: number }
+
+export const PARTITIONS: Partition[] = PARTS.map(({ rid, name }) =>
+  rid === 0 ? { label: '全部' } : { label: name, tid: rid },
+)
 
 export function PartitionFilter({
   active,

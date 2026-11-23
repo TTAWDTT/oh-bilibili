@@ -1,3 +1,4 @@
+import { TrackByline } from '../tracks/TrackByline'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
@@ -5,12 +6,13 @@ import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
-import { PART_CHILDREN, PARTS } from '../../shared/lib/biliParts'
+import { PARTS } from '../../shared/lib/biliParts'
 import { HeroBanner } from './HeroBanner'
 import { HeroQuoteLine, useHeroQuote } from './HeroQuote'
 import { LiveRow } from './LiveRow'
 import { BangumiRow } from './BangumiRow'
 import { PartitionRow } from './PartitionRow'
+import { RegionFeed, regionMemory } from './RegionFeed'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
@@ -56,23 +58,13 @@ export function HomeView() {
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const playContext = usePlayerStore((s) => s.playContext)
-  const [hoverPart, setHoverPart] = useState<{ name: string; left: number; top: number } | null>(null)
+  const scope = useAppStore((state) => state.view.kind === 'home' ? (state.view.rid ?? 0) : 0)
+  const replace = useAppStore((state) => state.replace)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
   const [resume, setResume] = useState<Resume | null>(null)
-  /** 当前浏览的分区；0 是「全部」，保留推荐流。 */
-  const [scope, setScope] = useState(0)
-  const [region, setRegion] = useState<Track[] | null>(null)
-  const [regionError, setRegionError] = useState<string | null>(null)
-  const [regionLoading, setRegionLoading] = useState(false)
-  const [regionAttempt, setRegionAttempt] = useState(0)
-  const regionSeq = useRef(0)
-  /** 进分区前的滚动位置，回到「全部」时放回去。 */
-  const scopeScroll = useRef(0)
-  const restoringScope = useRef(false)
-
   // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
   useEffect(() => {
     let alive = true
@@ -250,17 +242,8 @@ export function HomeView() {
   useLayoutEffect(() => {
     const el = scrollerRef.current
     if (!el) return
-    // 窗口化后滚动高度只代表已挂出来的这一段，按「第几条」恢复才落得回原处。
-    const card =
-      feedMemory.index > 0
-        ? el.querySelector<HTMLElement>(`[data-track-card][data-index="${feedMemory.index}"]`)
-        : null
-    if (card) {
-      el.scrollTop += card.getBoundingClientRect().top - el.getBoundingClientRect().top - 8
-    } else if (feedMemory.items.length > 0) {
-      el.scrollTop = feedMemory.scrollTop
-    }
-  }, [])
+    el.scrollTop = scope === 0 ? feedMemory.scrollTop : regionMemory.get(scope)?.top ?? 0
+  }, [scope])
 
   useEffect(() => {
     feedMemory.items = items
@@ -274,47 +257,10 @@ export function HomeView() {
     feedMemory.fresh = fresh
   }, [fresh])
 
-  // 选分区就换内容，不换页面：迟到的旧分区响应不能盖掉当前分区。
-  useEffect(() => {
-    if (scope === 0) return
-    const ticket = ++regionSeq.current
-    setRegionLoading(true)
-    setRegionError(null)
-    setRegion(null)
-    void ipc
-      .regionNew(scope, 1)
-      .then((list) => {
-        if (regionSeq.current === ticket) setRegion(list)
-      })
-      .catch((e) => {
-        if (regionSeq.current !== ticket) return
-        setRegion([])
-        setRegionError(toWireError(e).message)
-      })
-      .finally(() => {
-        if (regionSeq.current === ticket) setRegionLoading(false)
-      })
-  }, [scope, regionAttempt])
-
-  useEffect(() => {
-    if (scope !== 0 || !restoringScope.current) return
-    restoringScope.current = false
-    scrollerRef.current?.scrollTo({ top: scopeScroll.current })
-  }, [scope])
-
   const chooseScope = (rid: number): void => {
     if (rid === scope) return
-    if (scope === 0) scopeScroll.current = scrollerRef.current?.scrollTop ?? 0
-    setHoverPart(null)
-    setScope(rid)
-    scrollerRef.current?.scrollTo({ top: 0 })
-  }
-
-  const backToAll = (): void => {
-    if (scope === 0) return
-    restoringScope.current = true
-    setHoverPart(null)
-    setScope(0)
+    regionMemory.delete(rid)
+    replace(rid ? { kind: 'home', rid } : { kind: 'home' })
   }
 
   const more = (): void => {
@@ -391,7 +337,11 @@ export function HomeView() {
       onScroll={(event) => {
         const el = event.currentTarget
         // 分区里的滚动不是推荐流的位置，别把它写进返回时要用的记忆。
-        if (scope !== 0) return
+        if (scope !== 0) {
+          const region = regionMemory.get(scope)
+          if (region) region.top = el.scrollTop
+          return
+        }
         feedMemory.scrollTop = el.scrollTop
         const max = el.scrollHeight - el.clientHeight
         // 滚动高度只覆盖已挂出来的卡片，比例要按渲染窗口算，不能按取回的条数算。
@@ -433,10 +383,7 @@ export function HomeView() {
               </button>
             ))}
           </div>
-          <div
-            className="relative min-w-0 flex-1"
-            onMouseLeave={() => setHoverPart(null)}
-          >
+          <div className="relative min-w-0 flex-1">
             <div
               ref={channelRef}
               className={`no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto border-l border-[var(--line)] pl-5 ${
@@ -452,7 +399,7 @@ export function HomeView() {
               <button
                 type="button"
                 aria-pressed={scope === 0}
-                onClick={backToAll}
+                onClick={() => chooseScope(0)}
                 className={[
                   't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
                   scope === 0
@@ -468,22 +415,6 @@ export function HomeView() {
                   type="button"
                   aria-pressed={scope === part.rid}
                   onClick={() => chooseScope(part.rid)}
-                  onMouseEnter={(event) => {
-                    const el = event.currentTarget
-                    setHoverPart({
-                      name: part.name,
-                      left: el.offsetLeft - (el.parentElement?.scrollLeft ?? 0),
-                      top: el.offsetTop,
-                    })
-                  }}
-                  onFocus={(event) => {
-                    const el = event.currentTarget
-                    setHoverPart({
-                      name: part.name,
-                      left: el.offsetLeft - (el.parentElement?.scrollLeft ?? 0),
-                      top: el.offsetTop,
-                    })
-                  }}
                   className={[
                     't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
                     scope === part.rid
@@ -495,44 +426,12 @@ export function HomeView() {
                 </button>
               ))}
             </div>
-            {hoverPart && PART_CHILDREN[hoverPart.name] ? (
-              /* pt-2 是这块面板的悬停桥：留成 margin 的话，鼠标往下走的 8px 会
-                 先离开外层，面板在指针到达前就关了。top 跟着被悬停的胶囊走，
-                 频道条横向滚动时 left 也要减掉 scrollLeft，面板才不会跑偏。 */
-              <div
-                className="absolute z-30 pt-2"
-                style={{
-                  top: `${hoverPart.top + 28}px`,
-                  left: `clamp(0px, ${hoverPart.left - 20}px, calc(100% - min(600px, 100%)))`,
-                  width: 'min(600px, 100%)',
-                }}
-              >
-                <div className="w-full rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-5 py-4 shadow-[0_16px_40px_-18px_rgba(0,0,0,0.28)]">
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-2.5 sm:grid-cols-4 sm:gap-x-8">
-                    {(PART_CHILDREN[hoverPart.name] ?? []).map((child) => (
-                      <button
-                        key={child}
-                        type="button"
-                        onClick={() => {
-                          useAppStore.getState().setSearchFilters(hoverPart.name, 'totalrank', 0)
-                          useAppStore.getState().setHeroQuery(child)
-                          setHoverPart(null)
-                        }}
-                        className="w-full whitespace-nowrap py-0.5 text-left text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
-                      >
-                        {child}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       </nav>
 
       {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}
-      {error && items.length === 0 ? (
+      {scope === 0 && error && items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">
           <p className="text-[13px] text-[var(--text-3)]">{error}</p>
           <button
@@ -643,13 +542,10 @@ export function HomeView() {
                   <span className="mt-1.5 line-clamp-2 text-[13.5px] leading-[19px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
                     {track.title}
                   </span>
-                  <span className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-                    <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[13px]">
-                      UP
-                    </span>
-                    <span className="truncate">{track.artist}</span>
-                  </span>
                 </button>
+                <div className="mt-1 text-[12px] text-[var(--text-3)]">
+                  <TrackByline track={track} focusId={`hero-author:${track.key}`} />
+                </div>
                 {i === 0 && featuredQuote ? (
                   <HeroQuoteLine
                     track={track}
@@ -672,41 +568,7 @@ export function HomeView() {
       ) : null}
 
       {scope !== 0 ? (
-        <div data-home-region className="px-4 pt-4 md:px-8">
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <h2 className="text-[17px] font-medium text-[var(--text-1)]">
-              {PARTS.find((part) => part.rid === scope)?.name ?? '分区'}
-              <span className="ml-2 text-[12.5px] font-normal text-[var(--text-3)]">最新投稿</span>
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate({ kind: 'ranking', rid: scope })}
-              className="t press flex items-center gap-1 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
-            >
-              排行榜
-              <Icon name="chevronRight" size={12} />
-            </button>
-          </div>
-          {regionLoading ? <BiliLoader label="正在取这个分区…" /> : null}
-          {!regionLoading && regionError ? (
-            <div className="flex flex-col items-center gap-2 py-6">
-              <p className="text-center text-[12.5px] text-[var(--text-3)]">{regionError}</p>
-              <button
-                type="button"
-                onClick={() => setRegionAttempt((n) => n + 1)}
-                className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-              >
-                重试
-              </button>
-            </div>
-          ) : null}
-          {!regionLoading && !regionError && region?.length === 0 ? (
-            <p className="py-8 text-center text-[12.5px] text-[var(--text-3)]">这个分区暂时没有内容。</p>
-          ) : null}
-          {!regionLoading && region && region.length > 0 ? (
-            <ContentGrid tracks={region} activeKey={activeKey} playing={playing} />
-          ) : null}
-        </div>
+        <RegionFeed key={scope} rid={scope} activeKey={activeKey} playing={playing} />
       ) : (
         <>
           {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}

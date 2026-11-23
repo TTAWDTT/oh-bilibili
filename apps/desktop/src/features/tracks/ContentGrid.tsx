@@ -1,3 +1,4 @@
+import { TrackByline } from './TrackByline'
 import { formatCount } from '../../shared/lib/format'
 import { partColor } from '../../shared/lib/biliParts'
 import { FavPicker } from '../library/FavPicker'
@@ -120,7 +121,6 @@ type CardProps = {
   confirming: boolean
   extra: React.ReactNode
   onOpen: (track: Track) => void
-  onAuthor: (track: Track) => void
   onPlay: (index: number) => void
   onCoin: (track: Track) => void
   onFav: (track: Track, faved: boolean) => void
@@ -145,7 +145,6 @@ const TrackCard = memo(function TrackCard({
   confirming,
   extra,
   onOpen,
-  onAuthor,
   onPlay,
   onCoin,
   onFav,
@@ -261,17 +260,7 @@ const TrackCard = memo(function TrackCard({
       </h3>
 
       <div className="mt-1 flex items-center gap-1.5 text-[13px] text-[var(--text-3)]">
-        <button
-          type="button"
-          aria-label={`UP ${track.artist}`}
-          title={`看 ${track.artist} 的更多视频`}
-          data-focus-id={`author:${track.key}`}
-          onClick={() => onAuthor(track)}
-          className="flex min-w-0 items-center gap-1 hover:text-[var(--accent-strong-hover)]"
-        >
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </button>
+        <TrackByline track={track} focusId={`author:${track.key}`} />
       </div>
 
       {noteText ? <p className="mt-0.5 line-clamp-1 text-[12px] text-[var(--text-3)]">{noteText}</p> : null}
@@ -371,15 +360,6 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
     [navigate],
   )
 
-  const onAuthor = useCallback(
-    (track: Track) =>
-      navigate(
-        { kind: 'author', name: track.artist, mid: track.up_mid ?? null },
-        undefined,
-        `author:${track.key}`,
-      ),
-    [navigate],
-  )
   const onPlay = useCallback((index: number) => void playContext(keysRef.current, index), [playContext])
   const onCoin = useCallback((track: Track) => setConfirming(track.key), [])
   const onConfirmCoin = useCallback(
@@ -448,7 +428,6 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
               confirming={confirming === track.key}
               extra={extraAction ? extraAction(track) : null}
               onOpen={onOpen}
-              onAuthor={onAuthor}
               onPlay={onPlay}
               onCoin={onCoin}
               onFav={onFav}
