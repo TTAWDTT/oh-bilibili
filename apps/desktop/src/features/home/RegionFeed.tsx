@@ -86,7 +86,7 @@ export function RegionFeed({ rid, activeKey, playing }: { rid: number; activeKey
               type="button"
               className="py-1 hover:text-[var(--accent-strong)]"
               onClick={() => {
-                useAppStore.getState().setSearchFilters(name, 'totalrank', 0)
+                useAppStore.getState().setSearchFilters({ currentPartition: name, currentOrder: 'totalrank', currentDuration: 0 })
                 useAppStore.getState().setHeroQuery(child)
               }}
             >

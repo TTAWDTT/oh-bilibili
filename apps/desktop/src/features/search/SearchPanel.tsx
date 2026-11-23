@@ -15,7 +15,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAuthStore } from '../auth/authStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
-import { DurationFilter, type DurationKey } from './DurationFilter'
+import { DurationFilter } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
 
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
@@ -45,9 +45,9 @@ function searchKey(query: string, partition: string, order: string, duration: nu
 }
 
 export function SearchPanel({ query }: { query: string }) {
-  const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
-  const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
-  const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
+  const partition = useAppStore((state) => state.currentPartition)
+  const order = useAppStore((state) => state.currentOrder)
+  const duration = useAppStore((state) => state.currentDuration)
 
   const bootKey = searchKey(query.trim(), partition, order, duration)
   const restoreRef = useRef<SearchMemory | null | undefined>(undefined)
@@ -538,8 +538,7 @@ export function SearchPanel({ query }: { query: string }) {
                   <DurationFilter
                     active={duration}
                     onChange={(key) => {
-                      setDuration(key)
-                      setSearchFilters(partition, order, key)
+                      setSearchFilters({ currentDuration: key })
                       setPage(1)
                       scrollerRef.current?.scrollTo({ top: 0 })
                     }}
@@ -555,8 +554,7 @@ export function SearchPanel({ query }: { query: string }) {
                       key={value}
                       type="button"
                       onClick={() => {
-                        setOrder(value)
-                        setSearchFilters(partition, value, duration)
+                        setSearchFilters({ currentOrder: value })
                         setPage(1)
                         scrollerRef.current?.scrollTo({ top: 0 })
                       }}
@@ -577,8 +575,7 @@ export function SearchPanel({ query }: { query: string }) {
                 <PartitionFilter
                   active={partition}
                   onChange={(label) => {
-                    setPartition(label)
-                    setSearchFilters(label, order, duration)
+                    setSearchFilters({ currentPartition: label })
                     // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
                     setPage(1)
                     scrollerRef.current?.scrollTo({ top: 0 })
@@ -616,7 +613,7 @@ export function SearchPanel({ query }: { query: string }) {
                   }
                   action={
                     selectedPartition.tid
-                      ? { label: '全站搜这个词', onClick: () => { setPartition('全部'); setSearchFilters('全部', order, duration); setPage(1) } }
+                      ? { label: '全站搜这个词', onClick: () => { setSearchFilters({ currentPartition: '全部' }); setPage(1) } }
                       : { label: '返回', onClick: goBack }
                   }
                 />

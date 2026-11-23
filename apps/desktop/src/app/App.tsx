@@ -202,6 +202,7 @@ function FocusRestore() {
       if (!box) return
       const rect = target.getBoundingClientRect()
       const area = box.getBoundingClientRect()
+      if (focus.kind === 'search' && rect.top < area.bottom && rect.bottom > area.top) return
       if (rect.top < area.top || rect.bottom > area.bottom) {
         target.scrollIntoView({ block: 'nearest' })
       }

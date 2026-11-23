@@ -1,3 +1,4 @@
+import type { DurationKey } from '../features/search/DurationFilter'
 import type { Track } from '../shared/lib/contract'
 import type { MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
@@ -115,18 +116,19 @@ function saveSidebar(mode: SidebarMode): void {
   }
 }
 
-type AppStore = {
+type SearchFilters = {
+  currentPartition: string
+  currentOrder: 'totalrank' | 'click' | 'pubdate' | 'danmaku'
+  currentDuration: DurationKey
+}
+
+type AppStore = SearchFilters & {
   view: View
   rail: RailTab | null
   /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
   searchFocus: number
   /** 搜索面板当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
   currentQuery: string
-  /** 搜索面板上次用的分区与排序，收起再打开要恢复。 */
-  currentPartition: string
-  currentOrder: string
-  /** 时长筛选：0 不限，1~4 对应 B 站的 duration 参数。 */
-  currentDuration: number
   messageUnread: MessageUnread | null
   setMessageUnread: (unread: MessageUnread | null) => void
   authOpen: boolean
@@ -164,7 +166,7 @@ type AppStore = {
   closeRail: () => void
   focusSearch: () => void
   setHeroQuery: (q: string) => void
-  setSearchFilters: (partition: string, order: string, duration?: number) => void
+  setSearchFilters: (update: Partial<SearchFilters>) => void
   setAuthOpen: (open: boolean) => void
   setStage: (open: boolean) => void
   setCinema: (on: boolean) => void
@@ -265,8 +267,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     if (get().view.kind === 'search') get().replace(view)
     else get().navigate(view)
   },
-  setSearchFilters: (partition, order, duration = 0) =>
-    set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),
+  setSearchFilters: (update) => set(update),
   setAuthOpen: (open) => set({ authOpen: open }),
   setStage: (open) => set({ stage: open }),
   setCinema: (on) => set({ cinema: on }),
