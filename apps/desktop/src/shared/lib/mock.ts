@@ -313,16 +313,17 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = idx >= 0 ? idx : 0
       return Array.from({ length: 6 }, (_, i) => CATALOG[(start + i + 1) % CATALOG.length])
     }
-    case 'fav_folders':
-      // 预览用一个两页的收藏夹，方便验证「加载更多」。
-      return [
-        {
-          id: 1,
-          title: '默认收藏夹',
-          count: new URLSearchParams(window.location.search).has('favThree') ? 95 : 70,
-          cover: CATALOG[0]?.cover ?? null,
-        },
-      ]
+    case 'fav_folders': {
+      // 三个夹子（含一个空夹）用来验宽窗目录与切夹记忆；默认只有一个两页的夹子。
+      if (new URLSearchParams(window.location.search).has('favThree')) {
+        return [
+          { id: 1, title: '默认收藏夹', count: 95, cover: CATALOG[0]?.cover ?? null },
+          { id: 2, title: '长标题的稍后精读合集·第二季', count: 12, cover: CATALOG[2]?.cover ?? null },
+          { id: 3, title: '空收藏夹', count: 0, cover: null },
+        ]
+      }
+      return [{ id: 1, title: '默认收藏夹', count: 70, cover: CATALOG[0]?.cover ?? null }]
+    }
     case 'fav_covers': {
       const limit = Math.max(1, Math.trunc(num(args, 'limit')) || 4)
       return CATALOG.slice(0, limit)
@@ -537,6 +538,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const size = 40
       // `?favThree` 造一个 40 + 40 + 15、共 95 项的收藏夹，用来验「播放全部」读全集。
       if (new URLSearchParams(window.location.search).has('favThree')) {
+        const folder = Math.trunc(num(args, 'folder_id')) || 1
+        if (folder === 2) return page === 1 ? CATALOG.slice(0, 12) : []
+        if (folder === 3) return []
         const start = (page - 1) * size
         const total = 95
         return Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
