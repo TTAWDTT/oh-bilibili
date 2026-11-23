@@ -12,6 +12,7 @@ import type { CommentPage, Followed, PlayMode, WatchView,
   PreciousView,
   RepeatMode,
   SearchPage,
+  SeasonView,
   Track,
 } from './contract'
 import { mockInvoke } from './mock'
@@ -537,6 +538,11 @@ export function videoMeta(key: string): Promise<import('./contract').VideoMeta> 
 /** 简介里的站内素材预览：标题、封面与 UP。 */
 export function videoBrief(key: string): Promise<Track> {
   return call<Track>('video_brief', { key })
+}
+
+/** 这一稿所属的合集目录；没有合集时为 null。 */
+export function seasonOf(key: string): Promise<SeasonView | null> {
+  return call<SeasonView | null>('season_of', { key })
 }
 
 /** 相关推荐。 */

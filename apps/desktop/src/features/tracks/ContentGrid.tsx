@@ -5,6 +5,7 @@ import { useReactionStore } from '../reactions/reactionStore'
 import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
 import { PageSpine } from './PageSpine'
+import { SeasonPeek, hasSeasonMark } from './SeasonPeek'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -120,6 +121,8 @@ type CardProps = {
   confirming: boolean
   extra: React.ReactNode
   onOpen: (track: Track) => void
+  /** 「所属合集」里点某一集：按 BV 打开，列表里没有这条时也要能进。 */
+  onOpenKey: (key: string) => void
   onAuthor: (track: Track) => void
   onPlay: (index: number) => void
   onCoin: (track: Track) => void
@@ -145,6 +148,7 @@ const TrackCard = memo(function TrackCard({
   confirming,
   extra,
   onOpen,
+  onOpenKey,
   onAuthor,
   onPlay,
   onCoin,
@@ -245,6 +249,11 @@ const TrackCard = memo(function TrackCard({
           onLater={() => onLater(track)}
           extraAction={extra}
         />
+        {/* 本稿既有多个分 P、又确认属于某个合集时，给一条轻量的合集入口。
+            点开才请求一次合集目录；没有标记的卡不占位。 */}
+        {track.pages && track.pages >= 2 && hasSeasonMark(track.key) ? (
+          <SeasonPeek trackKey={track.key} title={track.title} onOpen={onOpenKey} />
+        ) : null}
       </div>
 
       <h3
@@ -370,6 +379,16 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
     [navigate],
   )
 
+  const onOpenKey = useCallback(
+    (key: string) =>
+      navigate(
+        { kind: 'watch', track: { key, title: key, artist: '', duration_ms: null, cover: null } },
+        undefined,
+        `card:${key}`,
+      ),
+    [navigate],
+  )
+
   const onAuthor = useCallback(
     (track: Track) =>
       navigate(
@@ -447,6 +466,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
               confirming={confirming === track.key}
               extra={extraAction ? extraAction(track) : null}
               onOpen={onOpen}
+              onOpenKey={onOpenKey}
               onAuthor={onAuthor}
               onPlay={onPlay}
               onCoin={onCoin}

@@ -1663,22 +1663,7 @@ impl Engine {
             tname: detail.track.tname.clone(),
             pages: detail.pages.clone(),
             current_page: page_no,
-            season: detail.season.as_ref().map(|season| crate::wire::SeasonView {
-                id: season.id,
-                title: season.title.clone(),
-                episodes: season
-                    .episodes
-                    .iter()
-                    .map(|ep| crate::wire::SeasonEpisodeView {
-                        key: ep.bvid.clone(),
-                        title: ep.title.clone(),
-                        cover: ep.cover.clone(),
-                        duration_ms: ep.duration_ms,
-                        views: ep.views,
-                        current: ep.bvid == key.as_opaque(),
-                    })
-                    .collect(),
-            }),
+            season: season_view(detail.season.as_ref(), key),
             staff: detail
                 .staff
                 .iter()
@@ -3337,6 +3322,14 @@ impl Engine {
         Ok(self.source.detail(key).await?.track)
     }
 
+    /// 这一稿所属的合集目录。详情带 `ugc_season` 才有内容，走同一份详情缓存。
+    ///
+    /// 列表页只在用户明确点开「所属合集」时调用，不在滚动时逐稿请求。
+    pub async fn season_of(&self, key: &TrackKey) -> Result<Option<crate::wire::SeasonView>, WireError> {
+        let detail = self.source.detail(key).await?;
+        Ok(season_view(detail.season.as_ref(), key))
+    }
+
     pub async fn related(&self, key: &TrackKey) -> Result<Vec<Track>, WireError> {
         if self.is_local_track(key) {
             return Ok(Vec::new());
@@ -4004,6 +3997,31 @@ fn remove_undecodable_download(path: &str) -> std::io::Result<()> {
 }
 
 const AUDIO_EXTS: [&str; 7] = ["m4a", "webm", "opus", "mp3", "flac", "aac", "ogg"];
+
+/// 详情里的合集目录转成界面契约。观看页与「所属合集」入口共用这一份，
+/// 两处的集数、标题与「当前这一集」判定不会各说各话。
+fn season_view(
+    season: Option<&bilimusic_bili::SeasonRef>,
+    key: &TrackKey,
+) -> Option<crate::wire::SeasonView> {
+    let season = season?;
+    Some(crate::wire::SeasonView {
+        id: season.id,
+        title: season.title.clone(),
+        episodes: season
+            .episodes
+            .iter()
+            .map(|episode| crate::wire::SeasonEpisodeView {
+                key: episode.bvid.clone(),
+                title: episode.title.clone(),
+                cover: episode.cover.clone(),
+                duration_ms: episode.duration_ms,
+                views: episode.views,
+                current: episode.bvid == key.as_opaque(),
+            })
+            .collect(),
+    })
+}
 
 fn download_part(key: &str) -> Option<(&str, u32)> {
     let (bvid, part) = key.rsplit_once("_p")?;

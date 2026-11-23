@@ -690,7 +690,16 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const fresh = Math.max(0, Math.trunc(num(args, 'fresh')))
       const size = 30
       const start = (fresh * size) % CATALOG.length
-      return CATALOG.slice(start, start + size)
+      const list = CATALOG.slice(start, start + size)
+      // ?multiPages 给首页前几张卡配上分 P 数，用来验「所属合集」入口。
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiPages')) {
+        return list.map((track) => ({ ...track, pages: 8 }))
+      }
+      // ?seasonPeek：多 P + 合集的组合，用来验卡片上的「所属合集」入口。
+      if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('seasonPeek')) {
+        return list.map((track, index) => (index < 3 ? { ...track, pages: 8 } : track))
+      }
+      return list
     }
     case 'message_unread':
       return { reply: 3, at: 2, like: 5, total: 10 }
@@ -1292,6 +1301,31 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         artist: '预览 UP',
         duration_ms: 180_000,
         cover: CATALOG[0]?.cover ?? null,
+      }
+    }
+    case 'season_of': {
+      const key = str(args, 'key')
+      // 首页列表项不在 CATALOG 里，按传入的 key 现造一条，保证「打开的那一稿」在目录里。
+      const track =
+        CATALOG.find((t) => t.key === key) ?? {
+          key,
+          title: `预览：${key}`,
+          artist: '预览 UP',
+          duration_ms: 30_000,
+          cover: CATALOG[0]?.cover ?? null,
+        }
+      // 预览：每稿都挂同一个三集合集，用来验「所属合集」入口。
+      return {
+        id: 1,
+        title: '预览合集 · 精选现场',
+        episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
+          key: t.key,
+          title: t.title,
+          cover: t.cover ?? null,
+          duration_ms: t.duration_ms ?? 30_000,
+          views: t.views ?? null,
+          current: t.key === track.key,
+        })),
       }
     }
     case 'danmaku_heat':
