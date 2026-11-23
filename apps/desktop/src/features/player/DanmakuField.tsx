@@ -189,7 +189,12 @@ export function DanmakuField({
         if (current.some((f) => f.at === item.at && f.text === item.text && f.mode === item.mode)) continue
         // 合并同句：只处理普通滚动弹幕，且必须落在同一条最早记录的 2 秒窗内。
         if (mergeSame && item.mode === 1) {
-          const leaderId = mergeGroups.current.leaderFor(item.text, item.at, new Set(current.map((f) => f.id)))
+          const leaderId = mergeGroups.current.leaderFor(
+            item.text,
+            item.color,
+            item.at,
+            new Set(current.map((f) => f.id)),
+          )
           const leader = leaderId === null ? undefined : current.find((f) => f.id === leaderId)
           if (leader) {
             const grown = { ...leader, count: leader.count + 1 }
@@ -220,7 +225,7 @@ export function DanmakuField({
         const flight = { ...item, id: seq.current, born: item.at, lane, count: 1 }
         fresh.push(flight)
         current = [...current, flight]
-        if (mergeSame) mergeGroups.current.remember(item.text, item.at, flight.id)
+        if (mergeSame) mergeGroups.current.remember(item.text, item.color, item.at, flight.id)
       }
       cursor.current = i
       if (!dirty && fresh.length === 0) {
