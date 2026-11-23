@@ -547,6 +547,7 @@ impl Client {
                     up_mid: upper_mid,
                     tname: None,
                     typeid: None,
+                    pages: m["page"].as_u64().map(|n| n as u32),
                 })
             })
             .collect())
@@ -622,6 +623,7 @@ impl Client {
                             up_mid: Some(mid),
                             tname: None,
                             typeid: None,
+                            pages: None,
                         })
                     })
                     .collect()
@@ -755,6 +757,7 @@ impl Client {
                     up_mid: m["owner"]["mid"].as_u64(),
                     tname: m["tname"].as_str().map(|s| s.to_string()),
                     typeid: None,
+                    pages: m["videos"].as_u64().map(|n| n as u32),
                 })
             })
             .collect())
@@ -802,6 +805,7 @@ impl Client {
                         .filter(|s| !s.is_empty())
                         .map(|s| s.to_string()),
                     typeid: None,
+                    pages: None,
                 })
             })
             .collect())
@@ -1517,6 +1521,7 @@ fn track_from_item(m: &serde_json::Value) -> Option<bilimusic_model::Track> {
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string()),
         typeid: None,
+        pages: m["videos"].as_u64().map(|n| n as u32),
     })
 }
 

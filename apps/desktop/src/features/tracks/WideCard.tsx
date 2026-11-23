@@ -3,6 +3,7 @@ import { useAppStore } from '../../app/appStore'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { PageSpine } from './PageSpine'
 
 /**
  * B 站「热门 / 入站必刷」这两页用的横排大卡：封面在左，标题与计数在右。
@@ -36,6 +37,7 @@ export function WideCard({
         <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[16px] text-white">
           {formatDuration(track.duration_ms)}
         </span>
+        <PageSpine pages={track.pages} trackKey={track.key} />
       </button>
       <div className="min-w-0 flex-1 py-0.5">
         <button type="button" onClick={onOpen} title={track.title} className="block w-full text-left">

@@ -1237,6 +1237,7 @@ impl Source {
                 up_mid: item["owner"]["mid"].as_u64(),
                 tname: search::partition_name(typeid).map(|n| n.to_string()),
                 typeid: Some(typeid),
+                pages: None,
             });
         }
         Ok(out)
@@ -1447,6 +1448,7 @@ fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.to_string()),
             typeid: data["tid"].as_u64().map(|v| v as u32),
+            pages: None,
         };
         Ok(TrackDetail {
             track,

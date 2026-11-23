@@ -39,6 +39,7 @@ pub fn items_from(value: &serde_json::Value) -> Vec<Track> {
                 up_mid: v["owner"]["mid"].as_u64(),
                 tname: v["tname"].as_str().map(|s| s.to_string()),
                 typeid: None,
+                pages: None,
             })
         })
         .collect()
