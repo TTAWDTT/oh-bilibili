@@ -16,7 +16,12 @@ import { Cover } from '../../shared/ui/Cover'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
+/** 阅读列：信息流本身保持窄列，读起来不横跨整屏。 */
 const FEED = 'mx-auto w-full max-w-[700px] px-4 md:px-0'
+/** 页标题与分类沿用公共页边距，跟关注、周刊落在同一条左缘（#258）。 */
+const HEADER = 'px-4 md:px-8'
+/** 信息流在宽窗右侧让出作者筛选列，所以外层比 FEED 宽一点。 */
+const FEED_WIDE = 'mx-auto w-full max-w-[980px] px-4 md:px-8'
 const TABS: { key: DynamicTab; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'video', label: '视频投稿' },
@@ -784,7 +789,7 @@ export function DynamicView() {
       className="min-h-0 flex-1 overflow-y-auto bg-[var(--ga0)] pb-10"
     >
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--panel)]">
-        <div className={`${FEED} flex h-[56px] items-center`}>
+        <div className={`${HEADER} flex h-[56px] items-center`}>
           <h2 className="text-page-title text-[var(--text-1)]">动态</h2>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -814,7 +819,7 @@ export function DynamicView() {
             </button>
           </div>
         </div>
-        <div className={FEED}>
+        <div className={HEADER}>
           <nav aria-label="动态分类" className="flex gap-6">
             {TABS.map((entry) => (
               <button
@@ -838,7 +843,7 @@ export function DynamicView() {
         </div>
       </header>
       {followingFailed && !following?.length ? (
-        <div className={`${FEED} pt-3`}>
+        <div className={`${FEED_WIDE} pt-3`}>
           <p className="flex items-center gap-2 text-[12px] text-[var(--text-3)]">
             关注列表没取到，暂时不能按作者筛选。
             <button
@@ -852,7 +857,7 @@ export function DynamicView() {
         </div>
       ) : null}
       {following?.length ? (
-        <div className={`${FEED} pt-4 xl:hidden`}>
+        <div className={`${FEED_WIDE} pt-4 xl:hidden`}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--text-3)]">
               <span className="shrink-0">关注的人</span>
