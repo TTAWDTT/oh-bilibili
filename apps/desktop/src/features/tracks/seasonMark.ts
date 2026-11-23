@@ -6,7 +6,7 @@ import type { SeasonView } from '../../shared/lib/contract'
  * 列表接口不带 `ugc_season`，逐稿请求详情又是一屏几十个请求。
  * 所以在已经打开过观看页（详情本来就要取）时把合集记到本地，
  * 之后列表里的同一稿直接用这份标记，不额外发请求。
- * 只记有完整目录的合集：稿数必须来自真实条目，不能猜。
+ * 不完整目录也保存合集身份，稿数等完整数据返回后再显示。
  */
 export type SeasonMark = {
   id: number

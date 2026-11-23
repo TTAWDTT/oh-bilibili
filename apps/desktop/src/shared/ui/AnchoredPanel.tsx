@@ -60,16 +60,18 @@ export function AnchoredPanel({
     ;(first ?? panel)?.focus({ preventScroll: true })
   }, [anchor])
 
-  // 靠近窗口底部时向上翻；先渲染一帧量真实高度，避免写死面板高度。
   useLayoutEffect(() => {
     const panel = panelRef.current
     if (!anchor || !panel) return
-    const height = panel.offsetHeight
-    const next =
-      anchor.top + height > window.innerHeight - 8
-        ? Math.max(8, anchor.anchorTop - height - 8)
-        : anchor.top
-    setTop(next)
+    const reposition = (): void => {
+      const height = panel.offsetHeight
+      const fitsBelow = anchor.top + height <= window.innerHeight - 8
+      setTop(fitsBelow ? anchor.top : Math.max(8, anchor.anchorTop - height - 8))
+    }
+    reposition()
+    const observer = new ResizeObserver(reposition)
+    observer.observe(panel)
+    return () => observer.disconnect()
   }, [anchor])
 
   if (!anchor) return null
@@ -92,7 +94,7 @@ export function AnchoredPanel({
         role="dialog"
         aria-label={label}
         style={{ left: anchor.left, top: top ?? anchor.top, width }}
-        className="fixed z-50 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.3)]"
+        className="fixed z-50 max-h-[calc(100vh-16px)] max-w-[calc(100vw-16px)] overflow-y-auto rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.3)]"
       >
         {children}
       </div>
