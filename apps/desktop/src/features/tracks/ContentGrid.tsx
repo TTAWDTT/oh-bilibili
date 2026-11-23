@@ -264,6 +264,7 @@ const TrackCard = memo(function TrackCard({
           type="button"
           aria-label={`UP ${track.artist}`}
           title={`看 ${track.artist} 的更多视频`}
+          data-focus-id={`author:${track.key}`}
           onClick={() => onAuthor(track)}
           className="flex min-w-0 items-center gap-1 hover:text-[var(--accent-strong-hover)]"
         >
@@ -370,7 +371,12 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
   )
 
   const onAuthor = useCallback(
-    (track: Track) => navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null }),
+    (track: Track) =>
+      navigate(
+        { kind: 'author', name: track.artist, mid: track.up_mid ?? null },
+        undefined,
+        `author:${track.key}`,
+      ),
     [navigate],
   )
   const onPlay = useCallback((index: number) => void playContext(keysRef.current, index), [playContext])

@@ -238,7 +238,11 @@ export function WatchLaterView() {
                 active={track.key === activeKey}
                 onOpen={() => navigate({ kind: 'watch', track })}
                 onAuthor={() =>
-                  navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })
+                  navigate(
+                    { kind: 'author', name: track.artist, mid: track.up_mid ?? null },
+                    undefined,
+                    `later-author:${track.key}`,
+                  )
                 }
                 onStart={() => startAt(index)}
                 onRemove={() => void removeOne(track.key)}
@@ -306,6 +310,7 @@ function WatchLaterRow({
           <button
             type="button"
             onClick={onAuthor}
+            data-focus-id={`later-author:${track.key}`}
             className="min-w-0 truncate text-left hover:text-[var(--accent-strong-hover)]"
           >
             {track.artist}
