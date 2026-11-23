@@ -21,6 +21,7 @@
     "test:fav-pages": "node scripts/fav-pages-test.mjs",
     "test:danmaku-merge": "node scripts/danmaku-merge-test.mjs",
     "test:note-reader": "node scripts/note-reader-test.mjs",
-    "test:page-spine": "node scripts/page-spine-test.mjs"
+    "test:page-spine": "node scripts/page-spine-test.mjs",
+    "test:danmaku-filter": "node scripts/danmaku-filter-test.mjs"
   }
 }

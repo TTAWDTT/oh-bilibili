@@ -51,6 +51,7 @@ export function DanmakuField({
   area,
   fade = false,
   mergeSame = false,
+  resetToken = '',
 }: {
   items: DanmakuItem[]
   /** 返回当前位置（毫秒）。存进 ref，所以父组件不需要为它重渲染。 */
@@ -66,6 +67,8 @@ export function DanmakuField({
   fade?: boolean
   /** 同一时段完全相同的滚动弹幕合成一条并累计条数。 */
   mergeSame?: boolean
+  /** 过滤条件变了就重建画面上的条目，避免沿用已经被屏蔽的计数。 */
+  resetToken?: string
 }) {
   const [flights, setFlights] = useState<Flight[]>([])
   /** 与 flights 同步的镜像：定时器里读它算下一帧，不把副作用写进 setState 的 updater。 */
@@ -124,6 +127,16 @@ export function DanmakuField({
     flightsRef.current = plain
     setFlights(plain)
   }, [mergeSame])
+
+  useEffect(() => {
+    // 条件变化后旧条目不再代表当前这批记录：清空，按当前位置重新长出来。
+    cursor.current = 0
+    lastPos.current = -1
+    mergeGroups.current.clear()
+    laneBorn.current.fill(-Infinity)
+    flightsRef.current = []
+    setFlights([])
+  }, [resetToken])
 
   useEffect(() => {
     if (!enabled) return

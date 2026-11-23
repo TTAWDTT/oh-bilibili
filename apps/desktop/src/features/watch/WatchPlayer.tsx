@@ -11,6 +11,7 @@ import { copyText } from '../../shared/lib/clipboard'
 import { watchUrl } from './watchUrl'
 import { chaptersFrom, type Chapter } from '../../shared/lib/chapters'
 import { DanmakuField } from '../player/DanmakuField'
+import { filterDanmaku } from '../player/danmakuFilter'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { DanmakuBeats } from '../player/DanmakuBeats'
 import { useDanmakuSettings } from '../player/danmakuSettings'
@@ -411,17 +412,12 @@ export function WatchPlayer({
   const [blockDraft, setBlockDraft] = useState('')
 
   /** 屏蔽词和屏蔽类型只作用于画面上的弹幕，右栏列表仍保留全部。 */
-  const visibleDanmaku = useMemo(() => {
-    const words = danmakuBlockWords.map((word) => word.trim().toLowerCase()).filter(Boolean)
-    const types = new Set(danmakuBlockTypes)
-    if (words.length === 0 && types.size === 0) return danmaku
-    return danmaku.filter((item) => {
-      const type = item.mode === 5 ? 'top' : item.mode === 4 ? 'bottom' : 'roll'
-      if (types.has(type)) return false
-      const text = item.text.toLowerCase()
-      return !words.some((word) => text.includes(word))
-    })
-  }, [danmaku, danmakuBlockWords, danmakuBlockTypes])
+  const visibleDanmaku = useMemo(
+    () => filterDanmaku(danmaku, danmakuBlockWords, danmakuBlockTypes),
+    [danmaku, danmakuBlockWords, danmakuBlockTypes],
+  )
+  /** 屏蔽条件一变，屏幕上的弹幕要按剩下的记录重建，不能沿用旧计数。 */
+  const danmakuFilterKey = `${danmakuBlockWords.join('\u0000')}#${danmakuBlockTypes.join(',')}`
 
   const addBlockWords = (): void => {
     const words = blockDraft
@@ -1144,6 +1140,7 @@ export function WatchPlayer({
         speed={danmakuSpeed}
         area={danmakuArea}
         mergeSame={danmakuMergeSame}
+        resetToken={danmakuFilterKey}
         fade
       />
       {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}

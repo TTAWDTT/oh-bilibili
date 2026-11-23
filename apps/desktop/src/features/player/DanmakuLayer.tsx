@@ -6,6 +6,7 @@ import { useDanmakuSettings } from './danmakuSettings'
 import { useSentDanmaku } from './sentDanmaku'
 import { DanmakuField, toDanmakuItems } from './DanmakuField'
 import type { DanmakuItem } from './DanmakuField'
+import { filterDanmaku } from './danmakuFilter'
 
 const EMPTY: never[] = []
 
@@ -17,6 +18,8 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
   const speed = useDanmakuSettings((s) => s.speed)
   const area = useDanmakuSettings((s) => s.area)
   const mergeSame = useDanmakuSettings((s) => s.mergeSame)
+  const blockWords = useDanmakuSettings((s) => s.blockWords)
+  const blockTypes = useDanmakuSettings((s) => s.blockTypes)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const sent = useSentDanmaku((s) => s.byTrack[trackKey] ?? EMPTY)
 
@@ -45,10 +48,13 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
           ),
     [items, sent],
   )
+  /** 听歌舞台和观看页共用同一份屏蔽规则；热度与列表不受影响。 */
+  const visible = useMemo(() => filterDanmaku(all, blockWords, blockTypes), [all, blockWords, blockTypes])
+  const filterKey = `${blockWords.join('\u0000')}#${blockTypes.join(',')}`
 
   return (
     <DanmakuField
-      items={all}
+      items={visible}
       position={readPlayhead}
       playing={playing}
       enabled={enabled}
@@ -58,6 +64,7 @@ export function DanmakuLayer({ trackKey, fade = false }: { trackKey: string; fad
       area={area}
       fade={fade}
       mergeSame={mergeSame}
+      resetToken={filterKey}
     />
   )
 }
