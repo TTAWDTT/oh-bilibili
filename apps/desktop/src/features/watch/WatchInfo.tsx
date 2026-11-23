@@ -224,7 +224,6 @@ export function WatchInfo({
   }, [track.key])
 
   useEffect(() => {
-    if (descOpen) return
     const el = descRef.current
     if (!el) return
     const measure = (): void => {
@@ -240,7 +239,9 @@ export function WatchInfo({
       document.body.appendChild(clone)
       const full = clone.scrollHeight
       clone.remove()
-      setDescCanExpand(full > el.clientHeight + 1)
+      // 收着的时候 el 只剩两行；展开之后要拿全文高度和两行比，按钮才不会消失。
+      const twoLines = (Number.parseFloat(getComputedStyle(el).lineHeight) || 20) * 2
+      setDescCanExpand(full > twoLines + 1)
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -274,7 +275,6 @@ export function WatchInfo({
     let cancelled = false
     setSaved(false)
     setTags([])
-    setDescOpen(false)
     setCoinAt(null)
     setShareAt(null)
     void ipc
