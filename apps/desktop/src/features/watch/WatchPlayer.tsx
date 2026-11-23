@@ -389,6 +389,8 @@ export function WatchPlayer({
   const setDanmakuBlockWords = useDanmakuSettings((s) => s.setBlockWords)
   const toggleDanmakuBlockType = useDanmakuSettings((s) => s.toggleBlockType)
   const setSendColor = useDanmakuSettings((s) => s.setSendColor)
+  const danmakuMergeSame = useDanmakuSettings((s) => s.mergeSame)
+  const setDanmakuMergeSame = useDanmakuSettings((s) => s.setMergeSame)
   const [danmakuPanel, setDanmakuPanel] = useState(false)
   useEffect(() => {
     if (!danmakuPanel && !pagesOpen) return
@@ -1141,6 +1143,7 @@ export function WatchPlayer({
         size={danmakuSize}
         speed={danmakuSpeed}
         area={danmakuArea}
+        mergeSame={danmakuMergeSame}
         fade
       />
       {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}
@@ -1963,6 +1966,26 @@ export function WatchPlayer({
                       </button>
                     ))}
                   </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={danmakuMergeSame}
+                  onClick={() => setDanmakuMergeSame(!danmakuMergeSame)}
+                  className="mt-2 flex w-full items-center justify-between border-t border-white/10 pt-2 text-[11px] leading-none text-white/70 hover:text-white"
+                >
+                  合并同句
+                  <span
+                    className={`relative flex h-4 w-7 items-center rounded-full p-0.5 transition-colors ${
+                      danmakuMergeSame ? 'bg-[var(--accent)]' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`h-3 w-3 rounded-full bg-white transition-transform ${
+                        danmakuMergeSame ? 'translate-x-3' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
+                </button>
                 </div>
 
                 <div className="border-t border-white/10 pt-2">

@@ -5,7 +5,8 @@ import { useDanmakuSettings } from './danmakuSettings'
 /** 弹幕设置面板。四项，和 B 站播放器的面板一致。 */
 export function DanmakuPanel() {
   const [open, setOpen] = useState(false)
-  const { enabled, opacity, size, speed, setEnabled, patch } = useDanmakuSettings()
+  const { enabled, opacity, size, speed, mergeSame, setEnabled, patch, setMergeSame } =
+    useDanmakuSettings()
 
   return (
     <div className="absolute right-5 top-16 z-20">
@@ -38,6 +39,16 @@ export function DanmakuPanel() {
           <Slider label="透明度" min={0.2} max={1} step={0.1} value={opacity} onChange={(v) => patch({ opacity: v })} />
           <Slider label="字号" min={11} max={22} step={1} value={size} onChange={(v) => patch({ size: v })} />
           <Slider label="速度" min={0.5} max={2.5} step={0.1} value={speed} onChange={(v) => patch({ speed: v })} />
+
+          <label className="mt-3 flex items-center justify-between text-[14px]">
+            合并同句
+            <input
+              type="checkbox"
+              checked={mergeSame}
+              onChange={(e) => setMergeSame(e.target.checked)}
+              className="h-3.5 w-3.5 accent-[var(--accent)]"
+            />
+          </label>
         </div>
       ) : null}
     </div>
