@@ -5228,15 +5228,17 @@ async function main() {
 
     await page.viewport(1000, 900)
     await sleep(600)
+    const pagePicker = `[...document.querySelectorAll('#scroll-main button[aria-haspopup="dialog"]')]
+      .find(button => button.textContent.trim().startsWith('选集 ·'))`
     const pickerEntry = await page.evaluate(`(() => {
-      const hit = document.querySelector('button[aria-haspopup="dialog"]')
+      const hit = ${pagePicker}
       return hit && hit.getClientRects().length > 0 ? hit.textContent.trim() : null
     })()`)
     check('中等窗口在播放器下方保留选集入口', !!pickerEntry && pickerEntry.includes('选集 · P62/80'))
-    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await page.evaluate(`${pagePicker}?.click()`)
     await sleep(500)
     const sheet = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"]')
+      const dialog = document.querySelector('[role="dialog"][aria-label="选集"]')
       const panel = dialog?.querySelector('[data-watch-pages]')
       const list = panel?.querySelector('ol')
       const current = panel?.querySelector('li button[aria-pressed="true"]')
@@ -5260,7 +5262,7 @@ async function main() {
     )
     const dialogFits = async () =>
       page.evaluate(`(() => {
-        const panel = document.querySelector('.modal-panel')
+        const panel = document.querySelector('[role="dialog"][aria-label="选集"]')
         const close = panel?.querySelector('button[aria-label="关闭"]')
         const box = panel?.getBoundingClientRect()
         const closeBox = close?.getBoundingClientRect()
@@ -5291,15 +5293,15 @@ async function main() {
     await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
     await sleep(400)
     const afterEsc = await page.evaluate(`({
-      dialog: !!document.querySelector('[role="dialog"]'),
-      focused: document.activeElement?.getAttribute('aria-haspopup') ?? null,
+      dialog: !!document.querySelector('[role="dialog"][aria-label="选集"]'),
+      focused: document.activeElement === ${pagePicker},
     })`)
-    check('关掉选集面板后焦点回到触发按钮', !afterEsc.dialog && afterEsc.focused === 'dialog')
+    check('关掉选集面板后焦点回到触发按钮', !afterEsc.dialog && afterEsc.focused)
 
-    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await page.evaluate(`${pagePicker}?.click()`)
     await sleep(400)
     const switchedInSheet = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"]')
+      const dialog = document.querySelector('[role="dialog"][aria-label="选集"]')
       const first = dialog?.querySelector('[data-watch-pages] ol li button')
       if (!first) return false
       first.click()
@@ -5307,8 +5309,8 @@ async function main() {
     })()`)
     await sleep(1500)
     const afterSheetSwitch = await page.evaluate(`(() => ({
-      dialog: !!document.querySelector('[role="dialog"]'),
-      trigger: document.querySelector('button[aria-haspopup="dialog"]')?.textContent?.trim() ?? '',
+      dialog: !!document.querySelector('[role="dialog"][aria-label="选集"]'),
+      trigger: ${pagePicker}?.textContent?.trim() ?? '',
     }))()`)
     check(
       '从目录里选定分 P 才切集，面板随即收起',
