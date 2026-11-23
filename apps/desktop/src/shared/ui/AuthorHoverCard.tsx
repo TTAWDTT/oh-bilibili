@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Followed } from '../lib/contract'
 import { formatCount } from '../lib/format'
@@ -26,14 +26,18 @@ export type AuthorHover = {
 }
 
 /** 名片贴在被悬停的头像右侧；右边放不下就翻到左侧，再夹进窗口。 */
-function popoverStyle(anchor: AuthorHover['anchor']): { left: number; top: number; width: number } {
+function popoverStyle(
+  anchor: AuthorHover['anchor'],
+  height: number,
+): { left: number; top: number; width: number } {
   const width = 320
   const gap = 10
   let left = anchor.right + gap
   if (left + width > window.innerWidth - 8) left = anchor.left - width - gap
   if (left < 8) left = 8
-  // 名片高约 236（头像行 + 签名两行 + 查看主页），留余量再夹进窗口，别让底部按钮掉出屏幕。
-  const top = Math.min(Math.max(anchor.top, 8), Math.max(8, window.innerHeight - 244))
+  // 用渲染后的真实高度夹进窗口：资料晚到、签名多一行时高度会变，
+  // 按固定估值算会让底部的「查看主页」掉出屏幕（#247）。
+  const top = Math.min(Math.max(anchor.top, 8), Math.max(8, window.innerHeight - height - 8))
   return { left, top, width }
 }
 
@@ -110,9 +114,24 @@ export function AuthorHoverCard({
   onKeep: () => void
   onOpen: (user: Followed) => void
 }) {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  /** 真实高度；资料晚到时重新量，位置跟着重算。 */
+  const [height, setHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const measure = (): void => setHeight(el.offsetHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hover?.user.mid, card])
+
   if (!hover) return null
   return createPortal(
     <div
+      ref={panelRef}
       role="tooltip"
       /* 名片本身可点：指针从卡片移进名片时不能收起来，否则里面的入口永远按不到 */
       onPointerEnter={onKeep}
@@ -120,7 +139,7 @@ export function AuthorHoverCard({
       onFocus={onKeep}
       onBlur={onHide}
       className="fixed z-[60] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
-      style={popoverStyle(hover.anchor)}
+      style={popoverStyle(hover.anchor, height || 244)}
     >
       <div className="flex items-start gap-2.5">
         <Avatar src={hover.user.face} alt={hover.user.name} size={48} />
