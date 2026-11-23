@@ -1008,6 +1008,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const pages = previewPages(track)
       const requestedPage = Number(args.page ?? 1) || 1
       if (commentJumps && requestedPage === 2) await sleep(600)
+      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused } })
       const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
       return {
         key: track.key,

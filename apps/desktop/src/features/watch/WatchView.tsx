@@ -228,7 +228,9 @@ export function WatchView({
     const current = data?.current_page ?? 1
     const target = pageNo ?? current
     if (target !== current || pageLoading.current) {
-      const paused = pageLoading.current ? pendingResume.paused : usePlayerStore.getState().snapshot?.phase === 'paused'
+      const phase = usePlayerStore.getState().snapshot?.phase
+      // 清单可以早于音轨就绪。此时 loading 仍沿用本次换 P 的播放意图。
+      const paused = pageLoading.current || phase === 'loading' ? pendingResume.paused : phase === 'paused'
       changePage(target, ms, paused)
       return
     }

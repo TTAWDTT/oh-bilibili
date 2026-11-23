@@ -4119,6 +4119,44 @@ async function checkProfileSettings(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkCommentPauseIntent(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const waitFor = async (expression) => {
+    const deadline = Date.now() + 8000
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return
+      await sleep(50)
+    }
+    throw new Error(`评论切 P 验收超时：${expression}`)
+  }
+  await waitFor('location.search.includes("commentJumps") && !!document.querySelector("main h2")')
+  await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
+    .then(([app, catalog]) => app.useAppStore.getState().navigate({ kind: 'watch', track: catalog.CATALOG[0], page: 1 }))`)
+  const buttons = `[...document.querySelectorAll('[data-comment-id="1"] button')]`
+  await waitFor(`${buttons}.some(button => button.textContent === 'P2 03:20')`)
+  const seek = (p) => page.evaluate(`${buttons}.find(button => button.textContent === 'P${p} 03:20').click()`)
+  const storeUrl = await page.evaluate(`performance.getEntriesByType('resource').find(entry =>
+    new URL(entry.name).pathname === '/src/features/player/playerStore.ts')?.name`)
+  const setPhase = (phase) => page.evaluate(`import(${JSON.stringify(storeUrl)}).then(m => {
+    const player = m.usePlayerStore.getState()
+    player.applySnapshot({ ...player.snapshot, phase: ${JSON.stringify(phase)} })
+  })`)
+  const last = "performance.getEntriesByName('comment-page-ready').at(-1)?.detail"
+  await setPhase('paused')
+  await seek(2)
+  await waitFor(`${last}?.page === 2`)
+  await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  await setPhase('loading')
+  await seek(1)
+  await waitFor(`${last}?.page === 1`)
+  check('清单已返回、音轨仍在加载时，第二次切 P 保持暂停', await page.evaluate(`${last}.paused === true`))
+
+  await setPhase('playing')
+  await seek(2)
+  await waitFor(`${last}?.page === 2`)
+  check('音轨就绪后恢复播放，再切 P 延续播放', await page.evaluate(`${last}.paused === false`))
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -4134,6 +4172,10 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--comment-pause-only')) {
+      await checkCommentPauseIntent(page)
+      return
+    }
     if (channelOnly) {
       await checkChannelNav(page)
       return
@@ -4172,6 +4214,7 @@ async function main() {
     }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkCommentPauseIntent(page)
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
     await checkStageMorph(page)
