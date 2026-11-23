@@ -311,12 +311,13 @@ function OrigCard({
   orig,
   body,
   onOpenVideo,
+  onAuthor,
 }: {
   orig: ipc.DynamicItem
   body: DynamicBody
   onOpenVideo: OpenDynamicItem
+  onAuthor: OpenDynamicItem
 }) {
-  const navigate = useAppStore((state) => state.navigate)
   const open: OpenDynamic = (event) => {
     if (orig.kind === 'video' && orig.bvid) {
       onOpenVideo(orig, event)
@@ -368,7 +369,8 @@ function OrigCard({
         <div className="mb-2 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => navigate({ kind: 'author', name: orig.author, mid: orig.mid })}
+            data-dynamic-open="original-author"
+            onClick={(event) => onAuthor(orig, event)}
             className="t flex min-w-0 items-center gap-2"
           >
             <Avatar src={orig.face} alt={orig.author} size={24} />
@@ -389,13 +391,8 @@ function OrigCard({
           inlineAuthor ? (
             <button
               type="button"
-              onClick={() =>
-                navigate(
-                  { kind: 'author', name: orig.author, mid: orig.mid },
-                  undefined,
-                  `forward-author:${orig.id}`,
-                )
-              }
+              data-dynamic-open="original-author"
+              onClick={(event) => onAuthor(orig, event)}
               aria-label={`UP ${orig.author}`}
               title={`看 ${orig.author} 的更多视频`}
               data-focus-id={`forward-author:${orig.id}`}
@@ -423,7 +420,7 @@ function DynamicCard({
   item: ipc.DynamicItem
   expandedBodies: readonly string[]
   onOpen: OpenDynamicItem
-  onAuthor: () => void
+  onAuthor: OpenDynamicItem
   onExternal: () => void
 }) {
   const body = { id: item.id, initiallyExpanded: expandedBodies.includes(item.id) }
@@ -450,7 +447,8 @@ function DynamicCard({
       <div className="flex items-start gap-3">
         <button
           type="button"
-          onClick={onAuthor}
+          data-dynamic-open="avatar"
+          onClick={(event) => onAuthor(item, event)}
           aria-label={`进入 ${item.author} 的主页`}
           className="t press shrink-0 rounded-full"
         >
@@ -460,7 +458,8 @@ function DynamicCard({
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={onAuthor}
+              data-dynamic-open="author"
+              onClick={(event) => onAuthor(item, event)}
               className="t line-clamp-2 min-w-0 break-words text-left text-work-name text-[var(--text-1)] hover:text-[var(--accent-strong-hover)]"
             >
               {item.author}
@@ -509,6 +508,7 @@ function DynamicCard({
                 orig={item.orig}
                 body={{ id: originalId, initiallyExpanded: expandedBodies.includes(originalId) }}
                 onOpenVideo={onOpen}
+                onAuthor={onAuthor}
               />
             ) : null}
           </>
@@ -578,7 +578,24 @@ export function DynamicView() {
   const pending = useRef(false)
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const allTop = useRef(dynamicReturn?.allTop ?? 0)
+  const filterTop = useRef<number | null>(null)
   const expandedBodies = returnPosition?.expandedBodies ?? []
+
+  const changeFilter = (nextAuthor: number | null, nextTab: DynamicTab): void => {
+    if (author === nextAuthor && tab === nextTab) return
+    if (author === null && tab === 'all') allTop.current = scrollerRef.current?.scrollTop ?? 0
+    filterTop.current = nextAuthor === null && nextTab === 'all' ? allTop.current : 0
+    setReturnPosition(undefined)
+    setAuthor(nextAuthor)
+    setTab(nextTab)
+  }
+
+  useLayoutEffect(() => {
+    if (filterTop.current === null) return
+    scrollerRef.current?.scrollTo({ top: filterTop.current })
+    filterTop.current = null
+  }, [author, tab])
   const byTab =
     tab === 'all'
       ? items
@@ -679,9 +696,7 @@ export function DynamicView() {
       title={author === user.mid ? `取消只看 ${user.name}` : `只看 ${user.name} 的动态`}
       onClick={() => {
         authorHover.hide()
-        setReturnPosition(undefined)
-        setAuthor((current) => (current === user.mid ? null : user.mid))
-        scrollerRef.current?.scrollTo({ top: 0 })
+        changeFilter(author === user.mid ? null : user.mid, tab)
       }}
       onPointerEnter={(event) => authorHover.show(user, event.currentTarget)}
       onPointerLeave={authorHover.hide}
@@ -716,10 +731,10 @@ export function DynamicView() {
     </button>
   )
 
-  const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
+  const capturePosition = (event: DynamicOpenEvent, index: number): DynamicReturn | undefined => {
     const scroller = scrollerRef.current
     const target = event.currentTarget
-    const position: DynamicReturn | undefined = scroller
+    return scroller
       ? {
           tab,
           author,
@@ -730,11 +745,15 @@ export function DynamicView() {
             (button) => button.value,
           ),
           top: target.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
-          trigger: target.dataset.dynamicOpen === 'forward' ? 'forward' : 'video',
-          restoreFocus: event.type === 'keydown',
+          trigger: target.dataset.dynamicOpen ?? 'video',
+          allTop: allTop.current,
+          restoreFocus: event.type === 'keydown' || event.detail === 0,
           pages: loadedPages.current,
         }
       : undefined
+  }
+
+  const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
     navigate({
       kind: 'watch',
       track: {
@@ -748,7 +767,7 @@ export function DynamicView() {
         up_avatar: item.face,
         up_mid: item.mid,
       },
-    }, position)
+    }, capturePosition(event, index))
   }
 
   if (!loaded && loading) return <BiliLoader label="正在取动态…" />
@@ -760,16 +779,6 @@ export function DynamicView() {
         title="动态没取到"
         detail={error}
         action={{ label: '重试', onClick: () => void load(null, false) }}
-      />
-    )
-  }
-  if (loaded && items.length === 0) {
-    return (
-      <EmptyState
-        icon="biliTv"
-        mascot="missYou"
-        title="关注的人还没有新视频"
-        action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
       />
     )
   }
@@ -826,9 +835,7 @@ export function DynamicView() {
                 key={entry.key}
                 type="button"
                 onClick={() => {
-                  setReturnPosition(undefined)
-                  setTab(entry.key)
-                  scrollerRef.current?.scrollTo({ top: 0 })
+                  changeFilter(author, entry.key)
                 }}
                 className={`t border-b-2 py-2 text-[14px] ${
                   tab === entry.key
@@ -872,8 +879,7 @@ export function DynamicView() {
                 <button
                   type="button"
                   onClick={() => {
-                    setReturnPosition(undefined)
-                    setAuthor(null)
+                    changeFilter(null, tab)
                   }}
                   className="t text-[12.5px] text-[var(--accent)] hover:underline"
                 >
@@ -910,6 +916,9 @@ export function DynamicView() {
       />
       <div className={`${FEED} pt-4 xl:grid xl:max-w-[980px] xl:grid-cols-[minmax(0,1fr)_200px] xl:items-start xl:gap-6`}>
         <div className="flex min-w-0 flex-col gap-3">
+        {loaded && items.length === 0 ? (
+          <EmptyState icon="biliTv" title="关注的人还没有新动态" action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }} />
+        ) : null}
         {visible.map((item, index) => (
           <DynamicCard
             key={item.id}
@@ -932,7 +941,10 @@ export function DynamicView() {
                   .catch((cause) => toastFailure('打开动态', cause))
               }
             }}
-            onAuthor={() => navigate({ kind: 'author', name: item.author, mid: item.mid })}
+            onAuthor={(opened, event) => navigate(
+              { kind: 'author', name: opened.author, mid: opened.mid },
+              capturePosition(event, index),
+            )}
             onExternal={() => {
               void ipc
                 .openExternal(
@@ -967,20 +979,21 @@ export function DynamicView() {
           <BiliLoader compact label="正在加载动态…" />
         ) : author !== null && pickedName !== null ? (
           <p className="py-6 text-center text-[12px] text-[var(--text-3)]">
-            已加载 {pageCount} 批动态，{pickedName} 的更新
-            {hasMore ? '还没出现' : '看完了'}
+            已加载 {pageCount} 批，找到 {visible.length} 条{pickedName}的更新
+            {hasMore ? (
+              <button type="button" onClick={() => void load(offset, true)} className="t ml-2 text-[var(--accent)] hover:underline">继续加载</button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
-                setReturnPosition(undefined)
-                setAuthor(null)
+                changeFilter(null, tab)
               }}
               className="t ml-2 text-[var(--accent)] hover:underline"
             >
               看全部关注
             </button>
           </p>
-        ) : hasMore ? null : (
+        ) : hasMore || items.length === 0 ? null : (
           <p className="py-6 text-center text-[12px] text-[var(--text-3)]">没有更多了</p>
         )}
         </div>
@@ -1009,8 +1022,7 @@ export function DynamicView() {
               <button
                 type="button"
                 onClick={() => {
-                  setReturnPosition(undefined)
-                  setAuthor(null)
+                  changeFilter(null, tab)
                 }}
                 className="t mx-1 mb-1 rounded-[4px] bg-[var(--accent-soft)] px-2 py-1 text-left text-[11.5px] text-[var(--accent)] hover:underline"
               >

@@ -3,7 +3,7 @@ import type { MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
 
 export type View =
-  | { kind: 'home' }
+  | { kind: 'home'; rid?: number }
   | { kind: 'dynamic' }
   | { kind: 'messages' }
   | { kind: 'ranking'; rid?: number }
@@ -35,7 +35,8 @@ export type DynamicReturn = {
   index: number
   expandedBodies: string[]
   top: number
-  trigger: 'video' | 'forward'
+  trigger: string
+  allTop: number
   restoreFocus: boolean
   pages: number
 }
