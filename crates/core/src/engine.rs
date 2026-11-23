@@ -3183,9 +3183,9 @@ impl Engine {
         Ok(self.source.video_shots(&key.as_opaque(), cid).await?)
     }
 
-    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
+    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<crate::wire::FavTrackPage, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
-        for t in &tracks {
+        for t in &tracks.tracks {
             self.remember(t);
         }
         Ok(tracks)

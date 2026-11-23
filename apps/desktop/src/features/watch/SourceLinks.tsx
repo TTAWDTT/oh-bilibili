@@ -72,7 +72,7 @@ function SourceRow({
             <button
               type="button"
               onClick={() => onOpen(entry, brief)}
-              data-focus-id={entry.kind === 'video' ? `source:${entry.bvid}` : undefined}
+              data-focus-id={entry.kind === 'video' ? `source:${entry.id}` : undefined}
               className="t flex min-w-0 items-center gap-1 text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
             >
               <span className="truncate">{label}</span>
@@ -82,7 +82,7 @@ function SourceRow({
               <span className="min-w-0 truncate text-[11px] text-[var(--text-3)]">UP {brief.artist}</span>
             ) : null}
           </div>
-          <p className="mt-0.5 line-clamp-2 break-words text-[12px] leading-[18px] text-[var(--text-3)]">
+          <p className="mt-0.5 break-words text-[12px] leading-[18px] text-[var(--text-3)]">
             {entry.sentence}
           </p>
         </div>
@@ -109,7 +109,11 @@ export function SourceLinks({ entries }: { entries: SourceEntry[] }) {
         duration_ms: null,
         cover: null,
       }
-      navigate({ kind: 'watch', track }, undefined, `source:${entry.bvid}`)
+      navigate({
+        kind: 'watch', track,
+        ...(entry.page !== undefined ? { page: entry.page } : {}),
+        ...(entry.atMs !== undefined ? { atMs: entry.atMs } : {}),
+      }, undefined, `source:${entry.id}`)
       return
     }
     if (entry.url) {

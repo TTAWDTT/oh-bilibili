@@ -615,7 +615,7 @@ impl Source {
     }
 
     /// 收藏夹内容，转成 Track。
-    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, BiliError> {
+    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<sync::FavTrackPage, BiliError> {
         // 列表接口已经带齐字段，不再逐条查详情
         self.client.fav_tracks(folder_id, page).await
     }

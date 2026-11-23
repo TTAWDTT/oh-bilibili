@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { toastDone, toastWarn } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
-import { useAppStore } from '../../app/appStore'
+import { useAppStore, type View } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
@@ -14,7 +14,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
-import { collectFavTracks } from './favPages'
+import { appendFavPage, collectFavTracks } from './favPages'
 
 /** 封面拼图按夹子缓存，来回切页不用重取。 */
 const coverCache = new Map<number, string[]>()
@@ -30,6 +30,8 @@ type FolderSnapshot = {
   top: number
 }
 
+const visits = new WeakMap<View, { pickedId: number | null; folders: Map<number, FolderSnapshot> }>()
+
 /**
  * B 站收藏夹。读的是你账号里真实存在的收藏夹，不是本地伪造的歌单。
  *
@@ -37,6 +39,8 @@ type FolderSnapshot = {
  * 未登录时明确提示需要登录——收藏夹在 B 站那边，本机没有副本。
  */
 export function FavFoldersView() {
+  const visit = useRef(useAppStore.getState().view).current
+  const savedVisit = visits.get(visit)
   const [folders, setFolders] = useState<FavFolder[] | null>(null)
   const [covers, setCovers] = useState<Record<number, string[]>>({})
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +66,7 @@ export function FavFoldersView() {
   const listRef = useRef<HTMLDivElement | null>(null)
   /** 切回某个夹子时，等列表渲染出来再落位。 */
   const restoreTop = useRef<number | null>(null)
-  const memory = useRef(new Map<number, FolderSnapshot>())
+  const memory = useRef(savedVisit?.folders ?? new Map<number, FolderSnapshot>())
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const navigate = useAppStore((state) => state.navigate)
   const snapshot = usePlayerStore((state) => state.snapshot)
@@ -142,7 +146,10 @@ export function FavFoldersView() {
     setQuery('')
     try {
       const list = await ipc.favTracks(id, 1)
-      if (requestTicket.current === ticket) setTracks(list)
+      if (requestTicket.current === ticket) {
+        setTracks(appendFavPage([], list.tracks))
+        setExhausted(!list.has_more)
+      }
     } catch (e) {
       if (requestTicket.current === ticket) setTrackError(toWireError(e).message)
     }
@@ -151,12 +158,15 @@ export function FavFoldersView() {
   const openFolder = (folder: FavFolder): void => {
     if (folder.id === pickedId) return
     if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
+    requestTicket.current += 1
+    busy.current = false
+    setLoadingMore(false)
     prepTicket.current += 1
     prepBusy.current = false
     setPrep(null)
     setPickedId(folder.id)
     const saved = memory.current.get(folder.id)
-    if (saved) {
+    if (saved && (saved.tracks !== null || saved.error)) {
       setTracks(saved.tracks)
       setPage(saved.page)
       setExhausted(saved.exhausted)
@@ -172,6 +182,9 @@ export function FavFoldersView() {
 
   const closeFolder = (): void => {
     if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
+    requestTicket.current += 1
+    busy.current = false
+    setLoadingMore(false)
     prepTicket.current += 1
     prepBusy.current = false
     setPrep(null)
@@ -182,9 +195,23 @@ export function FavFoldersView() {
   const openRef = useRef(openFolder)
   openRef.current = openFolder
   useEffect(() => {
-    if (!wide || pickedId !== null || !folders || folders.length === 0) return
-    openRef.current(folders[0]!)
-  }, [wide, folders, pickedId])
+    if (pickedId !== null || !folders?.length) return
+    const saved = visits.get(visit)
+    if (saved) visits.delete(visit)
+    const folder = folders.find((item) => item.id === saved?.pickedId) ?? (wide ? folders[0] : null)
+    if (folder) openRef.current(folder)
+  }, [wide, folders, pickedId, visit])
+
+  const saveVisit = useRef(() => {})
+  saveVisit.current = () => {
+    if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
+    visits.set(visit, { pickedId, folders: memory.current })
+  }
+  useLayoutEffect(() => () => {
+    if (useAppStore.getState().view !== visit) saveVisit.current()
+    prepTicket.current += 1
+    requestTicket.current += 1
+  }, [visit])
 
   useLayoutEffect(() => {
     if (restoreTop.current === null || !scrollRef.current) return
@@ -194,7 +221,7 @@ export function FavFoldersView() {
 
   /** 加载收藏夹的下一页。B 站每页 40 条。 */
   const loadMore = async (force = false): Promise<void> => {
-    if (!picked || busy.current || exhausted || (failed && !force)) return
+    if (!picked || busy.current || prepBusy.current || exhausted || (failed && !force)) return
     const ticket = requestTicket.current
     busy.current = true
     setLoadingMore(true)
@@ -202,25 +229,22 @@ export function FavFoldersView() {
     try {
       const next = await ipc.favTracks(picked.id, page + 1)
       if (requestTicket.current !== ticket) return
-      if (next.length === 0) {
-        setExhausted(true)
-      } else {
-        // 页间重复或整页都已见过的作品，按到底处理，避免列表无限变长。
-        const prev = tracks ?? []
-        const seen = new Set(prev.map((track) => track.key))
-        const fresh = next.filter((track) => !seen.has(track.key))
-        if (fresh.length === 0) {
-          setExhausted(true)
-        } else {
-          setTracks([...prev, ...fresh])
-          setPage((p) => p + 1)
-        }
+      const previous = tracks ?? []
+      const merged = appendFavPage(previous, next.tracks)
+      if (next.has_more && next.tracks.length > 0 && merged.length === previous.length) {
+        setFailed(true)
+        return
       }
+      setTracks(merged)
+      setPage(page + 1)
+      setExhausted(!next.has_more)
     } catch {
       if (requestTicket.current === ticket) setFailed(true)
     } finally {
-      busy.current = false
-      setLoadingMore(false)
+      if (requestTicket.current === ticket) {
+        busy.current = false
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -243,25 +267,31 @@ export function FavFoldersView() {
    * 中途失败、取消或切夹都不改动正在播放的队列。
    */
   const playAll = async (): Promise<void> => {
-    if (!picked || prepBusy.current) return
+    if (!picked || !tracks || busy.current || prepBusy.current) return
     prepBusy.current = true
     const ticket = ++prepTicket.current
-    setPrep({ loaded: tracks?.length ?? 0, page: 1 })
+    setPrep({ loaded: tracks.length, page })
     try {
-      const { tracks: all, complete } = await collectFavTracks(
+      const result = exhausted ? { tracks, complete: true } : await collectFavTracks(
         (nextPage) => ipc.favTracks(picked.id, nextPage),
         {
-          // 已翻过的页直接沿用当前列表，只补后面的。
-          initial: tracks ?? [],
-          fromPage: tracks && tracks.length > 0 ? page + 1 : 1,
-          expected: picked.count,
+          initial: tracks,
+          fromPage: page + 1,
           stopped: () => prepTicket.current !== ticket,
-          onProgress: (loaded, nextPage) => {
-            if (prepTicket.current === ticket) setPrep({ loaded, page: nextPage })
+          onProgress: (loaded, nextPage, complete) => {
+            setTracks(loaded)
+            setPage(nextPage)
+            setExhausted(complete)
+            setPrep({ loaded: loaded.length, page: nextPage })
           },
         },
       )
       if (prepTicket.current !== ticket) return
+      const all = result.tracks
+      if (!result.complete) {
+        toastWarn('收藏夹分页没有继续', `已读 ${all.length} 个可播视频，原队列已保留`)
+        return
+      }
       if (all.length === 0) {
         toastDone('这个收藏夹里没有可播放的视频')
         return
@@ -270,9 +300,7 @@ export function FavFoldersView() {
         all.map((t) => t.key),
         0,
       )
-      if (!complete) {
-        toastWarn(`按读到的 ${all.length} 项播放`, '收藏夹数量可能过期，没读到的项没有排进队列')
-      }
+      if (all.length !== picked.count) toastDone(`已播放夹内 ${all.length} 个可播视频`)
     } catch {
       if (prepTicket.current === ticket) {
         toastWarn('没能读全这个收藏夹', '这次没有开始播放，稍后再试')
@@ -357,9 +385,10 @@ export function FavFoldersView() {
               取消
             </button>
           </span>
-        ) : tracks && tracks.length > 0 ? (
+        ) : tracks && (tracks.length > 0 || !exhausted) ? (
           <button
             type="button"
+            disabled={loadingMore}
             onClick={() => void playAll()}
             className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 text-[12.5px] text-white"
           >
@@ -410,8 +439,8 @@ export function FavFoldersView() {
         <EmptyState
           mascot="hug"
           icon="biliTv"
-          title="这个收藏夹是空的"
-          action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }}
+          title={exhausted ? (picked.count > 0 ? '没有可播放的视频' : '这个收藏夹是空的') : '本页没有可播放的视频'}
+          action={exhausted ? null : { label: '加载下一页', onClick: () => void loadMore(true) }}
         />
       ) : visible.length === 0 ? (
         <div className="flex items-center justify-center gap-3 py-10 text-[13px] text-[var(--text-3)]">

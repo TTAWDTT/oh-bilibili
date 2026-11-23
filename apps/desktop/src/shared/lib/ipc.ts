@@ -434,8 +434,10 @@ export function videoShots(key: string, cid: number): Promise<VideoShots> {
 }
 
 /** 某个收藏夹里的曲目。 */
-export function favTracks(folderId: number, page = 1): Promise<Track[]> {
-  return call<Track[]>('fav_tracks', { folder_id: folderId, page })
+export type FavTrackPage = { tracks: Track[]; has_more: boolean }
+
+export function favTracks(folderId: number, page = 1): Promise<FavTrackPage> {
+  return call<FavTrackPage>('fav_tracks', { folder_id: folderId, page })
 }
 
 /** 从指定收藏夹移出。 */

@@ -1,95 +1,43 @@
-// 收藏夹全集读取的回归：用可控的分页响应跑真实模块。
+import assert from 'node:assert/strict'
 import { collectFavTracks } from '../apps/desktop/src/features/library/favPages.ts'
 
-let failed = 0
-function check(name, ok) {
-  if (ok) {
-    console.log(`ok   ${name}`)
-    return
-  }
-  failed += 1
-  console.error(`FAIL ${name}`)
-}
+const tracks = (start, count) => Array.from({ length: count }, (_, i) => ({ key: `BV${start + i}` }))
+const page = (start, count, has_more) => ({ tracks: tracks(start, count), has_more })
+const initial = tracks(0, 40)
+const fetched = []
+const progress = []
+const result = await collectFavTracks(async (n) => {
+  fetched.push(n)
+  return n === 2 ? page(40, 40, true) : page(80, 15, false)
+}, { initial, fromPage: 2, onProgress: (rows, n, done) => progress.push([n, rows.length, done]) })
+assert.deepEqual(fetched, [2, 3])
+assert.deepEqual(result, { tracks: tracks(0, 95), complete: true })
+assert.deepEqual(progress, [[2, 80, false], [3, 95, true]])
 
-const track = (key) => ({ key, title: key, artist: '', duration_ms: 60_000, cover: null })
-const pageOf = (from, count) =>
-  Array.from({ length: count }, (_, i) => track(`BV${String(from + i).padStart(4, '0')}`))
-const pages = (map) => async (page) => {
-  const value = map[page]
-  if (value instanceof Error) throw value
-  return value ?? []
-}
+assert.deepEqual(await collectFavTracks(async () => page(0, 0, false)), { tracks: [], complete: true })
+assert.deepEqual(await collectFavTracks(async (n) => n === 1 ? page(0, 39, true) : page(38, 4, false)),
+  { tracks: tracks(0, 42), complete: true })
+assert.deepEqual(await collectFavTracks(async (n) => n === 1 ? page(0, 0, true) : page(0, 3, false)),
+  { tracks: tracks(0, 3), complete: true })
+assert.deepEqual(await collectFavTracks(async () => page(0, 40, true)),
+  { tracks: initial, complete: false })
 
-{
-  const r = await collectFavTracks(pages({ 1: pageOf(0, 40), 2: pageOf(40, 40), 3: pageOf(80, 15) }), {
-    expected: 95,
-  })
-  check('三页读完正好 95 项且顺序不变', r.tracks.length === 95 && r.complete)
-  check('第一项与最后一项没有错位', r.tracks[0].key === 'BV0000' && r.tracks[94].key === 'BV0094')
-}
+let lastPage = 1
+let loaded = initial
+await assert.rejects(collectFavTracks(async (n) => {
+  if (n === 3) throw Error('timeout')
+  return page(40, 40, true)
+}, { initial, fromPage: 2, onProgress: (rows, n) => { loaded = rows; lastPage = n } }), /timeout/)
+const resumed = await collectFavTracks(async (n) => {
+  assert.equal(n, 3)
+  return page(80, 15, false)
+}, { initial: loaded, fromPage: lastPage + 1 })
+assert.deepEqual(resumed, result)
 
-{
-  const r = await collectFavTracks(pages({ 1: [] }), { expected: 0 })
-  check('空夹读完是空列表且算完成', r.tracks.length === 0 && r.complete)
-}
-
-{
-  const r = await collectFavTracks(pages({ 1: pageOf(0, 40), 2: pageOf(0, 40) }), { expected: 95 })
-  check('重复页不会无限翻', r.tracks.length === 40 && r.complete === false)
-}
-
-{
-  let threw = false
-  try {
-    await collectFavTracks(pages({ 1: pageOf(0, 40), 2: new Error('timeout') }), { expected: 95 })
-  } catch {
-    threw = true
-  }
-  check('中途失败会抛出，交给调用方放弃播放', threw)
-}
-
-{
-  let calls = 0
-  const r = await collectFavTracks(
-    async (page) => {
-      calls += 1
-      return pageOf(calls * 100, 40)
-    },
-    { expected: 500, stopped: () => calls >= 2 },
-  )
-  check('取消后只多取一页就停', calls === 2 && r.complete === false)
-  check('取消时带回已读到的部分', r.tracks.length === 40)
-}
-
-{
-  const progress = []
-  await collectFavTracks(pages({ 1: pageOf(0, 40), 2: pageOf(40, 10) }), {
-    expected: 50,
-    onProgress: (loaded, page) => progress.push(`${page}:${loaded}`),
-  })
-  check('进度按页报告已读数量', progress.join(',') === '1:40,2:50')
-}
-
-{
-  const r = await collectFavTracks(pages({ 1: pageOf(0, 40), 2: pageOf(40, 40) }), {
-    expected: 999,
-    maxPages: 2,
-  })
-  check('达到页数上限时不假装读全', r.tracks.length === 80 && r.complete === false)
-}
-
-{
-  let firstPage = 0
-  const r = await collectFavTracks(
-    async (page) => {
-      if (page === 1) firstPage += 1
-      return page === 2 ? pageOf(40, 40) : pageOf(80, 15)
-    },
-    { initial: pageOf(0, 40), fromPage: 2, expected: 95 },
-  )
-  check('已加载的页不再重读', firstPage === 0 && r.tracks.length === 95 && r.complete)
-  check('沿用旧顺序再接后面的页', r.tracks[0].key === 'BV0000' && r.tracks[94].key === 'BV0094')
-}
-
-if (failed > 0) process.exit(1)
+let stop = false
+const canceled = await collectFavTracks(async () => {
+  stop = true
+  return page(40, 4, false)
+}, { initial, fromPage: 2, stopped: () => stop, onProgress: () => assert.fail('取消后的请求更新了列表') })
+assert.deepEqual(canceled, { tracks: initial, complete: false })
 console.log('fav pages ok')

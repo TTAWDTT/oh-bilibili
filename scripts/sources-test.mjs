@@ -43,6 +43,11 @@ check('下一行带别的正文不认', hanging.length === 0)
 check('裸 BV 行内多目标跳过', parseSources('本家：BV1sM4y1V7x1 BV1oC411572T', 'BV1xx411c7mD').length === 0)
 check('重复条目去重', parseSources('伴奏：https://a.com/x\n伴奏：https://a.com/x', 'BV1xx411c7mD').length === 1)
 
+const parts = parseSources('原舞：https://www.bilibili.com/video/BV1Mk4y11666?p=2&t=18.5\n原舞：https://www.bilibili.com/video/BV1Mk4y11666?p=3', 'other')
+check('同稿不同分 P 的出处分别保留时间和页号', parts.length === 2 && parts[0].page === 2 && parts[0].atMs === 18500 && parts[1].page === 3)
+check('外部素材链接中的 BV 不改变其目的地', parseSources('素材：https://example.org/data/BV1Mk4y11666', 'other')[0]?.kind === 'external')
+check('同名而无明确目标不生成关系', parseSources('原舞：《大喜》', 'other').length === 0)
+
 if (failed > 0) {
   console.error(`sources: ${failed} failed`)
   process.exit(1)

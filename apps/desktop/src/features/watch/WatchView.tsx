@@ -524,12 +524,10 @@ export function WatchView({
   const nextPage = pageIndex >= 0 ? data?.pages[pageIndex + 1] ?? null : null
   const session = currentWatchSession(track.key)
   const sessionNext = session ? peekWatchSessionNext(track.key) : null
-  // 分 P 播完接下一 P；合集里的单集播完接下一集。B 站两者都是自动连播，
-  // 不走相关推荐；片单播放时再往后接片单，片单到最后一条就停下。
-  // 只有既没有下一 P、下一集，也不在片单里时才退到推荐第一条。
+  // 连续观看按启动时的片单前进，合集里的其他稿件不属于这份片单。
   const seasonEpisodes = data?.season?.episodes ?? []
   const seasonIndex = seasonEpisodes.findIndex((ep) => ep.key === track.key)
-  const nextSeasonEp = seasonIndex >= 0 ? seasonEpisodes[seasonIndex + 1] ?? null : null
+  const nextSeasonEp = !session && seasonIndex >= 0 ? seasonEpisodes[seasonIndex + 1] ?? null : null
   const nextUp: NextUp | null = nextPage
     ? {
         title: nextPage.title || `第 ${nextPage.no} P`,

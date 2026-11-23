@@ -426,8 +426,6 @@ export function WatchPlayer({
     () => filterDanmaku(danmaku, danmakuBlockWords, danmakuBlockTypes),
     [danmaku, danmakuBlockWords, danmakuBlockTypes],
   )
-  /** 屏蔽条件一变，屏幕上的弹幕要按剩下的记录重建，不能沿用旧计数。 */
-  const danmakuFilterKey = `${danmakuBlockWords.join('\u0000')}#${danmakuBlockTypes.join(',')}`
 
   const addBlockWords = (): void => {
     const words = blockDraft
@@ -1168,7 +1166,7 @@ export function WatchPlayer({
         speed={danmakuSpeed}
         area={danmakuArea}
         mergeSame={danmakuMergeSame}
-        resetToken={danmakuFilterKey}
+        playbackRate={speed}
         fade
       />
       {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}

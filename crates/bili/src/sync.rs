@@ -14,6 +14,12 @@ pub const FOLLOW_PAGE_SIZE: u32 = 50;
 /// 收藏夹名。产品要求固定这个名字，用户 B 站里能看到同一个夹子。
 pub const DEFAULT_FOLDER: &str = "哔哩哔哩 music";
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FavTrackPage {
+    pub tracks: Vec<bilimusic_model::Track>,
+    pub has_more: bool,
+}
+
 /// 搜索出来的 UP 主。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserHit {
@@ -481,7 +487,7 @@ impl Client {
         page: u32,
         ps: u32,
         min_interval: std::time::Duration,
-    ) -> Result<Vec<serde_json::Value>, BiliError> {
+    ) -> Result<(Vec<serde_json::Value>, bool), BiliError> {
         let v = self
             .get_json(
                 &format!(
@@ -491,7 +497,15 @@ impl Client {
                 min_interval,
             )
             .await?;
-        Ok(v["data"]["medias"].as_array().cloned().unwrap_or_default())
+        let data = &v["data"];
+        let has_more = data["has_more"].as_bool()
+            .ok_or_else(|| BiliError::Parse("收藏夹缺少分页状态".into()))?;
+        let medias = match &data["medias"] {
+            serde_json::Value::Array(items) => items.clone(),
+            serde_json::Value::Null if !has_more => Vec::new(),
+            _ => return Err(BiliError::Parse("收藏夹缺少作品列表".into())),
+        };
+        Ok((medias, has_more))
     }
 
     /// 收藏夹列表用的封面拼图：取每个夹子最前面的几张封面。
@@ -499,7 +513,7 @@ impl Client {
         Ok(self
             .fav_medias(folder_id, 1, limit.clamp(1, 20), std::time::Duration::from_millis(180))
             .await?
-            .iter()
+            .0.iter()
             .filter_map(|m| m["cover"].as_str().filter(|c| !c.is_empty()))
             .map(|c| c.replacen("http://", "https://", 1))
             .collect())
@@ -515,15 +529,18 @@ impl Client {
         &self,
         folder_id: i64,
         page: u32,
-    ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+    ) -> Result<FavTrackPage, BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};
 
-        Ok(self
+        let (medias, has_more) = self
             .fav_medias(folder_id, page, 40, std::time::Duration::from_millis(400))
-            .await?
-            .iter()
+            .await?;
+        let tracks = medias.iter()
             .filter_map(|m| {
-                let bvid = m["bvid"].as_str()?.to_string();
+                let bvid = m["bvid"].as_str().filter(|key| !key.is_empty())?;
+                if m["attr"].as_u64() == Some(9) {
+                    return None;
+                }
                 let duration = m["duration"].as_u64().filter(|d| *d > 0);
                 let play = m["cnt_info"]["play"].as_u64();
                 let danmaku = m["cnt_info"]["danmaku"].as_u64();
@@ -550,7 +567,8 @@ impl Client {
                     pages: m["page"].as_u64().map(|n| n as u32),
                 })
             })
-            .collect())
+            .collect();
+        Ok(FavTrackPage { tracks, has_more })
     }
 
     /// 稍后再看的列表。未登录会返回 NeedsLogin。

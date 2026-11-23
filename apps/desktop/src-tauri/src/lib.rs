@@ -945,7 +945,7 @@ async fn fav_tracks(
     engine: tauri::State<'_, Arc<Engine>>,
     folder_id: i64,
     page: u32,
-) -> Result<Vec<Track>, WireError> {
+) -> Result<bilimusic_core::wire::FavTrackPage, WireError> {
     engine.fav_tracks(folder_id, page).await
 }
 

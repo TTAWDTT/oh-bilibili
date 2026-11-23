@@ -34,8 +34,9 @@ export function DanmakuComposer({
     if (!trackKey || value.length === 0 || busy) return
     setBusy(true)
     try {
-      await ipc.danmakuSend(trackKey, value, Math.max(0, Math.round(readPlayhead())))
-      append(trackKey, { at: Math.max(0, Math.round(readPlayhead())), text: value, color: 'var(--text-1)' })
+      const sentAt = Math.max(0, Math.round(readPlayhead()))
+      await ipc.danmakuSend(trackKey, value, sentAt)
+      append(trackKey, { at: sentAt, text: value, color: 'var(--text-1)' })
       setText('')
       toastDone('弹幕已发出', `${Math.floor(at / 1000)} 秒处`)
       onSent?.()

@@ -486,7 +486,7 @@ async fn 收藏夹一页要多久() {
     assert!(!covers.is_empty(), "收藏夹列表页应该有封面可拼");
 
     let t0 = Instant::now();
-    let page = source.fav_tracks(id, 1).await.expect("一页");
+    let page = source.fav_tracks(id, 1).await.expect("一页").tracks;
     println!("第一页 {} 条，耗时 {} ms", page.len(), t0.elapsed().as_millis());
     if let Some(t) = page.first() {
         println!("首条: {} / {} / {:?} / 播放 {:?}", t.title.chars().take(18).collect::<String>(), t.artist, t.duration.map(|d| d.0), t.views);

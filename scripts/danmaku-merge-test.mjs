@@ -1,39 +1,25 @@
-// 弹幕同句合并的时间窗与组长失效：用真实模块跑断言。
-import { DanmakuMergeGroups, MERGE_WINDOW_MS } from '../apps/desktop/src/features/player/danmakuMerge.ts'
+import assert from 'node:assert/strict'
+import { scheduleDanmaku, visibleDanmaku, withLocalEchoes } from '../apps/desktop/src/features/player/danmakuMerge.ts'
 
-let failed = 0
-function check(name, ok) {
-  if (ok) {
-    console.log(`ok   ${name}`)
-    return
-  }
-  failed += 1
-  console.error(`FAIL ${name}`)
-}
-
-const groups = new DanmakuMergeGroups()
-groups.remember('前方高能', 10_000, 1)
-
-check('窗口内第一条重复并到组长', groups.leaderFor('前方高能', '#ffffff', 10_800, new Set([1])) === 1)
-check('窗口末尾仍算同一组', groups.leaderFor('前方高能', '#ffffff', 10_000 + MERGE_WINDOW_MS - 1, new Set([1])) === 1)
-check('到窗口终点另起一组', groups.leaderFor('前方高能', '#ffffff', 10_000 + MERGE_WINDOW_MS, new Set([1])) === null)
-check('更早的时间不会并入', groups.leaderFor('前方高能', '#ffffff', 9_900, new Set([1])) === null)
-check('不同文本各算各的', groups.leaderFor('前方高能！', '#ffffff', 10_500, new Set([1])) === null)
-check('组长已经被清理就不并入', groups.leaderFor('前方高能', '#ffffff', 10_500, new Set()) === null)
-
-groups.forget(1)
-check('摘掉组长后同句不再并入', groups.leaderFor('前方高能', '#ffffff', 10_500, new Set([1])) === null)
-
-groups.remember('再来一次', '#ffffff', 20_000, 7)
-check('第二条同句不会延长窗口', groups.leaderFor('再来一次', '#ffffff', 21_900, new Set([7])) === 7)
-check('窗口仍按第一条起算', groups.leaderFor('再来一次', '#ffffff', 22_000, new Set([7])) === null)
-
-groups.remember('同句', '#ffffff', 30_000, 11)
-check('颜色不同的同句各算一组', groups.leaderFor('同句', '#ff0000', 30_500, new Set([11])) === null)
-check('同色仍然合并', groups.leaderFor('同句', '#ffffff', 30_500, new Set([11])) === 11)
-
-groups.clear()
-check('清空后没有任何组', groups.leaderFor('再来一次', '#ffffff', 20_100, new Set([7])) === null)
-
-if (failed > 0) process.exit(1)
+const line = (at, text = '前方高能', mode = 1, color = '#fff') => ({ at, text, mode, color })
+const records = [line(10000), line(10800), line(11900), line(12000)]
+const life = 9000
+const timeline = scheduleDanmaku(records, true, 3, life)
+const counts = (plan, ms) => visibleDanmaku(plan, ms, life).map((row) => row.count)
+assert.deepEqual(counts(timeline, 9999), [])
+assert.deepEqual(counts(timeline, 10000), [1])
+assert.deepEqual(counts(timeline, 10800), [2])
+assert.deepEqual(counts(timeline, 11900), [3])
+assert.deepEqual(counts(timeline, 12000), [3, 1])
+assert.deepEqual(counts(timeline, 10800), [2])
+assert.deepEqual(counts(timeline, 10800), [2])
+assert.deepEqual(counts(scheduleDanmaku([line(0), line(0)], true, 1, life), 0), [2])
+const crowded = scheduleDanmaku([line(0), line(15, '独特'), line(500), line(580, '独特'), line(1490, '独特')], true, 1, life)
+assert.deepEqual(counts(crowded, 1490), [2])
+const variants = [line(100), line(200, '前方高能！'), line(210, '前方高能', 4), line(220, '前方高能', 1, '#ddd'), line(230)]
+assert.deepEqual(counts(scheduleDanmaku(variants, true, 5, life), 230), [2, 1, 1, 1])
+assert.deepEqual(counts(scheduleDanmaku(records, false, 5, life), 11900), [1, 1, 1])
+assert.deepEqual(counts(scheduleDanmaku([line(12000)], true, 2, life), 11900), [])
+assert.deepEqual(withLocalEchoes([line(0), line(0)], [line(0), line(25)]), [line(0), line(0), line(25)])
+assert.deepEqual(withLocalEchoes([line(0)], [line(0), line(0)]), [line(0), line(0)])
 console.log('danmaku merge ok')

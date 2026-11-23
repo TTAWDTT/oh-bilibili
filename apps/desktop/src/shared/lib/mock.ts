@@ -543,11 +543,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // `?favThree` 造一个 40 + 40 + 15、共 95 项的收藏夹，用来验「播放全部」读全集。
       if (new URLSearchParams(window.location.search).has('favThree')) {
         const folder = Math.trunc(num(args, 'folder_id')) || 1
-        if (folder === 2) return page === 1 ? CATALOG.slice(0, 12) : []
-        if (folder === 3) return []
+        if (folder === 2) return { tracks: page === 1 ? CATALOG.slice(0, 12) : [], has_more: false }
+        if (folder === 3) return { tracks: [], has_more: false }
         const start = (page - 1) * size
         const total = 95
-        return Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
+        const tracks = Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
           const n = start + i
           const base = CATALOG[n % CATALOG.length]!
           const track = {
@@ -560,9 +560,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           registerTrack(track)
           return track
         })
+        return { tracks, has_more: start + size < total }
       }
       const start = (page - 1) * size
-      return CATALOG.slice(start, start + Math.min(size, CATALOG.length - start))
+      return { tracks: CATALOG.slice(start, start + size), has_more: start + size < CATALOG.length }
     }
     case 'history_delete': {
       const key = str(args, 'key')
