@@ -982,11 +982,14 @@ export function DynamicView() {
         {following?.length ? (
           <aside
             data-dynamic-author-rail
-            aria-label="按作者筛选动态"
+            role="complementary"
+            aria-labelledby="dynamic-author-rail-title"
             className="sticky top-[72px] hidden max-h-[calc(100vh-160px)] flex-col gap-0.5 overflow-y-auto rounded-[6px] bg-[var(--panel)] p-2 xl:flex"
           >
             <div className="flex items-center justify-between gap-2 px-1 pb-1">
-              <h3 className="text-[12.5px] text-[var(--text-3)]">关注的人</h3>
+              <h3 id="dynamic-author-rail-title" className="text-[12.5px] text-[var(--text-3)]">
+                关注的人
+              </h3>
               <button
                 type="button"
                 onClick={() => navigate({ kind: 'following' })}
