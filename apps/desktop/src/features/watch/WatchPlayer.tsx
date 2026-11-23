@@ -447,12 +447,19 @@ export function WatchPlayer({
   }
   useEffect(() => {
     if (!seekSignal) return
-    const video = videoRef.current
-    if (video) video.currentTime = seekSignal.at / 1000
     setNow(seekSignal.at)
     void ipc.playerSeek(seekSignal.at).catch(() => {})
   }, [seekSignal])
 
+  const appliedVideoSeek = useRef<typeof seekSignal>(null)
+  useEffect(() => {
+    if (!ready || !seekSignal || appliedVideoSeek.current === seekSignal) return
+    const video = videoRef.current
+    if (video) {
+      video.currentTime = seekSignal.at / 1000
+      appliedVideoSeek.current = seekSignal
+    }
+  }, [ready, seekSignal])
   useEffect(() => {
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current)
@@ -735,7 +742,8 @@ export function WatchPlayer({
     setResumeNotice(null)
   }, [data.manifest_url])
 
-  // 挂载 shaka
+  // Shaka 的 destroy 会异步清空共用的 video.src。必须等旧实例释放后再挂下一 P。
+  const releasingPlayer = useRef<Promise<void> | null>(null)
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -747,6 +755,8 @@ export function WatchPlayer({
     let cancelled = false
     void (async () => {
       try {
+        await releasingPlayer.current
+        if (cancelled) return
         shaka.polyfill?.installAll?.()
         const player = new shaka.Player(video)
         playerRef.current = player
@@ -757,12 +767,12 @@ export function WatchPlayer({
         player.addEventListener('error', (event: { detail?: unknown }) => {
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
           const detail = event.detail as { handled?: boolean } | undefined
-          if (detail?.handled) return
+          if (cancelled || detail?.handled) return
           // 这一档取不到就退一档。B 站的 1080P 分片偶尔会被 CDN 直接拒，
           // 让用户自己去画质菜单里试是多余的；低一档几乎总能放。
           const heights = [...new Set(data.qualities.map((q) => q.height))].sort((a, b) => b - a)
           const lower = heights.find((h) => h < (currentHeight.current || heights[0]!))
-          if (lower !== undefined && !cancelled) {
+          if (lower !== undefined) {
             // 先记下这一档，下一次失败才会继续往下退；
             // 否则 load 在选轨之前就失败时会永远停在同一档来回重试。
             currentHeight.current = lower
@@ -780,6 +790,7 @@ export function WatchPlayer({
         video.muted = true
         video.volume = 0
         await player.load(data.manifest_url)
+        if (cancelled) return
         // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
         // 否则按钮上只能显示兜底文案，用户不知道现在是多少。
         // 降档重试优先；没有降档就按上次选的档位来。
@@ -820,10 +831,6 @@ export function WatchPlayer({
             )[0]
           if (match) setActiveId(match.id)
         }
-        if (cancelled) {
-          await player.destroy()
-          return
-        }
         setBuffering(false)
         setLoadedData(data)
       } catch (e) {
@@ -834,7 +841,7 @@ export function WatchPlayer({
       cancelled = true
       const player = playerRef.current
       playerRef.current = null
-      void player?.destroy()
+      if (player) releasingPlayer.current = player.destroy()
     }
   }, [data, retry])
 

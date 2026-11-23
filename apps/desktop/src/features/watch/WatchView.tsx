@@ -198,6 +198,7 @@ export function WatchView({
     }
     const at = resumeAtMs ?? loadPagePos(track.key, no)
     setResume(at !== null ? { key: track.key, at } : null)
+    setSeekSignal(null)
     pageLoading.current = true
     setPendingResume({ at, paused: commentPaused ?? false, comment: commentPaused !== undefined })
     setPage(no)
@@ -231,7 +232,6 @@ export function WatchView({
       changePage(target, ms, paused)
       return
     }
-    setResume(null)
     seekTo(ms)
   }
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
@@ -245,8 +245,10 @@ export function WatchView({
   const [metaChapters, setMetaChapters] = useState<{ at_ms: number; title: string }[]>([])
   /** 外部（章节/总结/简介）点时间戳时发一次定位请求，由播放器统一改声音与画面。 */
   const [seekSignal, setSeekSignal] = useState<{ at: number; nonce: number } | null>(null)
-  const seekTo = (ms: number): void =>
+  const seekTo = (ms: number): void => {
+    setResume(null)
     setSeekSignal((previous) => ({ at: ms, nonce: (previous?.nonce ?? 0) + 1 }))
+  }
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
   const [resume, setResume] = useState<{ key: string; at: number } | null>(
     atMs !== undefined
