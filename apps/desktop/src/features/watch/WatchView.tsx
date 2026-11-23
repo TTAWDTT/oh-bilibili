@@ -24,6 +24,7 @@ import { OwnerCard } from './OwnerCard'
 import { PageList } from './PageList'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
+import { rememberSeason } from '../tracks/seasonMark'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer, type NextUp } from './WatchPlayer'
@@ -614,6 +615,9 @@ export function WatchView({
             setResume(at ? { key: track.key, at } : null)
             saveWatchPage(track.key, fallback)
           }
+          // 详情里带完整合集目录时记到本地：列表页的书脊靠它，
+          // 不必为每个卡片额外请求一次详情。
+          rememberSeason(next.season)
           setData(next)
         }
       } catch (e) {
