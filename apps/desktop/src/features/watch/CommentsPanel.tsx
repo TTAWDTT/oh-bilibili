@@ -6,6 +6,9 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { findCommentTimes } from './commentTime'
+import type { CommentAnchor } from './commentTime'
+import { NoteReader } from './NoteReader'
+import type { CommentNote } from './NoteReader'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { COMMENT_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -290,6 +293,7 @@ function CommentRow({
   onSeek,
   onAuthorHover,
   onAuthorHide,
+  onReadNote,
 }: {
   c: Comment
   depth?: number
@@ -307,6 +311,8 @@ function CommentRow({
   onSeek?: SeekTime | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
+  /** 评论里有不止一个有效时间点时给出「边看边读」。 */
+  onReadNote?: ((note: { id: string; author: string; text: string; anchors: CommentAnchor[] }) => void) | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
@@ -441,6 +447,8 @@ function CommentRow({
       data-comment-id={c.id}
       data-comment-mid={c.mid}
       data-comment-depth={depth}
+      /* 「回到原评论」会把焦点交给这一楼；-1 只让脚本聚焦，不进 Tab 顺序。 */
+      tabIndex={-1}
       className={depth > 0 ? 'mt-2 border-l border-[var(--line)] pl-3' : ''}
     >
       <div className="flex items-start gap-2">
@@ -572,6 +580,21 @@ function CommentRow({
               {expanded ? '收起' : '展开'}
             </button>
           ) : null}
+          {/* 两个以上有效时间点才值得整理成一列；单条时间点直接点链接就够了。 */}
+          {(() => {
+            if (depth > 0 || !onReadNote) return null
+            const anchors = findCommentTimes(c.text, 999).filter((anchor) => !anchor.invalid)
+            if (anchors.length < 2) return null
+            return (
+              <button
+                type="button"
+                onClick={() => onReadNote({ id: c.id, author: c.author, text: c.text, anchors })}
+                className="t mt-1 ml-2 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                边看边读 · {anchors.length} 个时间点
+              </button>
+            )
+          })()}
           {c.pictures?.length ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {c.pictures.slice(0, 9).map((src, index) => (
@@ -923,6 +946,8 @@ export function CommentsPanel({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; root: string; author: string } | null>(null)
+  /** 「边看边读」当前整理的是哪条评论。 */
+  const [noteReading, setNoteReading] = useState<CommentNote | null>(null)
   /** 当前打开的对话分支：一级评论 + 分支里的二级评论。 */
   const [dialog, setDialog] = useState<{ root: string; anchor: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
@@ -1456,6 +1481,25 @@ export function CommentsPanel({
             </button>
           </div>
         ) : null}
+        {noteReading ? (
+          <div className="mb-3 max-w-[880px] rounded-[6px] bg-[var(--panel-alt)]">
+            <NoteReader
+              note={noteReading}
+              onSeek={(anchor) => seekToTime(anchor.ms, anchor.page ?? undefined)}
+              onBack={() => {
+                const id = noteReading.id
+                setNoteReading(null)
+                // 原楼可能还在列表里；滚回去并把焦点交给它，键盘用户不用重新找。
+                window.setTimeout(() => {
+                  const row = document.querySelector<HTMLElement>(`[data-comment-id="${id}"]`)
+                  row?.scrollIntoView({ block: 'center' })
+                  row?.focus({ preventScroll: true })
+                }, 0)
+              }}
+              onClose={() => setNoteReading(null)}
+            />
+          </div>
+        ) : null}
         <ul className="max-w-[880px] space-y-4" data-comment-list="root">
           {visible.map((c) => (
             <CommentRow
@@ -1474,6 +1518,7 @@ export function CommentsPanel({
               deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
               onPhoto={(pictures, index) => setPhoto({ pictures, index })}
               onSeek={seekToTime}
+                onReadNote={setNoteReading}
               onAuthorHover={showAuthorCard}
               onAuthorHide={authorHover.hide}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}

@@ -13,7 +13,7 @@ export type CommentAnchor = {
 }
 
 const TIME = /((?:\d{1,2}[:：])?[0-5]?\d[:：][0-5]\d)/g
-const PAGE = /(?<=^|[\s（(【\[])[Pp](\d{1,3})(?=[\s:：,，、）)】\]]|$)/g
+const PAGE = /(^|[^\p{L}\p{N}_])[Pp](\d{1,3})(?=[\s:：,，、）)】\]]|$)/gu
 
 /**
  * 从一条评论里找时间点，并解析它指哪个分 P。
@@ -38,8 +38,9 @@ export function findCommentTimes(text: string, pages: number): CommentAnchor[] {
     }
 
     const markers = [...line.matchAll(PAGE)].map((m) => ({
-      start: m.index ?? 0,
-      page: Number(m[1]),
+      // 前缀是被吃进匹配里的分隔符（分号、括号、行首等），P 标记从它后面开始。
+      start: (m.index ?? 0) + (m[1] ?? '').length,
+      page: Number(m[2]),
     }))
     /** 上一条时间的结尾：两条时间之间的 P 标记才算这一条的声明。 */
     let prevEnd = 0
