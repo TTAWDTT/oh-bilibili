@@ -149,7 +149,10 @@ function describePlaybackError(e: unknown): string {
   if (status === 404) return '这段画面取不到了，稍后再试。'
   if (detail?.code === 1001 || detail?.code === 1002) return '连不上 B 站的视频服务器，检查一下网络。'
   if (detail?.code === 1006) return '这条视频的编码本机不支持。'
-  return '这条视频没播起来，换一条或稍后再试。'
+  // 其余错误带上 shaka 的码：用户报「放不出来」时能直接对上原因。
+  return typeof detail?.code === 'number'
+    ? `这条视频没播起来（${detail.code}），换一条或稍后再试。`
+    : '这条视频没播起来，换一条或稍后再试。'
 }
 
 /**
