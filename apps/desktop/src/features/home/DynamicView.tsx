@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { DynamicReturn, DynamicTab } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
@@ -83,7 +83,16 @@ function RichText({ text, body }: { text: string; body: DynamicBody }) {
   )
 }
 
-function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDynamic }) {
+function DynamicVideo({
+  item,
+  onOpen,
+  attribution,
+}: {
+  item: ipc.DynamicItem
+  onOpen: OpenDynamic
+  /** 引用视频时把被引作者的入口收进落款，标题下紧跟着「UP 乙」。 */
+  attribution?: ReactNode
+}) {
   const later = (event: MouseEvent): void => {
     event.stopPropagation()
     if (!item.bvid) return
@@ -149,6 +158,7 @@ function DynamicVideo({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyn
         <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent-strong-hover)]">
           {item.title}
         </span>
+        {attribution ?? null}
         <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-2)]">
           <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
             <Icon name="play" size={12} />
@@ -229,10 +239,13 @@ function DynamicContent({
   item,
   body,
   onOpen,
+  attribution,
 }: {
   item: ipc.DynamicItem
   body: DynamicBody
   onOpen: OpenDynamic
+  /** 引用视频的署名落款，交给作品卡自己排在标题下面。 */
+  attribution?: ReactNode
 }) {
   const text =
     item.kind === 'video' && item.text.trim() === item.title.trim() ? '' : item.text.trim()
@@ -246,7 +259,9 @@ function DynamicContent({
         </p>
       ) : null}
       {text ? <RichText text={text} body={body} /> : null}
-      {item.kind === 'video' ? <DynamicVideo item={item} onOpen={onOpen} /> : null}
+      {item.kind === 'video' ? (
+        <DynamicVideo item={item} onOpen={onOpen} attribution={attribution} />
+      ) : null}
       {item.kind === 'opus' && item.images.length > 0 ? (
         <div
           className={`grid gap-1.5 ${item.images.length === 1 ? 'grid-cols-1' : item.images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
@@ -313,6 +328,9 @@ function OrigCard({
     }
   }
 
+  // 视频引用的署名进作品落款，这里就不再单独占一行，同一个引用里乙只出现一次。
+  const inlineAuthor = orig.kind === 'video'
+
   return (
     <div
       role="button"
@@ -337,22 +355,53 @@ function OrigCard({
       /* 转发只做一层浅底引用，不再套第二道描边：外层是白卡，这里靠底色和缩进分出层级。 */
       className="mt-1 cursor-pointer rounded-[6px] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
-      <div className="mb-2 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'author', name: orig.author, mid: orig.mid })}
-          className="t flex min-w-0 items-center gap-2"
-        >
-          <Avatar src={orig.face} alt={orig.author} size={24} />
-          <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]">
-            {orig.author}
+      {inlineAuthor ? (
+        <span className="num mb-1 block text-[11px] text-[var(--text-2)]">{orig.pub_time}</span>
+      ) : (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate({ kind: 'author', name: orig.author, mid: orig.mid })}
+            className="t flex min-w-0 items-center gap-2"
+          >
+            <Avatar src={orig.face} alt={orig.author} size={24} />
+            <span className="truncate text-[13px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]">
+              {orig.author}
+            </span>
+          </button>
+          <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-2)]">
+            {orig.pub_time}
           </span>
-        </button>
-        <span className="num ml-auto shrink-0 text-[11px] text-[var(--text-2)]">
-          {orig.pub_time}
-        </span>
-      </div>
-      <DynamicContent item={orig} body={body} onOpen={open} />
+        </div>
+      )}
+      <DynamicContent
+        item={orig}
+        body={body}
+        onOpen={open}
+        attribution={
+          inlineAuthor ? (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  { kind: 'author', name: orig.author, mid: orig.mid },
+                  undefined,
+                  `forward-author:${orig.id}`,
+                )
+              }
+              aria-label={`UP ${orig.author}`}
+              title={`看 ${orig.author} 的更多视频`}
+              data-focus-id={`forward-author:${orig.id}`}
+              className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong-hover)]"
+            >
+              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
+                UP
+              </span>
+              <span className="truncate">{orig.author}</span>
+            </button>
+          ) : undefined
+        }
+      />
     </div>
   )
 }
