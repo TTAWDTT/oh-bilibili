@@ -157,6 +157,7 @@ export type WatchStaff = {
 }
 
 export type SeasonView = {
+  work_count: number | null
   id: number
   title: string
   episodes: SeasonEpisodeView[]
@@ -279,7 +280,7 @@ export type WireError = {
   field?: string
 }
 
-export type SearchPage = { tracks: Track[]; page: number }
+export type SearchPage = { tracks: Track[]; page: number; has_more: boolean }
 
 export type AppEvent =
   | { type: 'state'; snapshot: PlayerSnapshot }

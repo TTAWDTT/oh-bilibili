@@ -21,3 +21,22 @@ export function readResumePage(key: string): number | null {
     return null
   }
 }
+
+export function rememberPageCount(key: string, count: number): void {
+  try {
+    if (count > 1) localStorage.setItem(`oh-bilibili:page-count:${key}`, String(count))
+    else localStorage.removeItem(`oh-bilibili:page-count:${key}`)
+  } catch {
+    // 私密窗口可能禁用本地存储。
+  }
+}
+
+export function knownPageCount(key: string, pages: number | null | undefined): number | null {
+  if (pages && pages > 0) return pages
+  try {
+    const count = Number(localStorage.getItem(`oh-bilibili:page-count:${key}`))
+    return Number.isSafeInteger(count) && count > 1 ? count : null
+  } catch {
+    return null
+  }
+}

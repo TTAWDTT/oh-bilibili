@@ -1522,7 +1522,7 @@ async function checkHeroAllocation(page) {
   for (let i = 0; i < 40 && !ready; i += 1) {
     await sleep(250)
     ready = await page.evaluate(
-      `document.querySelectorAll('[data-home-hero-grid] > button').length === 6 &&
+      `document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6 &&
        document.querySelectorAll('[data-home-feed] [data-track-card]').length >= 5`,
     )
   }
@@ -1530,7 +1530,7 @@ async function checkHeroAllocation(page) {
     page.evaluate(`(() => {
       const carousel = [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
         .map((image) => image.dataset.trackTitle ?? '')
-      const grid = [...document.querySelectorAll('[data-home-hero-grid] > button')]
+      const grid = [...document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]')]
         .map((card) => card.querySelector('.line-clamp-2')?.textContent?.trim() ?? '')
       const feed = [...document.querySelectorAll('[data-home-feed] [data-track-card]')]
         .map((card) => card.dataset.trackTitle ?? '')
@@ -1579,7 +1579,7 @@ async function checkHeroAllocation(page) {
   for (let i = 0; i < 20 && !refreshedReady; i += 1) {
     await sleep(200)
     refreshedReady = await page.evaluate(
-      `[...document.querySelectorAll('[data-home-hero-grid] > button')].some((card) =>
+      `[...document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]')].some((card) =>
         card.textContent.includes('首页分配 12'))`,
     )
   }
@@ -1681,7 +1681,7 @@ async function checkHomeResume(page) {
     await sleep(250)
     ready = await page.evaluate(
       `!!document.querySelector('[data-home-resume="wide"]') &&
-       document.querySelectorAll('[data-home-hero-grid] > button').length === 6`,
+       document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6`,
     )
   }
   const wide = await page.evaluate(`(() => {
@@ -1689,7 +1689,7 @@ async function checkHomeResume(page) {
     return {
       text: (card?.textContent || '').trim(),
       carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-      grid: document.querySelectorAll('[data-home-hero-grid] > button').length,
+      grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
     }
   })()`)
   check(
@@ -1754,7 +1754,7 @@ async function checkHomeResume(page) {
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(1200)
   const recovered = await page.evaluate(`({
-    grid: document.querySelectorAll('[data-home-hero-grid] > button').length,
+    grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
     error: document.body.innerText.includes('连不上 B 站'),
   })`)
   check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
@@ -1863,7 +1863,9 @@ async function checkNavConventions(page) {
 /** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
 async function checkRanking(page) {
   await page.viewport(1440, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  const url = new URL(WEB)
+  url.searchParams.set('slowRanking', '1')
+  await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
   await sleep(4000)
   await page.evaluate(`(() => {
     const nav = document.querySelector('nav[aria-label="主导航"]')
@@ -1871,11 +1873,14 @@ async function checkRanking(page) {
     hit?.focus()
     hit?.click()
   })()`)
-  let ready = false
-  for (let i = 0; i < 30 && !ready; i += 1) {
-    await sleep(300)
-    ready = await page.evaluate(`document.querySelectorAll('[data-rank-row]').length >= 9`)
+  const waitForRows = async () => {
+    for (let i = 0; i < 30; i += 1) {
+      if (await page.evaluate(`document.querySelectorAll('[data-rank-row]').length >= 9`)) return true
+      await sleep(300)
+    }
+    return false
   }
+  const ready = await waitForRows()
   const wide = await page.evaluate(`(() => {
     const rows = [...document.querySelectorAll('[data-rank-row]')]
     const lefts = rows.slice(0, 9).map((row) => Math.round(row.getBoundingClientRect().left))
@@ -1959,15 +1964,15 @@ async function checkRanking(page) {
     watching = await page.evaluate(`!!document.querySelector('video')`)
   }
   await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
-  await sleep(1500)
+  await waitForRows()
   const back = await page.evaluate(`(() => {
     const box = document.getElementById('scroll-main')
     const part = document.querySelector('#scroll-main [aria-pressed="true"]')?.textContent?.trim() ?? ''
     return { top: box ? Math.round(box.scrollTop) : null, part, rows: document.querySelectorAll('[data-rank-row]').length }
   })()`)
   check(
-    '从视频返回仍在该分区和原来的名次附近',
-    watching && back.rows >= 9 && back.part === '全站' && back.top !== null && back.top >= 320,
+    `从视频返回仍在该分区和原来的名次附近（400 → ${back.top}，${back.part}）`,
+    watching && back.rows >= 9 && back.part === '全站' && back.top === 400,
   )
 
   await page.viewport(380, 820)
@@ -2273,14 +2278,16 @@ async function checkChannelNav(page) {
       prev: rect(header?.querySelector('button[aria-label="上一期"]')),
       picker: rect(header?.querySelector('[aria-haspopup="listbox"]')),
       next: rect(header?.querySelector('button[aria-label="下一期"]')),
-      first: rect(document.querySelector('[data-weekly-issue] .bili-card')),
-      cards: document.querySelectorAll('[data-weekly-issue] .bili-card').length,
+      issue: rect(document.querySelector('[data-weekly-issue]')),
+      subject: rect(document.querySelector('[data-weekly-issue] > h3')),
+      first: rect(document.querySelector('[data-weekly-issue] [data-wide-card]')),
+      cards: document.querySelectorAll('[data-weekly-issue] [data-wide-card]').length,
       select: [...document.querySelectorAll('[data-hot-channel-select]')]
         .filter((select) => select.getClientRects().length > 0).length,
     }
   })()`)
   check(
-    '每周必看换期组紧邻标题、紧接作品，中间没有跨频道入口',
+    '每周必看换期组紧邻页标题，当期主题和作品紧随其后',
     weeklyLayout.title && weeklyLayout.prev && weeklyLayout.picker && weeklyLayout.next &&
       weeklyLayout.prev.top >= weeklyLayout.title.top - 4 &&
       weeklyLayout.prev.top <= weeklyLayout.title.bottom &&
@@ -2288,8 +2295,10 @@ async function checkChannelNav(page) {
       weeklyLayout.picker.right <= weeklyLayout.next.left + 1 &&
       weeklyLayout.prev.left >= weeklyLayout.title.right &&
       weeklyLayout.prev.left - weeklyLayout.title.right <= 24 &&
-      weeklyLayout.first.top >= weeklyLayout.header.bottom - 1 &&
-      weeklyLayout.first.top - weeklyLayout.header.bottom <= 24 &&
+      weeklyLayout.issue.top >= weeklyLayout.header.bottom - 1 &&
+      weeklyLayout.issue.top - weeklyLayout.header.bottom <= 24 &&
+      weeklyLayout.first.top >= (weeklyLayout.subject?.bottom ?? weeklyLayout.issue.top) - 1 &&
+      weeklyLayout.first.top - (weeklyLayout.subject?.bottom ?? weeklyLayout.issue.top) <= 24 &&
       weeklyLayout.cards > 0 && weeklyLayout.select === 0,
   )
 
@@ -2440,7 +2449,7 @@ async function checkChannelNav(page) {
   check('期数下拉按 Esc 收起，焦点回到触发按钮', !afterEsc.list && afterEsc.focus === 'listbox')
 
   const weeklyOpened = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-weekly-issue] .bili-card')
+    const card = document.querySelector('[data-weekly-issue] [data-wide-card] button[data-focus-id]')
     if (!card) return ''
     const focusId = card.dataset.focusId ?? ''
     card.click()
@@ -4119,6 +4128,44 @@ async function checkProfileSettings(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkCommentPauseIntent(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const waitFor = async (expression) => {
+    const deadline = Date.now() + 8000
+    while (Date.now() < deadline) {
+      if (await page.evaluate(expression)) return
+      await sleep(50)
+    }
+    throw new Error(`评论切 P 验收超时：${expression}`)
+  }
+  await waitFor('location.search.includes("commentJumps") && !!document.querySelector("main h2")')
+  await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
+    .then(([app, catalog]) => app.useAppStore.getState().navigate({ kind: 'watch', track: catalog.CATALOG[0], page: 1 }))`)
+  const buttons = `[...document.querySelectorAll('[data-comment-id="1"] button')]`
+  await waitFor(`${buttons}.some(button => button.textContent === 'P2 03:20')`)
+  const seek = (p) => page.evaluate(`${buttons}.find(button => button.textContent === 'P${p} 03:20').click()`)
+  const storeUrl = await page.evaluate(`performance.getEntriesByType('resource').find(entry =>
+    new URL(entry.name).pathname === '/src/features/player/playerStore.ts')?.name`)
+  const setPhase = (phase) => page.evaluate(`import(${JSON.stringify(storeUrl)}).then(m => {
+    const player = m.usePlayerStore.getState()
+    player.applySnapshot({ ...player.snapshot, phase: ${JSON.stringify(phase)} })
+  })`)
+  const last = "performance.getEntriesByName('comment-page-ready').at(-1)?.detail"
+  await setPhase('paused')
+  await seek(2)
+  await waitFor(`${last}?.page === 2`)
+  await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  await setPhase('loading')
+  await seek(1)
+  await waitFor(`${last}?.page === 1`)
+  check('清单已返回、音轨仍在加载时，第二次切 P 保持暂停', await page.evaluate(`${last}.paused === true`))
+
+  await setPhase('playing')
+  await seek(2)
+  await waitFor(`${last}?.page === 2`)
+  check('音轨就绪后恢复播放，再切 P 延续播放', await page.evaluate(`${last}.paused === false`))
+}
+
 async function main() {
   if (!existsSync(CHROME)) {
     if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
@@ -4134,6 +4181,10 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--comment-pause-only')) {
+      await checkCommentPauseIntent(page)
+      return
+    }
     if (channelOnly) {
       await checkChannelNav(page)
       return
@@ -4172,6 +4223,7 @@ async function main() {
     }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkCommentPauseIntent(page)
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
     await checkStageMorph(page)
@@ -4199,41 +4251,37 @@ async function main() {
     }
     await sleep(6000)
 
-    const primaryButtons = await page.evaluate(`(() => {
-      const button = (text) =>
-        [...document.querySelectorAll('button')].find((element) => (element.textContent || '').trim() === text)
-      return ['搜索', '投稿', '登录'].map((label) => {
-        const element = button(label)
-        if (!element) return null
-        const style = getComputedStyle(element)
-        const box = element.getBoundingClientRect()
-        return {
-          label,
-          color: style.color,
-          background: style.backgroundColor,
-          center: [box.left + box.width / 2, box.top + box.height / 2],
-        }
-      })
+    const readBarButton = (label) => page.evaluate(`(() => {
+      const element = [...document.querySelectorAll('.safe-top button')].find(
+        (button) => button.textContent.trim() === ${JSON.stringify(label)},
+      )
+      if (!element) return null
+      let surface = element
+      while (surface.parentElement && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') {
+        surface = surface.parentElement
+      }
+      const box = element.getBoundingClientRect()
+      return {
+        color: getComputedStyle(element).color,
+        background: getComputedStyle(surface).backgroundColor,
+        center: [box.left + box.width / 2, box.top + box.height / 2],
+      }
     })()`)
+    const labels = ['搜索', '投稿', '登录']
+    const primaryButtons = await Promise.all(labels.map(readBarButton))
     check(
-      '顶栏主按钮白字达到 4.5:1',
+      '顶栏按钮文字在实际背景上达到 4.5:1',
       primaryButtons.every(
         (button) => button && contrastRatio(button.color, button.background) >= 4.5,
       ),
     )
-    for (const button of primaryButtons) {
+    for (const [i, button] of primaryButtons.entries()) {
       if (!button) continue
       await page.mouseEvent({ type: 'mouseMoved', x: button.center[0], y: button.center[1] })
       await sleep(250)
-      const hovered = await page.evaluate(`(() => {
-        const element = [...document.querySelectorAll('button')].find(
-          (candidate) => (candidate.textContent || '').trim() === ${JSON.stringify(button.label)},
-        )
-        const style = element ? getComputedStyle(element) : null
-        return style ? { color: style.color, background: style.backgroundColor } : null
-      })()`)
+      const hovered = await readBarButton(labels[i])
       check(
-        `${button.label}悬停时仍达到 4.5:1`,
+        `${labels[i]}悬停时仍达到 4.5:1`,
         hovered && contrastRatio(hovered.color, hovered.background) >= 4.5,
       )
     }
@@ -4261,13 +4309,9 @@ async function main() {
     )
 
     const heroAuthor = await page.evaluate(`(() => {
-      const card = document.querySelector('[data-home-recommend] div.bili-hero-swap button')
-      const authorRow = card
-        ? [...card.querySelectorAll(':scope > span')].find((row) => row.textContent.includes('UP'))
-        : null
-      const coverStats = card
-        ? [...card.querySelectorAll(':scope > span')].find((row) => row.querySelector('svg'))
-        : null
+      const card = document.querySelector('[data-home-hero-grid] > div')
+      const authorRow = card?.querySelector('[data-focus-id^="hero-author:"], span[title]')
+      const coverStats = card?.querySelector('button[data-focus-id^="herocard:"] > span')
       const statsOverlay = coverStats?.lastElementChild
       const countText = statsOverlay?.firstElementChild?.textContent?.trim() ?? ''
       const durationText = statsOverlay?.lastElementChild?.textContent?.trim() ?? ''
@@ -4787,13 +4831,13 @@ async function main() {
     for (let i = 0; i < 20 && !searched; i += 1) {
       await sleep(400)
       searched = await page.evaluate(`(() => {
-        const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+        const dialog = document.querySelector('[data-search-results]')
         return !!dialog && dialog.querySelectorAll('[data-track-card]').length > 0
       })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
     const singleResult = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       if (!dialog) return null
       dialog.scrollTop = dialog.scrollHeight - dialog.clientHeight
       const scrollTop = dialog.scrollTop
@@ -4809,7 +4853,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const returned = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       const active = document.activeElement
       return {
@@ -4819,11 +4863,11 @@ async function main() {
         scrollTop: dialog?.scrollTop,
       }
     })()`)
-    check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
+    check('从作品返回原搜索页', searchVideo && returned.dialog && returned.query === '晴天')
     check('返回后焦点落回结果卡片', returned.focused)
     check(
-      `单条结果保留滚动位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
-      singleResult?.count === 1 && singleResult.scrollTop > 0 && returned.scrollTop === singleResult.scrollTop,
+      `单条结果返回原位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
+      singleResult?.count === 1 && returned.scrollTop === singleResult.scrollTop,
     )
 
     // 再次进入同一结果：只点顶栏搜索框后按 Esc 收联想，不能抹掉返回目标。
@@ -4859,7 +4903,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const secondReturn = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       return {
         dialog: !!dialog,
@@ -4868,7 +4912,7 @@ async function main() {
       }
     })()`)
     check(
-      'Esc 收联想后返回仍回结果面板与原卡片',
+      'Esc 收联想后返回仍回结果页与原卡片',
       secondReturn.dialog && secondReturn.query === '晴天' && secondReturn.focused,
     )
 
@@ -4883,12 +4927,12 @@ async function main() {
     let resultCount = 0
     for (let i = 0; i < 20 && resultCount < 5; i += 1) {
       await sleep(400)
-      resultCount = await page.evaluate(`document.querySelectorAll('#search-scroll [data-track-card]').length`)
+      resultCount = await page.evaluate(`document.querySelectorAll('[data-search-results] [data-track-card]').length`)
     }
 
     const filters = ['音乐', '最多播放', '10 分钟以下']
     const filtersSelected = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const buttons = [...(dialog?.querySelectorAll('button') ?? [])]
       return ${JSON.stringify(filters)}.every((label) => {
         const button = buttons.find((button) => button.textContent.trim() === label)
@@ -4898,7 +4942,7 @@ async function main() {
     })()`)
     await sleep(1200)
     const manyResults = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const cards = dialog?.querySelectorAll('[data-track-card]')
       const button = cards?.[2]?.querySelector('button[aria-label^="观看"]')
       if (!button) return null
@@ -4919,7 +4963,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const returnedMany = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const pressed = [...(dialog?.querySelectorAll('button[aria-pressed="true"]') ?? [])]
       return {
         scrollTop: dialog?.scrollTop,
@@ -4937,10 +4981,24 @@ async function main() {
       '返回后保留关键词、分区、排序和时长',
       filtersSelected && returnedMany.query === '周杰伦' && filters.every((filter) => returnedMany.filters.includes(filter)),
     )
-    await page.evaluate(`document.querySelector('#search-scroll button[aria-label="关闭搜索"]')?.click()`)
+    await page.evaluate(`(() => {
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '尚未提交的词')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await page.evaluate(`document.querySelector('button[aria-label="清空搜索"]')?.click()`)
+    check('清空草稿保留已提交的结果与阅读位置', await page.evaluate(`(() => {
+      const results = document.querySelector('[data-search-results]')
+      const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      return input?.value === '' && document.activeElement === input &&
+        results?.querySelector('h2')?.textContent.includes('周杰伦') &&
+        results.scrollTop === ${returnedMany.scrollTop}
+    })()`))
+    await page.evaluate(`[...document.querySelectorAll('[data-search-results] button')].find(b => b.textContent.trim() === '返回')?.click()`)
     check(
       '主动关闭搜索后露出原页面',
-      await page.evaluate(`!document.querySelector('#search-scroll') && !!document.querySelector('[data-home-recommend]')`),
+      await page.evaluate(`!document.querySelector('[data-search-results]') && !!document.querySelector('[data-home-recommend]')`),
     )
     await page.viewport(1320, 900)
 
@@ -5175,15 +5233,17 @@ async function main() {
 
     await page.viewport(1000, 900)
     await sleep(600)
+    const pagePicker = `[...document.querySelectorAll('#scroll-main button[aria-haspopup="dialog"]')]
+      .find(button => button.textContent.trim().startsWith('选集 ·'))`
     const pickerEntry = await page.evaluate(`(() => {
-      const hit = document.querySelector('button[aria-haspopup="dialog"]')
+      const hit = ${pagePicker}
       return hit && hit.getClientRects().length > 0 ? hit.textContent.trim() : null
     })()`)
     check('中等窗口在播放器下方保留选集入口', !!pickerEntry && pickerEntry.includes('选集 · P62/80'))
-    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await page.evaluate(`${pagePicker}?.click()`)
     await sleep(500)
     const sheet = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"]')
+      const dialog = document.querySelector('[role="dialog"][aria-label="选集"]')
       const panel = dialog?.querySelector('[data-watch-pages]')
       const list = panel?.querySelector('ol')
       const current = panel?.querySelector('li button[aria-pressed="true"]')
@@ -5207,7 +5267,7 @@ async function main() {
     )
     const dialogFits = async () =>
       page.evaluate(`(() => {
-        const panel = document.querySelector('.modal-panel')
+        const panel = document.querySelector('[role="dialog"][aria-label="选集"]')
         const close = panel?.querySelector('button[aria-label="关闭"]')
         const box = panel?.getBoundingClientRect()
         const closeBox = close?.getBoundingClientRect()
@@ -5238,15 +5298,15 @@ async function main() {
     await page.keyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
     await sleep(400)
     const afterEsc = await page.evaluate(`({
-      dialog: !!document.querySelector('[role="dialog"]'),
-      focused: document.activeElement?.getAttribute('aria-haspopup') ?? null,
+      dialog: !!document.querySelector('[role="dialog"][aria-label="选集"]'),
+      focused: document.activeElement === ${pagePicker},
     })`)
-    check('关掉选集面板后焦点回到触发按钮', !afterEsc.dialog && afterEsc.focused === 'dialog')
+    check('关掉选集面板后焦点回到触发按钮', !afterEsc.dialog && afterEsc.focused)
 
-    await page.evaluate(`document.querySelector('button[aria-haspopup="dialog"]')?.click()`)
+    await page.evaluate(`${pagePicker}?.click()`)
     await sleep(400)
     const switchedInSheet = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"]')
+      const dialog = document.querySelector('[role="dialog"][aria-label="选集"]')
       const first = dialog?.querySelector('[data-watch-pages] ol li button')
       if (!first) return false
       first.click()
@@ -5254,8 +5314,8 @@ async function main() {
     })()`)
     await sleep(1500)
     const afterSheetSwitch = await page.evaluate(`(() => ({
-      dialog: !!document.querySelector('[role="dialog"]'),
-      trigger: document.querySelector('button[aria-haspopup="dialog"]')?.textContent?.trim() ?? '',
+      dialog: !!document.querySelector('[role="dialog"][aria-label="选集"]'),
+      trigger: ${pagePicker}?.textContent?.trim() ?? '',
     }))()`)
     check(
       '从目录里选定分 P 才切集，面板随即收起',

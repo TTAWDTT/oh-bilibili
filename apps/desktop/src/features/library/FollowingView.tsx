@@ -1,3 +1,4 @@
+import { AuthorHoverCard, useAuthorHover } from '../../shared/ui/AuthorHoverCard'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
@@ -92,6 +93,7 @@ function AuthorMarks({ user }: { user: Followed }) {
  * 窄窗先名单、点人再进预览。作品只取当前选中作者，打开后返回沿用 #212 的焦点约定。
  */
 export function FollowingView() {
+  const hover = useAuthorHover()
   const navigate = useAppStore((state) => state.navigate)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const auth = useAuthStore((state) => state.auth)
@@ -278,13 +280,13 @@ export function FollowingView() {
     setSelectedMid(null)
     followingMemory.selectedMid = null
   }
-  const openSpace = (user: Followed): void => {
+  const openSpace = (user: Followed, focusId = `following-space:${user.mid}`): void => {
     followingMemory.listTop = boxRef.current?.scrollTop ?? followingMemory.listTop
     if (!wide) followingMemory.detailTop = boxRef.current?.scrollTop ?? 0
     navigate(
       { kind: 'author', name: user.name, mid: user.mid },
       undefined,
-      `following-space:${user.mid}`,
+      focusId,
     )
   }
   const openWork = (track: Track): void => {
@@ -464,7 +466,9 @@ export function FollowingView() {
                       data-following-author={user.mid}
                       data-focus-id={`following:${user.mid}`}
                       aria-current={active ? 'true' : undefined}
-                      onClick={() => pick(user.mid)}
+                      onFocus={(event) => hover.show(user, event.currentTarget)}
+                      onBlur={hover.hide}
+                      onClick={() => { hover.hide(); pick(user.mid) }}
                       onKeyDown={(event) => onRowKeyDown(event, at)}
                       className={[
                         // 名单是连续的行，不是一张张卡片：整行只改底色，选中行加左侧标记。
@@ -475,10 +479,12 @@ export function FollowingView() {
                           : 'hover:bg-[var(--panel)]',
                       ].join(' ')}
                     >
-                      <Avatar src={user.face} alt={user.name} size={compact ? 38 : 44} />
+                      <span onPointerEnter={(event) => hover.show(user, event.currentTarget.parentElement!)} onPointerLeave={hover.hide}>
+                        <Avatar src={user.face} alt={user.name} size={compact ? 38 : 44} />
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate text-[14px] font-medium text-[var(--text-1)]" title={user.name}>
+                          <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)]" title={user.name}>
                             {user.name}
                           </span>
                           <AuthorMarks user={user} />
@@ -537,14 +543,14 @@ export function FollowingView() {
               <Avatar src={selected.face} alt={selected.name} size={64} />
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="truncate text-[19px] font-semibold text-[var(--text-1)]" title={selected.name}>
+                  <h2 className="line-clamp-2 break-words text-[19px] font-semibold text-[var(--text-1)]" title={selected.name}>
                     {selected.name}
                   </h2>
                   <AuthorMarks user={selected} />
                 </div>
-                <p className="num mt-1 text-[12px] text-[var(--text-3)]">UID {selected.mid}</p>
+                <p className="num mt-1 text-page-meta text-[var(--text-3)]">UID {selected.mid}</p>
                 {selected.sign ? (
-                  <p className="mt-2 line-clamp-3 break-words text-[13px] leading-relaxed text-[var(--text-2)]">
+                  <p className="mt-2 line-clamp-3 break-words text-reading-body text-[var(--text-2)]">
                     {selected.sign}
                   </p>
                 ) : null}
@@ -600,10 +606,10 @@ export function FollowingView() {
                             {formatDuration(track.duration_ms)}
                           </span>
                         </span>
-                        <span className="mt-1.5 line-clamp-2 text-[13px] leading-[19px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                        <span className="mt-1.5 line-clamp-2 break-words text-work-name text-[var(--text-1)] group-hover:text-[var(--accent)]">
                           {track.title}
                         </span>
-                        <span className="num mt-0.5 block text-[11px] text-[var(--text-3)]">
+                        <span className="num mt-0.5 block text-page-meta text-[var(--text-3)]">
                           {formatCount(track.views ?? 0)} 播放
                         </span>
                       </button>
@@ -624,6 +630,13 @@ export function FollowingView() {
           </aside>
         ) : null}
       </div>
+      <AuthorHoverCard
+        hover={hover.hover}
+        card={hover.card}
+        onHide={hover.hide}
+        onKeep={hover.keep}
+        onOpen={(user) => openSpace(user, `following:${user.mid}`)}
+      />
     </div>
   )
 }

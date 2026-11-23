@@ -352,12 +352,12 @@ async fn up_名片能拿到粉丝数与签名() {
     // 影视飓风
     let c = source.author_card(946974).await.expect("名片");
     println!(
-        "{} / LV{} / 粉丝 {} / 投稿 {} / 获赞 {} / 认证 {:?}",
+        "{} / LV{} / 粉丝 {:?} / 投稿 {:?} / 获赞 {:?} / 认证 {:?}",
         c.name, c.level, c.fans, c.videos, c.likes, c.official
     );
     assert!(!c.name.is_empty());
-    assert!(c.fans > 1000, "粉丝数应该是真实值");
-    assert!(c.videos > 0, "投稿总数应该是真实值");
+    assert!(c.fans.is_some_and(|fans| fans > 1000), "粉丝数应该是真实值");
+    assert!(c.videos.is_some_and(|videos| videos > 0), "投稿总数应该是真实值");
     assert!(c.level >= 1 && c.level <= 6, "等级应该在 1..6");
     assert!(c.face.starts_with("https://"));
 }
@@ -486,7 +486,7 @@ async fn 收藏夹一页要多久() {
     assert!(!covers.is_empty(), "收藏夹列表页应该有封面可拼");
 
     let t0 = Instant::now();
-    let page = source.fav_tracks(id, 1).await.expect("一页");
+    let page = source.fav_tracks(id, 1).await.expect("一页").tracks;
     println!("第一页 {} 条，耗时 {} ms", page.len(), t0.elapsed().as_millis());
     if let Some(t) = page.first() {
         println!("首条: {} / {} / {:?} / 播放 {:?}", t.title.chars().take(18).collect::<String>(), t.artist, t.duration.map(|d| d.0), t.views);

@@ -344,10 +344,21 @@ async fn watch_open(
     key: String,
     page: Option<u32>,
     resume_at: Option<u64>,
+    paused: Option<bool>,
+    preserve_listen_queue: Option<bool>,
 ) -> Result<bilimusic_core::wire::WatchView, WireError> {
     let origin = format!("http://127.0.0.1:{}", port.0);
     engine
-        .open_watch_page(&TrackKey::from_provider(key), &origin, page, resume_at)
+        .open_watch_page_with_options(
+            &TrackKey::from_provider(key),
+            &origin,
+            page,
+            resume_at,
+            bilimusic_core::engine::WatchOptions {
+                paused: paused.unwrap_or(false),
+                preserve_listen_queue: preserve_listen_queue.unwrap_or(false),
+            },
+        )
         .await
 }
 
@@ -382,6 +393,18 @@ async fn search_q(
     partition_ids: Option<Vec<u32>>,
     duration: Option<u32>,
 ) -> Result<Vec<Track>, WireError> {
+    Ok(search_page(engine, query, page, order, partition_ids, duration).await?.tracks)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn search_page(
+    engine: tauri::State<'_, Arc<Engine>>,
+    query: String,
+    page: u32,
+    order: Option<String>,
+    partition_ids: Option<Vec<u32>>,
+    duration: Option<u32>,
+) -> Result<bilimusic_model::SearchPage, WireError> {
     use bilimusic_model::SearchOrder;
     let order = match order.as_deref() {
         Some("click") => SearchOrder::Click,
@@ -393,7 +416,7 @@ async fn search_q(
     // 不传则全站搜索。原来拿 4 页再按 typeid 筛的做法已经不需要了。
     let tid = partition_ids.as_ref().and_then(|ids| ids.first().copied());
     engine
-        .search_scoped(&query, page, order, tid, duration)
+        .search_page(&query, page, order, tid, duration)
         .await
 }
 
@@ -667,14 +690,14 @@ async fn coin_set(
 struct AuthorCardView {
     name: String,
     face: String,
-    fans: u64,
+    fans: Option<u64>,
     sign: String,
     official: Option<String>,
     official_type: Option<i8>,
     level: u8,
     vip: bool,
-    videos: u64,
-    likes: u64,
+    videos: Option<u64>,
+    likes: Option<u64>,
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -933,7 +956,7 @@ async fn fav_tracks(
     engine: tauri::State<'_, Arc<Engine>>,
     folder_id: i64,
     page: u32,
-) -> Result<Vec<Track>, WireError> {
+) -> Result<bilimusic_core::wire::FavTrackPage, WireError> {
     engine.fav_tracks(folder_id, page).await
 }
 
@@ -1258,6 +1281,7 @@ pub fn run() {
             set_mode,
             close_watch,
             search_q,
+            search_page,
             player_state,
             player_play,
             player_play_local,

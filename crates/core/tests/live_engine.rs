@@ -505,6 +505,131 @@ fn 评论能取到真实数据与嵌套回复() {
     });
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
+async fn paused_comment_jump_preserves_page_and_position() {
+    let dir = TestDir::new("comment-jump");
+    let engine = Engine::new(&dir.join("library.sqlite")).unwrap();
+    engine.set_volume(0.0);
+    let key = bilimusic_model::TrackKey::from_provider("BV1ZRihBkE8m");
+    for page in [2, 1] {
+        let view = engine
+            .open_watch_page_with_pause(&key, "http://127.0.0.1:9", Some(page), Some(200_000), true)
+            .await
+            .unwrap();
+        assert_eq!(view.current_page, page);
+        assert!(view.duration_ms > 240_000);
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let snapshot = engine.snapshot();
+                assert_ne!(snapshot.phase, "faulted");
+                if snapshot.phase == "paused" && snapshot.position_ms == 200_000 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("new audio must settle at the paused cue");
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(engine.snapshot().position_ms, 200_000);
+    }
+    let p2 =
+        engine.open_watch_page_with_pause(&key, "http://127.0.0.1:9", Some(2), Some(120_000), true);
+    let p1 = async {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        engine
+            .open_watch_page_with_pause(&key, "http://127.0.0.1:9", Some(1), Some(193_000), true)
+            .await
+    };
+    let (_, latest) = tokio::join!(p2, p1);
+    assert_eq!(latest.unwrap().current_page, 1);
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while engine.snapshot().phase != "paused" || engine.snapshot().position_ms != 193_000 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(engine.snapshot().position_ms, 193_000);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
+async fn watch_session_preserves_listen_queue_and_bookmark() {
+    let dir = TestDir::new("watch-session-queue");
+    let db = dir.join("library.sqlite");
+    let media_key = "BV1ZRihBkE8m";
+    let saved = serde_json::json!({
+        "tracks": [
+            { "key": "BV1LISTEN", "title": "当前在听", "artist": "" },
+            { "key": media_key, "title": "队列中的下一首", "artist": "" },
+        ],
+        "index": 0,
+        "position_ms": 65_000,
+    });
+    let library = bilimusic_store::Library::open(&db).unwrap();
+    library.save_queue(&saved.to_string()).unwrap();
+    let engine = Engine::new(&db).unwrap();
+    engine.set_volume(0.0);
+    let key = bilimusic_model::TrackKey::from_provider(media_key);
+
+    for (page, explicit_listen) in [(2, false), (1, true)] {
+        if explicit_listen {
+            engine.queue_remove(media_key).unwrap();
+        }
+        let initial = engine.queue_view();
+        let initial_persisted = library.load_queue().unwrap();
+        engine
+            .open_watch_page_with_options(
+                &key,
+                "http://127.0.0.1:9",
+                Some(page),
+                Some(200_000),
+                bilimusic_core::engine::WatchOptions {
+                    paused: true,
+                    preserve_listen_queue: true,
+                },
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(20), async {
+            while engine.snapshot().phase != "paused" {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(engine.snapshot().track.unwrap().key, key);
+        assert_eq!(engine.seek(210_000).position_ms, 210_000);
+        assert_eq!(engine.queue_view().items, initial.items);
+        assert_eq!(engine.queue_view().index, Some(0));
+        let persisted = |raw: Option<String>| {
+            serde_json::from_str::<serde_json::Value>(&raw.unwrap()).unwrap()
+        };
+        assert_eq!(persisted(library.load_queue().unwrap()), persisted(initial_persisted));
+        if explicit_listen {
+            engine
+                .set_mode(bilimusic_core::wire::PlayMode::Listen, Some(210_000), Some(&key))
+                .await
+                .unwrap();
+            assert_eq!(engine.queue_view().index, Some(1));
+            assert_eq!(engine.queue_view().items[1].key, key);
+            let listening = engine.close_watch(Some(&key));
+            assert_eq!(listening.track.unwrap().key, key);
+            assert_eq!(listening.position_ms, 210_000);
+        } else {
+            assert_eq!(engine.replay().await.unwrap().track.unwrap().key, key);
+            assert_eq!(engine.queue_view().index, Some(0));
+            let restored = engine.close_watch(Some(&key));
+            assert_eq!(restored.phase, "idle");
+            assert_eq!(restored.track.unwrap().key, initial.items[0].key);
+            assert_eq!(restored.position_ms, 65_000);
+        }
+    }
+}
+
 /// 分P 要能取到，并且切换分P 会换 cid。
 #[test]
 #[ignore = "真实网络"]

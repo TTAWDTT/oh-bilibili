@@ -22,15 +22,15 @@ function authorCardOf(mid: number): Promise<AuthorCard> {
 
 export type AuthorHover = {
   user: Followed
-  anchor: { top: number; left: number; right: number }
+  trigger: HTMLElement
 }
 
 /** 名片贴在被悬停的头像右侧；右边放不下就翻到左侧，再夹进窗口。 */
 function popoverStyle(
-  anchor: AuthorHover['anchor'],
+  anchor: DOMRect,
   height: number,
 ): { left: number; top: number; width: number } {
-  const width = 320
+  const width = Math.min(320, window.innerWidth - 16)
   const gap = 10
   let left = anchor.right + gap
   if (left + width > window.innerWidth - 8) left = anchor.left - width - gap
@@ -79,9 +79,8 @@ export function useAuthorHover(): {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     // 鼠标扫过整列时会一路触发，留一帧的延迟避免名片疯狂闪
     timerRef.current = window.setTimeout(() => {
-      const rect = el.getBoundingClientRect()
-      setHover({ user, anchor: { top: rect.top, left: rect.left, right: rect.right } })
-    }, 40)
+      setHover({ user, trigger: el })
+    }, document.activeElement === el ? 0 : 40)
   }
 
   const hide = (): void => {
@@ -128,18 +127,42 @@ export function AuthorHoverCard({
     return () => observer.disconnect()
   }, [hover?.user.mid, card])
 
+  useEffect(() => {
+    if (!hover) return
+    const handleKey = (event: KeyboardEvent): void => {
+      const inCard = panelRef.current?.contains(event.target as Node)
+      if (!inCard && event.target !== hover.trigger) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        hover.trigger.focus({ preventScroll: true })
+        onHide()
+      } else if (!inCard && (event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey))) {
+        event.preventDefault()
+        panelRef.current?.querySelector('button')?.focus({ preventScroll: true })
+      } else if (inCard && event.key === 'Tab') {
+        hover.trigger.focus({ preventScroll: true })
+        if (event.shiftKey) event.preventDefault()
+        onHide()
+      }
+    }
+    document.addEventListener('keydown', handleKey, true)
+    return () => document.removeEventListener('keydown', handleKey, true)
+  }, [hover, onHide])
+
   if (!hover) return null
   return createPortal(
     <div
       ref={panelRef}
-      role="tooltip"
+      role="dialog"
+      aria-label={`${hover.user.name}的名片`}
       /* 名片本身可点：指针从卡片移进名片时不能收起来，否则里面的入口永远按不到 */
       onPointerEnter={onKeep}
-      onPointerLeave={onHide}
+      onPointerLeave={() => { if (!panelRef.current?.contains(document.activeElement)) onHide() }}
       onFocus={onKeep}
       onBlur={onHide}
       className="fixed z-[60] rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]"
-      style={popoverStyle(hover.anchor, height || 244)}
+      style={popoverStyle(hover.trigger.getBoundingClientRect(), height)}
     >
       <div className="flex items-start gap-2.5">
         <Avatar src={hover.user.face} alt={hover.user.name} size={48} />
@@ -176,10 +199,10 @@ export function AuthorHoverCard({
               </span>
             ) : null}
           </div>
-          {card ? (
+          {card && (card.fans !== null || card.videos !== null) ? (
             <div className="num mt-1 flex items-center gap-3 whitespace-nowrap text-[12px] text-[var(--text-3)]">
-              <span>{formatCount(card.fans)} 粉丝</span>
-              <span>{formatCount(card.videos)} 投稿</span>
+              {card.fans !== null ? <span>{formatCount(card.fans)} 粉丝</span> : null}
+              {card.videos !== null ? <span>{formatCount(card.videos)} 投稿</span> : null}
             </div>
           ) : null}
           {card?.official ? (
@@ -197,7 +220,7 @@ export function AuthorHoverCard({
       <button
         type="button"
         onClick={() => onOpen(hover.user)}
-        className="t press mt-2.5 flex w-full items-center justify-center gap-1 rounded-[4px] border border-[var(--accent)] py-1 text-[12px] text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+        className="t mt-2.5 ml-auto flex items-center gap-1 rounded-sm py-1 text-[12px] text-[var(--accent-strong)] hover:underline"
       >
         查看主页
         <Icon name="chevronRight" size={12} />

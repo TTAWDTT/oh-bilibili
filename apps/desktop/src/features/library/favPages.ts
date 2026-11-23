@@ -1,73 +1,44 @@
 import type { Track } from '../../shared/lib/contract'
+import type { FavTrackPage } from '../../shared/lib/ipc'
 
-export type CollectOptions = {
-  /** 已经加载出来的前几页，按原顺序带入，不再重读。 */
-  initial?: Track[]
-  /** 从哪一页继续；默认第 1 页。 */
-  fromPage?: number
-  /** 目录里写的总数；可能过期，只当参考。 */
-  expected?: number | null
-  pageSize?: number
-  maxPages?: number
-  /** 用户取消或切夹：每取完一页检查一次。 */
-  stopped?: () => boolean
-  onProgress?: (loaded: number, page: number) => void
-}
-
-export type CollectResult = { tracks: Track[]; complete: boolean }
-
-/**
- * 把收藏夹的所有页读完再交给播放器。
- *
- * 结束条件按可靠性排序：取消、空页、达到目录总数、整页没有新作品。
- * 数量过期或页间重复时不会无限翻；读不全时 `complete` 为 false，
- * 由调用方说明实际范围，或者不开始播放。
- */
-export async function collectFavTracks(
-  fetchPage: (page: number) => Promise<Track[]>,
-  {
-    initial = [],
-    fromPage = 1,
-    expected = null,
-    pageSize = 40,
-    maxPages = 50,
-    stopped,
-    onProgress,
-  }: CollectOptions = {},
-): Promise<CollectResult> {
-  const tracks: Track[] = []
-  const seen = new Set<string>()
-  for (const track of initial) {
-    if (seen.has(track.key)) continue
-    seen.add(track.key)
-    tracks.push(track)
-  }
-  if (expected !== null && expected > 0 && tracks.length >= expected) {
-    return { tracks, complete: true }
-  }
-  let page = Math.max(1, fromPage)
-  while (page <= maxPages) {
-    const list = await fetchPage(page)
-    if (stopped?.()) return { tracks, complete: false }
-    if (list.length === 0) return { tracks, complete: true }
-    let added = 0
-    for (const track of list) {
-      if (seen.has(track.key)) continue
+export function appendFavPage(previous: Track[], incoming: Track[]): Track[] {
+  const seen = new Set(previous.map((track) => track.key))
+  const tracks = previous.slice()
+  for (const track of incoming) {
+    if (!seen.has(track.key)) {
       seen.add(track.key)
       tracks.push(track)
-      added += 1
     }
-    onProgress?.(tracks.length, page)
-    if (expected !== null && expected > 0 && tracks.length >= expected) {
-      return { tracks, complete: true }
-    }
-    // 一整页都是见过的作品：再翻也只会重复，停下并把「没读全」交给调用方处理。
-    if (added === 0) return { tracks, complete: false }
-    // B 站最后一页不满 40 条；目录总数可信时再核对一次。
-    if (list.length < pageSize) {
-      return { tracks, complete: expected === null || expected <= 0 || tracks.length >= expected }
-    }
-    page += 1
   }
-  return { tracks, complete: false }
+  return tracks
+}
+
+type CollectOptions = {
+  initial?: Track[]
+  fromPage?: number
+  stopped?: () => boolean
+  onProgress?: (tracks: Track[], page: number, complete: boolean) => void
+}
+
+/** 队列只在接口确认最后一页后提交。目录数量和过滤失效稿后的页长都不能判断结束。 */
+export async function collectFavTracks(
+  fetchPage: (page: number) => Promise<FavTrackPage>,
+  { initial = [], fromPage = 1, stopped, onProgress }: CollectOptions = {},
+): Promise<{ tracks: Track[]; complete: boolean }> {
+  let tracks = initial
+  let emptyPages = 0
+  for (let page = fromPage; ; page += 1) {
+    const result = await fetchPage(page)
+    if (stopped?.()) return { tracks, complete: false }
+    const next = appendFavPage(tracks, result.tracks)
+    if (result.has_more && next.length === tracks.length && result.tracks.length > 0) {
+      return { tracks, complete: false }
+    }
+    tracks = next
+    onProgress?.(tracks, page, !result.has_more)
+    if (!result.has_more) return { tracks, complete: true }
+    // 接口连续报空页并声称还有数据时，保留已读部分供重试。
+    emptyPages = result.tracks.length === 0 ? emptyPages + 1 : 0
+    if (emptyPages >= 2) return { tracks, complete: false }
+  }
 }

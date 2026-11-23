@@ -36,15 +36,14 @@ export function health(): Promise<Health> {
   return Promise.resolve({ ok: true, version: '0.1.0', engine: 'browser-mock', platform: 'web' })
 }
 
-/** 契约里同时存在 SearchPage 包裹形状；命令表按 Track[] 实现，两种都吃下来更稳。 */
-export async function searchQ(
+export async function searchPage(
   query: string,
   page: number,
   order?: string,
   partitionIds?: number[],
   duration?: number,
-): Promise<Track[]> {
-  const result = await call<Track[] | SearchPage>('search_q', {
+): Promise<SearchPage> {
+  return call<SearchPage>('search_page', {
     query,
     page,
     order,
@@ -52,7 +51,10 @@ export async function searchQ(
     partition_ids: partitionIds && partitionIds.length > 0 ? [partitionIds[0]] : [],
     duration: duration === undefined ? null : duration,
   })
-  return Array.isArray(result) ? result : result.tracks
+}
+
+export async function searchQ(...args: Parameters<typeof searchPage>): Promise<Track[]> {
+  return (await searchPage(...args)).tracks
 }
 
 export function playerState(): Promise<PlayerSnapshot> {
@@ -215,7 +217,7 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
 export type AuthorCard = {
   name: string
   face: string
-  fans: number
+  fans: number | null
   sign: string
   official: string | null
   /** 0 个人、1 机构；null 未认证。 */
@@ -223,8 +225,8 @@ export type AuthorCard = {
   level: number
   /** 大会员。 */
   vip?: boolean
-  videos: number
-  likes: number
+  videos: number | null
+  likes: number | null
 }
 
 /** UP 主名片：粉丝数、签名、认证。 */
@@ -432,8 +434,10 @@ export function videoShots(key: string, cid: number): Promise<VideoShots> {
 }
 
 /** 某个收藏夹里的曲目。 */
-export function favTracks(folderId: number, page = 1): Promise<Track[]> {
-  return call<Track[]>('fav_tracks', { folder_id: folderId, page })
+export type FavTrackPage = { tracks: Track[]; has_more: boolean }
+
+export function favTracks(folderId: number, page = 1): Promise<FavTrackPage> {
+  return call<FavTrackPage>('fav_tracks', { folder_id: folderId, page })
 }
 
 /** 从指定收藏夹移出。 */
@@ -656,7 +660,7 @@ export type DynamicItem = {
   room_id?: number
   /** 直播分区名，kind 为 live 时才有。 */
   live_area?: string
-  /** 转发动态里被转的那条，只嵌套一层。 */
+  /** 转发动态里实际可读的被转条目。 */
   orig?: DynamicItem | null
   forwards: number
   comments: number
@@ -761,11 +765,18 @@ export function hotSearch(): Promise<HotSearchItem[]> {
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
-export function watchOpen(key: string, page?: number, resumeAt?: number): Promise<WatchView> {
+export function watchOpen(
+  key: string,
+  page?: number,
+  resumeAt?: number,
+  { paused = false, preserveListenQueue = false } = {},
+): Promise<WatchView> {
   return call<WatchView>('watch_open', {
     key,
     page: page ?? null,
     resume_at: resumeAt ?? null,
+    paused,
+    preserve_listen_queue: preserveListenQueue,
   })
 }
 

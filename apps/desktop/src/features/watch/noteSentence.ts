@@ -15,10 +15,6 @@ export function noteSentence(text: string, anchor: CommentAnchor): string {
   const separators = [...line.matchAll(/[；;]/g)].map((match) => match.index ?? 0)
   const from = separators.filter((at) => at < localStart).at(-1)
   const to = separators.find((at) => at >= localEnd)
-  const segment = line.slice(from === undefined ? 0 : from + 1, to ?? line.length)
-  return segment
-    .replace(anchor.token, '')
-    .replace(/^[\s，,、:：]*/, '')
-    .replace(new RegExp(`^[Pp]${anchor.page ?? -1}\\s*`), '')
-    .trim()
+  return (line.slice(from === undefined ? 0 : from + 1, localStart) +
+    line.slice(localEnd, to ?? line.length)).trim().replace(/^[，,、:：]\s*/, '')
 }

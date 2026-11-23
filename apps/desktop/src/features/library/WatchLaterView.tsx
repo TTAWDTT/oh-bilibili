@@ -7,7 +7,7 @@ import { formatTime } from '../../shared/lib/format'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
-import { PageSpine } from '../tracks/PageSpine'
+import { TrackDirectory } from '../tracks/TrackDirectory'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -153,14 +153,14 @@ export function WatchLaterView() {
   for (const track of tracks) counts[bucketOf(track)] += 1
   const visible = tracks.filter((track) => bucket === 'all' || bucketOf(track) === bucket)
 
-  const startAt = (index: number): void => {
+  const startAt = (index: number, focusId: string): void => {
     const track = visible[index]
     if (!track) return
     if (useLoopOne.getState().enabled) {
       toastWarn('单曲循环开着', '连续观看不会自动跳到下一条')
     }
     startWatchSession(visible, index)
-    navigate({ kind: 'watch', track })
+    navigate({ kind: 'watch', track }, undefined, focusId)
   }
 
   return (
@@ -177,7 +177,8 @@ export function WatchLaterView() {
           <button
             type="button"
             disabled={visible.length === 0}
-            onClick={() => startAt(0)}
+            data-focus-id="later-start"
+            onClick={() => startAt(0, 'later-start')}
             className="t press flex h-8 items-center gap-2 rounded-[4px] bg-[var(--accent)] px-4 text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-40"
           >
             <Icon name="play" size={13} />
@@ -236,7 +237,7 @@ export function WatchLaterView() {
                 key={track.key}
                 track={track}
                 active={track.key === activeKey}
-                onOpen={() => navigate({ kind: 'watch', track })}
+                onOpen={() => navigate({ kind: 'watch', track }, undefined, `card:${track.key}`)}
                 onAuthor={() =>
                   navigate(
                     { kind: 'author', name: track.artist, mid: track.up_mid ?? null },
@@ -244,7 +245,7 @@ export function WatchLaterView() {
                     `later-author:${track.key}`,
                   )
                 }
-                onStart={() => startAt(index)}
+                onStart={() => startAt(index, `later-start:${track.key}`)}
                 onRemove={() => void removeOne(track.key)}
               />
             ))}
@@ -285,11 +286,10 @@ function WatchLaterRow({
       >
         <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
         {track.duration_ms ? (
-          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white/85">
+          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white">
             {formatTime(track.duration_ms)}
           </span>
         ) : null}
-        <PageSpine pages={track.pages} trackKey={track.key} />
       </button>
 
       <div className="min-w-0 flex-1 py-0.5">
@@ -316,6 +316,7 @@ function WatchLaterRow({
             {track.artist}
           </button>
         </div>
+        <TrackDirectory track={track} />
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
           {track.duration_ms ? null : <span>时长未知</span>}
           {resume ? (
@@ -329,6 +330,7 @@ function WatchLaterRow({
         <button
           type="button"
           onClick={onStart}
+          data-focus-id={`later-start:${track.key}`}
           className="t press rounded-[4px] px-2 py-1 text-[12.5px] text-[var(--text-3)] opacity-0 hover:bg-[var(--panel)] hover:text-[var(--accent)] focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100"
         >
           从这里连续观看

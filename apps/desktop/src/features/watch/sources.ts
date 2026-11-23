@@ -16,7 +16,7 @@ const RELATIONS = [
 ] as const
 
 const URL_RE = /https?:\/\/[^\s]+/g
-const BV_RE = /\bBV[0-9A-Za-z]{10}\b/
+const BV_RE = /^BV[0-9A-Za-z]{10}$/
 const BARE_BV_RE = /\bBV[0-9A-Za-z]{10}\b/g
 
 export type SourceEntry = {
@@ -28,6 +28,8 @@ export type SourceEntry = {
   kind: 'video' | 'external'
   /** 站内视频的 BV。 */
   bvid?: string
+  page?: number
+  atMs?: number
   /** 外部资源地址。 */
   url?: string
 }
@@ -43,15 +45,7 @@ function cleanUrl(raw: string): string {
 function linksIn(line: string): string[] {
   const urls = (line.match(URL_RE) ?? []).map(cleanUrl)
   const bare = [...line.replace(URL_RE, ' ').matchAll(BARE_BV_RE)].map((match) => match[0])
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const link of [...urls, ...bare]) {
-    const id = bvidOf(link) ?? link
-    if (seen.has(id)) continue
-    seen.add(id)
-    out.push(link)
-  }
-  return out
+  return [...new Set([...urls, ...bare])]
 }
 
 function relationsIn(line: string): string[] {
@@ -60,8 +54,20 @@ function relationsIn(line: string): string[] {
   return [...new Set([...line.matchAll(pattern)].map((match) => match[0]))]
 }
 
-function bvidOf(link: string): string | null {
-  return link.match(BV_RE)?.[0] ?? null
+function videoTarget(link: string): { bvid: string; page?: number; atMs?: number } | null {
+  if (BV_RE.test(link)) return { bvid: link }
+  if (!URL.canParse(link)) return null
+  const url = new URL(link)
+  if (!['www.bilibili.com', 'm.bilibili.com', 'bilibili.com'].includes(url.hostname)) return null
+  const bvid = url.pathname.match(/^\/video\/(BV[0-9A-Za-z]{10})\/?$/)?.[1]
+  if (!bvid) return null
+  const page = Number(url.searchParams.get('p'))
+  const seconds = Number(url.searchParams.get('t'))
+  return {
+    bvid,
+    ...(Number.isSafeInteger(page) && page > 0 ? { page } : {}),
+    ...(url.searchParams.has('t') && Number.isFinite(seconds) && seconds >= 0 ? { atMs: Math.round(seconds * 1000) } : {}),
+  }
 }
 
 /**
@@ -76,17 +82,18 @@ export function parseSources(desc: string, currentKey: string): SourceEntry[] {
   const seen = new Set<string>()
 
   const push = (sentence: string, relations: string[], link: string): void => {
-    const bvid = bvidOf(link)
-    if (bvid && bvid === currentKey) return
-    const id = `${relations.join('|')}@${bvid ?? link}`
+    const video = videoTarget(link)
+    if (video?.bvid === currentKey) return
+    const target = video ? `${video.bvid}:${video.page ?? ''}:${video.atMs ?? ''}` : link
+    const id = `${relations.join('|')}@${target}`
     if (seen.has(id)) return
     seen.add(id)
     entries.push({
       id,
       relations,
       sentence: sentence.trim(),
-      kind: bvid ? 'video' : 'external',
-      ...(bvid ? { bvid } : { url: link }),
+      kind: video ? 'video' : 'external',
+      ...(video ?? { url: link }),
     })
   }
 

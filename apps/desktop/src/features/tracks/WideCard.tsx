@@ -1,83 +1,53 @@
 import type { Track } from '../../shared/lib/contract'
-import { useAppStore } from '../../app/appStore'
+import { TrackByline } from './TrackByline'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { PageSpine } from './PageSpine'
 
-/**
- * B 站「热门 / 入站必刷」这两页用的横排大卡：封面在左，标题与计数在右。
- * 和发现页的封面网格不是一套密度，所以单列出来，不塞进 ContentGrid。
- * `note` 只有入站必刷给：B 站那张卡底部有一条橙色推荐语。
- */
 export function WideCard({
   track,
   note,
   noteAsTag = false,
+  lead = false,
   onOpen,
 }: {
   track: Track
   note?: string | null
-  /** 热门页的标签是「百万播放」这种短词，B 站画成一个橙色描边小胶囊；入站必刷是整句话。 */
+  lead?: boolean
   noteAsTag?: boolean
   onOpen: () => void
 }) {
-  const navigate = useAppStore((state) => state.navigate)
-  const author = track.up_mid ?? null
   return (
-    <div className="bili-card group flex items-start gap-4" data-wide-card={track.key}>
+    <div className={`bili-card flex min-w-0 items-start ${lead ? 'flex-col gap-3' : 'gap-3 md:gap-4'}`} data-wide-card={track.key}>
       <button
         type="button"
         onClick={onOpen}
         data-focus-id={`wide:${track.key}`}
         aria-label={`观看 ${track.title}`}
-        className="relative aspect-video w-[190px] shrink-0 overflow-hidden rounded-[8px]"
+        className={`group relative aspect-video shrink-0 overflow-hidden rounded-[8px] ${lead ? 'w-full' : 'w-[36%] max-w-[190px]'}`}
       >
-        <Cover cover={track.cover} title={track.title} width={190} className="bili-card-cover h-full w-full" />
+        <Cover cover={track.cover} title={track.title} width={lead ? 640 : 190} className="bili-card-cover h-full w-full" />
         <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/65 px-1 text-[11px] leading-[16px] text-white">
           {formatDuration(track.duration_ms)}
         </span>
         <PageSpine pages={track.pages} trackKey={track.key} />
       </button>
-      <div className="min-w-0 flex-1 py-0.5">
+      <div className="min-w-0 max-w-full flex-1 py-0.5">
         <button type="button" onClick={onOpen} title={track.title} className="block w-full text-left">
-          <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+          <span className={`line-clamp-2 break-words text-[var(--text-1)] hover:text-[var(--accent)] ${lead ? 'text-xl leading-snug font-semibold md:text-2xl' : 'text-work-name'}`}>
             {track.title}
           </span>
         </button>
-        {/* 热门页的标签在标题正下方、UP 之上；入站必刷的推荐语在整张卡最底部。 */}
         {note && noteAsTag ? (
           <span className="mt-1 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
             {note}
           </span>
         ) : null}
         <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-          {author !== null ? (
-            <button
-              type="button"
-              aria-label={`UP ${track.artist}`}
-              title={`看 ${track.artist} 的更多视频`}
-              data-focus-id={`wide-author:${track.key}`}
-              onClick={() =>
-                navigate({ kind: 'author', name: track.artist, mid: author }, undefined, `wide-author:${track.key}`)
-              }
-              className="flex min-w-0 items-center gap-1.5 hover:text-[var(--accent-strong-hover)]"
-            >
-              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
-                UP
-              </span>
-              <span className="truncate">{track.artist}</span>
-            </button>
-          ) : (
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">
-                UP
-              </span>
-              <span className="truncate">{track.artist}</span>
-            </span>
-          )}
+          <TrackByline track={track} focusId={`wide-author:${track.key}`} />
         </div>
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+        <span className="num mt-1 flex items-center gap-3 text-page-meta text-[var(--text-3)]">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -92,12 +62,11 @@ export function WideCard({
           ) : null}
         </span>
         {note && !noteAsTag ? (
-          <span className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ff7a45]">
-            {/* B 站入站必刷 / 每周必看的推荐语前面是一对橙色引号，不是火焰图标。 */}
+          <span className="mt-1.5 flex items-baseline gap-1 text-reading-body text-[var(--text-2)]">
             <span aria-hidden className="shrink-0 text-[13px] leading-none">
               ❝
             </span>
-            <span className="truncate">{note}</span>
+            <span className="min-w-0 break-words">{note}</span>
           </span>
         ) : null}
       </div>

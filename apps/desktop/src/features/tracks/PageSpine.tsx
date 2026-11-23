@@ -24,7 +24,7 @@ export function PageSpine({
   const label = spineLabel(pages, resume) ?? seasonLabel(season)
   if (label === null) return null
   const spoken = season
-    ? `属于合集 ${season.title}，共 ${season.count} 稿`
+    ? `属于合集 ${season.title}${season.count ? `，共 ${season.count} 稿` : ''}`
     : resume !== null
       ? `本稿 ${pages} 个分 P，上次看到 P${resume}`
       : `本稿 ${pages} 个分 P`

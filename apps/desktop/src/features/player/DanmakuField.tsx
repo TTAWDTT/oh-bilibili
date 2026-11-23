@@ -1,36 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DanmakuLine } from '../../shared/lib/ipc'
-import { DanmakuMergeGroups } from './danmakuMerge'
-
-/** 一条弹幕：出现时刻（毫秒）、文本、颜色、位置（1 滚动 / 4 底部 / 5 顶部）。 */
-export type DanmakuItem = { at: number; text: string; color: string; mode: number }
-/** 屏幕上正在飘的一条，key 里带一个自增号，避免同文本去重。 */
-type Flight = DanmakuItem & {
-  id: number
-  born: number
-  lane: number
-  /** 合并计数：同一条上累计了多少条相同弹幕。1 表示不显示。 */
-  count: number
-}
+import { scheduleDanmaku, visibleDanmaku } from './danmakuMerge'
+import type { DanmakuItem, Flight } from './danmakuMerge'
+export type { DanmakuItem } from './danmakuMerge'
 
 const LIFE_MS = 9000
-/** 顶部/底部弹幕是钉住的，钉太久会糊住画面。 */
-const PINNED_MS = 4000
 const LANES = 10
-/** 多久检查一次「有哪些新弹幕该出现」。运动本身由 CSS 跑，不受这个频率影响。 */
-const SPAWN_TICK_MS = 220
-/**
- * 一条车道多久后可以放下一条。
- *
- * 之前是「车道上还有活着的弹幕就不复用」，等于每条车道被独占 9 秒，
- * 十条车道上限约 1 条/秒，热视频看起来像没几条弹幕。同速弹幕不会追尾，
- * 只要前一条已经完全进入画面，这条车道就能再用。
- */
-const LANE_REUSE_RATIO = 0.16
-/** 一条弹幕该在屏幕上停留多久：滚动的按全场寿命，钉住的短一些。 */
-function pinnedLife(item: DanmakuItem, scrollLife: number): number {
-  return item.mode === 4 || item.mode === 5 ? PINNED_MS : scrollLife
-}
+const SPAWN_TICK_MS = 160
 
 /**
  * 弹幕层本体。
@@ -51,7 +27,7 @@ export function DanmakuField({
   area,
   fade = false,
   mergeSame = false,
-  resetToken = '',
+  playbackRate = 1,
 }: {
   items: DanmakuItem[]
   /** 返回当前位置（毫秒）。存进 ref，所以父组件不需要为它重渲染。 */
@@ -67,28 +43,10 @@ export function DanmakuField({
   fade?: boolean
   /** 同一时段完全相同的滚动弹幕合成一条并累计条数。 */
   mergeSame?: boolean
-  /** 过滤条件变了就重建画面上的条目，避免沿用已经被屏蔽的计数。 */
-  resetToken?: string
+  playbackRate?: number
 }) {
-  const [flights, setFlights] = useState<Flight[]>([])
-  /** 与 flights 同步的镜像：定时器里读它算下一帧，不把副作用写进 setState 的 updater。 */
-  const flightsRef = useRef<Flight[]>([])
-  flightsRef.current = flights
-  const seq = useRef(0)
   const positionRef = useRef(position)
   positionRef.current = position
-  /** 已经放到哪一条了。整场扫一遍太浪费：一部热视频几千条弹幕，220ms 一轮就是几十万次比较。 */
-  const cursor = useRef(0)
-  const lastPos = useRef(-1)
-  /** 每条车道最近一条的出生时刻，用来判断能不能复用。 */
-  const laneBorn = useRef<number[]>(new Array<number>(LANES).fill(-Infinity))
-  /** 每段文本最近一条合并组；只在同一个 2 秒窗内累加。 */
-  const mergeGroups = useRef(new DanmakuMergeGroups())
-  /**
-   * 弹幕要跑的距离 = 播放器宽度 + 自身宽度。
-   * 之前写死 100vw（整窗宽），播放器比窗口窄时后半程在画面外空跑，
-   * 既看不见又让每条露脸的时间变短。宽度用 ResizeObserver 跟着容器走。
-   */
   const boxRef = useRef<HTMLDivElement | null>(null)
   const [boxWidth, setBoxWidth] = useState(0)
 
@@ -101,147 +59,25 @@ export function DanmakuField({
     return () => ro.disconnect()
   }, [])
 
-  const all = useMemo(() => [...items].sort((a, b) => a.at - b.at), [items])
-  /** 显示区域越小，可用车道越少，避免把十条车道压进 1/4 屏里互相叠字。 */
   const lanes = Math.max(1, Math.round(LANES * area))
-
-  useEffect(() => {
-    cursor.current = 0
-    lastPos.current = -1
-    mergeGroups.current.clear()
-  }, [all])
-
-  useEffect(() => {
-    // 区域变了就重排：超出现有区域的车道直接收掉。
-    laneBorn.current.fill(-Infinity)
-    const kept = flightsRef.current.filter((f) => f.lane < lanes)
-    flightsRef.current = kept
-    setFlights(kept)
-  }, [lanes])
-
-  useEffect(() => {
-    mergeGroups.current.clear()
-    if (mergeSame) return
-    // 关掉合并：已经在屏幕上的条目恢复成单条，不再显示旧计数。
-    const plain = flightsRef.current.map((f) => (f.count === 1 ? f : { ...f, count: 1 }))
-    flightsRef.current = plain
-    setFlights(plain)
-  }, [mergeSame])
-
-  useEffect(() => {
-    // 条件变化后旧条目不再代表当前这批记录：清空，按当前位置重新长出来。
-    cursor.current = 0
-    lastPos.current = -1
-    mergeGroups.current.clear()
-    laneBorn.current.fill(-Infinity)
-    flightsRef.current = []
-    setFlights([])
-  }, [resetToken])
-
+  const life = LIFE_MS / speed
+  const schedule = useMemo(() => scheduleDanmaku(items, mergeSame, lanes, life), [items, mergeSame, lanes, life])
+  const [frame, setFrame] = useState({ now: 0, epoch: 0 })
   useEffect(() => {
     if (!enabled) return
-    /** 当前速度下一条弹幕在屏幕上的总时长。CSS 的 animationDuration 用的是同一个值。 */
-    const lifeMs = LIFE_MS / Math.max(speed, 0.1)
-    /** 前一条走开足够远、这条再进来不会追尾。 */
-    const reuseMs = lifeMs * LANE_REUSE_RATIO
-    const tick = (): void => {
-      const pos = positionRef.current()
-      // 往回拖或换片：二分找到第一个还没过期的位置，从头对齐。
-      if (pos < lastPos.current) {
-        let lo = 0
-        let hi = all.length
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1
-          if (all[mid]!.at < pos - 2000) lo = mid + 1
-          else hi = mid
-        }
-        cursor.current = lo
-        // 往回拖之后，车道记录里全是「未来」的出生时刻，不复位就再也放不出新的。
-        laneBorn.current.fill(-Infinity)
-        mergeGroups.current.clear()
-      }
-      lastPos.current = pos
-
-      const prev = flightsRef.current
-      const alive = prev.filter((f) => pos - f.born < pinnedLife(f, lifeMs))
-      // 活着但已经过了独占期的车道要放回去，否则吞吐被寿命卡死。
-      for (let c = 0; c < lanes; c += 1) {
-        if (pos - laneBorn.current[c]! >= reuseMs) laneBorn.current[c] = -Infinity
-      }
-      if (!playing) {
-        if (alive.length !== prev.length) {
-          flightsRef.current = alive
-          setFlights(alive)
-        }
-        return
-      }
-      // 车道在生成时定死并存进条目。用数组下标算 top 的话，一条飘完被移除后
-      // 其余条目下标前移，整排会瞬间跳一行。
-      const fresh: Flight[] = []
-      while (cursor.current < all.length && all[cursor.current]!.at <= pos - 2000) cursor.current += 1
-      let i = cursor.current
-      /** 合并后的最新一串：既给后面的条目查重，也在最后一次性提交。 */
-      let current = alive
-      /** 这一轮里有必要提交状态吗（合并计数或新增弹幕）。 */
-      let dirty = false
-      for (; i < all.length && all[i]!.at <= pos; i += 1) {
-        const item = all[i]!
-        if (current.some((f) => f.at === item.at && f.text === item.text && f.mode === item.mode)) continue
-        // 合并同句：只处理普通滚动弹幕，且必须落在同一条最早记录的 2 秒窗内。
-        if (mergeSame && item.mode === 1) {
-          const leaderId = mergeGroups.current.leaderFor(
-            item.text,
-            item.color,
-            item.at,
-            new Set(current.map((f) => f.id)),
-          )
-          const leader = leaderId === null ? undefined : current.find((f) => f.id === leaderId)
-          if (leader) {
-            const grown = { ...leader, count: leader.count + 1 }
-            current = current.map((f) => (f.id === leader.id ? grown : f))
-            dirty = true
-            continue
-          }
-        }
-        // 顶部/底部弹幕不占车道，钉在画面上几秒就走。
-        if (item.mode === 4 || item.mode === 5) {
-          seq.current += 1
-          const pinned = { ...item, id: seq.current, born: item.at, lane: -1, count: 1 }
-          fresh.push(pinned)
-          current = [...current, pinned]
-          continue
-        }
-        let lane = -1
-        for (let c = 0; c < lanes; c += 1) {
-          if (laneBorn.current[c] === -Infinity && !fresh.some((f) => f.lane === c)) {
-            lane = c
-            break
-          }
-        }
-        // 车道满了就丢掉这条：B 站也是这么做的，硬塞会互相压住
-        if (lane < 0) continue
-        seq.current += 1
-        laneBorn.current[lane] = item.at
-        const flight = { ...item, id: seq.current, born: item.at, lane, count: 1 }
-        fresh.push(flight)
-        current = [...current, flight]
-        if (mergeSame) mergeGroups.current.remember(item.text, item.color, item.at, flight.id)
-      }
-      cursor.current = i
-      if (!dirty && fresh.length === 0) {
-        if (alive.length !== prev.length) {
-          flightsRef.current = alive
-          setFlights(alive)
-        }
-        return
-      }
-      flightsRef.current = current
-      setFlights(current)
-    }
-    const timer = window.setInterval(tick, SPAWN_TICK_MS)
+    let previous = positionRef.current()
+    setFrame((frame) => ({ now: previous, epoch: frame.epoch + 1 }))
+    const timer = window.setInterval(() => {
+      const now = positionRef.current()
+      if (now === previous) return
+      const seek = now < previous || now - previous > 2 * SPAWN_TICK_MS * playbackRate
+      previous = now
+      setFrame((frame) => ({ now, epoch: frame.epoch + Number(seek) }))
+    }, SPAWN_TICK_MS)
     return () => window.clearInterval(timer)
-  }, [all, enabled, playing, speed, lanes, mergeSame])
+  }, [enabled, schedule, playbackRate])
 
+  const flights = enabled ? visibleDanmaku(schedule, frame.now, life) : []
   /** 车道间距不变，区域越小能用的车道越少：1/4 屏只占画面顶部一条窄带。 */
   const laneStep = 72 / LANES
 
@@ -255,6 +91,7 @@ export function DanmakuField({
     >
       {enabled
         ? flights
+            .map(({ flight }) => flight)
             .filter((f) => f.mode === 5)
             .map((f, index) => (
               <span
@@ -274,6 +111,7 @@ export function DanmakuField({
         : null}
       {enabled
         ? flights
+            .map(({ flight }) => flight)
             .filter((f) => f.mode === 4)
             .map((f, index) => (
               <span
@@ -291,34 +129,41 @@ export function DanmakuField({
               </span>
             ))
         : null}
-      {enabled && flights.length > 0
-        ? flights
-            .filter((f) => f.mode !== 4 && f.mode !== 5)
-            .map((f) => (
-            <span
-              key={f.id}
-              className="danmaku absolute whitespace-nowrap"
-              style={{
-                /* 车道只铺到画面 70.8%：底下留给进度条与控制条；
-                   选了 1/4 或 1/2 屏就压进对应的上半部分。 */
-                top: `${6 + f.lane * laneStep}%`,
-                animationDuration: `${LIFE_MS / speed / 1000}s`,
-                animationPlayState: playing ? 'running' : 'paused',
-                color: f.color,
-                textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
-                opacity: fade ? opacity * 0.85 : opacity,
-                fontSize: `${size}px`,
-              }}
-            >
-              {f.text}
-              {f.count > 1 ? (
-                /* 同句合并在原轨道里更新计数，不重新从右侧起飞；留一格空白给两位数。 */
-                <span className="num ml-1 tabular-nums text-[0.82em] text-[#ffd76a]">×{f.count}</span>
-              ) : null}
-            </span>
-          ))
-        : null}
+      {flights.filter(({ flight }) => flight.lane >= 0).map(({ flight, count }) => (
+        <ScrollingLine
+          key={`${frame.epoch}:${flight.id}`} flight={flight} count={count} now={frame.now}
+          laneStep={laneStep} opacity={fade ? opacity * 0.85 : opacity} size={size}
+          playing={playing} playbackRate={playbackRate} life={life} merge={mergeSame}
+        />
+      ))}
     </div>
+  )
+}
+
+function ScrollingLine({
+  flight, count, now, laneStep, opacity, size, playing, playbackRate, life, merge,
+}: {
+  flight: Flight; count: number; now: number; laneStep: number; opacity: number
+  size: number; playing: boolean; playbackRate: number; life: number; merge: boolean
+}) {
+  // CSS 从入场时的媒体位置起跑，刷新计数时保持同一个动画实例。
+  const [elapsed] = useState(() => now - flight.at)
+  return (
+    <span className="danmaku absolute whitespace-nowrap" style={{
+      top: `${6 + flight.lane * laneStep}%`,
+      animationDuration: `${life / playbackRate}ms`,
+      animationDelay: `${-elapsed / playbackRate}ms`,
+      animationPlayState: playing ? 'running' : 'paused',
+      color: flight.color, opacity, fontSize: size,
+      textShadow: '0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff',
+    }}>
+      {flight.text}
+      {merge && flight.mode === 1 ? (
+        <span className="num ml-1 inline-block min-w-[3ch] tabular-nums text-[0.82em] text-[#ffd76a]">
+          {count > 1 ? `×${count}` : ''}
+        </span>
+      ) : null}
+    </span>
   )
 }
 

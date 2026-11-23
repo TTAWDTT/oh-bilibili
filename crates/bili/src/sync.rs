@@ -14,6 +14,12 @@ pub const FOLLOW_PAGE_SIZE: u32 = 50;
 /// 收藏夹名。产品要求固定这个名字，用户 B 站里能看到同一个夹子。
 pub const DEFAULT_FOLDER: &str = "哔哩哔哩 music";
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FavTrackPage {
+    pub tracks: Vec<bilimusic_model::Track>,
+    pub has_more: bool,
+}
+
 /// 搜索出来的 UP 主。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserHit {
@@ -169,7 +175,7 @@ pub struct FavFolder {
 pub struct AuthorCard {
     pub name: String,
     pub face: String,
-    pub fans: u64,
+    pub fans: Option<u64>,
     pub sign: String,
     pub official: Option<String>,
     /// 认证类型：0 个人、1 机构；None 未认证。徽章颜色靠它区分。
@@ -179,9 +185,9 @@ pub struct AuthorCard {
     /// 大会员（`card.vip.vipStatus == 1`）。
     pub vip: bool,
     /// 投稿总数。
-    pub videos: u64,
+    pub videos: Option<u64>,
     /// 累计获赞。
-    pub likes: u64,
+    pub likes: Option<u64>,
 }
 
 /// 每周必看的一期。
@@ -279,7 +285,7 @@ pub struct DynamicItem {
     /// 直播分区名，`kind == Live` 时才有。
     #[serde(default)]
     pub live_area: String,
-    /// 转发动态里被转的那条。只解析一层：原动态自己也是转发时留空。
+    /// 上游返回的被转动态。原作删除时仅保留可读的上层。
     #[serde(default)]
     pub orig: Option<Box<DynamicItem>>,
     /// 动态本身的转发 / 评论 / 点赞数，不是稿件统计。
@@ -422,7 +428,7 @@ impl Client {
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1))
                 .unwrap_or_default(),
-            fans: v["data"]["follower"].as_u64().unwrap_or(0),
+            fans: v["data"]["follower"].as_u64(),
             sign: card["sign"].as_str().unwrap_or_default().to_string(),
             official: card["Official"]["title"]
                 .as_str()
@@ -435,8 +441,8 @@ impl Client {
             // 等级就在 card 里，不需要另调 acc/info（那条会被限流成 -799）。
             level: card["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
             vip: card["vip"]["vipStatus"].as_u64() == Some(1),
-            videos: v["data"]["archive_count"].as_u64().unwrap_or(0),
-            likes: v["data"]["like_num"].as_u64().unwrap_or(0),
+            videos: v["data"]["archive_count"].as_u64(),
+            likes: v["data"]["like_num"].as_u64(),
         })
     }
 
@@ -481,7 +487,7 @@ impl Client {
         page: u32,
         ps: u32,
         min_interval: std::time::Duration,
-    ) -> Result<Vec<serde_json::Value>, BiliError> {
+    ) -> Result<(Vec<serde_json::Value>, bool), BiliError> {
         let v = self
             .get_json(
                 &format!(
@@ -491,7 +497,15 @@ impl Client {
                 min_interval,
             )
             .await?;
-        Ok(v["data"]["medias"].as_array().cloned().unwrap_or_default())
+        let data = &v["data"];
+        let has_more = data["has_more"].as_bool()
+            .ok_or_else(|| BiliError::Parse("收藏夹缺少分页状态".into()))?;
+        let medias = match &data["medias"] {
+            serde_json::Value::Array(items) => items.clone(),
+            serde_json::Value::Null if !has_more => Vec::new(),
+            _ => return Err(BiliError::Parse("收藏夹缺少作品列表".into())),
+        };
+        Ok((medias, has_more))
     }
 
     /// 收藏夹列表用的封面拼图：取每个夹子最前面的几张封面。
@@ -499,7 +513,7 @@ impl Client {
         Ok(self
             .fav_medias(folder_id, 1, limit.clamp(1, 20), std::time::Duration::from_millis(180))
             .await?
-            .iter()
+            .0.iter()
             .filter_map(|m| m["cover"].as_str().filter(|c| !c.is_empty()))
             .map(|c| c.replacen("http://", "https://", 1))
             .collect())
@@ -515,15 +529,18 @@ impl Client {
         &self,
         folder_id: i64,
         page: u32,
-    ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+    ) -> Result<FavTrackPage, BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};
 
-        Ok(self
+        let (medias, has_more) = self
             .fav_medias(folder_id, page, 40, std::time::Duration::from_millis(400))
-            .await?
-            .iter()
+            .await?;
+        let tracks = medias.iter()
             .filter_map(|m| {
-                let bvid = m["bvid"].as_str()?.to_string();
+                let bvid = m["bvid"].as_str().filter(|key| !key.is_empty())?;
+                if m["attr"].as_u64() == Some(9) {
+                    return None;
+                }
                 let duration = m["duration"].as_u64().filter(|d| *d > 0);
                 let play = m["cnt_info"]["play"].as_u64();
                 let danmaku = m["cnt_info"]["danmaku"].as_u64();
@@ -550,7 +567,8 @@ impl Client {
                     pages: m["page"].as_u64().map(|n| n as u32),
                 })
             })
-            .collect())
+            .collect();
+        Ok(FavTrackPage { tracks, has_more })
     }
 
     /// 稍后再看的列表。未登录会返回 NeedsLogin。
@@ -1639,12 +1657,6 @@ fn duration_text_ms(text: &str) -> Option<u64> {
 }
 
 fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
-    dynamic_item_at(item, 1)
-}
-
-/// `depth` 是还允许往下解析几层转发。B 站的转发可以套转发，
-/// 界面上只画一层原动态，再往里就是一条没有信息的空引用。
-fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
     let major = &item["modules"]["module_dynamic"]["major"];
     let kind = match (item["type"].as_str(), major["type"].as_str()) {
         (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
@@ -1659,6 +1671,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
         // 转发里的原动态常常是直播，信息在 major.live，不走 live_rcmd。
         (Some("DYNAMIC_TYPE_LIVE"), Some("MAJOR_TYPE_LIVE")) => DynamicKind::Live,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
+        (Some("DYNAMIC_TYPE_WORD"), _) => DynamicKind::Opus,
         _ => return None,
     };
     let author = &item["modules"]["module_author"];
@@ -1668,7 +1681,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
             .map(str::to_string)
             .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?,
         kind,
-        mid: dynamic_mid(&author["mid"])?,
+        mid: dynamic_mid(&author["mid"]).unwrap_or(0),
         author: author["name"].as_str().unwrap_or_default().to_string(),
         face: author["face"]
             .as_str()
@@ -1805,11 +1818,7 @@ fn dynamic_item_at(item: &serde_json::Value, depth: u8) -> Option<DynamicItem> {
                 .as_str()
                 .unwrap_or_default()
                 .to_string();
-            if depth > 0 {
-                dynamic.orig = dynamic_item_at(&item["orig"], depth - 1)
-                    .filter(|orig| orig.kind != DynamicKind::Forward)
-                    .map(Box::new);
-            }
+            dynamic.orig = dynamic_item(&item["orig"]).map(Box::new);
         }
     }
     Some(dynamic)
@@ -2164,7 +2173,7 @@ mod dynamic_duration_tests {
     }
 
     #[test]
-    fn 转发套转发只保留一层() {
+    fn 转发套转发保留中间层及原作() {
         let outer = json!({
             "id_str": "4",
             "type": "DYNAMIC_TYPE_FORWARD",
@@ -2194,7 +2203,18 @@ mod dynamic_duration_tests {
         });
         let dynamic = super::dynamic_item(&outer).expect("转发动态应能解析");
         assert_eq!(dynamic.kind, super::DynamicKind::Forward);
-        assert!(dynamic.orig.is_none());
+        let middle = dynamic.orig.unwrap();
+        assert_eq!(middle.id, "5");
+        assert_eq!(middle.text, "再转");
+        assert_eq!(middle.orig.unwrap().text, "原图文");
+
+        let mut deleted = outer;
+        deleted["orig"]["orig"] = json!({ "type": "DYNAMIC_TYPE_NONE" });
+        let dynamic = super::dynamic_item(&deleted).unwrap();
+        assert_eq!(dynamic.text, "转");
+        let middle = dynamic.orig.unwrap();
+        assert_eq!(middle.id, "5");
+        assert!(middle.orig.is_none());
     }
 
     #[test]

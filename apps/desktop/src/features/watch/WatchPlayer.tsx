@@ -265,11 +265,10 @@ export function WatchPlayer({
   nextUp,
   onNext,
   seekSignal,
-  noteSeek,
-  onNoteSeekDone,
   currentPage,
   onPage,
   resumeAt,
+  commentSeek,
   chapters: chapterMeta,
   liked,
   faved,
@@ -294,13 +293,12 @@ export function WatchPlayer({
   /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
   seekSignal: { at: number; nonce: number } | null
   /** 评论笔记跨 P 的定位：等目标分 P 的媒体就绪后再落位，并按跳转前恢复暂停。 */
-  noteSeek: { page: number; ms: number; nonce: number; paused: boolean } | null
-  onNoteSeekDone: () => void
   /** 多 P 时控制条上的选集。 */
   currentPage: number
   onPage: (no: number) => void
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
+  commentSeek: boolean
   /** UP 主设的章节；空表时退回简介里的时间戳。 */
   chapters: Chapter[]
   liked: boolean
@@ -321,9 +319,8 @@ export function WatchPlayer({
   const [retry, setRetry] = useState(0)
 
   const [error, setError] = useState<string | null>(null)
-  const [ready, setReady] = useState(false)
-  /** 每次换到一份新媒体时加一，跨 P 定位靠它等到画面能 seek。 */
-  const [mediaSeq, setMediaSeq] = useState(0)
+  const [loadedData, setLoadedData] = useState<typeof data | null>(null)
+  const ready = loadedData === data
   /** 播放器自己报的缓冲态：卡住时画面上要有转圈，不然只能看到画面定格。 */
   const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -426,8 +423,6 @@ export function WatchPlayer({
     () => filterDanmaku(danmaku, danmakuBlockWords, danmakuBlockTypes),
     [danmaku, danmakuBlockWords, danmakuBlockTypes],
   )
-  /** 屏蔽条件一变，屏幕上的弹幕要按剩下的记录重建，不能沿用旧计数。 */
-  const danmakuFilterKey = `${danmakuBlockWords.join('\u0000')}#${danmakuBlockTypes.join(',')}`
 
   const addBlockWords = (): void => {
     const words = blockDraft
@@ -452,28 +447,19 @@ export function WatchPlayer({
   }
   useEffect(() => {
     if (!seekSignal) return
-    const video = videoRef.current
-    if (video) video.currentTime = seekSignal.at / 1000
     setNow(seekSignal.at)
     void ipc.playerSeek(seekSignal.at).catch(() => {})
   }, [seekSignal])
 
-  /** 笔记跨 P 只落一次；换 P 后画面还没元数据时不动，等 mediaSeq 变了再来。 */
-  const noteSeekDone = useRef<number | null>(null)
+  const appliedVideoSeek = useRef<typeof seekSignal>(null)
   useEffect(() => {
-    if (!noteSeek || noteSeekDone.current === noteSeek.nonce) return
-    if (data.current_page !== noteSeek.page) return
+    if (!ready || !seekSignal || appliedVideoSeek.current === seekSignal) return
     const video = videoRef.current
-    if (!video || video.readyState < 1) return
-    noteSeekDone.current = noteSeek.nonce
-    video.currentTime = noteSeek.ms / 1000
-    setNow(noteSeek.ms)
-    void ipc
-      .playerSeek(noteSeek.ms)
-      .then(() => (noteSeek.paused ? ipc.playerPause() : null))
-      .catch(() => {})
-      .finally(onNoteSeekDone)
-  }, [noteSeek, mediaSeq, data.current_page, onNoteSeekDone])
+    if (video) {
+      video.currentTime = seekSignal.at / 1000
+      appliedVideoSeek.current = seekSignal
+    }
+  }, [ready, seekSignal])
   useEffect(() => {
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current)
@@ -591,7 +577,7 @@ export function WatchPlayer({
     if (resumedFor.current === data.manifest_url) return
     const duration = data.duration_ms || track.duration_ms || 0
     // 太靠前说明只是瞄过一眼，太靠后又基本等于看完了，两种情况都从头放。
-    if (!duration || resumeAt < 5000 || resumeAt > duration - 10_000) {
+    if (!duration || (!commentSeek && (resumeAt < 5000 || resumeAt > duration - 10_000))) {
       resumedFor.current = data.manifest_url
       return
     }
@@ -599,12 +585,12 @@ export function WatchPlayer({
     // 声音已经在 resume_at_ms 起播，这里再把音频 seek 回去会倒带已播的部分。
     // 只把画面对齐到声音的当前进度；声音若还没加载好，就落在续播点上等它。
     const head = localPlayhead()
-    const at = head > resumeAt ? head : resumeAt
+    const at = commentSeek ? resumeAt : Math.max(head, resumeAt)
     const v = videoRef.current
     if (v) v.currentTime = at / 1000
     setNow(at)
-    setResumeNotice(resumeAt)
-  }, [ready, resumeAt, data.manifest_url, data.duration_ms, track.duration_ms])
+    setResumeNotice(commentSeek ? null : resumeAt)
+  }, [ready, resumeAt, commentSeek, data.manifest_url, data.duration_ms, track.duration_ms])
 
   useEffect(() => {
     if (resumeNotice === null) return
@@ -756,7 +742,8 @@ export function WatchPlayer({
     setResumeNotice(null)
   }, [data.manifest_url])
 
-  // 挂载 shaka
+  // Shaka 的 destroy 会异步清空共用的 video.src。必须等旧实例释放后再挂下一 P。
+  const releasingPlayer = useRef<Promise<void> | null>(null)
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -768,6 +755,8 @@ export function WatchPlayer({
     let cancelled = false
     void (async () => {
       try {
+        await releasingPlayer.current
+        if (cancelled) return
         shaka.polyfill?.installAll?.()
         const player = new shaka.Player(video)
         playerRef.current = player
@@ -778,12 +767,12 @@ export function WatchPlayer({
         player.addEventListener('error', (event: { detail?: unknown }) => {
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
           const detail = event.detail as { handled?: boolean } | undefined
-          if (detail?.handled) return
+          if (cancelled || detail?.handled) return
           // 这一档取不到就退一档。B 站的 1080P 分片偶尔会被 CDN 直接拒，
           // 让用户自己去画质菜单里试是多余的；低一档几乎总能放。
           const heights = [...new Set(data.qualities.map((q) => q.height))].sort((a, b) => b - a)
           const lower = heights.find((h) => h < (currentHeight.current || heights[0]!))
-          if (lower !== undefined && !cancelled) {
+          if (lower !== undefined) {
             // 先记下这一档，下一次失败才会继续往下退；
             // 否则 load 在选轨之前就失败时会永远停在同一档来回重试。
             currentHeight.current = lower
@@ -801,6 +790,7 @@ export function WatchPlayer({
         video.muted = true
         video.volume = 0
         await player.load(data.manifest_url)
+        if (cancelled) return
         // shaka 会自动选一档。把当前档位映射回 B 站的画质 id，
         // 否则按钮上只能显示兜底文案，用户不知道现在是多少。
         // 降档重试优先；没有降档就按上次选的档位来。
@@ -841,12 +831,8 @@ export function WatchPlayer({
             )[0]
           if (match) setActiveId(match.id)
         }
-        if (cancelled) {
-          await player.destroy()
-          return
-        }
         setBuffering(false)
-        setReady(true)
+        setLoadedData(data)
       } catch (e) {
         if (!cancelled) setError(describePlaybackError(e))
       }
@@ -855,7 +841,7 @@ export function WatchPlayer({
       cancelled = true
       const player = playerRef.current
       playerRef.current = null
-      void player?.destroy()
+      if (player) releasingPlayer.current = player.destroy()
     }
   }, [data, retry])
 
@@ -1142,7 +1128,6 @@ export function WatchPlayer({
         ref={videoRef}
         muted
         playsInline
-        onLoadedMetadata={() => setMediaSeq((n) => n + 1)}
         onClick={(event) => {
           // 双击的第二下不再当成暂停，否则双击全屏会顺手把视频停下来。
           if (event.detail > 1) return
@@ -1168,7 +1153,7 @@ export function WatchPlayer({
         speed={danmakuSpeed}
         area={danmakuArea}
         mergeSame={danmakuMergeSame}
-        resetToken={danmakuFilterKey}
+        playbackRate={speed}
         fade
       />
       {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}
@@ -1230,7 +1215,7 @@ export function WatchPlayer({
               wantHeight.current = 0
               currentHeight.current = 0
               setError(null)
-              setReady(false)
+              setLoadedData(null)
               setRetry((n) => n + 1)
             }}
             className="t press mt-1 rounded-full border border-white/30 px-3 py-1 text-[12px] text-white hover:border-white/70"

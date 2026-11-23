@@ -1,3 +1,4 @@
+import { TrackByline } from '../tracks/TrackByline'
 import type { PreciousItemView } from '../../shared/lib/contract'
 import { useAppStore } from '../../app/appStore'
 import { formatCount, formatDuration } from '../../shared/lib/format'
@@ -24,15 +25,6 @@ export function PreciousExhibit({
   const navigate = useAppStore((state) => state.navigate)
   const { track, note } = item
   const open = (): void => navigate({ kind: 'watch', track }, undefined, `precious:${track.key}`)
-  const openAuthor = (): void => {
-    if (track.up_mid == null) return
-    navigate(
-      { kind: 'author', name: track.artist, mid: track.up_mid },
-      undefined,
-      `precious-author:${track.key}`,
-    )
-  }
-
   const cover = (
     <button
       type="button"
@@ -64,24 +56,7 @@ export function PreciousExhibit({
 
   const byline = (
     <div className="mt-1.5 flex min-w-0 items-center gap-2 text-[12px] text-[var(--text-3)]">
-      {track.up_mid != null ? (
-        <button
-          type="button"
-          onClick={openAuthor}
-          aria-label={`UP ${track.artist}`}
-          title={`看 ${track.artist} 的更多视频`}
-          data-focus-id={`precious-author:${track.key}`}
-          className="flex min-w-0 items-center gap-1 hover:text-[var(--accent-strong-hover)]"
-        >
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </button>
-      ) : (
-        <span className="flex min-w-0 items-center gap-1">
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </span>
-      )}
+      <TrackByline track={track} focusId={`precious-author:${track.key}`} />
       {track.views ? (
         <span className="num flex shrink-0 items-center gap-0.5">
           <Icon name="play" size={11} />

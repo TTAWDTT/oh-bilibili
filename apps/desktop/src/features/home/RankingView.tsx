@@ -1,3 +1,4 @@
+import { TrackByline } from '../tracks/TrackByline'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track } from '../../shared/lib/contract'
@@ -27,12 +28,11 @@ function rankColor(rank: number): string {
  * 榜单的一行：名次独立成列，竖向对齐成一整条；封面、标题、统计依次向右。
  * 第一名把封面与标题放大一档，但名次仍与下面同一条线。
  */
-function RankRow({ track, rank, active, onOpen, onAuthor }: {
+function RankRow({ track, rank, active, onOpen }: {
   track: Track
   rank: number
   active: boolean
   onOpen: () => void
-  onAuthor: () => void
 }) {
   const top = rank <= 3
   const first = rank === 1
@@ -40,7 +40,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
     <div
       data-rank-row
       data-rank={rank}
-      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 lg:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] lg:gap-x-4"
+      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card:gap-x-4"
     >
       <span className="pt-1 text-right">
         <span className="sr-only">第 {rank} 名</span>
@@ -59,7 +59,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
         onClick={onOpen}
         data-focus-id={`rank:${track.key}`}
         aria-label={track.title}
-        className={`relative w-[7rem] shrink-0 ${first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'}`}
+        className={`relative w-[7rem] shrink-0 ${first ? '@card:w-[13.5rem]' : '@card:w-[10.5rem]'}`}
         title={track.title}
       >
         <span className="relative block aspect-video overflow-hidden rounded-[6px]">
@@ -79,7 +79,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           onClick={onOpen}
           title={track.title}
           className={`w-full text-left font-medium hover:text-[var(--accent)] ${
-            first ? 'text-[17px] leading-[24px] lg:text-[18px] lg:leading-[26px]' : 'text-[15px] leading-[22px]'
+            first ? 'text-[17px] leading-[24px] @card:text-[18px] @card:leading-[26px]' : 'text-[15px] leading-[22px]'
           } ${
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
           }`}
@@ -87,21 +87,16 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           {/* 最多两行：按行高钉死高度，不依赖 -webkit-box（按钮/span 的 display 会被浏览器重算） */}
           <span
             data-rank-title
-            className={`block overflow-hidden ${first ? 'max-h-12 lg:max-h-[52px]' : 'max-h-11'}`}
+            className={`block overflow-hidden ${first ? 'max-h-12 @card:max-h-[52px]' : 'max-h-11'}`}
           >
             {track.title}
           </span>
         </button>
-        <button
-          type="button"
-          onClick={onAuthor}
-          className="mt-1.5 flex w-full min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)] hover:text-[var(--accent)]"
-        >
-          <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-          <span className="truncate">{track.artist}</span>
-        </button>
+        <div className="mt-1.5 text-[12px] text-[var(--text-3)]">
+          <TrackByline track={track} focusId={`rank-author:${track.key}`} />
+        </div>
         {/* 窄窗把统计挪到标题下面，先保住名次、标题和封面的宽度。 */}
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] lg:hidden">
+        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] @card:hidden">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -116,7 +111,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
           ) : null}
         </span>
       </div>
-      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] lg:flex">
+      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] @card:flex">
         {track.views ? (
           <span className="flex w-16 items-center justify-end gap-1">
             <Icon name="play" size={11} />
@@ -145,7 +140,7 @@ function RankSkeletonRow({ rank }: { rank: number }) {
     <div
       data-rank-skeleton-row
       aria-hidden
-      className="grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 lg:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] lg:gap-x-4"
+      className="grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card:gap-x-4"
     >
       <span className="pt-1">
         <span
@@ -156,7 +151,7 @@ function RankSkeletonRow({ rank }: { rank: number }) {
       </span>
       <span
         className={`block w-[7rem] shrink-0 aspect-video rounded-[6px] bg-[var(--ga1)] ${
-          first ? 'lg:w-[13.5rem]' : 'lg:w-[10.5rem]'
+          first ? '@card:w-[13.5rem]' : '@card:w-[10.5rem]'
         }`}
       />
       <div className="min-w-0 py-0.5">
@@ -166,9 +161,9 @@ function RankSkeletonRow({ rank }: { rank: number }) {
           }`}
         />
         <span className="mt-1.5 block h-[14px] w-24 rounded-[3px] bg-[var(--ga0)]" />
-        <span className="mt-1 block h-[12px] w-32 rounded-[3px] bg-[var(--ga1)] lg:hidden" />
+        <span className="mt-1 block h-[12px] w-32 rounded-[3px] bg-[var(--ga1)] @card:hidden" />
       </div>
-      <span className="hidden shrink-0 items-center gap-4 pt-1 lg:flex">
+      <span className="hidden shrink-0 items-center gap-4 pt-1 @card:flex">
         <span className="block h-3 w-16 rounded-[3px] bg-[var(--ga1)]" />
         <span className="block h-3 w-14 rounded-[3px] bg-[var(--ga1)]" />
       </span>
@@ -188,19 +183,18 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const restorePending = useRef(false)
+  const restoreTop = useRef(0)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
     // 换分区就是换一份榜；同一分区从视频返回则回到原来的名次附近。
-    const box = scrollRef.current
-    const same = rankMemory.rid === rid
-    if (!same) rankMemory.top = 0
-    if (box) box.scrollTop = same ? rankMemory.top : 0
-    rankMemory.rid = rid
-    // 列表还没回来时容器只有 loader，先记下，等这一份榜渲染出来再落位。
-    restorePending.current = same && rankMemory.top > 0
+    if (rankMemory.rid !== rid) {
+      rankMemory.rid = rid
+      rankMemory.top = 0
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    }
+    restoreTop.current = rankMemory.top
     setTracks(null)
     setError(null)
     void ipc
@@ -217,9 +211,9 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   }, [rid, nonce])
 
   useLayoutEffect(() => {
-    if (!restorePending.current || tracks === null) return
-    restorePending.current = false
-    if (scrollRef.current) scrollRef.current.scrollTop = rankMemory.top
+    if (tracks !== null && scrollRef.current) {
+      scrollRef.current.scrollTop = restoreTop.current
+    }
   }, [tracks])
 
   return (
@@ -227,8 +221,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       ref={scrollRef}
       id="scroll-main"
       onScroll={(event) => {
-        rankMemory.rid = rid
-        rankMemory.top = event.currentTarget.scrollTop
+        if (tracks !== null) rankMemory.top = event.currentTarget.scrollTop
       }}
       className="min-h-0 flex-1 overflow-y-auto pb-10"
     >
@@ -264,7 +257,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           </div>
         }
       />
-      <div className="px-4 md:px-8">
+      <div className="@container px-4 md:px-8">
       {error ? (
         <EmptyState
           icon="alert"
@@ -291,9 +284,6 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
               rank={index + 1}
               active={track.key === snapshot?.track?.key}
               onOpen={() => navigate({ kind: 'watch', track }, undefined, `rank:${track.key}`)}
-              onAuthor={() =>
-                navigate({ kind: 'author', name: track.artist, mid: track.up_mid ?? null })
-              }
             />
           ))}
         </div>

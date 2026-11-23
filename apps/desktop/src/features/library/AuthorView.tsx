@@ -295,9 +295,9 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                 <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--text-3)]">
                   {card ? (
                     <>
-                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>
-                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span>
-                      <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>
+                      {card.fans !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span> : null}
+                      {card.videos !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span> : null}
+                      {card.likes !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span> : null}
                     </>
                   ) : (
                     <>

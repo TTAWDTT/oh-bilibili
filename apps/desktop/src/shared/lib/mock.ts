@@ -1,4 +1,4 @@
-import type { DownloadView, QrStatus, Track, WireError } from './contract'
+import type { DownloadView, PageRef, QrStatus, Track, WireError } from './contract'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -190,6 +190,25 @@ const popularFailOnce =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('popularFailOnce')
 let popularFailedOnce = false
 
+function previewPages(track: Track): PageRef[] {
+  const params = new URLSearchParams(window.location.search)
+  const many = params.has('manyPages')
+  const commentJumps = params.has('commentJumps')
+  const count = many ? 80 : params.has('multiP') || commentJumps ? 2 : track.pages ?? 1
+  return Array.from({ length: count }, (_, index) => ({
+    no: index + 1,
+    cid: (many ? 100 : 1) + index,
+    title: index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : index === 1 ? '第二 P · 预览' : `第 ${index + 1} 集 · 预览`,
+    duration_ms: many ? 30_000 + index * 1000 : commentJumps ? 300_000 : track.duration_ms ?? 30_000,
+  }))
+}
+
+function eightPartTrack(track: Track): Track {
+  const result = { ...track, pages: 8 }
+  registerTrack(result)
+  return result
+}
+
 export async function mockInvoke(command: string, args: Record<string, unknown>): Promise<unknown> {
   ensureClock()
   // 队列相关命令都在 player 侧实现
@@ -208,7 +227,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
   }
 
   switch (command) {
-    case 'search_q': {
+    case 'search_q':
+    case 'search_page': {
       const raw = str(args, 'query').trim()
       // 预览用开关：关键词以「限流」开头时，第 2 页起报错，
       // 用来验证翻页失败后的「重试这一页」入口。
@@ -233,7 +253,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         const rightStarts = right.title.startsWith(query) ? 0 : 1
         return leftStarts - rightStarts
       })
-      return matched.slice((page - 1) * 8, page * 8)
+      const tracks = matched.slice((page - 1) * 8, page * 8)
+      return command === 'search_q' ? tracks : { tracks, page, has_more: page * 8 < matched.length }
     }
     case 'search_users': {
       const keyword = str(args, 'keyword').trim()
@@ -354,7 +375,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const rid = num(args, 'rid')
       return CATALOG.slice(0, 12).map((track, index) =>
         index === 0
-          ? { ...track, title: `${track.title} · 分区 ${rid} 最新`, pages: 8 }
+          ? { ...eightPartTrack(track), title: `${track.title} · 分区 ${rid} 最新` }
           : track,
       )
     }
@@ -541,11 +562,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // `?favThree` 造一个 40 + 40 + 15、共 95 项的收藏夹，用来验「播放全部」读全集。
       if (new URLSearchParams(window.location.search).has('favThree')) {
         const folder = Math.trunc(num(args, 'folder_id')) || 1
-        if (folder === 2) return page === 1 ? CATALOG.slice(0, 12) : []
-        if (folder === 3) return []
+        if (folder === 2) return { tracks: page === 1 ? CATALOG.slice(0, 12) : [], has_more: false }
+        if (folder === 3) return { tracks: [], has_more: false }
         const start = (page - 1) * size
         const total = 95
-        return Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
+        const tracks = Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
           const n = start + i
           const base = CATALOG[n % CATALOG.length]!
           const track = {
@@ -558,9 +579,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           registerTrack(track)
           return track
         })
+        return { tracks, has_more: start + size < total }
       }
       const start = (page - 1) * size
-      return CATALOG.slice(start, start + Math.min(size, CATALOG.length - start))
+      return { tracks: CATALOG.slice(start, start + size), has_more: start + size < CATALOG.length }
     }
     case 'history_delete': {
       const key = str(args, 'key')
@@ -693,11 +715,11 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const list = CATALOG.slice(start, start + size)
       // ?multiPages 给首页前几张卡配上分 P 数，用来验「所属合集」入口。
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiPages')) {
-        return list.map((track) => ({ ...track, pages: 8 }))
+        return list.map(eightPartTrack)
       }
       // ?seasonPeek：多 P + 合集的组合，用来验卡片上的「所属合集」入口。
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('seasonPeek')) {
-        return list.map((track, index) => (index < 3 ? { ...track, pages: 8 } : track))
+        return list.map((track, index) => (index < 3 ? eightPartTrack(track) : track))
       }
       return list
     }
@@ -979,27 +1001,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'watch_open': {
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
+      const commentJumps = import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
+      const pageDuration = commentJumps ? 300_000 : track.duration_ms ?? 30_000
       // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
-      setDuration(track.duration_ms ?? 30_000)
-      const multiP =
-        import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiP')
-      const manyPages =
-        import.meta.env.DEV && new URLSearchParams(window.location.search).has('manyPages')
-      const pages = manyPages
-        ? Array.from({ length: 80 }, (_, index) => ({
-            no: index + 1,
-            cid: 100 + index,
-            title:
-              index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : `第 ${index + 1} 集 · 预览`,
-            duration_ms: 30_000 + index * 1000,
-          }))
-        : multiP
-          ? [
-              { no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 },
-              { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: track.duration_ms ?? 30_000 },
-            ]
-          : [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }]
+      setDuration(pageDuration)
+      const pages = previewPages(track)
       const requestedPage = Number(args.page ?? 1) || 1
+      if (commentJumps && requestedPage === 2) await sleep(600)
+      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused } })
       const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
       return {
         key: track.key,
@@ -1024,6 +1033,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         season: {
           id: 1,
           title: '预览合集 · 精选现场',
+          work_count: 3,
           episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
             key: t.key,
             title: t.title,
@@ -1136,7 +1146,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           mid: i === 0 && ownerMid !== null ? ownerMid : seed.mid,
           author: seed.author,
           avatar: null,
-          text: i === 1 ? '@阿明 谢谢 @阿明，这段前奏我也循环了很久。' : seed.text,
+          text: i === 0 && import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
+            ? 'P1 03:20 正片演示\nP2 03:20 对照演示\n03:20 无页码的小结\nP3 09:00 跳过不存在的页'
+            : i === 1 ? '@阿明 谢谢 @阿明，这段前奏我也循环了很久。' : seed.text,
           emotes: [],
           mentions: i === 1 ? [['阿明', 90002]] : [],
           pictures:
@@ -1284,10 +1296,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         likes: 2_048,
         tname: track.tname ?? null,
         current_page: 1,
-        pages: [
-          { no: 1, cid: 900001, title: '正片', duration_ms: track.duration_ms ?? 240_000 },
-          { no: 2, cid: 900002, title: '花絮', duration_ms: 180_000 },
-        ],
+        pages: previewPages(track),
         season: null,
       }
     }
@@ -1318,6 +1327,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return {
         id: 1,
         title: '预览合集 · 精选现场',
+        work_count: 3,
         episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
           key: t.key,
           title: t.title,
@@ -1413,7 +1423,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return [36, 1_240_000]
     case 'watch_later_list':
       return CATALOG.slice(0, 9).map((track, index) =>
-        index === 0 ? { ...track, pages: 8 } : track,
+        index === 0 ? eightPartTrack(track) : track,
       )
     case 'danmaku_send':
       return null

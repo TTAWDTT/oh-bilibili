@@ -906,6 +906,72 @@ mod queue_restore_tests {
         }
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "真实网络与声卡"]
+    async fn 临时观看后继续听原分集() {
+        use super::{lock, WatchOptions};
+        use crate::wire::PlayMode;
+        use std::time::Duration;
+
+        let saved = SavedQueue::new(&[]);
+        let engine = Engine::new(&saved.db()).unwrap();
+        engine.set_volume(0.0);
+        let x = TrackKey::from_provider("BV1ZRihBkE8m");
+        let y = TrackKey::from_provider("BV1GJ411x7h7");
+        let origin = "http://127.0.0.1:9";
+        let wait_for_phase = |phase| {
+            let engine = engine.clone();
+            async move {
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    while engine.snapshot().phase != phase {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                })
+                .await
+                .unwrap();
+            }
+        };
+        let view = engine
+            .open_watch_page_with_pause(&x, origin, Some(2), Some(193_000), true)
+            .await
+            .unwrap();
+        let p2 = view.pages.iter().find(|p| p.no == 2).unwrap();
+        assert_ne!(p2.cid, view.pages[0].cid);
+        wait_for_phase("paused").await;
+        engine
+            .set_mode(PlayMode::Listen, Some(193_000), Some(&x))
+            .await
+            .unwrap();
+        engine.close_watch(Some(&x));
+
+        let temporary = engine
+            .open_watch_page_with_options(
+                &y,
+                origin,
+                None,
+                Some(10_000),
+                WatchOptions { paused: true, preserve_listen_queue: true },
+            )
+            .await
+            .unwrap();
+        wait_for_phase("paused").await;
+        assert_eq!(lock(&engine.watch_cid).as_ref().unwrap().1, temporary.pages[0].cid);
+        let restored = engine.close_watch(Some(&y));
+        assert_eq!(restored.track.unwrap().key, x);
+        assert_eq!(restored.position_ms, 193_000);
+
+        engine.toggle_or_load().await.unwrap();
+        wait_for_phase("playing").await;
+        let resumed = engine.pause();
+        assert_eq!(resumed.track.unwrap().key, x);
+        assert!((193_000..=196_000).contains(&resumed.position_ms));
+        assert_eq!(*lock(&engine.watch_cid), Some((x.as_opaque().into(), p2.cid)));
+        println!(
+            "X P1={} P2={} / Y={} / 恢复位置={}ms",
+            view.pages[0].cid, p2.cid, temporary.pages[0].cid, resumed.position_ms
+        );
+    }
+
     #[test]
     fn 播放前重排其他曲目保持续播点() {
         let a = track("BV1");
@@ -1143,6 +1209,17 @@ mod queue_restore_tests {
     }
 }
 
+#[derive(Default)]
+pub struct WatchOptions {
+    pub paused: bool,
+    pub preserve_listen_queue: bool,
+}
+
+struct QueueBookmark {
+    current: Option<(TrackKey, u64)>,
+    watch_cid: Option<(String, u64)>,
+}
+
 pub struct Engine {
     /// 登录 cookie 的落盘位置。凭据只在本机，不上传任何地方。
     cookie_file: std::path::PathBuf,
@@ -1161,6 +1238,7 @@ pub struct Engine {
     volume: Mutex<f32>,
     speed: Mutex<f32>,
     pending_resume: Mutex<Option<(TrackKey, u64)>>,
+    listen_bookmark: Mutex<Option<QueueBookmark>>,
     /// 看模式下当前 P 的 cid。`detail.cid` 永远是第一 P，多 P 视频取音轨
     /// 必须换成用户正在看的那一 P，否则每一集放的都是 P1 的声音。
     watch_cid: Mutex<Option<(String, u64)>>,
@@ -1219,6 +1297,7 @@ impl Engine {
             volume: Mutex::new(0.7),
             speed: Mutex::new(1.0),
             pending_resume: Mutex::new(None),
+            listen_bookmark: Mutex::new(None),
             watch_cid: Mutex::new(None),
             repeat: Mutex::new("off".into()),
             events,
@@ -1338,13 +1417,24 @@ impl Engine {
         tid: Option<u32>,
         duration: Option<u32>,
     ) -> Result<Vec<Track>, WireError> {
+        Ok(self.search_page(query, page, order, tid, duration).await?.tracks)
+    }
+
+    pub async fn search_page(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+        duration: Option<u32>,
+    ) -> Result<bilimusic_model::SearchPage, WireError> {
         let q = SearchQuery::parse(query, page)
             .map_err(|e| WireError::input("query", e.to_string()))?;
-        let tracks = self.source.search_scoped(&q, order, tid, duration).await?;
-        for t in &tracks {
-            self.remember(t);
+        let result = self.source.search_page(&q, order, tid, duration).await?;
+        for track in &result.tracks {
+            self.remember(track);
         }
-        Ok(tracks)
+        Ok(result)
     }
 
     #[allow(dead_code)]
@@ -1420,9 +1510,23 @@ impl Engine {
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         let track = self.track_of(key)?;
-        self.discard_resume_for_other_track(Some(key));
+        self.restore_queue_bookmark();
         lock(&self.queue).jump_by_key(key);
-        let token = self.begin_load(&track, false);
+        self.start_playback(&track, false, None).await
+    }
+
+    async fn start_playback(
+        self: &Arc<Self>,
+        track: &Track,
+        paused: bool,
+        watch_duration: Option<Millis>,
+    ) -> Result<PlayerSnapshot, WireError> {
+        let key = &track.key;
+        self.discard_resume_for_other_track(Some(key));
+        let token = self.begin_load(track, false);
+        if paused {
+            lock(&self.player).pause();
+        }
         self.emit(AppEvent::Buffering {
             track: track.clone(),
         });
@@ -1432,8 +1536,9 @@ impl Engine {
                 let resume = self.pending_resume_for(key).unwrap_or(0);
                 // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
                 // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
-                let bounded = match track.duration {
-                    Some(d) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
+                let bounded = match (watch_duration, track.duration) {
+                    (Some(d), _) if d.0 > 0 => resume.min(d.0),
+                    (_, Some(d)) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
                     _ => resume,
                 };
                 if bounded > 0 {
@@ -1443,7 +1548,17 @@ impl Engine {
                 // 取流完成不等于声卡已经出声。状态先留在 loading，看门狗看到
                 // `Player::is_started()` 后才迁到 playing；否则首段等待期间
                 // 就会显示「正在播放」而位置一直是 0。
-                *lock(&self.pending_prepared) = Some((token, prepared));
+                if paused {
+                    let mut state = lock(&self.state);
+                    if state.token() == Some(token) {
+                        *state = std::mem::replace(&mut *state, PlayerState::Idle)
+                            .stream_ready(token, prepared)
+                            .pause();
+                    }
+                } else {
+                    *lock(&self.pending_prepared) = Some((token, prepared));
+                }
+
                 // 开播就在后台把歌词取好：用户打开右栏时通常已经在了，
                 // 不用等 lrclib 那几秒。
                 {
@@ -1454,8 +1569,13 @@ impl Engine {
                     });
                 }
                 self.emit(AppEvent::NowPlaying {
-                    track: self.track_of(key)?,
-                    index: self.queue.lock().ok().and_then(|q| q.index()),
+                    track: track.clone(),
+                    index: {
+                        let queue = lock(&self.queue);
+                        queue.current()
+                            .filter(|entry| &entry.track.key == key)
+                            .and_then(|entry| queue.position_of(entry.id))
+                    },
                 });
                 self.emit_state();
                 Ok(self.snapshot())
@@ -1510,7 +1630,9 @@ impl Engine {
             .ok_or_else(|| WireError::input("key", "本地音频无法读取，请重试下载"))?;
         let track = self.track_of(key)?;
         self.remember(&track);
-        self.save_queue_resume_before_local();
+        if !self.restore_queue_bookmark() {
+            self.save_queue_resume_before_local();
+        }
         self.watch_gate.cancel();
         *lock(&self.mode) = crate::wire::PlayMode::Listen;
         *lock(&self.watch_cid) = None;
@@ -1574,31 +1696,65 @@ impl Engine {
         page: Option<u32>,
         resume_at_ms: Option<u64>,
     ) -> Result<WatchView, WireError> {
+        self.open_watch_page_with_pause(key, proxy_origin, page, resume_at_ms, false)
+            .await
+    }
+
+    pub async fn open_watch_page_with_pause(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        proxy_origin: &str,
+        page: Option<u32>,
+        resume_at_ms: Option<u64>,
+        paused: bool,
+    ) -> Result<WatchView, WireError> {
+        self.open_watch_page_with_options(
+            key,
+            proxy_origin,
+            page,
+            resume_at_ms,
+            WatchOptions { paused, ..Default::default() },
+        )
+        .await
+    }
+
+    pub async fn open_watch_page_with_options(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        proxy_origin: &str,
+        page: Option<u32>,
+        resume_at_ms: Option<u64>,
+        options: WatchOptions,
+    ) -> Result<WatchView, WireError> {
         let generation = self.watch_gate.begin(key.as_opaque());
         // 打开观看页就是「看」模式：底部音频条按模式隐藏，
         // 不会出现「没在听却挂着一条音频」。
         *lock(&self.mode) = crate::wire::PlayMode::Watch;
+        if options.preserve_listen_queue {
+            self.preserve_queue_bookmark();
+        }
         let detail = self.source.detail(key).await?;
         // 详情查询可能跨越一次切视频。迟到的旧详情不能再改队列、分P、
         // 续播点，更不能起播；否则用户已经看到 B，声音却被 A 抢走。
         if !self.watch_gate.is_current(generation) {
             return Err(WireError::internal("打开已过期，用户已经切走"));
         }
-        // 观看也把这一条设成队列当前项：否则切到「听」会接着放队列里上一首，
-        // 用户看到的是 A 却听到 B。实测踩到过。
-        // jump_by_key 只在条目已存在时有效，所以不存在要先插进去。
-        lock(&self.known).insert(key.as_opaque().to_string(), detail.track.clone());
-        {
-            let mut queue = lock(&self.queue);
-            if !queue.jump_by_key(key) {
-                queue.push_back(detail.track.clone());
-                queue.jump_by_key(key);
-            }
+        self.remember(&detail.track);
+        if !options.preserve_listen_queue {
+            self.restore_queue_bookmark();
+            self.select_listen_track(&detail.track);
         }
         let current = page
             .and_then(|no| detail.pages.iter().find(|p| p.no == no))
             .or_else(|| detail.pages.first());
         let page_cid = current.map(|p| p.cid);
+        // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
+        // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
+        let duration = current
+            .filter(|p| p.duration_ms > 0)
+            .map(|p| Millis(p.duration_ms))
+            .or(detail.track.duration)
+            .unwrap_or(Millis(0));
         let page_no = current.map(|p| p.no).unwrap_or(1);
         *lock(&self.watch_cid) = current.map(|p| (key.as_opaque().to_string(), p.cid));
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
@@ -1621,22 +1777,17 @@ impl Engine {
         // 起播要等拉流，放后台跑，页面先出来。
         {
             let engine = Arc::clone(self);
-            let track = detail.track.key.clone();
+            let track = detail.track.clone();
             tokio::spawn(async move {
-                let _ = engine.play_key(&track).await;
+                if engine.watch_gate.is_current(generation) {
+                    let _ = engine.start_playback(&track, options.paused, Some(duration)).await;
+                }
             });
         }
         // 模式切到「看」这一步也要让界面知道：底部播放条、右栏歌词
         // 都按模式决定是否出现，不给它们新快照就会停在「听」的旧状态。
         self.emit_state();
         let video = self.source.dash_video_at(key, page_cid).await?;
-        // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
-        // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
-        let duration = current
-            .filter(|p| p.duration_ms > 0)
-            .map(|p| Millis(p.duration_ms))
-            .or(detail.track.duration)
-            .unwrap_or(Millis(0));
         let origin = proxy_origin.trim_end_matches('/').to_string();
         let engine = self;
         let mpd = crate::dash_bridge::video_mpd(&video, duration.0, |url| {
@@ -1681,6 +1832,39 @@ impl Engine {
         })
     }
 
+    fn select_listen_track(&self, track: &Track) {
+        let mut queue = lock(&self.queue);
+        if !queue.jump_by_key(&track.key) {
+            let id = queue.push_back(track.clone());
+            queue.jump(id);
+        }
+    }
+
+    fn preserve_queue_bookmark(&self) {
+        let mut session = lock(&self.listen_bookmark);
+        session.get_or_insert_with(|| {
+            let key = lock(&self.queue).current().map(|entry| entry.track.key.clone());
+            let current = key.map(|key| {
+                let at = self.listen_queue_position(&key);
+                (key, at)
+            });
+            QueueBookmark {
+                current,
+                watch_cid: lock(&self.watch_cid).clone(),
+            }
+        });
+    }
+
+    fn restore_queue_bookmark(&self) -> bool {
+        if let Some(bookmark) = lock(&self.listen_bookmark).take() {
+            *lock(&self.pending_resume) = bookmark.current;
+            *lock(&self.watch_cid) = bookmark.watch_cid;
+            true
+        } else {
+            false
+        }
+    }
+
     /// 切换渲染目标。
     ///
     /// 从「看」切到「听」时，界面把画面当前的位置传进来，音频引擎从那里接着放。
@@ -1694,10 +1878,11 @@ impl Engine {
         if *lock(&self.mode) != crate::wire::PlayMode::Watch {
             return self.snapshot();
         }
+        let closing_current = key.map_or(true, |key| self.watch_gate.is_key(key.as_opaque()));
         if let Some(key) = key {
             // 旧页面的 cleanup 可能晚于新页面的打开到达。只取消自己那一代，
             // 不能把后来页面或用户主动播放的声音停掉。
-            if self.watch_gate.is_key(key.as_opaque()) {
+            if closing_current {
                 self.watch_gate.cancel_for(key.as_opaque());
             } else {
                 // 新页面还没真正起播时，旧音轨仍可能是这一条；让它停下，
@@ -1712,7 +1897,10 @@ impl Engine {
         }
         *lock(&self.pending_prepared) = None;
         lock(&self.player).stop();
-        {
+        if closing_current && self.restore_queue_bookmark() {
+            *lock(&self.state) = PlayerState::Idle;
+            *lock(&self.mode) = crate::wire::PlayMode::Listen;
+        } else {
             let mut st = lock(&self.state);
             *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
         }
@@ -1733,6 +1921,11 @@ impl Engine {
             // 没有这条事件，界面就会一直以为还在看。
             self.emit_state();
             return Ok(snapshot);
+        }
+
+        if let Some(key) = key {
+            self.select_listen_track(&self.track_of(key)?);
+            *lock(&self.listen_bookmark) = None;
         }
 
         // 要听哪一条：调用方给了就用它，否则用队列当前项。
@@ -2197,17 +2390,12 @@ impl Engine {
         if let Some(key) = local {
             return self.start_local(&key);
         }
-        let key = lock(&self.queue).current().map(|e| e.track.key.clone());
-        match key {
-            Some(k) => {
-                *lock(&self.pending_resume) = None;
-                let snap = self.play_key(&k).await?;
-                // 重播是从头看，历史进度也该归零。
-                let _ = self.library.set_history_position(k.as_opaque(), 0);
-                Ok(snap)
-            }
-            None => Ok(self.snapshot()),
-        }
+        let track = self.snapshot().track;
+        let Some(track) = track else { return Ok(self.snapshot()) };
+        *lock(&self.pending_resume) = None;
+        let snapshot = self.start_playback(&track, false, None).await?;
+        let _ = self.library.set_history_position(track.key.as_opaque(), 0);
+        Ok(snapshot)
     }
 
     pub fn set_volume(&self, volume: f32) -> PlayerSnapshot {
@@ -2435,13 +2623,10 @@ impl Engine {
                         continue;
                     }
                     stalled = 0;
-                    let key = lock(&engine.queue).current().map(|e| e.track.key.clone());
-                    if let Some(k) = key {
-                        // 重载会重新签一次流地址；从断点续上，别让一次 CDN 断流把进度送回 0:00。
-                        let state_track = lock(&engine.state).track().cloned();
-                        let at = engine.position_for(&k, state_track.as_ref());
-                        *lock(&engine.pending_resume) = Some((k.clone(), at));
-                        let _ = rt.block_on(engine.play_key(&k));
+                    let snapshot = engine.snapshot();
+                    if let Some(track) = snapshot.track {
+                        *lock(&engine.pending_resume) = Some((track.key.clone(), snapshot.position_ms));
+                        let _ = rt.block_on(engine.start_playback(&track, false, None));
                     }
                 }
             });
@@ -2627,13 +2812,13 @@ impl Engine {
             let current = queue.current().map(|entry| entry.track.key.clone());
             (queue.items(), queue.index(), current)
         };
-        let state_track = lock(&self.state).track().cloned();
-        let local = lock(&self.local_track).is_some();
         let position_ms = current.as_ref().map_or(0, |key| {
-            if local {
-                self.pending_resume_for(key).unwrap_or(0)
+            if let Some(bookmark) = lock(&self.listen_bookmark).as_ref() {
+                bookmark.current.as_ref()
+                    .filter(|(current, _)| current == key)
+                    .map_or(0, |(_, at)| *at)
             } else {
-                self.position_for(key, state_track.as_ref())
+                self.listen_queue_position(key)
             }
         });
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
@@ -2645,6 +2830,15 @@ impl Engine {
         });
         if let Ok(json) = serde_json::to_string(&snapshot) {
             let _ = self.library.save_queue(&json);
+        }
+    }
+
+    fn listen_queue_position(&self, key: &TrackKey) -> u64 {
+        if lock(&self.local_track).is_some() {
+            self.pending_resume_for(key).unwrap_or(0)
+        } else {
+            let state_track = lock(&self.state).track().cloned();
+            self.position_for(key, state_track.as_ref())
         }
     }
 
@@ -3172,9 +3366,9 @@ impl Engine {
         Ok(self.source.video_shots(&key.as_opaque(), cid).await?)
     }
 
-    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<Vec<Track>, WireError> {
+    pub async fn fav_tracks(&self, folder_id: i64, page: u32) -> Result<crate::wire::FavTrackPage, WireError> {
         let tracks = self.source.fav_tracks(folder_id, page).await?;
-        for t in &tracks {
+        for t in &tracks.tracks {
             self.remember(t);
         }
         Ok(tracks)
@@ -4006,6 +4200,7 @@ fn season_view(
 ) -> Option<crate::wire::SeasonView> {
     let season = season?;
     Some(crate::wire::SeasonView {
+        work_count: season.work_count,
         id: season.id,
         title: season.title.clone(),
         episodes: season

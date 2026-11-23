@@ -141,6 +141,7 @@ pub enum PlayMode {
 /// 观看页右栏的合集。字段与 TS 契约逐一对应。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SeasonView {
+    pub work_count: Option<usize>,
     pub id: u64,
     pub title: String,
     pub episodes: Vec<SeasonEpisodeView>,
@@ -306,7 +307,7 @@ pub use bilimusic_bili::comments::{Comment, CommentPage};
 
 pub use bilimusic_bili::messages::{MessageItem, MessageKind, MessagePage, MessageUnread, MessageUser};
 pub use bilimusic_bili::sync::{
-    DynamicItem, DynamicPage, Followed, SubtitleCue, SubtitleTrack, SummaryPoint, SummarySection,
+    DynamicItem, DynamicPage, FavTrackPage, Followed, SubtitleCue, SubtitleTrack, SummaryPoint, SummarySection,
     VideoMeta, VideoShots, VideoSummary,
 };
 pub use bilimusic_bili::HotSearchItem;
