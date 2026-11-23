@@ -467,11 +467,12 @@ export function FollowingView() {
                       onClick={() => pick(user.mid)}
                       onKeyDown={(event) => onRowKeyDown(event, at)}
                       className={[
-                        'bili-card group flex w-full min-w-0 items-center gap-3 rounded-[10px] border px-3 text-left',
+                        // 名单是连续的行，不是一张张卡片：整行只改底色，选中行加左侧标记。
+                        'group flex w-full min-w-0 items-center gap-3 rounded-[6px] px-3 text-left',
                         compact ? 'py-2' : 'py-2.5',
                         active
-                          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
-                          : 'border-[var(--line)] bg-[var(--panel)] hover:border-[var(--accent)]',
+                          ? 'bg-[var(--accent-soft)] shadow-[inset_2px_0_0_var(--accent)]'
+                          : 'hover:bg-[var(--panel)]',
                       ].join(' ')}
                     >
                       <Avatar src={user.face} alt={user.name} size={compact ? 38 : 44} />
