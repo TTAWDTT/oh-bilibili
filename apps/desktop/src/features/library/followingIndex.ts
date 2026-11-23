@@ -16,6 +16,16 @@ type Snapshot = {
 /** 一个账号只建一次索引：离开目录再回来还从原处接着读，不重新扫全量。 */
 const cache = new Map<number, Snapshot>()
 
+/**
+ * 已经读到的关注名单快照。动态页只需要一份头像列表，不该为此再发一次
+ * 分页请求——限流时那次失败会让筛选条整条消失。
+ */
+export function cachedFollowing(accountMid: number | null): Followed[] | null {
+  if (accountMid == null) return null
+  const hit = cache.get(accountMid)
+  return hit && hit.items.length > 0 ? hit.items : null
+}
+
 export type FollowingIndexState = {
   items: Followed[]
   total: number
