@@ -4787,13 +4787,13 @@ async function main() {
     for (let i = 0; i < 20 && !searched; i += 1) {
       await sleep(400)
       searched = await page.evaluate(`(() => {
-        const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+        const dialog = document.querySelector('[data-search-results]')
         return !!dialog && dialog.querySelectorAll('[data-track-card]').length > 0
       })()`)
     }
     check('顶栏搜索提交后出结果', submitted && searched)
     const singleResult = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       if (!dialog) return null
       dialog.scrollTop = dialog.scrollHeight - dialog.clientHeight
       const scrollTop = dialog.scrollTop
@@ -4809,7 +4809,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const returned = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       const active = document.activeElement
       return {
@@ -4819,11 +4819,11 @@ async function main() {
         scrollTop: dialog?.scrollTop,
       }
     })()`)
-    check('从搜索结果返回会重新展开结果', searchVideo && returned.dialog && returned.query === '晴天')
+    check('从作品返回原搜索页', searchVideo && returned.dialog && returned.query === '晴天')
     check('返回后焦点落回结果卡片', returned.focused)
     check(
-      `单条结果保留滚动位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
-      singleResult?.count === 1 && singleResult.scrollTop > 0 && returned.scrollTop === singleResult.scrollTop,
+      `单条结果返回原位置（${singleResult?.scrollTop} → ${returned.scrollTop}）`,
+      singleResult?.count === 1 && returned.scrollTop === singleResult.scrollTop,
     )
 
     // 再次进入同一结果：只点顶栏搜索框后按 Esc 收联想，不能抹掉返回目标。
@@ -4859,7 +4859,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const secondReturn = await page.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-label="搜索结果"]')
+      const dialog = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
       return {
         dialog: !!dialog,
@@ -4868,7 +4868,7 @@ async function main() {
       }
     })()`)
     check(
-      'Esc 收联想后返回仍回结果面板与原卡片',
+      'Esc 收联想后返回仍回结果页与原卡片',
       secondReturn.dialog && secondReturn.query === '晴天' && secondReturn.focused,
     )
 
@@ -4883,12 +4883,12 @@ async function main() {
     let resultCount = 0
     for (let i = 0; i < 20 && resultCount < 5; i += 1) {
       await sleep(400)
-      resultCount = await page.evaluate(`document.querySelectorAll('#search-scroll [data-track-card]').length`)
+      resultCount = await page.evaluate(`document.querySelectorAll('[data-search-results] [data-track-card]').length`)
     }
 
     const filters = ['音乐', '最多播放', '10 分钟以下']
     const filtersSelected = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const buttons = [...(dialog?.querySelectorAll('button') ?? [])]
       return ${JSON.stringify(filters)}.every((label) => {
         const button = buttons.find((button) => button.textContent.trim() === label)
@@ -4898,7 +4898,7 @@ async function main() {
     })()`)
     await sleep(1200)
     const manyResults = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const cards = dialog?.querySelectorAll('[data-track-card]')
       const button = cards?.[2]?.querySelector('button[aria-label^="观看"]')
       if (!button) return null
@@ -4919,7 +4919,7 @@ async function main() {
     await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
     await sleep(900)
     const returnedMany = await page.evaluate(`(() => {
-      const dialog = document.querySelector('#search-scroll')
+      const dialog = document.querySelector('[data-search-results]')
       const pressed = [...(dialog?.querySelectorAll('button[aria-pressed="true"]') ?? [])]
       return {
         scrollTop: dialog?.scrollTop,
@@ -4937,10 +4937,10 @@ async function main() {
       '返回后保留关键词、分区、排序和时长',
       filtersSelected && returnedMany.query === '周杰伦' && filters.every((filter) => returnedMany.filters.includes(filter)),
     )
-    await page.evaluate(`document.querySelector('#search-scroll button[aria-label="关闭搜索"]')?.click()`)
+    await page.evaluate(`[...document.querySelectorAll('[data-search-results] button')].find(b => b.textContent.trim() === '返回')?.click()`)
     check(
       '主动关闭搜索后露出原页面',
-      await page.evaluate(`!document.querySelector('#search-scroll') && !!document.querySelector('[data-home-recommend]')`),
+      await page.evaluate(`!document.querySelector('[data-search-results]') && !!document.querySelector('[data-home-recommend]')`),
     )
     await page.viewport(1320, 900)
 

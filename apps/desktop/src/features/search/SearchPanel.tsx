@@ -29,15 +29,13 @@ type SearchMemory = {
   tracks: Track[]
   users: ipc.UserHit[]
   page: number
+  ended: boolean
   usersPage: number
   usersEnded: boolean
   tab: SearchTab
   scrollTop: number
   lastRenderedIndex: number
 }
-
-/** B 站搜索接口一次最多给 50 条；不足这个数就是一页到底。 */
-const SEARCH_PAGE_SIZE = 50
 
 /** 搜索结果按查询条件缓存：从视频页返回时不该重新搜一遍，也不该跳回顶部。 */
 let searchMemory: SearchMemory | null = null
@@ -46,13 +44,7 @@ function searchKey(query: string, partition: string, order: string, duration: nu
   return [query, partition, order, duration].join('\u0000')
 }
 
-/**
- * 搜索结果面板。搜索没有独立页面：顶栏输入框下面直接长出这一块，
- * 点结果或按 Esc 收起，主页面保持在原处。
- */
-export function SearchPanel() {
-  const storeQuery = useAppStore((state) => state.currentQuery)
-  const [query, setQuery] = useState(storeQuery)
+export function SearchPanel({ query }: { query: string }) {
   const [partition, setPartition] = useState(useAppStore.getState().currentPartition)
   const [order, setOrder] = useState(useAppStore.getState().currentOrder as 'totalrank' | 'click' | 'pubdate' | 'danmaku')
   const [duration, setDuration] = useState<DurationKey>((useAppStore.getState().currentDuration ?? 0) as DurationKey)
@@ -61,7 +53,7 @@ export function SearchPanel() {
   const restoreRef = useRef<SearchMemory | null | undefined>(undefined)
   if (restoreRef.current === undefined) {
     restoreRef.current =
-      searchMemory && searchMemory.key === bootKey && searchMemory.tracks.length > 0 ? searchMemory : null
+      searchMemory?.key === bootKey ? searchMemory : null
   }
   const restored = restoreRef.current
   const [page, setPage] = useState(restored?.page ?? 1)
@@ -77,7 +69,7 @@ export function SearchPanel() {
   const [usersError, setUsersError] = useState(false)
   const [dataKey, setDataKey] = useState(restored?.key ?? '')
   const [status, setStatus] = useState<Status>(restored ? 'ready' : 'idle')
-  const skipFirstFetch = useRef(restored !== null)
+  const loaded = useRef({ key: restored?.key ?? '', page: restored?.page ?? 0 })
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState(false)
@@ -85,7 +77,7 @@ export function SearchPanel() {
   const [followedMids, setFollowedMids] = useState<ReadonlySet<number>>(new Set())
   const loggedIn = useAuthStore((state) => state.auth?.logged_in ?? false)
   /** 结果已经翻到头。ref 不能触发渲染，底部要据此换掉「继续下滑查看更多」。 */
-  const [ended, setEnded] = useState(false)
+  const [ended, setEnded] = useState(restored?.ended ?? false)
   const sentinel = useRef<HTMLDivElement | null>(null)
   const [nonce, setNonce] = useState(0)
   const [usersNonce, setUsersNonce] = useState(0)
@@ -113,32 +105,9 @@ export function SearchPanel() {
       : SUGGESTIONS.map((s) => ({ keyword: s, label: s, icon: '', heat: 0 }))
   const selectedPartition = PARTITIONS.find((p) => p.label === partition) ?? PARTITIONS[0]!
   const pushHistory = useSearchHistory((s) => s.push)
-  const heroQuery = useAppStore((state) => state.heroQuery)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
-  const setCurrentQuery = useAppStore((state) => state.setCurrentQuery)
   const setSearchFilters = useAppStore((state) => state.setSearchFilters)
   const goBack = useAppStore((state) => state.goBack)
-  const searchFocusResult = useAppStore((state) => state.searchFocusResult)
-  const clearSearchFocusResult = useAppStore((state) => state.clearSearchFocusResult)
-
-  // 把实际在搜的词与筛选条件同步给 store：
-  // 顶栏跟着它走，切走再回来也能恢复。
-  useEffect(() => {
-    setCurrentQuery(query)
-    setSearchFilters(partition, order, duration)
-  }, [query, partition, order, duration, setCurrentQuery, setSearchFilters])
-
-  // 顶栏搜索框提交后，这里接住关键词并立刻搜一次。
-  useEffect(() => {
-    // 空串是「搜一个空词」：清掉结果回到热搜页，不能当成没提交。
-    if (heroQuery === null) return
-    setQuery(heroQuery)
-    setPage(1)
-    setTab('all')
-    setNonce((n) => n + 1)
-    setHeroQuery(null)
-  }, [heroQuery, setHeroQuery])
-
   const [error, setError] = useState<WireError | null>(null)
   const seq = useRef(0)
   const usersSeq = useRef(0)
@@ -146,9 +115,6 @@ export function SearchPanel() {
   const trimmed = query.trim()
   const userScope = [trimmed, partition].join('\u0000')
   const usersReady = usersScope === userScope
-  /** 上一页返回空就说明到底了；否则自动补齐会对着空页无限重试。 */
-  const reachedEnd = useRef(false)
-
   const loadFollowed = useCallback((list: ipc.UserHit[]): void => {
     if (list.length === 0) return
     void ipc
@@ -172,17 +138,6 @@ export function SearchPanel() {
     }
   }, [restored])
 
-  useLayoutEffect(() => {
-    if (searchFocusResult === null) return
-    const index = restored?.tracks.findIndex((track) => track.key === searchFocusResult) ?? -1
-    if (index >= 0) {
-      scrollerRef.current
-        ?.querySelector<HTMLButtonElement>(`[data-track-card][data-index="${index}"] button`)
-        ?.focus({ preventScroll: true })
-    }
-    clearSearchFocusResult()
-  }, [restored, searchFocusResult, clearSearchFocusResult])
-
   // 只把属于当前查询的结果写进缓存，避免新关键词挂上旧结果。
   useEffect(() => {
     if (trimmed.length === 0) {
@@ -199,7 +154,8 @@ export function SearchPanel() {
         key,
         tracks,
         users: currentUsers,
-        page,
+        page: loaded.current.page,
+        ended,
         usersPage: currentUsersPage,
         usersEnded: currentUsersEnded,
         tab,
@@ -209,12 +165,13 @@ export function SearchPanel() {
     } else {
       searchMemory.tracks = tracks
       searchMemory.users = currentUsers
-      searchMemory.page = page
+      searchMemory.page = loaded.current.page
+      searchMemory.ended = ended
       searchMemory.usersPage = currentUsersPage
       searchMemory.usersEnded = currentUsersEnded
       searchMemory.tab = tab
     }
-  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page, tab])
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page, ended, tab])
 
   // UP 主结果按关键词与分区重置；视频翻页、排序和时长筛选不动它。先排队以免被视频预取挡住。
   useEffect(() => {
@@ -263,10 +220,8 @@ export function SearchPanel() {
       searchMemory = null
       return
     }
-    if (skipFirstFetch.current) {
-      skipFirstFetch.current = false
-      return
-    }
+    const key = searchKey(trimmed, partition, order, duration)
+    if (loaded.current.key === key && loaded.current.page === page) return
     const ticket = ++seq.current
     const handle = window.setTimeout(() => {
       // 只有第 1 页算「正在搜索」；翻页是补内容，顶部不该一直转。
@@ -274,12 +229,13 @@ export function SearchPanel() {
         setStatus('loading')
         setTracks([])
         setDataKey('')
+        loaded.current = { key: '', page: 0 }
         setMoreError(false)
         setEnded(false)
         scrollerRef.current?.scrollTo({ top: 0 })
       }
       ipc
-        .searchQ(
+        .searchPage(
           trimmed,
           page,
           order,
@@ -292,13 +248,14 @@ export function SearchPanel() {
         .then((next) => {
           if (seq.current !== ticket) return
           if (page === 1) pushHistory(trimmed)
-          // 不足一整页就已经到底：只有 1 条结果时不该再去要第 2 页，
-          // 否则那一次请求失败会在结果下面留一个假的「重试这一页」。
-          const done = next.length < SEARCH_PAGE_SIZE
-          reachedEnd.current = done
-          setEnded(done)
-          setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
-          setDataKey(searchKey(trimmed, partition, order, duration))
+          loaded.current = { key, page: next.page }
+          setEnded(!next.has_more)
+          setTracks((prev) => {
+            if (page === 1) return next.tracks
+            const seen = new Set(prev.map((track) => track.key))
+            return [...prev, ...next.tracks.filter((track) => !seen.has(track.key))]
+          })
+          setDataKey(key)
           setStatus('ready')
           setLoadingMore(false)
           setMoreError(false)
@@ -319,15 +276,24 @@ export function SearchPanel() {
       // 防抖只在第 1 页有意义：用户还在敲字，等他把词打完。
       // 翻页是明确的动作，再等 320ms 就是白等。
     }, page === 1 ? 320 : 0)
-    return () => window.clearTimeout(handle)
+    return () => {
+      window.clearTimeout(handle)
+      seq.current += 1
+    }
   }, [trimmed, page, nonce, order, partition, duration])
 
-  /** 卡片网格的缓冲浅到阈值就来要下一页。 */
-  const needMore = (): void => {
-    if (tab === 'user' || status !== 'ready' || loadingMore || moreError || reachedEnd.current) return
-    setLoadingMore(true)
-    setPage((p) => p + 1)
-  }
+  useEffect(() => {
+    const marker = sentinel.current
+    if (!marker || tab === 'user' || status !== 'ready' || loadingMore || moreError || ended) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return
+      observer.disconnect()
+      setLoadingMore(true)
+      setPage((current) => current + 1)
+    }, { root: scrollerRef.current, rootMargin: '350px 0px' })
+    observer.observe(marker)
+    return () => observer.disconnect()
+  }, [tab, status, loadingMore, moreError, ended, tracks])
 
   const loadMoreUsers = (): void => {
     if (!usersReady || usersLoading || usersEnded) return
@@ -361,17 +327,11 @@ export function SearchPanel() {
       })
   }
 
-  const pick = (value: string): void => {
-    setQuery(value)
-    setPage(1)
-    setTab('all')
-    setNonce((current) => current + 1)
-  }
-
   return (
     <div
       ref={scrollerRef}
       id="scroll-main"
+      data-search-results
       className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
       <div className="mb-3 flex items-center gap-3">
@@ -442,7 +402,8 @@ export function SearchPanel() {
                     >
                     <button
                       type="button"
-                      onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid })}
+                      data-focus-id={`search-user:${user.mid}`}
+                      onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid }, undefined, `search-user:${user.mid}`)}
                       className="bili-press flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
                       <Avatar src={user.face} alt={user.name} size={40} />
@@ -583,7 +544,7 @@ export function SearchPanel() {
                       scrollerRef.current?.scrollTo({ top: 0 })
                     }}
                   />
-                  <div className="flex items-center gap-1">
+                  <div role="group" aria-label="视频排序" className="flex items-center gap-1">
                   {([
                     ['totalrank', '综合'],
                     ['click', '最多播放'],
@@ -603,7 +564,7 @@ export function SearchPanel() {
                       className={[
                         't rounded-[4px] px-2 py-1 text-[13px]',
                         order === value
-                          ? 'text-[var(--accent)]'
+                          ? 'font-semibold text-[var(--accent-strong)] underline underline-offset-4'
                           : 'text-[var(--text-3)] hover:text-[var(--text-1)]',
                       ].join(' ')}
                     >
@@ -655,7 +616,7 @@ export function SearchPanel() {
                   }
                   action={
                     selectedPartition.tid
-                      ? { label: '全站搜这个词', onClick: () => setPartition('全部') }
+                      ? { label: '全站搜这个词', onClick: () => { setPartition('全部'); setSearchFilters('全部', order, duration); setPage(1) } }
                       : { label: '返回', onClick: goBack }
                   }
                 />
@@ -682,7 +643,7 @@ export function SearchPanel() {
                         <button
                           key={item.keyword}
                           type="button"
-                          onClick={() => pick(item.keyword)}
+                          onClick={() => setHeroQuery(item.keyword)}
                           className="rounded-[3px] bg-[var(--panel-raised)] px-2 py-1 text-[12.5px] text-[var(--text-2)] hover:text-[var(--accent)]"
                         >
                           {item.label}
@@ -700,7 +661,6 @@ export function SearchPanel() {
                 activeKey={snapshot?.track?.key ?? null}
                 playing={snapshot?.phase === 'playing'}
                 highlight={trimmed}
-                onNeedMore={needMore}
                 initialIndex={restored?.lastRenderedIndex ?? 0}
               />
             ) : null}

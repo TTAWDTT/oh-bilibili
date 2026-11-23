@@ -36,15 +36,14 @@ export function health(): Promise<Health> {
   return Promise.resolve({ ok: true, version: '0.1.0', engine: 'browser-mock', platform: 'web' })
 }
 
-/** 契约里同时存在 SearchPage 包裹形状；命令表按 Track[] 实现，两种都吃下来更稳。 */
-export async function searchQ(
+export async function searchPage(
   query: string,
   page: number,
   order?: string,
   partitionIds?: number[],
   duration?: number,
-): Promise<Track[]> {
-  const result = await call<Track[] | SearchPage>('search_q', {
+): Promise<SearchPage> {
+  return call<SearchPage>('search_page', {
     query,
     page,
     order,
@@ -52,7 +51,10 @@ export async function searchQ(
     partition_ids: partitionIds && partitionIds.length > 0 ? [partitionIds[0]] : [],
     duration: duration === undefined ? null : duration,
   })
-  return Array.isArray(result) ? result : result.tracks
+}
+
+export async function searchQ(...args: Parameters<typeof searchPage>): Promise<Track[]> {
+  return (await searchPage(...args)).tracks
 }
 
 export function playerState(): Promise<PlayerSnapshot> {

@@ -1,9 +1,3 @@
-/**
- * 分区筛选栏。B 站搜索页顶部那排「全部 / 音乐 / 游戏 / 影视」。
- *
- * B 站的搜索接口已经不接受 tids 参数（实测传了直接返回 0 条），
- * 所以这里改成按返回结果的 typeid 在前端过滤——分区是接口给的真数据。
- */
 /** tid 是 B 站的一级分区 id（tids 参数用它）；ids 保留做展示与未来细化。 */
 export type Partition = { label: string; tid?: number; ids: number[] }
 
@@ -34,12 +28,12 @@ export function PartitionFilter({
           <button
             key={p.label}
             type="button"
-            onClick={() => onChange(p.label)}
+            onClick={() => onChange(on ? '全部' : p.label)}
             aria-pressed={on}
             className={[
               't shrink-0 whitespace-nowrap rounded-[4px] px-2.5 py-1 text-[14px]',
               on
-                ? 'bg-[var(--accent)] text-white'
+                ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]'
                 : 'bg-[var(--panel-raised)] text-[var(--text-2)] hover:text-[var(--text-1)]',
             ].join(' ')}
           >

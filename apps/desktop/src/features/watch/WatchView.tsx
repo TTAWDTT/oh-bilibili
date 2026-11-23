@@ -26,6 +26,7 @@ import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
 import { NoteReader } from './NoteReader'
 import type { CommentNote } from './NoteReader'
+import { rememberPageCount } from '../tracks/pageSpineLabel'
 import { rememberSeason } from '../tracks/seasonMark'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
@@ -621,6 +622,7 @@ export function WatchView({
           }
           // 详情里带完整合集目录时记到本地：列表页的书脊靠它，
           // 不必为每个卡片额外请求一次详情。
+          rememberPageCount(track.key, next.pages.length)
           rememberSeason(next.season, track.key)
           setData(next)
         }

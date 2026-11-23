@@ -26,6 +26,7 @@ check('单稿合集仍按稿数写', seasonLabel({ id: 1, title: '收藏', count
 rememberSeason(
   {
     id: 7,
+    work_count: null,
     title: '文物修复系列',
     episodes: [
       { key: 'BVother', title: '别集', cover: null, duration_ms: 1000, views: null, current: false },
@@ -34,8 +35,8 @@ rememberSeason(
   'BVcurrent',
 )
 check('当前稿被补进合集标记', readSeasonMark('BVcurrent')?.id === 7)
-check('当前稿也计入稿数', readSeasonMark('BVcurrent')?.count === 2)
-check('目录里的其它集同样被标记', readSeasonMark('BVother')?.count === 2)
+check('不完整目录只标合集身份', seasonLabel(readSeasonMark('BVcurrent')) === '合集')
+check('目录里的其它集同样被标记', readSeasonMark('BVother')?.id === 7)
 check('没有目录时不写', (() => { rememberSeason(null, 'BVx'); return readSeasonMark('BVx') === null })())
 
 // 损坏数据不能崩，也不该画出一个假书脊。

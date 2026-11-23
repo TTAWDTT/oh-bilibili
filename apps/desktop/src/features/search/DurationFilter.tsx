@@ -29,12 +29,12 @@ export function DurationFilter({
           <button
             key={option.key}
             type="button"
-            onClick={() => onChange(option.key)}
+            onClick={() => onChange(on ? 0 : option.key)}
             aria-pressed={on}
             className={[
             't shrink-0 whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[13px]',
               on
-                ? 'bg-[var(--accent)] text-white'
+                ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]'
                 : 'text-[var(--text-2)] hover:text-[var(--accent)]',
             ].join(' ')}
           >

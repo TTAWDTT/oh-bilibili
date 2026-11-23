@@ -83,6 +83,7 @@ pub struct StaffMember {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeasonRef {
     pub id: u64,
+    pub work_count: Option<usize>,
     pub title: String,
     /// 合集里的每一集，顺序就是 B 站的播放顺序。
     pub episodes: Vec<SeasonEpisode>,
@@ -137,6 +138,7 @@ pub struct Source {
 
 /// 详情缓存最多留这么多条。
 const DETAIL_CACHE_MAX: usize = 128;
+const SEARCH_PAGE_SIZE: usize = 50;
 
 /// 弹幕正文是 XML 文本，`<` `>` `&` 都以实体出现。
 ///
@@ -221,13 +223,23 @@ impl Source {
         tid: Option<u32>,
         duration: Option<u32>,
     ) -> Result<Vec<Track>, BiliError> {
+        Ok(self.search_page(query, order, tid, duration).await?.tracks)
+    }
+
+    pub async fn search_page(
+        &self,
+        query: &SearchQuery,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+        duration: Option<u32>,
+    ) -> Result<bilimusic_model::SearchPage, BiliError> {
         let mut params = vec![
             ("search_type", "video".to_string()),
             ("keyword", query.keyword().to_string()),
             ("page", query.page().to_string()),
             // 接口上限就是 50（实测 50 条全带封面）。一次取满，
             // 列表深预取时少跑几轮往返。
-            ("page_size", "50".to_string()),
+            ("page_size", SEARCH_PAGE_SIZE.to_string()),
         ];
         if let Some(tid) = tid {
             params.push(("tids", tid.to_string()));
@@ -254,7 +266,11 @@ impl Source {
             bilimusic_model::SearchOrder::TotalRank => search::rank(query.keyword(), candidates),
             _ => search::dedupe(candidates),
         };
-        Ok(ordered.iter().map(search::to_track).collect())
+        Ok(bilimusic_model::SearchPage {
+            tracks: ordered.iter().map(search::to_track).collect(),
+            page: query.page(),
+            has_more: wire::search_has_more(&value["data"], query.page()),
+        })
     }
 
     /// 用 TrackKey 换回 cid 与 aid。TrackKey 只在这个 crate 里被解释。
@@ -1298,6 +1314,15 @@ mod wire {
         }
     }
 
+    pub fn search_has_more(data: &serde_json::Value, page: u32) -> bool {
+        if let Some(total_pages) = data["numPages"].as_u64() {
+            return u64::from(page) < total_pages;
+        }
+        let page_size = data["pagesize"].as_u64().filter(|n| *n > 0)
+            .unwrap_or(super::SEARCH_PAGE_SIZE as u64);
+        data["result"].as_array().is_some_and(|rows| rows.len() as u64 >= page_size)
+    }
+
     pub fn search_candidates(value: &serde_json::Value) -> Result<Vec<Candidate>, BiliError> {
         // 没有匹配时 B 站只给 numResults=0，不带 result 数组；这不是解析失败。
         let zero = value["data"]["numResults"].as_u64() == Some(0);
@@ -1341,34 +1366,36 @@ mod wire {
 ///
 /// 每集的标题/封面/时长/播放量都在 `arc` 里；`arc` 偶尔缺失，那就只给
 /// bvid 和标题，界面仍然能点进去。
-fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
-    let season = data.get("ugc_season")?;
-    let id = season["id"].as_u64()?;
-    let mut episodes = Vec::new();
-    for section in season["sections"].as_array().into_iter().flatten() {
-        for ep in section["episodes"].as_array().into_iter().flatten() {
-            let Some(bvid) = ep["bvid"].as_str().filter(|s| !s.is_empty()) else {
-                continue;
-            };
-            let arc = &ep["arc"];
-            episodes.push(SeasonEpisode {
-                bvid: bvid.to_string(),
-                title: search::strip_tags(ep["title"].as_str().unwrap_or("（无标题）")),
-                cover: norm_cover(arc["pic"].as_str().unwrap_or("")),
-                duration_ms: arc["duration"].as_u64().unwrap_or(0) * 1000,
-                views: arc["stat"]["view"].as_u64(),
-            });
+    fn season_of(data: &serde_json::Value) -> Option<SeasonRef> {
+        let season = data.get("ugc_season")?;
+        let id = season["id"].as_u64()?;
+        let mut episodes = Vec::new();
+        for section in season["sections"].as_array().into_iter().flatten() {
+            for ep in section["episodes"].as_array().into_iter().flatten() {
+                let Some(bvid) = ep["bvid"].as_str().filter(|s| !s.is_empty()) else {
+                    continue;
+                };
+                let arc = &ep["arc"];
+                episodes.push(SeasonEpisode {
+                    bvid: bvid.to_string(),
+                    title: search::strip_tags(ep["title"].as_str().unwrap_or("（无标题）")),
+                    cover: norm_cover(arc["pic"].as_str().unwrap_or("")),
+                    duration_ms: arc["duration"].as_u64().unwrap_or(0) * 1000,
+                    views: arc["stat"]["view"].as_u64(),
+                });
+            }
         }
+        let complete = season["ep_count"].as_u64() == Some(episodes.len() as u64);
+        let mut seen = std::collections::HashSet::new();
+        episodes.retain(|ep| seen.insert(ep.bvid.clone()));
+        let work_count = (complete && !episodes.is_empty()).then_some(episodes.len());
+        Some(SeasonRef {
+            id,
+            work_count,
+            title: search::strip_tags(season["title"].as_str().unwrap_or("合集")),
+            episodes,
+        })
     }
-    if episodes.is_empty() {
-        return None;
-    }
-    Some(SeasonRef {
-        id,
-        title: search::strip_tags(season["title"].as_str().unwrap_or("合集")),
-        episodes,
-    })
-}
 
     pub fn track_detail(
         value: &serde_json::Value,
@@ -1596,6 +1623,33 @@ mod tests {
         assert_eq!(c[0].duration, Some(Millis(317_000)));
         assert_eq!(c[0].cover.as_deref(), Some("https://i0.hdslb.com/x.jpg"));
         assert_eq!(c[0].typeid, 3);
+    }
+
+    #[test]
+    fn pagination_uses_source_pages_before_filtering_or_ranking() {
+        use serde_json::json;
+        let data = json!({ "numPages": 3, "result": [{"bvid": "BV1"}] });
+        assert!(wire::search_has_more(&data, 2));
+        assert!(!wire::search_has_more(&data, 3));
+        let data = json!({ "pagesize": 2, "result": [{"bvid": "BV1"}, {"bvid": "BV1"}] });
+        assert!(wire::search_has_more(&data, 1));
+        assert!(!wire::search_has_more(&json!({ "numResults": 0 }), 1));
+    }
+
+    #[test]
+    fn season_totals_require_a_complete_directory_and_count_distinct_works() {
+        let mut payload = serde_json::json!({ "data": { "aid": 1, "cid": 1, "ugc_season": {
+            "id": 7, "ep_count": 4, "sections": [{"episodes": [
+                {"bvid":"BV1"}, {"bvid":"BV1"}, {"bvid":"BV2"}
+            ]}]
+        }}});
+        let key = bilimusic_model::TrackKey::from_provider("BV1");
+        let read = |data: &serde_json::Value| wire::track_detail(data, &key).unwrap().season.unwrap();
+        assert_eq!(read(&payload).work_count, None);
+        payload["data"]["ugc_season"]["ep_count"] = 3.into();
+        let season = read(&payload);
+        assert_eq!(season.work_count, Some(2));
+        assert_eq!(season.episodes.len(), 2);
     }
 
     #[test]

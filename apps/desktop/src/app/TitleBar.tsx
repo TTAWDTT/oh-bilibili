@@ -201,13 +201,14 @@ export function TitleBar() {
   const [submitMenu, setSubmitMenu] = useState<Anchor | null>(null)
   const [siteMenu, setSiteMenu] = useState<Anchor | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const siteTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const sitePanelRef = useRef<HTMLDivElement | null>(null)
   const drag = useWindowDrag()
 
   // 搜索快捷键和左侧栏都会递增 nonce，这里跟着聚焦。
   useEffect(() => {
-    if (focusNonce > 0) inputRef.current?.focus()
+    if (focusNonce > 0) {
+      inputRef.current?.focus()
+      setFocused(true)
+    }
   }, [focusNonce])
 
   // 结果页换了搜索词（点历史、点分区、点作者）时，输入框跟着变
@@ -248,6 +249,7 @@ export function TitleBar() {
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
       anchorTop: rect.top,
+      trigger: button,
     })
   }
 
@@ -260,6 +262,7 @@ export function TitleBar() {
       left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
       anchorTop: rect.top,
+      trigger: button,
     })
   }
 
@@ -272,21 +275,9 @@ export function TitleBar() {
       left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
       top: rect.bottom + 8,
       anchorTop: rect.top,
+      trigger: button,
     })
   }
-
-  const closeSiteMenu = (restoreFocus: boolean): void => {
-    setSiteMenu(null)
-    if (restoreFocus) window.requestAnimationFrame(() => siteTriggerRef.current?.focus())
-  }
-
-  useEffect(() => {
-    if (!siteMenu) return
-    const timer = window.setTimeout(() => {
-      sitePanelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [siteMenu])
 
   const accountItem = (label: string, icon: IconName, run: () => void) => (
     <button
@@ -333,13 +324,12 @@ export function TitleBar() {
        */}
       {!viewing ? (
         <button
-          ref={siteTriggerRef}
           type="button"
           data-site-menu-trigger
-          onClick={(event) => openSiteMenu(event.currentTarget)}
+          onClick={(event) => siteMenu ? setSiteMenu(null) : openSiteMenu(event.currentTarget)}
           aria-label="哔哩哔哩网站"
           aria-expanded={siteMenu !== null}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           title="哔哩哔哩网站"
           className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] px-2 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
         >
@@ -356,12 +346,16 @@ export function TitleBar() {
           if (event.key === 'Escape') {
             event.preventDefault()
             event.stopPropagation()
+            inputRef.current?.focus({ preventScroll: true })
             setFocused(false)
-            inputRef.current?.blur()
-            // Esc 只收联想；结果页是独立页面，留在原处。
             return
           }
           if (event.key !== 'ArrowDown' || event.target !== inputRef.current) return
+          if (!focused) {
+            event.preventDefault()
+            setFocused(true)
+            return
+          }
           const first = event.currentTarget.querySelector<HTMLButtonElement>('[data-search-suggest-panel] button')
           if (!first) return
           event.preventDefault()
@@ -380,7 +374,11 @@ export function TitleBar() {
           <input
             ref={inputRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value)
+              setFocused(true)
+            }}
+            onClick={() => setFocused(true)}
             onFocus={() => setFocused(true)}
             placeholder="搜索视频、UP 主"
             aria-label="顶栏搜索"
@@ -473,9 +471,9 @@ export function TitleBar() {
             它是次级动作，和搜索一样在中性状态下不抢品牌色。 */}
         <button
           type="button"
-          onClick={(event) => openSubmit(event.currentTarget)}
+          onClick={(event) => submitMenu ? setSubmitMenu(null) : openSubmit(event.currentTarget)}
           aria-expanded={submitMenu !== null}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           className="bili-press hidden h-8 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] sm:flex"
         >
           <Icon name="plus" size={15} />
@@ -484,9 +482,10 @@ export function TitleBar() {
         {user ? (
           <button
             type="button"
-            onClick={(event) => openAccount(event.currentTarget)}
+            onClick={(event) => account ? setAccount(null) : openAccount(event.currentTarget)}
             title={user.uname}
             aria-label="账号菜单"
+            aria-haspopup="dialog"
             aria-expanded={account !== null}
             className="bili-press"
           >
@@ -504,21 +503,15 @@ export function TitleBar() {
       </div>
       <AnchoredPanel
         anchor={siteMenu}
-        onClose={() => closeSiteMenu(false)}
+        onClose={() => setSiteMenu(null)}
         label="哔哩哔哩网站"
         width={240}
       >
         <div
-          ref={sitePanelRef}
+          role="menu"
           data-site-menu
           className="py-1"
           onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              event.stopPropagation()
-              closeSiteMenu(true)
-              return
-            }
             if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
             const items = [
               ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
@@ -537,7 +530,7 @@ export function TitleBar() {
                 role="menuitem"
                 data-site-kind="bangumi"
                 onClick={() => {
-                  closeSiteMenu(false)
+                  setSiteMenu(null)
                   navigate({ kind: 'bangumi' })
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
@@ -550,7 +543,7 @@ export function TitleBar() {
                 role="menuitem"
                 data-site-kind="live"
                 onClick={() => {
-                  closeSiteMenu(false)
+                  setSiteMenu(null)
                   navigate({ kind: 'live' })
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
@@ -568,7 +561,7 @@ export function TitleBar() {
               role="menuitem"
               data-site-url={site.url}
               onClick={() => {
-                closeSiteMenu(false)
+                setSiteMenu(null)
                 void ipc.openExternal(site.url).catch((cause) => toastFailure(`打开${site.label}`, cause))
               }}
               className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"

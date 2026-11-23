@@ -208,7 +208,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
   }
 
   switch (command) {
-    case 'search_q': {
+    case 'search_q':
+    case 'search_page': {
       const raw = str(args, 'query').trim()
       // 预览用开关：关键词以「限流」开头时，第 2 页起报错，
       // 用来验证翻页失败后的「重试这一页」入口。
@@ -233,7 +234,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         const rightStarts = right.title.startsWith(query) ? 0 : 1
         return leftStarts - rightStarts
       })
-      return matched.slice((page - 1) * 8, page * 8)
+      const tracks = matched.slice((page - 1) * 8, page * 8)
+      return command === 'search_q' ? tracks : { tracks, page, has_more: page * 8 < matched.length }
     }
     case 'search_users': {
       const keyword = str(args, 'keyword').trim()
@@ -1024,6 +1026,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         season: {
           id: 1,
           title: '预览合集 · 精选现场',
+          work_count: 3,
           episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
             key: t.key,
             title: t.title,
@@ -1318,6 +1321,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return {
         id: 1,
         title: '预览合集 · 精选现场',
+          work_count: 3,
         episodes: [track, ...CATALOG.filter((t) => t.key !== track.key).slice(0, 2)].map((t) => ({
           key: t.key,
           title: t.title,

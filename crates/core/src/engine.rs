@@ -1338,13 +1338,24 @@ impl Engine {
         tid: Option<u32>,
         duration: Option<u32>,
     ) -> Result<Vec<Track>, WireError> {
+        Ok(self.search_page(query, page, order, tid, duration).await?.tracks)
+    }
+
+    pub async fn search_page(
+        &self,
+        query: &str,
+        page: u32,
+        order: bilimusic_model::SearchOrder,
+        tid: Option<u32>,
+        duration: Option<u32>,
+    ) -> Result<bilimusic_model::SearchPage, WireError> {
         let q = SearchQuery::parse(query, page)
             .map_err(|e| WireError::input("query", e.to_string()))?;
-        let tracks = self.source.search_scoped(&q, order, tid, duration).await?;
-        for t in &tracks {
-            self.remember(t);
+        let result = self.source.search_page(&q, order, tid, duration).await?;
+        for track in &result.tracks {
+            self.remember(track);
         }
-        Ok(tracks)
+        Ok(result)
     }
 
     #[allow(dead_code)]
@@ -4006,6 +4017,7 @@ fn season_view(
 ) -> Option<crate::wire::SeasonView> {
     let season = season?;
     Some(crate::wire::SeasonView {
+        work_count: season.work_count,
         id: season.id,
         title: season.title.clone(),
         episodes: season

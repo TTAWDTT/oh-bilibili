@@ -119,12 +119,6 @@ type AppStore = {
   rail: RailTab | null
   /** 每次 ⌘K 自增，搜索框据此主动抢焦点，不必把 ref 提到全局。 */
   searchFocus: number
-  /** 顶栏搜索框提交的关键词，搜索面板消费一次后清空。 */
-  heroQuery: string | null
-  /** 搜索面板是否展开。搜索是顶栏的一个面板，不是独立页面。 */
-  searchOpen: boolean
-  searchReturn: Track['key'] | null
-  searchFocusResult: Track['key'] | null
   /** 搜索面板当前实际搜索的词。顶栏输入框跟着它走，两边不会各说各话。 */
   currentQuery: string
   /** 搜索面板上次用的分区与排序，收起再打开要恢复。 */
@@ -168,10 +162,7 @@ type AppStore = {
   toggleRail: (tab: RailTab) => void
   closeRail: () => void
   focusSearch: () => void
-  setHeroQuery: (q: string | null) => void
-  closeSearch: () => void
-  clearSearchFocusResult: () => void
-  setCurrentQuery: (q: string) => void
+  setHeroQuery: (q: string) => void
   setSearchFilters: (partition: string, order: string, duration?: number) => void
   setAuthOpen: (open: boolean) => void
   setStage: (open: boolean) => void
@@ -200,10 +191,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
   rail: null,
   searchFocus: 0,
-  heroQuery: null,
-  searchOpen: false,
-  searchReturn: null,
-  searchFocusResult: null,
   currentQuery: '',
   currentPartition: '全部',
   currentOrder: 'totalrank',
@@ -220,14 +207,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set((state) => {
       // 同一个视图重复点不算一次前进，否则「返回」要按很多次才动。
       if (state.view.kind === view.kind && JSON.stringify(state.view) === JSON.stringify(view)) {
-        return { searchOpen: false }
+        return state
       }
       return {
         view,
         returnFocus: null,
         watchSource: view.kind === 'watch' ? state.view.kind : null,
-        searchOpen: false,
-        searchReturn: state.searchOpen && view.kind === 'watch' ? view.track.key : null,
         cinema: false,
         osFullscreen: false,
         history: [
@@ -238,14 +223,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
     }),
   replace: (view) =>
-    set((state) => ({
+    set({
       view,
+      returnFocus: null,
       dynamicReturn: undefined,
-      searchOpen: false,
-      searchReturn: view.kind === 'watch' ? state.searchReturn : null,
       cinema: false,
       osFullscreen: false,
-    })),
+    }),
   goBack: () =>
     set((state) => {
       const prev = state.history.at(-1)
@@ -253,21 +237,16 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         return {
           dynamicReturn: undefined,
           view: { kind: 'home' } as View,
-          searchOpen: false,
-          searchReturn: null,
           cinema: false,
           osFullscreen: false,
         }
       }
       return {
         view: prev.view,
+        currentQuery: prev.view.kind === 'search' ? prev.view.query : state.currentQuery,
         dynamicReturn: prev.dynamicReturn,
-        searchOpen: state.searchReturn !== null,
-        searchReturn: null,
-        searchFocusResult: state.searchReturn,
-        // 从搜索结果回来时由搜索面板自己接焦点；普通返回把焦点还给进来的那张卡。
         returnFocus:
-          state.searchReturn === null && prev.focusId
+          prev.focusId
             ? { kind: prev.view.kind, id: prev.focusId }
             : null,
         cinema: false,
@@ -279,18 +258,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ searchFocus: state.searchFocus + 1 })),
-  // null 只表示「这一条请求已被面板消费」，不该把面板重新打开。
   setHeroQuery: (q) => {
-    if (q === null) {
-      set({ heroQuery: null })
-      return
-    }
-    set({ heroQuery: q, currentQuery: q })
-    get().navigate({ kind: 'search', query: q })
+    set({ currentQuery: q })
+    const view = { kind: 'search', query: q } as const
+    if (get().view.kind === 'search') get().replace(view)
+    else get().navigate(view)
   },
-  closeSearch: () => set({ searchOpen: false, searchReturn: null }),
-  clearSearchFocusResult: () => set({ searchFocusResult: null }),
-  setCurrentQuery: (q) => set({ currentQuery: q }),
   setSearchFilters: (partition, order, duration = 0) =>
     set({ currentPartition: partition, currentOrder: order, currentDuration: duration }),
   setAuthOpen: (open) => set({ authOpen: open }),

@@ -145,7 +145,7 @@ function CurrentView({ view }: { view: View }) {
     case 'following':
       return <FollowingView />
     case 'search':
-      return <SearchPanel />
+      return <SearchPanel key={view.query} query={view.query} />
   }
 }
 
@@ -211,7 +211,7 @@ function FocusRestore() {
     const run = (): void => {
       if (stopped) return
       const app = useAppStore.getState()
-      if (app.searchOpen || app.view.kind !== focus.kind) return
+      if (app.view.kind !== focus.kind) return
       const target = find()
       if (!target) {
         // 目标一直不出现（窗口化未渲染、入口已不在）就放弃，不要永远轮询。

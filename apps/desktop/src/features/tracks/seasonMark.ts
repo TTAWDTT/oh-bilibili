@@ -12,7 +12,7 @@ export type SeasonMark = {
   id: number
   title: string
   /** 合集里的独立稿件数。同一 BV 的多个分 P 不重复计数。 */
-  count: number
+  count: number | null
 }
 
 const PREFIX = 'oh-bilibili:season-of:'
@@ -24,10 +24,10 @@ export function rememberSeason(season: SeasonView | null | undefined, currentKey
   // 或者当前这集被折叠在别的 section 里，漏掉它等于这张卡永远没有入口。
   if (currentKey && !keys.includes(currentKey)) keys.push(currentKey)
   if (keys.length === 0) return
-  const mark: SeasonMark = { id: season.id, title: season.title, count: keys.length }
+  const mark: SeasonMark = { id: season.id, title: season.title, count: season.work_count ?? null }
   try {
     for (const key of keys) {
-      localStorage.setItem(`${PREFIX}${key}`, JSON.stringify(mark))
+      localStorage.setItem(`${PREFIX}${key}`, JSON.stringify({ id: mark.id, title: mark.title, workCount: mark.count }))
     }
   } catch {
     // 隐私模式写不进去：只是少了书脊，不影响观看
@@ -39,9 +39,11 @@ export function readSeasonMark(key: string | undefined): SeasonMark | null {
   try {
     const raw = localStorage.getItem(`${PREFIX}${key}`)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<SeasonMark> | null
-    if (!parsed || typeof parsed.count !== 'number' || parsed.count < 1) return null
-    return { id: Number(parsed.id ?? 0), title: String(parsed.title ?? '合集'), count: parsed.count }
+    const parsed = JSON.parse(raw)
+    if (!Number.isSafeInteger(parsed?.id) || typeof parsed.title !== 'string') return null
+    // 旧版本的 count 来自已加载目录，不能证明合集总稿数。
+    const count = Number.isSafeInteger(parsed.workCount) && parsed.workCount > 0 ? parsed.workCount : null
+    return { id: parsed.id, title: parsed.title, count }
   } catch {
     return null
   }
@@ -50,5 +52,5 @@ export function readSeasonMark(key: string | undefined): SeasonMark | null {
 /** 书脊文案：有稿数写「合集 · N 稿」，只知道是合集才写「合集」。 */
 export function seasonLabel(mark: SeasonMark | null): string | null {
   if (!mark) return null
-  return mark.count > 0 ? `合集 · ${mark.count} 稿` : '合集'
+  return mark.count !== null && mark.count > 0 ? `合集 · ${mark.count} 稿` : '合集'
 }

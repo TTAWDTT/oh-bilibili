@@ -141,6 +141,7 @@ pub enum PlayMode {
 /// 观看页右栏的合集。字段与 TS 契约逐一对应。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SeasonView {
+    pub work_count: Option<usize>,
     pub id: u64,
     pub title: String,
     pub episodes: Vec<SeasonEpisodeView>,

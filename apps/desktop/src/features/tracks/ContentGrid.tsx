@@ -4,8 +4,7 @@ import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
 import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
-import { PageSpine } from './PageSpine'
-import { SeasonPeek, hasSeasonMark } from './SeasonPeek'
+import { TrackDirectory } from './TrackDirectory'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -121,8 +120,6 @@ type CardProps = {
   confirming: boolean
   extra: React.ReactNode
   onOpen: (track: Track) => void
-  /** 「所属合集」里点某一集：按 BV 打开，列表里没有这条时也要能进。 */
-  onOpenKey: (key: string) => void
   onAuthor: (track: Track) => void
   onPlay: (index: number) => void
   onCoin: (track: Track) => void
@@ -148,7 +145,6 @@ const TrackCard = memo(function TrackCard({
   confirming,
   extra,
   onOpen,
-  onOpenKey,
   onAuthor,
   onPlay,
   onCoin,
@@ -204,7 +200,6 @@ const TrackCard = memo(function TrackCard({
             </span>
           ) : null}
           <CardDanmaku trackKey={track.key} />
-          <PageSpine pages={track.pages} trackKey={track.key} />
           {/* B 站卡片左下角的信息：播放量与弹幕数并排（各带一枚图标），右下是时长。
               播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
           {ratio !== null && ratio > 0 && ratio < 1 ? (
@@ -249,13 +244,10 @@ const TrackCard = memo(function TrackCard({
           onLater={() => onLater(track)}
           extraAction={extra}
         />
-        {/* 本稿既有多个分 P、又确认属于某个合集时，给一条轻量的合集入口。
-            点开才请求一次合集目录；没有标记的卡不占位。 */}
-        {track.pages && track.pages >= 2 && hasSeasonMark(track.key) ? (
-          <SeasonPeek trackKey={track.key} title={track.title} onOpen={onOpenKey} />
-        ) : null}
+
       </div>
 
+      <TrackDirectory track={track} />
       <h3
         className={[
           'bili-card-title mt-2 line-clamp-2 min-h-[44px] text-[15px] font-medium leading-[22px]',
@@ -379,16 +371,6 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
     [navigate],
   )
 
-  const onOpenKey = useCallback(
-    (key: string) =>
-      navigate(
-        { kind: 'watch', track: { key, title: key, artist: '', duration_ms: null, cover: null } },
-        undefined,
-        `card:${key}`,
-      ),
-    [navigate],
-  )
-
   const onAuthor = useCallback(
     (track: Track) =>
       navigate(
@@ -466,7 +448,6 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
               confirming={confirming === track.key}
               extra={extraAction ? extraAction(track) : null}
               onOpen={onOpen}
-              onOpenKey={onOpenKey}
               onAuthor={onAuthor}
               onPlay={onPlay}
               onCoin={onCoin}

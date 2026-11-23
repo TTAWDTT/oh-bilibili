@@ -7,7 +7,7 @@ import { formatTime } from '../../shared/lib/format'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
-import { PageSpine } from '../tracks/PageSpine'
+import { TrackDirectory } from '../tracks/TrackDirectory'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -285,11 +285,10 @@ function WatchLaterRow({
       >
         <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
         {track.duration_ms ? (
-          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white/85">
+          <span className="num absolute bottom-1 right-1 rounded-[2px] bg-black/70 px-1 text-[10px] leading-4 text-white">
             {formatTime(track.duration_ms)}
           </span>
         ) : null}
-        <PageSpine pages={track.pages} trackKey={track.key} />
       </button>
 
       <div className="min-w-0 flex-1 py-0.5">
@@ -316,6 +315,7 @@ function WatchLaterRow({
             {track.artist}
           </button>
         </div>
+        <TrackDirectory track={track} />
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
           {track.duration_ms ? null : <span>时长未知</span>}
           {resume ? (

@@ -164,6 +164,13 @@ impl Default for Volume {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchPage {
+    pub tracks: Vec<Track>,
+    pub page: u32,
+    pub has_more: bool,
+}
+
 /// 搜索请求。校验在构造处完成，provider 拿到的一定是合法值。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchQuery {

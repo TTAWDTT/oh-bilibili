@@ -221,12 +221,13 @@ export function DanmakuBeats({
           onPointerDown={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
+          /* ui-audit-ok: 预览气泡固定深底，描边和时间都叠在这块底色上。 */
           className="absolute bottom-full z-40 mb-2 w-[272px] -translate-x-1/2 rounded-[6px] border border-white/15 bg-black/90 p-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-sm"
           style={{
             left: `${Math.min(88, Math.max(12, ((active ?? 0) + 0.5) * (100 / BUCKETS)))}%`,
           }}
         >
-          <div className="num text-[11px] text-white/55">
+          <div className="num text-[11px] text-slate-300">
             {formatTime(shown.start)} – {formatTime(shown.end)}
           </div>
           <div className="mt-1.5 flex flex-col gap-1">
