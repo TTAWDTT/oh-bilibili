@@ -319,9 +319,8 @@ function WatchLaterRow({
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
           {track.duration_ms ? null : <span>时长未知</span>}
           {resume ? (
-            <span className="num">
-              {resume.page > 1 ? `P${resume.page} · ` : ''}从 {formatTime(resume.at)} 继续
-            </span>
+            // 分 P 号已经在封面书脊上，这里只留时间，避免同一行说两遍。
+            <span className="num">从 {formatTime(resume.at)} 继续</span>
           ) : null}
         </div>
       </div>
