@@ -175,7 +175,7 @@ pub struct FavFolder {
 pub struct AuthorCard {
     pub name: String,
     pub face: String,
-    pub fans: u64,
+    pub fans: Option<u64>,
     pub sign: String,
     pub official: Option<String>,
     /// 认证类型：0 个人、1 机构；None 未认证。徽章颜色靠它区分。
@@ -185,9 +185,9 @@ pub struct AuthorCard {
     /// 大会员（`card.vip.vipStatus == 1`）。
     pub vip: bool,
     /// 投稿总数。
-    pub videos: u64,
+    pub videos: Option<u64>,
     /// 累计获赞。
-    pub likes: u64,
+    pub likes: Option<u64>,
 }
 
 /// 每周必看的一期。
@@ -428,7 +428,7 @@ impl Client {
                 .as_str()
                 .map(|f| f.replacen("http://", "https://", 1))
                 .unwrap_or_default(),
-            fans: v["data"]["follower"].as_u64().unwrap_or(0),
+            fans: v["data"]["follower"].as_u64(),
             sign: card["sign"].as_str().unwrap_or_default().to_string(),
             official: card["Official"]["title"]
                 .as_str()
@@ -441,8 +441,8 @@ impl Client {
             // 等级就在 card 里，不需要另调 acc/info（那条会被限流成 -799）。
             level: card["level_info"]["current_level"].as_u64().unwrap_or(0) as u8,
             vip: card["vip"]["vipStatus"].as_u64() == Some(1),
-            videos: v["data"]["archive_count"].as_u64().unwrap_or(0),
-            likes: v["data"]["like_num"].as_u64().unwrap_or(0),
+            videos: v["data"]["archive_count"].as_u64(),
+            likes: v["data"]["like_num"].as_u64(),
         })
     }
 

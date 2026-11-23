@@ -464,6 +464,8 @@ function CommentRow({
                 onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
                 onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
                 onMouseLeave={onAuthorHide}
+                onFocus={(event) => onAuthorHover?.(c, event.currentTarget)}
+                onBlur={onAuthorHide}
                 title={`看 ${c.author} 的空间`}
                 className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
               >
@@ -745,6 +747,8 @@ function DialogRow({
               onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
               onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
               onMouseLeave={onAuthorHide}
+              onFocus={(event) => onAuthorHover?.(c, event.currentTarget)}
+              onBlur={onAuthorHide}
               title={`看 ${c.author} 的空间`}
               className="t min-w-0 truncate text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
             >

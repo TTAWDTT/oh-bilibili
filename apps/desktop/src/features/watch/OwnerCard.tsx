@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react'
+import type { FocusEvent, MouseEvent } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import * as ipc from '../../shared/lib/ipc'
@@ -50,6 +50,8 @@ export function OwnerCard({
         onMouseEnter: (event: MouseEvent<HTMLButtonElement>) =>
           hover.show(ownerUser, event.currentTarget),
         onMouseLeave: hover.hide,
+        onFocus: (event: FocusEvent<HTMLButtonElement>) => hover.show(ownerUser, event.currentTarget),
+        onBlur: hover.hide,
       }
     : {}
   const hoverCard = (
@@ -98,7 +100,7 @@ export function OwnerCard({
             ) : null}
           </div>
           {/* 粉丝数是这一行里最有用的一格信息：B 站在名字右侧挂「N 粉丝」。 */}
-          {card ? (
+          {card?.fans != null ? (
             <p className="num mt-0.5 text-[12px] text-[var(--text-3)]">
               {formatCount(Math.max(0, card.fans + (fansDelta ?? 0)))} 粉丝
             </p>
@@ -184,7 +186,7 @@ export function OwnerCard({
       </div>
       {/* 粉丝数跟关注按钮分开：关注后按钮换成「已关注」，粉丝数不该跟着消失。 */}
       <div className="flex items-center gap-2">
-        {card ? (
+        {card?.fans != null ? (
           <span className="num text-[12px] text-[var(--text-3)]">
             {formatCount(Math.max(0, card.fans + (fansDelta ?? 0)))} 粉丝
           </span>

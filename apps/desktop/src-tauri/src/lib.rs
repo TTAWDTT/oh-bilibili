@@ -679,14 +679,14 @@ async fn coin_set(
 struct AuthorCardView {
     name: String,
     face: String,
-    fans: u64,
+    fans: Option<u64>,
     sign: String,
     official: Option<String>,
     official_type: Option<i8>,
     level: u8,
     vip: bool,
-    videos: u64,
-    likes: u64,
+    videos: Option<u64>,
+    likes: Option<u64>,
 }
 
 #[tauri::command(rename_all = "snake_case")]

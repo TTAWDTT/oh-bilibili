@@ -217,7 +217,7 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
 export type AuthorCard = {
   name: string
   face: string
-  fans: number
+  fans: number | null
   sign: string
   official: string | null
   /** 0 个人、1 机构；null 未认证。 */
@@ -225,8 +225,8 @@ export type AuthorCard = {
   level: number
   /** 大会员。 */
   vip?: boolean
-  videos: number
-  likes: number
+  videos: number | null
+  likes: number | null
 }
 
 /** UP 主名片：粉丝数、签名、认证。 */
