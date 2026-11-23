@@ -923,6 +923,8 @@ export function CommentsPanel({
   flow = false,
   pages = [],
   onSeek,
+  note = null,
+  onNote,
 }: {
   trackKey: string
   ownerMid?: number | null
@@ -931,6 +933,9 @@ export function CommentsPanel({
   pages?: { no: number; duration_ms: number }[]
   /** 播放器给的就地定位；带分 P 时会先切 P。 */
   onSeek?: SeekTime
+  /** 当前正在读的笔记。宽窗由播放器右栏渲染，这里只负责产生与回原楼。 */
+  note?: CommentNote | null
+  onNote?: (note: CommentNote | null) => void
 }) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
   const [hot, setHot] = useState(loadCommentHot)
@@ -949,8 +954,10 @@ export function CommentsPanel({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; root: string; author: string } | null>(null)
-  /** 「边看边读」当前整理的是哪条评论。 */
-  const [noteReading, setNoteReading] = useState<CommentNote | null>(null)
+  /** 「边看边读」当前整理的是哪条评论。宽窗由右栏接管，这里只在行内用。 */
+  const [noteLocal, setNoteLocal] = useState<CommentNote | null>(null)
+  const noteReading = onNote ? note : noteLocal
+  const setNoteReading = onNote ?? setNoteLocal
   /** 当前打开的对话分支：一级评论 + 分支里的二级评论。 */
   const [dialog, setDialog] = useState<{ root: string; anchor: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
@@ -1484,8 +1491,9 @@ export function CommentsPanel({
             </button>
           </div>
         ) : null}
+        {/* 宽窗由播放器右栏渲染同一份笔记，这里只留窄窗的行内副本。 */}
         {noteReading ? (
-          <div className="mb-3 max-w-[880px] rounded-[6px] bg-[var(--panel-alt)]">
+          <div className="mb-3 max-w-[880px] rounded-[6px] bg-[var(--panel-alt)] xl:hidden">
             <NoteReader
               note={noteReading}
               pages={pages}
