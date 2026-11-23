@@ -5,6 +5,7 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
+import { findCommentTimes } from './commentTime'
 import { formatCount, formatRelative } from '../../shared/lib/format'
 import { COMMENT_PREFETCH_PX } from '../../shared/lib/prefetch'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -15,6 +16,9 @@ import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
 import { clearRecentEmote, readRecentEmote, type RecentEmote, writeRecentEmote } from './recentEmote'
+
+/** 评论里的时间点：`page` 为空表示评论没写明分 P，按当前 P 跳。 */
+type SeekTime = (ms: number, page?: number) => void
 
 /** 对话页大小，与后端 `reply/dialog/cursor` 的 `size` 参数一致。 */
 const DIALOG_PAGE_SIZE = 20
@@ -67,7 +71,7 @@ function mentionNodes(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
-  onSeek?: ((ms: number) => void) | undefined,
+  onSeek?: SeekTime | undefined,
 ): ReactNode[] {
   // URL 整段保留，@ 只在非 URL 段落里找，避免把链接路径里的 @ 拆开。
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
@@ -104,7 +108,7 @@ function mentionLinks(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
-  onSeek?: ((ms: number) => void) | undefined,
+  onSeek?: SeekTime | undefined,
 ): ReactNode[] {
   const names = [...mentions]
     .sort((a, b) => b[0].length - a[0].length)
@@ -139,46 +143,32 @@ function mentionLinks(
   return nodes
 }
 
-/** `01:23` / `1:02:03` 转毫秒。评论里的时间戳和简介一样可以点着跳。 */
-function timestampMs(token: string): number | null {
-  const parts = token.replace(/：/g, ':').split(':').map(Number)
-  if (parts.some((n) => Number.isNaN(n))) return null
-  if (parts.length === 2) return ((parts[0] ?? 0) * 60 + (parts[1] ?? 0)) * 1000
-  if (parts.length === 3) {
-    return ((parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)) * 1000
-  }
-  return null
-}
-
 function timestampLinks(
   text: string,
-  onSeek: ((ms: number) => void) | undefined,
+  onSeek: SeekTime | undefined,
   keyBase: number,
 ): ReactNode[] {
   if (!onSeek) return [text]
   const nodes: ReactNode[] = []
-  const pattern = /\b((?:\d{1,2}[:：])?[0-5]?\d[:：][0-5]\d)\b/g
   let last = 0
-  for (const match of text.matchAll(pattern)) {
-    const token = match[1] ?? ''
-    const at = match.index ?? 0
-    if (at > last) nodes.push(text.slice(last, at))
-    const ms = timestampMs(token)
-    if (ms === null) {
-      nodes.push(token)
+  for (const anchor of findCommentTimes(text, 999)) {
+    if (anchor.start > last) nodes.push(text.slice(last, anchor.start))
+    const label = text.slice(anchor.start, anchor.end)
+    if (anchor.invalid) {
+      nodes.push(label)
     } else {
       nodes.push(
         <button
-          key={`${keyBase}-${at}`}
+          key={`${keyBase}-${anchor.start}`}
           type="button"
-          onClick={() => onSeek(ms)}
+          onClick={() => onSeek(anchor.ms, anchor.page ?? undefined)}
           className="t text-[var(--accent)] hover:underline"
         >
-          {token}
+          {label}
         </button>,
       )
     }
-    last = at + token.length
+    last = anchor.end
   }
   if (last < text.length) nodes.push(text.slice(last))
   return nodes
@@ -194,7 +184,7 @@ function CommentText({
   text: string
   emotes: [string, string][]
   mentions: [string, number][]
-  onSeek?: ((ms: number) => void) | undefined
+  onSeek?: SeekTime | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   if (emotes.length === 0 && mentions.length === 0) {
@@ -314,7 +304,7 @@ function CommentRow({
   replyComposerFor?: ((c: Comment) => ReactNode) | undefined
   onDialog?: ((c: Comment) => void) | undefined
   onPhoto?: ((pictures: string[], index: number) => void) | undefined
-  onSeek?: ((ms: number) => void) | undefined
+  onSeek?: SeekTime | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
 }) {
@@ -713,7 +703,7 @@ function DialogRow({
   c: Comment
   ownerMid: number | null
   onPhoto?: ((pictures: string[], index: number) => void) | undefined
-  onSeek?: ((ms: number) => void) | undefined
+  onSeek?: SeekTime | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
 }) {
@@ -812,7 +802,7 @@ function DialogModal({
   anchor: string
   onClose: () => void
   onPhoto?: ((pictures: string[], index: number) => void) | undefined
-  onSeek?: ((ms: number) => void) | undefined
+  onSeek?: SeekTime | undefined
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
 }) {
@@ -908,10 +898,13 @@ export function CommentsPanel({
   trackKey,
   ownerMid = null,
   flow = false,
+  onSeek,
 }: {
   trackKey: string
   ownerMid?: number | null
   flow?: boolean
+  /** 播放器给的就地定位；带分 P 时会先切 P。 */
+  onSeek?: SeekTime
 }) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
   const [hot, setHot] = useState(loadCommentHot)
@@ -1241,7 +1234,11 @@ export function CommentsPanel({
     }
   }
 
-  const seekToTime = (ms: number): void => {
+  const seekToTime = (ms: number, page?: number): void => {
+    if (onSeek) {
+      onSeek(ms, page)
+      return
+    }
     void ipc.playerSeek(ms).catch(() => {})
   }
 
