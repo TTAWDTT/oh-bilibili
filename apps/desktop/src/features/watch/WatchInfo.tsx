@@ -218,8 +218,9 @@ export function WatchInfo({
   const descRef = useRef<HTMLParagraphElement | null>(null)
   const sources = parseSources(data.desc, data.key)
 
+  // 换了稿件才重置；从出处返回同一稿时沿用这次会话里记下的展开状态。
   useEffect(() => {
-    setDescOpen(false)
+    setDescOpen(descOpenMemory.get(track.key) ?? false)
   }, [track.key])
 
   useEffect(() => {
