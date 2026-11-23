@@ -552,7 +552,11 @@ export function DynamicView() {
   const dynamicReturn = useAppStore((state) => state.dynamicReturn)
   const [returnPosition, setReturnPosition] = useState(dynamicReturn)
   const loadedPages = useRef(0)
+  /** 已加载批数同时留一份 state：筛选态末尾的说明要跟着它更新。 */
+  const [pageCount, setPageCount] = useState(0)
   const [following, setFollowing] = useState<Followed[] | null>(null)
+  /** 点头像在这一页筛该作者；null 表示全部关注。 */
+  const [author, setAuthor] = useState<number | null>(returnPosition?.author ?? null)
   const authorHover = useAuthorHover()
   const [items, setItems] = useState<ipc.DynamicItem[]>([])
   const [tab, setTab] = useState<DynamicTab>(dynamicReturn?.tab ?? 'all')
@@ -566,12 +570,15 @@ export function DynamicView() {
   const prefetchPages = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const expandedBodies = returnPosition?.expandedBodies ?? []
-  const visible =
+  const byTab =
     tab === 'all'
       ? items
       : items.filter(
           (item) => item.kind === tab || (tab === 'opus' && item.kind === 'article'),
         )
+  const visible = author === null ? byTab : byTab.filter((item) => item.mid === author)
+  const pickedName = author === null ? null : (following?.find((u) => u.mid === author)?.name ?? null)
+  const tabLabel = TABS.find((entry) => entry.key === tab)?.label ?? ''
 
   const load = useCallback(async (next: string | null, append: boolean): Promise<void> => {
     if (pending.current) return
@@ -582,6 +589,7 @@ export function DynamicView() {
     try {
       const page = await ipc.dynamicFeed(next)
       loadedPages.current = append ? loadedPages.current + 1 : 1
+      setPageCount(loadedPages.current)
       setItems((prev) => {
         if (!append) return page.items
         const seen = new Set(prev.map((item) => item.id))
@@ -638,6 +646,7 @@ export function DynamicView() {
     const position: DynamicReturn | undefined = scroller
       ? {
           tab,
+          author,
           itemIds: visible.map((entry) => entry.id),
           index,
           expandedBodies: Array.from(
@@ -759,16 +768,37 @@ export function DynamicView() {
       </header>
       {following?.length ? (
         <div className={`${FEED} pt-4`}>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[12.5px] text-[var(--text-3)]">关注的人</h3>
-            <button
-              type="button"
-              onClick={() => navigate({ kind: 'following' })}
-              className="t flex items-center gap-1 text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
-            >
-              全部关注
-              <Icon name="chevronRight" size={12} />
-            </button>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--text-3)]">
+              <span className="shrink-0">关注的人</span>
+              {pickedName ? (
+                <span data-dynamic-author-filter className="min-w-0 truncate text-[var(--accent)]">
+                  只看 {pickedName}
+                </span>
+              ) : null}
+            </h3>
+            <div className="flex shrink-0 items-center gap-3">
+              {pickedName ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReturnPosition(undefined)
+                    setAuthor(null)
+                  }}
+                  className="t text-[12.5px] text-[var(--accent)] hover:underline"
+                >
+                  显示全部
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => navigate({ kind: 'following' })}
+                className="t flex items-center gap-1 text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
+              >
+                全部关注
+                <Icon name="chevronRight" size={12} />
+              </button>
+            </div>
           </div>
           <div
             onScroll={authorHover.hide}
@@ -778,17 +808,26 @@ export function DynamicView() {
               <button
                 key={user.mid}
                 type="button"
+                aria-pressed={author === user.mid}
                 onClick={() => {
                   authorHover.hide()
-                  navigate({ kind: 'author', name: user.name, mid: user.mid })
+                  setReturnPosition(undefined)
+                  setAuthor((current) => (current === user.mid ? null : user.mid))
+                  scrollerRef.current?.scrollTo({ top: 0 })
                 }}
                 onPointerEnter={(event) => authorHover.show(user, event.currentTarget)}
                 onPointerLeave={authorHover.hide}
                 onFocus={(event) => authorHover.show(user, event.currentTarget)}
                 onBlur={authorHover.hide}
-                className="t press w-[64px] shrink-0 text-center"
+                className={`t press w-[64px] shrink-0 rounded-[6px] text-center ${
+                  author === user.mid ? 'text-[var(--accent)]' : ''
+                }`}
               >
-                <span className="relative inline-flex">
+                <span
+                  className={`relative inline-flex rounded-full ${
+                    author === user.mid ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--panel)]' : ''
+                  }`}
+                >
                   <Avatar src={user.face} alt={user.name} size={48} />
                   {user.special ? (
                     <span
@@ -799,7 +838,11 @@ export function DynamicView() {
                     </span>
                   ) : null}
                 </span>
-                <span className="mt-1.5 block truncate text-[12px] leading-[16px] text-[var(--text-2)]">
+                <span
+                  className={`mt-1.5 block truncate text-[12px] leading-[16px] ${
+                    author === user.mid ? 'font-medium text-[var(--accent)]' : 'text-[var(--text-2)]'
+                  }`}
+                >
                   {user.name}
                 </span>
               </button>
@@ -856,9 +899,40 @@ export function DynamicView() {
             }}
           />
         ))}
+        {/* 筛了作者时列表可能只是这一批里没有他：正文先给出范围说明，
+            不在这里等「滑到底」才出现文字，否则整页看起来是空的。 */}
+        {visible.length === 0 && items.length > 0 && !loading && error === null && hasMore && author !== null && pickedName !== null ? (
+          <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
+            已加载的动态里还没有 {pickedName} 在{tabLabel}下的更新
+            <button
+              type="button"
+              onClick={() => {
+                setReturnPosition(undefined)
+                setAuthor(null)
+              }}
+              className="t ml-2 text-[var(--accent)] hover:underline"
+            >
+              看全部关注
+            </button>
+          </p>
+        ) : null}
         {visible.length === 0 && items.length > 0 && !loading && !hasMore && !error ? (
           <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
-            这个分类还没有动态
+            {author === null || pickedName === null
+              ? '这个分类还没有动态'
+              : `已加载的动态里没有 ${pickedName} 在${tabLabel}下的更新`}
+            {author !== null && pickedName !== null ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setReturnPosition(undefined)
+                  setAuthor(null)
+                }}
+                className="t ml-2 text-[var(--accent)] hover:underline"
+              >
+                看全部关注
+              </button>
+            ) : null}
           </p>
         ) : null}
         {error && items.length > 0 ? (
@@ -874,7 +948,11 @@ export function DynamicView() {
         ) : loading ? (
           <BiliLoader compact label="正在加载动态…" />
         ) : hasMore ? null : (
-          <p className="py-6 text-center text-[12px] text-[var(--text-3)]">没有更多了</p>
+          <p className="py-6 text-center text-[12px] text-[var(--text-3)]">
+            {author === null || pickedName === null
+              ? '没有更多了'
+              : `已加载 ${pageCount} 批动态，${pickedName} 的更新看完了`}
+          </p>
         )}
       </div>
     </div>
