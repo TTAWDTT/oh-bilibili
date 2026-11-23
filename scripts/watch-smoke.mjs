@@ -532,6 +532,10 @@ async function checkStageLyrics(page) {
       `!!document.querySelector('[data-stage-lyrics] button[data-current]')`,
     )
   }
+  check(
+    '在线曲目的听歌舞台可以直接看当前视频',
+    await page.evaluate(`[...document.querySelectorAll('.stage button')].some(button => button.textContent.trim() === '看视频')`),
+  )
   const openedFocus = await page.evaluate(`(() => ({
     label: document.activeElement?.getAttribute('aria-label'),
     inside: !!document.querySelector('.stage')?.contains(document.activeElement),
