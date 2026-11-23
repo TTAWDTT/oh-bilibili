@@ -144,20 +144,27 @@ export function AuthorHoverCard({
       <div className="flex items-start gap-2.5">
         <Avatar src={hover.user.face} alt={hover.user.name} size={48} />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-[15px] font-medium text-[var(--text-1)]">
+          {/* 首行只放昵称与认证：长中文名允许两行，不能被等级和会员先挤掉。
+              等级、会员这些身份留到粉丝那一组旁边，空间不足时才换行。 */}
+          <div className="flex min-w-0 items-start gap-1.5">
+            <span
+              className="line-clamp-2 min-w-0 break-words text-[15px] font-medium leading-[21px] text-[var(--text-1)]"
+              title={hover.user.name}
+            >
               {hover.user.name}
             </span>
-            {card ? <LevelBadge level={card.level} /> : null}
             {hover.user.official != null ? (
               <span
                 title={hover.user.official === 1 ? '机构认证' : '个人认证'}
-                className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-white"
+                className="mt-[3px] flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-white"
                 style={{ background: hover.user.official === 1 ? 'var(--accent)' : '#ffb027' }}
               >
                 <Icon name="check" size={9} />
               </span>
             ) : null}
+          </div>
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
+            {card ? <LevelBadge level={card.level} /> : null}
             {hover.user.vip ? (
               <span className="shrink-0 rounded-[2px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1 text-[10px] leading-[15px] text-[var(--accent)]">
                 大会员
