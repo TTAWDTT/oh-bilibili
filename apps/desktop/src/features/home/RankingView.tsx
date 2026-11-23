@@ -183,19 +183,18 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const restorePending = useRef(false)
+  const restoreTop = useRef(0)
   const snapshot = usePlayerStore((state) => state.snapshot)
 
   useEffect(() => {
     let cancelled = false
     // 换分区就是换一份榜；同一分区从视频返回则回到原来的名次附近。
-    const box = scrollRef.current
-    const same = rankMemory.rid === rid
-    if (!same) rankMemory.top = 0
-    if (box) box.scrollTop = same ? rankMemory.top : 0
-    rankMemory.rid = rid
-    // 列表还没回来时容器只有 loader，先记下，等这一份榜渲染出来再落位。
-    restorePending.current = same && rankMemory.top > 0
+    if (rankMemory.rid !== rid) {
+      rankMemory.rid = rid
+      rankMemory.top = 0
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    }
+    restoreTop.current = rankMemory.top
     setTracks(null)
     setError(null)
     void ipc
@@ -212,9 +211,9 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
   }, [rid, nonce])
 
   useLayoutEffect(() => {
-    if (!restorePending.current || tracks === null) return
-    restorePending.current = false
-    if (scrollRef.current) scrollRef.current.scrollTop = rankMemory.top
+    if (tracks !== null && scrollRef.current) {
+      scrollRef.current.scrollTop = restoreTop.current
+    }
   }, [tracks])
 
   return (
@@ -222,8 +221,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
       ref={scrollRef}
       id="scroll-main"
       onScroll={(event) => {
-        rankMemory.rid = rid
-        rankMemory.top = event.currentTarget.scrollTop
+        if (tracks !== null) rankMemory.top = event.currentTarget.scrollTop
       }}
       className="min-h-0 flex-1 overflow-y-auto pb-10"
     >

@@ -1863,7 +1863,9 @@ async function checkNavConventions(page) {
 /** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
 async function checkRanking(page) {
   await page.viewport(1440, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  const url = new URL(WEB)
+  url.searchParams.set('slowRanking', '1')
+  await page.evaluate(`location.href = ${JSON.stringify(url.href)}`)
   await sleep(4000)
   await page.evaluate(`(() => {
     const nav = document.querySelector('nav[aria-label="主导航"]')
@@ -1871,11 +1873,14 @@ async function checkRanking(page) {
     hit?.focus()
     hit?.click()
   })()`)
-  let ready = false
-  for (let i = 0; i < 30 && !ready; i += 1) {
-    await sleep(300)
-    ready = await page.evaluate(`document.querySelectorAll('[data-rank-row]').length >= 9`)
+  const waitForRows = async () => {
+    for (let i = 0; i < 30; i += 1) {
+      if (await page.evaluate(`document.querySelectorAll('[data-rank-row]').length >= 9`)) return true
+      await sleep(300)
+    }
+    return false
   }
+  const ready = await waitForRows()
   const wide = await page.evaluate(`(() => {
     const rows = [...document.querySelectorAll('[data-rank-row]')]
     const lefts = rows.slice(0, 9).map((row) => Math.round(row.getBoundingClientRect().left))
@@ -1959,15 +1964,15 @@ async function checkRanking(page) {
     watching = await page.evaluate(`!!document.querySelector('video')`)
   }
   await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
-  await sleep(1500)
+  await waitForRows()
   const back = await page.evaluate(`(() => {
     const box = document.getElementById('scroll-main')
     const part = document.querySelector('#scroll-main [aria-pressed="true"]')?.textContent?.trim() ?? ''
     return { top: box ? Math.round(box.scrollTop) : null, part, rows: document.querySelectorAll('[data-rank-row]').length }
   })()`)
   check(
-    '从视频返回仍在该分区和原来的名次附近',
-    watching && back.rows >= 9 && back.part === '全站' && back.top !== null && back.top >= 320,
+    `从视频返回仍在该分区和原来的名次附近（400 → ${back.top}，${back.part}）`,
+    watching && back.rows >= 9 && back.part === '全站' && back.top === 400,
   )
 
   await page.viewport(380, 820)
