@@ -36,6 +36,9 @@ type SearchMemory = {
   lastRenderedIndex: number
 }
 
+/** B 站搜索接口一次最多给 50 条；不足这个数就是一页到底。 */
+const SEARCH_PAGE_SIZE = 50
+
 /** 搜索结果按查询条件缓存：从视频页返回时不该重新搜一遍，也不该跳回顶部。 */
 let searchMemory: SearchMemory | null = null
 
@@ -289,8 +292,11 @@ export function SearchPanel() {
         .then((next) => {
           if (seq.current !== ticket) return
           if (page === 1) pushHistory(trimmed)
-          reachedEnd.current = next.length === 0
-          setEnded(next.length === 0)
+          // 不足一整页就已经到底：只有 1 条结果时不该再去要第 2 页，
+          // 否则那一次请求失败会在结果下面留一个假的「重试这一页」。
+          const done = next.length < SEARCH_PAGE_SIZE
+          reachedEnd.current = done
+          setEnded(done)
           setTracks((prev) => (page === 1 ? next : [...prev, ...next]))
           setDataKey(searchKey(trimmed, partition, order, duration))
           setStatus('ready')
