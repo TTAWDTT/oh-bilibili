@@ -792,6 +792,7 @@ fn row_to_track(row: &rusqlite::Row<'_>) -> rusqlite::Result<Track> {
         up_mid: row.get::<_, Option<i64>>(6)?.map(|v| v as u64),
         tname: None,
         typeid: None,
+        pages: None,
     })
 }
 
@@ -990,6 +991,7 @@ mod tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         }
     }
 

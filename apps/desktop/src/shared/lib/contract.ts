@@ -12,6 +12,8 @@ export type Track = {
   up_mid?: number | null
   tname?: string | null
   typeid?: number | null
+  /** 本稿分 P 数；列表接口能直接给的才有，拿不到就不显示。 */
+  pages?: number | null
 }
 
 export type PlayerPhase = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'faulted'

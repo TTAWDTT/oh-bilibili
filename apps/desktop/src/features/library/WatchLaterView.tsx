@@ -7,6 +7,7 @@ import { formatTime } from '../../shared/lib/format'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Cover } from '../../shared/ui/Cover'
+import { PageSpine } from '../tracks/PageSpine'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -284,6 +285,7 @@ function WatchLaterRow({
             {formatTime(track.duration_ms)}
           </span>
         ) : null}
+        <PageSpine pages={track.pages} trackKey={track.key} />
       </button>
 
       <div className="min-w-0 flex-1 py-0.5">

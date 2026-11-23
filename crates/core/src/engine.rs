@@ -138,6 +138,7 @@ mod download_restore_tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         }
     }
 
@@ -846,6 +847,7 @@ mod queue_restore_tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         }
     }
 
@@ -3802,6 +3804,7 @@ mod sync_state_tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         }
     }
 
@@ -4154,6 +4157,7 @@ mod offline_boot_tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         };
         engine.remember(&track);
         engine.add_to_playlist(playlist.id, &track.key).expect("加入歌单");

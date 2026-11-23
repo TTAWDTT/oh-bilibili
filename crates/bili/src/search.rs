@@ -217,6 +217,7 @@ pub fn to_track(c: &Candidate) -> bilimusic_model::Track {
         up_mid: c.up_mid,
         tname: partition_name(c.typeid).map(|n| n.to_string()),
         typeid: Some(c.typeid),
+        pages: None,
     }
 }
 

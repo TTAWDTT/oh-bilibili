@@ -4,6 +4,7 @@ import { FavPicker } from '../library/FavPicker'
 import { useReactionStore } from '../reactions/reactionStore'
 import { CardActions } from './CardActions'
 import { CardDanmaku } from './CardDanmaku'
+import { PageSpine } from './PageSpine'
 import { reportActionError } from '../../shared/lib/actionError'
 import type React from 'react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -199,6 +200,7 @@ const TrackCard = memo(function TrackCard({
             </span>
           ) : null}
           <CardDanmaku trackKey={track.key} />
+          <PageSpine pages={track.pages} trackKey={track.key} />
           {/* B 站卡片左下角的信息：播放量与弹幕数并排（各带一枚图标），右下是时长。
               播放量放封面上、正文行只留 UP 主，信息层级和网页端一致。 */}
           {ratio !== null && ratio > 0 && ratio < 1 ? (

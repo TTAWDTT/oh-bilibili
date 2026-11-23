@@ -510,6 +510,7 @@ mod tests {
             up_mid: None,
             tname: None,
             typeid: None,
+            pages: None,
         }
     }
 

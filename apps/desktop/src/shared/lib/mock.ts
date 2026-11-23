@@ -353,7 +353,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 预览里分区内容也换标题，能看出范围真的切换了。
       const rid = num(args, 'rid')
       return CATALOG.slice(0, 12).map((track, index) =>
-        index === 0 ? { ...track, title: `${track.title} · 分区 ${rid} 最新` } : track,
+        index === 0
+          ? { ...track, title: `${track.title} · 分区 ${rid} 最新`, pages: 8 }
+          : track,
       )
     }
     case 'live_rooms': {
@@ -546,7 +548,13 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         return Array.from({ length: Math.max(0, Math.min(size, total - start)) }, (_, i) => {
           const n = start + i
           const base = CATALOG[n % CATALOG.length]!
-          const track = { ...base, key: `${base.key}-fav${n}`, title: `${base.title} · 收藏 ${n + 1}` }
+          const track = {
+            ...base,
+            key: `${base.key}-fav${n}`,
+            title: `${base.title} · 收藏 ${n + 1}`,
+            // 每五条给一个多 P 稿，用来验封面右缘的书脊。
+            ...(n % 5 === 0 ? { pages: 8 } : {}),
+          }
           registerTrack(track)
           return track
         })
@@ -1370,7 +1378,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'space_stat':
       return [36, 1_240_000]
     case 'watch_later_list':
-      return CATALOG.slice(0, 9)
+      return CATALOG.slice(0, 9).map((track, index) =>
+        index === 0 ? { ...track, pages: 8 } : track,
+      )
     case 'danmaku_send':
       return null
     case 'danmaku_colored': {

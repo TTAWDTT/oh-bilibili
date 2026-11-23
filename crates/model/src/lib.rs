@@ -133,6 +133,9 @@ pub struct Track {
     /// 分区 id，界面拿它做分区筛选。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typeid: Option<u32>,
+    /// 本稿分 P 数。列表接口能直接给的才填，拿不到就不猜。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pages: Option<u32>,
 }
 
 /// 音量。构造即夹紧，所以 0.0 到 1.0 这个不变量全应用只维护一处。

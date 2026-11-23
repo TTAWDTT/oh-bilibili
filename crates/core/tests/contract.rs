@@ -74,6 +74,7 @@ fn sample_track() -> Track {
         up_mid: Some(1234),
         tname: Some("音乐".into()),
         typeid: Some(3),
+        pages: Some(8),
     }
 }
 
