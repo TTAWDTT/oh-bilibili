@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { toastDone, toastWarn } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
 import { useAppStore } from '../../app/appStore'
@@ -58,6 +59,7 @@ export function FavFoldersView() {
   const prepTicket = useRef(0)
   const requestTicket = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
   /** 切回某个夹子时，等列表渲染出来再落位。 */
   const restoreTop = useRef<number | null>(null)
   const memory = useRef(new Map<number, FolderSnapshot>())
@@ -369,6 +371,20 @@ export function FavFoldersView() {
     </div>
   ) : null
 
+  /** 目录里用上下键换夹子，和关注页的名单一致。 */
+  const onFolderKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const rows = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('[data-fav-folder]') ?? [])]
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? rows.length - 1
+          : index + (event.key === 'ArrowDown' ? 1 : -1)
+    rows[Math.max(0, Math.min(rows.length - 1, next))]?.focus()
+  }
+
   const content = picked ? (
     <>
       {header}
@@ -460,14 +476,16 @@ export function FavFoldersView() {
             <h2 className="text-[20px] font-semibold leading-[28px] text-[var(--text-1)]">收藏夹</h2>
             <p className="num mt-0.5 text-[12.5px] text-[var(--text-3)]">{folders.length} 个</p>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
-            {folders.map((folder) => {
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
+            {folders.map((folder, index) => {
               const on = folder.id === pickedId
               return (
                 <button
                   key={folder.id}
                   type="button"
                   onClick={() => openFolder(folder)}
+                  onKeyDown={(event) => onFolderKeyDown(event, index)}
+                  data-fav-folder
                   aria-current={on ? 'true' : undefined}
                   className={[
                     't press mb-0.5 block w-full rounded-[6px] px-2.5 py-2 text-left',
