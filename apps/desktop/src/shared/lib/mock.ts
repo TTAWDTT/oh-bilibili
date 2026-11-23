@@ -26,7 +26,7 @@ const COMMENT_SEEDS: { author: string; mid: number; text: string; level: number;
   {
     author: '课代表',
     mid: 90004,
-    text: 'P2 00:12 花絮从这里开始；P1 00:05 是正片的高能段。',
+    text: 'P2 00:12 花絮从这里开始；P1 00:05 是正片的高能段；00:20 结尾还有一段。',
     level: 4,
     medal: null,
   },

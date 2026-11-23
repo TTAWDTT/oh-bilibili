@@ -921,11 +921,14 @@ export function CommentsPanel({
   trackKey,
   ownerMid = null,
   flow = false,
+  pages = [],
   onSeek,
 }: {
   trackKey: string
   ownerMid?: number | null
   flow?: boolean
+  /** 本稿分 P 目录；多 P 评论里没写分 P 时用它给用户选一页。 */
+  pages?: { no: number; duration_ms: number }[]
   /** 播放器给的就地定位；带分 P 时会先切 P。 */
   onSeek?: SeekTime
 }) {
@@ -1485,6 +1488,7 @@ export function CommentsPanel({
           <div className="mb-3 max-w-[880px] rounded-[6px] bg-[var(--panel-alt)]">
             <NoteReader
               note={noteReading}
+              pages={pages}
               onSeek={(anchor) => seekToTime(anchor.ms, anchor.page ?? undefined)}
               onBack={() => {
                 const id = noteReading.id

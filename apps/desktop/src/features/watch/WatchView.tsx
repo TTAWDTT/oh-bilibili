@@ -199,6 +199,13 @@ export function WatchView({
     saveWatchPage(track.key, no)
   }
   /** 评论里的时间点：写明了别的 P 就先切过去，加载后落在同一毫秒。 */
+  /** 评论笔记跨 P 的一次定位：目标 P 的媒体就绪后落位，并按跳转前恢复暂停。 */
+  const [noteSeek, setNoteSeek] = useState<{
+    page: number
+    ms: number
+    nonce: number
+    paused: boolean
+  } | null>(null)
   const seekFromComment = (ms: number, pageNo?: number): void => {
     const current = page ?? data?.current_page ?? 1
     if (pageNo !== undefined && pageNo !== current) {
@@ -214,7 +221,10 @@ export function WatchView({
         )
         return
       }
+      const paused = usePlayerStore.getState().snapshot?.phase !== 'playing'
       changePage(pageNo, ms)
+      // 连续点两条时只留最后一次；迟到的旧跳转不会把画面拖回去。
+      setNoteSeek((prev) => ({ page: pageNo, ms, nonce: (prev?.nonce ?? 0) + 1, paused }))
       return
     }
     seekTo(ms)
@@ -800,6 +810,8 @@ export function WatchView({
                 nextUp={nextUp}
                 onNext={playNext}
                 seekSignal={seekSignal}
+                noteSeek={noteSeek}
+                onNoteSeekDone={() => setNoteSeek(null)}
                 currentPage={currentPageNo}
                 onPage={changePage}
                 resumeAt={resume?.key === track.key ? resume.at : null}
@@ -895,6 +907,7 @@ export function WatchView({
               <CommentsPanel
                 trackKey={track.key}
                 ownerMid={data?.owner_mid ?? null}
+                pages={data?.pages ?? []}
                 onSeek={seekFromComment}
                 flow
               />
