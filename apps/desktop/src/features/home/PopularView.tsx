@@ -137,16 +137,18 @@ export function PopularView() {
           <EmptyState mascot="missYou" icon="biliTv" title="热门榜暂时是空的" action={null} />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
-              {tracks.map((track) => (
-                <WideCard
-                  key={track.key}
-                  track={track}
-                  note={notes[track.key] ?? null}
-                  noteAsTag
-                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
-                />
-              ))}
+            <div className="@container">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-6 @card:grid-cols-2">
+                {tracks.map((track) => (
+                  <WideCard
+                    key={track.key}
+                    track={track}
+                    note={notes[track.key] ?? null}
+                    noteAsTag
+                    onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+                  />
+                ))}
+              </div>
             </div>
             <div ref={sentinelRef} className="h-1" aria-hidden />
             {error ? (

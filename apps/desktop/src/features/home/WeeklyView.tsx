@@ -246,15 +246,17 @@ export function WeeklyView() {
       ) : issues === null || (number !== null && page === null) ? (
         <BiliLoader label="正在取本期…" />
       ) : page && page.tracks.length > 0 ? (
-        <div data-weekly-issue={number ?? ''} className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-2">
-          {page.tracks.map((track) => (
-            <WideCard
-              key={track.key}
-              track={track}
-              note={page.notes[track.key] ?? null}
-              onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
-            />
-          ))}
+        <div data-weekly-issue={number ?? ''} className="@container">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 @card:grid-cols-2">
+            {page.tracks.map((track) => (
+              <WideCard
+                key={track.key}
+                track={track}
+                note={page.notes[track.key] ?? null}
+                onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+              />
+            ))}
+          </div>
         </div>
       ) : (
         <EmptyState mascot="missYou" icon="biliTv" title="这一期暂时是空的" action={null} />

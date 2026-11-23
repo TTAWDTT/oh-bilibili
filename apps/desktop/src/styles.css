@@ -10,7 +10,9 @@
  * 3. 强调色只出现在焦点环、进度条、激活图标这类微小面积上，永远不填大面积。
  */
 
+/* 热门/每周必看的两列卡片：正文容器够宽才分两列，侧栏收放也跟着变。 */
 @theme {
+  --container-card: 46rem;
   --color-ink: #f6f7f8;
   --color-ink-raised: #ffffff;
   --color-hairline: #e3e5e7;
