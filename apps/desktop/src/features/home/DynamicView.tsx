@@ -334,7 +334,8 @@ function OrigCard({
         event.preventDefault()
         open(event)
       }}
-      className="mt-1 cursor-pointer rounded-[6px] border border-[var(--line)] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
+      /* 转发只做一层浅底引用，不再套第二道描边：外层是白卡，这里靠底色和缩进分出层级。 */
+      className="mt-1 cursor-pointer rounded-[6px] bg-[var(--ga1)] p-3 transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
       <div className="mb-2 flex items-center gap-2">
         <button
