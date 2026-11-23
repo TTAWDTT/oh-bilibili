@@ -1,3 +1,5 @@
+import { formatTime } from '../../shared/lib/format.ts'
+
 /** 评论里的一个可定位时间点。 */
 export type CommentAnchor = {
   /** 在原文里的起点和终点；同一个分 P 标记会一起包进按钮。 */
@@ -12,65 +14,63 @@ export type CommentAnchor = {
   invalid: boolean
 }
 
-const TIME = /((?:\d{1,2}[:：])?[0-5]?\d[:：][0-5]\d)/g
+export type NotePage = { no: number; duration_ms: number }
+
+const TOKENS = /https?:\/\/[^\s，。；、）】]+|(?:\d{1,2}[:：])?[0-5]?\d[:：][0-5]\d/g
 const PAGE = /(^|[^\p{L}\p{N}_])[Pp](\d{1,3})(?=[\s:：,，、）)】\]]|$)/gu
 
-/**
- * 从一条评论里找时间点，并解析它指哪个分 P。
- *
- * 规则按 #263：同一行的「P2 03:20」优先；单独成行的「P2」约束它下面
- * 直到下一个分组标题的时间点；其余时间点不猜分 P，由调用方按当前 P 处理。
- * 同一行写了两个不同的 P、或 P 超出本稿分 P 数时标记为不可跳转。
- */
-export function findCommentTimes(text: string, pages: number): CommentAnchor[] {
+export function findCommentTimes(text: string, pages: readonly NotePage[], trackKey?: string): CommentAnchor[] {
   const out: CommentAnchor[] = []
   let group: number | null = null
-  let groupInvalid = false
   let offset = 0
   for (const line of text.split('\n')) {
     const header = line.match(/^\s*[Pp]\s*(\d{1,3})\s*[:：]?\s*$/)
     if (header) {
-      const no = Number(header[1])
-      groupInvalid = !(no >= 1 && no <= pages)
-      group = groupInvalid ? null : no
-      offset += line.length + 1
-      continue
-    }
-
-    const markers = [...line.matchAll(PAGE)].map((m) => ({
-      // 前缀是被吃进匹配里的分隔符（分号、括号、行首等），P 标记从它后面开始。
-      start: (m.index ?? 0) + (m[1] ?? '').length,
-      page: Number(m[2]),
-    }))
-    /** 上一条时间的结尾：两条时间之间的 P 标记才算这一条的声明。 */
-    let prevEnd = 0
-
-    for (const time of line.matchAll(TIME)) {
-      const token = time[1] ?? ''
-      const ms = timestampMs(token)
-      if (ms === null) continue
-      const at = time.index ?? 0
-      const claimed = markers.filter((m) => m.start >= prevEnd && m.start < at)
-      const conflict = new Set(claimed.map((m) => m.page)).size > 1
-      const marker = claimed.at(-1)
-      let page: number | null = null
-      let invalid = conflict
-      let start = offset + at
-      if (!conflict && marker) {
-        const exists = marker.page >= 1 && marker.page <= pages
-        page = exists ? marker.page : null
-        invalid ||= !exists
-        start = offset + marker.start
-      } else if (!conflict) {
-        page = group
-        invalid ||= groupInvalid
+      group = Number(header[1])
+    } else {
+      let previousEnd = 0
+      for (const match of line.matchAll(TOKENS)) {
+        const tokenStart = match.index
+        const raw = match[0]
+        const isLink = raw.startsWith('http')
+        const token = isLink ? raw.replace(/[.,;:!?)\]]+$/, '') : raw
+        const declaration = line.slice(previousEnd, tokenStart)
+        const claims = [...declaration.matchAll(PAGE)]
+        previousEnd = tokenStart + raw.length
+        const link = isLink ? linkedTime(token, trackKey) : null
+        if (isLink && !link) continue
+        const ms = link?.ms ?? timestampMs(token)
+        if (ms === null) continue
+        const marker = claims.at(-1)
+        const claimed = claims.map((m) => Number(m[2]))
+        if (link) claimed.push(link.page)
+        const pageNo = claimed.at(-1) ?? group ?? (pages.length === 1 ? pages[0]!.no : null)
+        const page = pages.find((entry) => entry.no === pageNo)
+        const invalid = pages.length === 0 || new Set(claimed).size > 1 || (pageNo !== null && (!page || ms > page.duration_ms))
+        const start = !marker ? tokenStart : tokenStart - declaration.length + marker.index + (marker[1] ?? '').length
+        out.push({
+          start: offset + start,
+          end: offset + tokenStart + token.length,
+          token: link ? formatTime(ms) : token,
+          ms,
+          page: page?.no ?? null,
+          invalid,
+        })
       }
-      out.push({ start, end: offset + at + token.length, token, ms, page: page ?? null, invalid })
-      prevEnd = at + token.length
     }
     offset += line.length + 1
   }
   return out
+}
+
+function linkedTime(raw: string, trackKey?: string): { page: number; ms: number } | null {
+  const url = URL.canParse(raw) ? new URL(raw) : null
+  if (!url || !['www.bilibili.com', 'bilibili.com', 'm.bilibili.com'].includes(url.hostname)) return null
+  const video = url.pathname.match(/^\/video\/(BV[0-9A-Za-z]+)\/?$/)?.[1]
+  const time = url.searchParams.get('t')
+  const page = url.searchParams.get('p') ?? '1'
+  if (!video || video !== trackKey || !time || !/^\d+(?:\.\d+)?$/.test(time) || !/^\d+$/.test(page)) return null
+  return { page: Number(page), ms: Math.round(Number(time) * 1000) }
 }
 
 /** `01:23` / `1:02:03` 转毫秒。全角冒号也认。 */

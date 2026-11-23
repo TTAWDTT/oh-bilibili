@@ -265,11 +265,10 @@ export function WatchPlayer({
   nextUp,
   onNext,
   seekSignal,
-  noteSeek,
-  onNoteSeekDone,
   currentPage,
   onPage,
   resumeAt,
+  commentSeek,
   chapters: chapterMeta,
   liked,
   faved,
@@ -294,13 +293,12 @@ export function WatchPlayer({
   /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
   seekSignal: { at: number; nonce: number } | null
   /** 评论笔记跨 P 的定位：等目标分 P 的媒体就绪后再落位，并按跳转前恢复暂停。 */
-  noteSeek: { page: number; ms: number; nonce: number; paused: boolean } | null
-  onNoteSeekDone: () => void
   /** 多 P 时控制条上的选集。 */
   currentPage: number
   onPage: (no: number) => void
   /** 上次看到的位置，毫秒。太靠前或太靠后播放器会自己放弃。 */
   resumeAt: number | null
+  commentSeek: boolean
   /** UP 主设的章节；空表时退回简介里的时间戳。 */
   chapters: Chapter[]
   liked: boolean
@@ -321,9 +319,8 @@ export function WatchPlayer({
   const [retry, setRetry] = useState(0)
 
   const [error, setError] = useState<string | null>(null)
-  const [ready, setReady] = useState(false)
-  /** 每次换到一份新媒体时加一，跨 P 定位靠它等到画面能 seek。 */
-  const [mediaSeq, setMediaSeq] = useState(0)
+  const [loadedData, setLoadedData] = useState<typeof data | null>(null)
+  const ready = loadedData === data
   /** 播放器自己报的缓冲态：卡住时画面上要有转圈，不然只能看到画面定格。 */
   const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -456,22 +453,6 @@ export function WatchPlayer({
     void ipc.playerSeek(seekSignal.at).catch(() => {})
   }, [seekSignal])
 
-  /** 笔记跨 P 只落一次；换 P 后画面还没元数据时不动，等 mediaSeq 变了再来。 */
-  const noteSeekDone = useRef<number | null>(null)
-  useEffect(() => {
-    if (!noteSeek || noteSeekDone.current === noteSeek.nonce) return
-    if (data.current_page !== noteSeek.page) return
-    const video = videoRef.current
-    if (!video || video.readyState < 1) return
-    noteSeekDone.current = noteSeek.nonce
-    video.currentTime = noteSeek.ms / 1000
-    setNow(noteSeek.ms)
-    void ipc
-      .playerSeek(noteSeek.ms)
-      .then(() => (noteSeek.paused ? ipc.playerPause() : null))
-      .catch(() => {})
-      .finally(onNoteSeekDone)
-  }, [noteSeek, mediaSeq, data.current_page, onNoteSeekDone])
   useEffect(() => {
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current)
@@ -589,7 +570,7 @@ export function WatchPlayer({
     if (resumedFor.current === data.manifest_url) return
     const duration = data.duration_ms || track.duration_ms || 0
     // 太靠前说明只是瞄过一眼，太靠后又基本等于看完了，两种情况都从头放。
-    if (!duration || resumeAt < 5000 || resumeAt > duration - 10_000) {
+    if (!duration || (!commentSeek && (resumeAt < 5000 || resumeAt > duration - 10_000))) {
       resumedFor.current = data.manifest_url
       return
     }
@@ -597,12 +578,12 @@ export function WatchPlayer({
     // 声音已经在 resume_at_ms 起播，这里再把音频 seek 回去会倒带已播的部分。
     // 只把画面对齐到声音的当前进度；声音若还没加载好，就落在续播点上等它。
     const head = localPlayhead()
-    const at = head > resumeAt ? head : resumeAt
+    const at = commentSeek ? resumeAt : Math.max(head, resumeAt)
     const v = videoRef.current
     if (v) v.currentTime = at / 1000
     setNow(at)
-    setResumeNotice(resumeAt)
-  }, [ready, resumeAt, data.manifest_url, data.duration_ms, track.duration_ms])
+    setResumeNotice(commentSeek ? null : resumeAt)
+  }, [ready, resumeAt, commentSeek, data.manifest_url, data.duration_ms, track.duration_ms])
 
   useEffect(() => {
     if (resumeNotice === null) return
@@ -844,7 +825,7 @@ export function WatchPlayer({
           return
         }
         setBuffering(false)
-        setReady(true)
+        setLoadedData(data)
       } catch (e) {
         if (!cancelled) setError(describePlaybackError(e))
       }
@@ -1140,7 +1121,6 @@ export function WatchPlayer({
         ref={videoRef}
         muted
         playsInline
-        onLoadedMetadata={() => setMediaSeq((n) => n + 1)}
         onClick={(event) => {
           // 双击的第二下不再当成暂停，否则双击全屏会顺手把视频停下来。
           if (event.detail > 1) return
@@ -1228,7 +1208,7 @@ export function WatchPlayer({
               wantHeight.current = 0
               currentHeight.current = 0
               setError(null)
-              setReady(false)
+              setLoadedData(null)
               setRetry((n) => n + 1)
             }}
             className="t press mt-1 rounded-full border border-white/30 px-3 py-1 text-[12px] text-white hover:border-white/70"

@@ -982,8 +982,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
     case 'watch_open': {
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
+      const commentJumps = import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
+      const pageDuration = commentJumps ? 300_000 : track.duration_ms ?? 30_000
       // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
-      setDuration(track.duration_ms ?? 30_000)
+      setDuration(pageDuration)
       const multiP =
         import.meta.env.DEV && new URLSearchParams(window.location.search).has('multiP')
       const manyPages =
@@ -996,13 +998,14 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
               index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : `第 ${index + 1} 集 · 预览`,
             duration_ms: 30_000 + index * 1000,
           }))
-        : multiP
+        : multiP || commentJumps
           ? [
-              { no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 },
-              { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: track.duration_ms ?? 30_000 },
+              { no: 1, cid: 1, title: track.title, duration_ms: pageDuration },
+              { no: 2, cid: 2, title: '第二 P · 预览', duration_ms: pageDuration },
             ]
           : [{ no: 1, cid: 1, title: track.title, duration_ms: track.duration_ms ?? 30_000 }]
       const requestedPage = Number(args.page ?? 1) || 1
+      if (commentJumps && requestedPage === 2) await sleep(600)
       const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
       return {
         key: track.key,
@@ -1140,7 +1143,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           mid: i === 0 && ownerMid !== null ? ownerMid : seed.mid,
           author: seed.author,
           avatar: null,
-          text: i === 1 ? '@阿明 谢谢 @阿明，这段前奏我也循环了很久。' : seed.text,
+          text: i === 0 && import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
+            ? 'P1 03:20 正片演示\nP2 03:20 对照演示\n03:20 无页码的小结\nP3 09:00 跳过不存在的页'
+            : i === 1 ? '@阿明 谢谢 @阿明，这段前奏我也循环了很久。' : seed.text,
           emotes: [],
           mentions: i === 1 ? [['阿明', 90002]] : [],
           pictures:

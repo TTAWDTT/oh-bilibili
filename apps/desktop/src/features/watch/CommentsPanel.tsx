@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
@@ -6,7 +6,8 @@ import * as ipc from '../../shared/lib/ipc'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { findCommentTimes } from './commentTime'
-import type { CommentAnchor } from './commentTime'
+import type { CommentAnchor, NotePage } from './commentTime'
+import { CommentTimeLink } from './CommentTimeLink'
 import { NoteReader } from './NoteReader'
 import type { CommentNote } from './NoteReader'
 import { formatCount, formatRelative } from '../../shared/lib/format'
@@ -20,7 +21,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { useAuthStore } from '../auth/authStore'
 import { clearRecentEmote, readRecentEmote, type RecentEmote, writeRecentEmote } from './recentEmote'
 
-/** 评论里的时间点：`page` 为空表示评论没写明分 P，按当前 P 跳。 */
+const TimeSource = createContext<{ trackKey: string; pages: NotePage[] }>({ trackKey: '', pages: [] })
 type SeekTime = (ms: number, page?: number) => void
 
 /** 对话页大小，与后端 `reply/dialog/cursor` 的 `size` 参数一致。 */
@@ -74,7 +75,6 @@ function mentionNodes(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
-  onSeek?: SeekTime | undefined,
 ): ReactNode[] {
   // URL 整段保留，@ 只在非 URL 段落里找，避免把链接路径里的 @ 拆开。
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
@@ -97,10 +97,10 @@ function mentionNodes(
       return
     }
     if (mentions.length === 0) {
-      nodes.push(...timestampLinks(part, onSeek, keyBase * 100 + index))
+      nodes.push(part)
       return
     }
-    nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index, onSeek))
+    nodes.push(...mentionLinks(part, mentions, open, keyBase * 100 + index))
   })
   return nodes
 }
@@ -111,7 +111,6 @@ function mentionLinks(
   mentions: [string, number][],
   open: (name: string, mid: number) => void,
   keyBase: number,
-  onSeek?: SeekTime | undefined,
 ): ReactNode[] {
   const names = [...mentions]
     .sort((a, b) => b[0].length - a[0].length)
@@ -125,7 +124,7 @@ function mentionLinks(
   for (const match of text.matchAll(pattern)) {
     const prefix = match[1] ?? ''
     const at = (match.index ?? 0) + prefix.length
-    if (at > last) nodes.push(...timestampLinks(text.slice(last, at), onSeek, keyBase * 100 + at))
+    if (at > last) nodes.push(text.slice(last, at))
     const name = match[2] ?? ''
     const mid = mentions.find(([value]) => value === name)?.[1] ?? 0
     nodes.push(
@@ -141,53 +140,20 @@ function mentionLinks(
     last = (match.index ?? 0) + match[0].length
   }
   if (last < text.length) {
-    nodes.push(...timestampLinks(text.slice(last), onSeek, keyBase * 100 + last))
+    nodes.push(text.slice(last))
   }
-  return nodes
-}
-
-function timestampLinks(
-  text: string,
-  onSeek: SeekTime | undefined,
-  keyBase: number,
-): ReactNode[] {
-  if (!onSeek) return [text]
-  const nodes: ReactNode[] = []
-  let last = 0
-  for (const anchor of findCommentTimes(text, 999)) {
-    if (anchor.start > last) nodes.push(text.slice(last, anchor.start))
-    const label = text.slice(anchor.start, anchor.end)
-    if (anchor.invalid) {
-      nodes.push(label)
-    } else {
-      nodes.push(
-        <button
-          key={`${keyBase}-${anchor.start}`}
-          type="button"
-          onClick={() => onSeek(anchor.ms, anchor.page ?? undefined)}
-          className="t text-[var(--accent)] hover:underline"
-        >
-          {label}
-        </button>,
-      )
-    }
-    last = anchor.end
-  }
-  if (last < text.length) nodes.push(text.slice(last))
   return nodes
 }
 
 /** 把评论里的 [表情] 代号换成 B 站表情图，@用户 换成可点链接，其余文字原样保留。 */
-function CommentText({
+function CommentRichText({
   text,
   emotes,
   mentions,
-  onSeek,
 }: {
   text: string
   emotes: [string, string][]
   mentions: [string, number][]
-  onSeek?: SeekTime | undefined
 }) {
   const navigate = useAppStore((state) => state.navigate)
   if (emotes.length === 0 && mentions.length === 0) {
@@ -198,7 +164,6 @@ function CommentText({
           mentions,
           (name, mid) => navigate({ kind: 'author', name, mid }),
           0,
-          onSeek,
         )}
       </>
     )
@@ -215,7 +180,6 @@ function CommentText({
         mentions,
         (name, mid) => navigate({ kind: 'author', name, mid }),
         chunk,
-        onSeek,
       ),
     )
     buffer = ''
@@ -245,6 +209,35 @@ function CommentText({
     buffer += text[i]
   }
   flush()
+  return <>{nodes}</>
+}
+
+function CommentText({
+  text, emotes, mentions, onSeek, anchors,
+}: {
+  text: string
+  emotes: [string, string][]
+  mentions: [string, number][]
+  onSeek?: SeekTime | undefined
+  anchors?: CommentAnchor[]
+}) {
+  const { trackKey, pages } = useContext(TimeSource)
+  const times = anchors ?? findCommentTimes(text, pages, trackKey)
+  if (!onSeek || times.length === 0) return <CommentRichText text={text} emotes={emotes} mentions={mentions} />
+  const nodes: ReactNode[] = []
+  let last = 0
+  for (const anchor of times) {
+    if (anchor.start > last) {
+      nodes.push(<CommentRichText key={`text:${last}`} text={text.slice(last, anchor.start)} emotes={emotes} mentions={mentions} />)
+    }
+    nodes.push(
+      <CommentTimeLink key={`time:${anchor.start}`} anchor={anchor} pages={pages} onSeek={onSeek}>
+        {text.slice(anchor.start, anchor.end)}
+      </CommentTimeLink>,
+    )
+    last = anchor.end
+  }
+  if (last < text.length) nodes.push(<CommentRichText key={`text:${last}`} text={text.slice(last)} emotes={emotes} mentions={mentions} />)
   return <>{nodes}</>
 }
 
@@ -314,6 +307,9 @@ function CommentRow({
   /** 评论里有不止一个有效时间点时给出「边看边读」。 */
   onReadNote?: ((note: { id: string; author: string; text: string; anchors: CommentAnchor[] }) => void) | undefined
 }) {
+  const { pages } = useContext(TimeSource)
+  const anchors = findCommentTimes(c.text, pages, trackKey)
+  const validTimes = anchors.filter((anchor) => !anchor.invalid).length
   const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
   const [loadedReplies, setLoadedReplies] = useState<Comment[]>([])
@@ -567,6 +563,7 @@ function CommentRow({
             }`}
           >
             <CommentText
+              anchors={anchors}
               text={c.text}
               emotes={c.emotes}
               mentions={c.mentions}
@@ -582,21 +579,15 @@ function CommentRow({
               {expanded ? '收起' : '展开'}
             </button>
           ) : null}
-          {/* 两个以上有效时间点才值得整理成一列；单条时间点直接点链接就够了。 */}
-          {(() => {
-            if (depth > 0 || !onReadNote) return null
-            const anchors = findCommentTimes(c.text, 999).filter((anchor) => !anchor.invalid)
-            if (anchors.length < 2) return null
-            return (
-              <button
-                type="button"
-                onClick={() => onReadNote({ id: c.id, author: c.author, text: c.text, anchors })}
-                className="t mt-1 ml-2 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
-              >
-                边看边读 · {anchors.length} 个时间点
-              </button>
-            )
-          })()}
+          {depth === 0 && onReadNote && validTimes >= 2 ? (
+            <button
+              type="button"
+              onClick={() => onReadNote({ id: c.id, author: c.author, text: c.text, anchors })}
+              className="t mt-1 ml-2 text-[11px] text-[var(--text-3)] hover:text-[var(--accent)]"
+            >
+              边看边读 · {validTimes} 个时间点
+            </button>
+          ) : null}
           {c.pictures?.length ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {c.pictures.slice(0, 9).map((src, index) => (
@@ -929,6 +920,7 @@ export function CommentsPanel({
   onSeek,
   note = null,
   onNote,
+  onBackToComment,
 }: {
   trackKey: string
   ownerMid?: number | null
@@ -939,7 +931,8 @@ export function CommentsPanel({
   onSeek?: SeekTime
   /** 当前正在读的笔记。宽窗由播放器右栏渲染，这里只负责产生与回原楼。 */
   note?: CommentNote | null
-  onNote?: (note: CommentNote | null) => void
+  onNote: (note: CommentNote) => void
+  onBackToComment: () => void
 }) {
   /** B 站那一对按钮：热度优先，还是时间优先。 */
   const [hot, setHot] = useState(loadCommentHot)
@@ -959,9 +952,6 @@ export function CommentsPanel({
   const [sending, setSending] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; root: string; author: string } | null>(null)
   /** 「边看边读」当前整理的是哪条评论。宽窗由右栏接管，这里只在行内用。 */
-  const [noteLocal, setNoteLocal] = useState<CommentNote | null>(null)
-  const noteReading = onNote ? note : noteLocal
-  const setNoteReading = onNote ?? setNoteLocal
   /** 当前打开的对话分支：一级评论 + 分支里的二级评论。 */
   const [dialog, setDialog] = useState<{ root: string; anchor: string } | null>(null)
   /** 自己刚发的评论 rpid。只有这些能删，界面不会给别人的评论删按钮。 */
@@ -1406,6 +1396,7 @@ export function CommentsPanel({
   )
 
   return (
+    <TimeSource.Provider value={{ trackKey, pages }}>
     <div id="watch-comments" className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
       <div className={`flex items-baseline gap-2 py-3 ${flow ? '' : 'px-3'}`}>
         <h3 className="text-[14px] font-medium">评论</h3>
@@ -1496,24 +1487,9 @@ export function CommentsPanel({
           </div>
         ) : null}
         {/* 宽窗由播放器右栏渲染同一份笔记，这里只留窄窗的行内副本。 */}
-        {noteReading ? (
+        {note ? (
           <div className="mb-3 max-w-[880px] rounded-[6px] bg-[var(--panel-alt)] xl:hidden">
-            <NoteReader
-              note={noteReading}
-              pages={pages}
-              onSeek={(anchor) => seekToTime(anchor.ms, anchor.page ?? undefined)}
-              onBack={() => {
-                const id = noteReading.id
-                setNoteReading(null)
-                // 原楼可能还在列表里；滚回去并把焦点交给它，键盘用户不用重新找。
-                window.setTimeout(() => {
-                  const row = document.querySelector<HTMLElement>(`[data-comment-id="${id}"]`)
-                  row?.scrollIntoView({ block: 'center' })
-                  row?.focus({ preventScroll: true })
-                }, 0)
-              }}
-              onClose={() => setNoteReading(null)}
-            />
+            <NoteReader key={note.id} note={note} pages={pages} onSeek={seekToTime} onBack={onBackToComment} />
           </div>
         ) : null}
         <ul className="max-w-[880px] space-y-4" data-comment-list="root">
@@ -1534,7 +1510,7 @@ export function CommentsPanel({
               deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
               onPhoto={(pictures, index) => setPhoto({ pictures, index })}
               onSeek={seekToTime}
-                onReadNote={setNoteReading}
+              onReadNote={onNote}
               onAuthorHover={showAuthorCard}
               onAuthorHide={authorHover.hide}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
@@ -1671,5 +1647,6 @@ export function CommentsPanel({
           )
         : null}
     </div>
+    </TimeSource.Provider>
   )
 }

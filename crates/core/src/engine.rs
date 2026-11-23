@@ -1430,10 +1430,22 @@ impl Engine {
 
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        self.start_playback(key, false, None).await
+    }
+
+    async fn start_playback(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        paused: bool,
+        watch_duration: Option<Millis>,
+    ) -> Result<PlayerSnapshot, WireError> {
         let track = self.track_of(key)?;
         self.discard_resume_for_other_track(Some(key));
         lock(&self.queue).jump_by_key(key);
         let token = self.begin_load(&track, false);
+        if paused {
+            lock(&self.player).pause();
+        }
         self.emit(AppEvent::Buffering {
             track: track.clone(),
         });
@@ -1443,8 +1455,9 @@ impl Engine {
                 let resume = self.pending_resume_for(key).unwrap_or(0);
                 // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
                 // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
-                let bounded = match track.duration {
-                    Some(d) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
+                let bounded = match (watch_duration, track.duration) {
+                    (Some(d), _) if d.0 > 0 => resume.min(d.0),
+                    (_, Some(d)) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
                     _ => resume,
                 };
                 if bounded > 0 {
@@ -1454,7 +1467,17 @@ impl Engine {
                 // 取流完成不等于声卡已经出声。状态先留在 loading，看门狗看到
                 // `Player::is_started()` 后才迁到 playing；否则首段等待期间
                 // 就会显示「正在播放」而位置一直是 0。
-                *lock(&self.pending_prepared) = Some((token, prepared));
+                if paused {
+                    let mut state = lock(&self.state);
+                    if state.token() == Some(token) {
+                        *state = std::mem::replace(&mut *state, PlayerState::Idle)
+                            .stream_ready(token, prepared)
+                            .pause();
+                    }
+                } else {
+                    *lock(&self.pending_prepared) = Some((token, prepared));
+                }
+
                 // 开播就在后台把歌词取好：用户打开右栏时通常已经在了，
                 // 不用等 lrclib 那几秒。
                 {
@@ -1585,6 +1608,18 @@ impl Engine {
         page: Option<u32>,
         resume_at_ms: Option<u64>,
     ) -> Result<WatchView, WireError> {
+        self.open_watch_page_with_pause(key, proxy_origin, page, resume_at_ms, false)
+            .await
+    }
+
+    pub async fn open_watch_page_with_pause(
+        self: &Arc<Self>,
+        key: &TrackKey,
+        proxy_origin: &str,
+        page: Option<u32>,
+        resume_at_ms: Option<u64>,
+        paused: bool,
+    ) -> Result<WatchView, WireError> {
         let generation = self.watch_gate.begin(key.as_opaque());
         // 打开观看页就是「看」模式：底部音频条按模式隐藏，
         // 不会出现「没在听却挂着一条音频」。
@@ -1610,6 +1645,13 @@ impl Engine {
             .and_then(|no| detail.pages.iter().find(|p| p.no == no))
             .or_else(|| detail.pages.first());
         let page_cid = current.map(|p| p.cid);
+        // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
+        // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
+        let duration = current
+            .filter(|p| p.duration_ms > 0)
+            .map(|p| Millis(p.duration_ms))
+            .or(detail.track.duration)
+            .unwrap_or(Millis(0));
         let page_no = current.map(|p| p.no).unwrap_or(1);
         *lock(&self.watch_cid) = current.map(|p| (key.as_opaque().to_string(), p.cid));
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
@@ -1634,20 +1676,15 @@ impl Engine {
             let engine = Arc::clone(self);
             let track = detail.track.key.clone();
             tokio::spawn(async move {
-                let _ = engine.play_key(&track).await;
+                if engine.watch_gate.is_current(generation) {
+                    let _ = engine.start_playback(&track, paused, Some(duration)).await;
+                }
             });
         }
         // 模式切到「看」这一步也要让界面知道：底部播放条、右栏歌词
         // 都按模式决定是否出现，不给它们新快照就会停在「听」的旧状态。
         self.emit_state();
         let video = self.source.dash_video_at(key, page_cid).await?;
-        // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
-        // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
-        let duration = current
-            .filter(|p| p.duration_ms > 0)
-            .map(|p| Millis(p.duration_ms))
-            .or(detail.track.duration)
-            .unwrap_or(Millis(0));
         let origin = proxy_origin.trim_end_matches('/').to_string();
         let engine = self;
         let mpd = crate::dash_bridge::video_mpd(&video, duration.0, |url| {

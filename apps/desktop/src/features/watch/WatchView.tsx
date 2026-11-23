@@ -3,7 +3,6 @@ import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
-import { formatTime } from '../../shared/lib/format'
 import { toDanmakuItems } from '../player/DanmakuField'
 import type { DanmakuItem } from '../player/DanmakuField'
 import { useReactionStore } from '../reactions/reactionStore'
@@ -165,7 +164,8 @@ export function WatchView({
     pageTriggerRef.current?.focus()
   }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
-  const [pendingResume, setPendingResume] = useState<number | null>(atMs ?? storedPagePos)
+  const [pendingResume, setPendingResume] = useState({ at: atMs ?? storedPagePos, paused: false, comment: false })
+  const pageLoading = useRef(false)
   const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
@@ -186,53 +186,52 @@ export function WatchView({
     savePageLen(track.key, data.current_page, data.duration_ms)
   }, [data, track.key])
   /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
-  const changePage = (no: number, resumeAtMs?: number): void => {
+  const changePage = (no: number, resumeAtMs?: number, commentPaused?: boolean): void => {
     const from = page ?? data?.current_page
     const snap = usePlayerStore.getState().snapshot
     // 快照只在命令时更新，真实播放位置在 progress 切片里（10Hz）。
     const now = usePlayerStore.getState().progress.position_ms
-    if (from !== undefined && snap?.track?.key === track.key && now >= 5000) {
+    if (!pageLoading.current && from === data?.current_page && from !== undefined && snap?.track?.key === track.key && now >= 5000) {
       savePagePos(track.key, from, now)
       // 历史里的 duration 是整条投稿总长，分 P 要看观看数据里这一页的时长。
       if ((data?.duration_ms ?? 0) > 0) savePageLen(track.key, from, data!.duration_ms)
     }
     const at = resumeAtMs ?? loadPagePos(track.key, no)
-    setResume(at ? { key: track.key, at } : null)
-    setPendingResume(at)
+    setResume(at !== null ? { key: track.key, at } : null)
+    pageLoading.current = true
+    setPendingResume({ at, paused: commentPaused ?? false, comment: commentPaused !== undefined })
     setPage(no)
     saveWatchPage(track.key, no)
   }
-  /** 评论里的时间点：写明了别的 P 就先切过去，加载后落在同一毫秒。 */
-  /** 「边看边读」正在读的那条评论。宽窗渲染进右栏，窄窗留在评论区里。 */
   const [watchNote, setWatchNote] = useState<CommentNote | null>(null)
-  /** 评论笔记跨 P 的一次定位：目标 P 的媒体就绪后落位，并按跳转前恢复暂停。 */
-  const [noteSeek, setNoteSeek] = useState<{
-    page: number
-    ms: number
-    nonce: number
-    paused: boolean
-  } | null>(null)
+  const openNote = (note: CommentNote): void => {
+    setWatchNote(note)
+    requestAnimationFrame(() => {
+      const reader = Array.from(document.querySelectorAll<HTMLElement>('[data-watch-note]'))
+        .find((el) => el.getClientRects().length > 0)
+      reader?.focus({ preventScroll: true })
+      reader?.scrollIntoView({ block: 'nearest' })
+    })
+  }
+  const backToComment = (): void => {
+    if (!watchNote) return
+    const id = watchNote.id
+    setWatchNote(null)
+    requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(`[data-comment-id="${CSS.escape(id)}"]`)
+      row?.scrollIntoView({ block: 'center' })
+      row?.focus({ preventScroll: true })
+    })
+  }
   const seekFromComment = (ms: number, pageNo?: number): void => {
-    const current = page ?? data?.current_page ?? 1
-    if (pageNo !== undefined && pageNo !== current) {
-      const target = data?.pages.find((entry) => entry.no === pageNo)
-      if (!target) {
-        toastWarn('这个分 P 不存在', `评论写的是 P${pageNo}`)
-        return
-      }
-      if (ms > target.duration_ms) {
-        toastWarn(
-          '这个时间点超出分 P',
-          `P${pageNo} 只有 ${formatTime(target.duration_ms)}，评论写的是 ${formatTime(ms)}`,
-        )
-        return
-      }
-      const paused = usePlayerStore.getState().snapshot?.phase !== 'playing'
-      changePage(pageNo, ms)
-      // 连续点两条时只留最后一次；迟到的旧跳转不会把画面拖回去。
-      setNoteSeek((prev) => ({ page: pageNo, ms, nonce: (prev?.nonce ?? 0) + 1, paused }))
+    const current = data?.current_page ?? 1
+    const target = pageNo ?? current
+    if (target !== current || pageLoading.current) {
+      const paused = pageLoading.current ? pendingResume.paused : usePlayerStore.getState().snapshot?.phase === 'paused'
+      changePage(target, ms, paused)
       return
     }
+    setResume(null)
     seekTo(ms)
   }
   /** 上一次取清单的视频；同一条视频换 P 时保留旧画面，别闪一下黑屏。 */
@@ -606,7 +605,7 @@ export function WatchView({
     setError(null)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key, page, pendingResume ?? undefined)
+        const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, pendingResume.paused)
         if (!cancelled) {
           initialStoredPage.current = false
           if (page !== undefined) saveWatchPage(track.key, page)
@@ -614,7 +613,7 @@ export function WatchView({
             const fallback = next.current_page
             const at = loadPagePos(track.key, fallback)
             setPage(fallback)
-            setPendingResume(at)
+            setPendingResume({ at, paused: pendingResume.paused, comment: false })
             setResume(at ? { key: track.key, at } : null)
             saveWatchPage(track.key, fallback)
           }
@@ -622,6 +621,7 @@ export function WatchView({
           // 不必为每个卡片额外请求一次详情。
           rememberPageCount(track.key, next.pages.length)
           rememberSeason(next.season, track.key)
+          pageLoading.current = false
           setData(next)
         }
       } catch (e) {
@@ -818,11 +818,10 @@ export function WatchView({
                 nextUp={nextUp}
                 onNext={playNext}
                 seekSignal={seekSignal}
-                noteSeek={noteSeek}
-                onNoteSeekDone={() => setNoteSeek(null)}
                 currentPage={currentPageNo}
                 onPage={changePage}
-                resumeAt={resume?.key === track.key ? resume.at : null}
+                resumeAt={pageLoading.current || resume?.key !== track.key ? null : resume.at}
+                commentSeek={pendingResume.comment}
                 chapters={chapters}
               />
             </div>
@@ -918,7 +917,8 @@ export function WatchView({
                 pages={data?.pages ?? []}
                 onSeek={seekFromComment}
                 note={watchNote}
-                onNote={setWatchNote}
+                onNote={openNote}
+                onBackToComment={backToComment}
                 flow
               />
             </div>
@@ -934,19 +934,11 @@ export function WatchView({
                 不用跟着评论区滚走（#263）。 */}
             {watchNote ? (
               <NoteReader
+                key={watchNote.id}
                 note={watchNote}
                 pages={data?.pages ?? []}
-                onSeek={(anchor) => seekFromComment(anchor.ms, anchor.page ?? undefined)}
-                onBack={() => {
-                  const id = watchNote.id
-                  setWatchNote(null)
-                  window.setTimeout(() => {
-                    const row = document.querySelector<HTMLElement>(`[data-comment-id="${id}"]`)
-                    row?.scrollIntoView({ block: 'center' })
-                    row?.focus({ preventScroll: true })
-                  }, 0)
-                }}
-                onClose={() => setWatchNote(null)}
+                onSeek={seekFromComment}
+                onBack={backToComment}
               />
             ) : null}
             {/* 目录贴住视频顶边：连续看教程时先找「在放哪一集」，再关心别的。 */}
