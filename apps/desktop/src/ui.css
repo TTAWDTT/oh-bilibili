@@ -1146,6 +1146,17 @@ select:focus-visible {
   letter-spacing: -0.01em;
 }
 
+.text-work-name {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+.text-reading-body {
+  font-size: 15px;
+  line-height: 24px;
+}
+
 .text-page-meta {
   font-size: 12.5px;
   line-height: 18px;

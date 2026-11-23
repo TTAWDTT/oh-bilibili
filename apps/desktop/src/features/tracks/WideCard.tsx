@@ -41,7 +41,7 @@ export function WideCard({
       </button>
       <div className="min-w-0 flex-1 py-0.5">
         <button type="button" onClick={onOpen} title={track.title} className="block w-full text-left">
-          <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+          <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)] group-hover:text-[var(--accent)]">
             {track.title}
           </span>
         </button>
@@ -77,7 +77,7 @@ export function WideCard({
             </span>
           )}
         </div>
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)]">
+        <span className="num mt-1 flex items-center gap-3 text-page-meta text-[var(--text-3)]">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -92,12 +92,12 @@ export function WideCard({
           ) : null}
         </span>
         {note && !noteAsTag ? (
-          <span className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ff7a45]">
+          <span className="mt-1.5 flex items-baseline gap-1 text-reading-body text-[var(--text-2)]">
             {/* B 站入站必刷 / 每周必看的推荐语前面是一对橙色引号，不是火焰图标。 */}
             <span aria-hidden className="shrink-0 text-[13px] leading-none">
               ❝
             </span>
-            <span className="truncate">{note}</span>
+            <span className="min-w-0 break-words">{note}</span>
           </span>
         ) : null}
       </div>

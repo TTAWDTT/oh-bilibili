@@ -70,7 +70,7 @@ function RichText({ text, body }: { text: string; body: DynamicBody }) {
     <div className="mb-3">
       <p
         ref={textRef}
-        className={`whitespace-pre-wrap break-words text-[15px] leading-[24px] text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
+        className={`whitespace-pre-wrap break-words text-reading-body text-[var(--text-1)] ${expanded ? '' : 'line-clamp-6'}`}
       >
         {bodyNodes}
       </p>
@@ -162,11 +162,11 @@ function DynamicVideo({
         </button>
       </span>
       <span className="flex min-w-0 flex-1 flex-col px-4 py-3">
-        <span className="line-clamp-2 text-[15px] leading-[22px] text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent-strong-hover)]">
+        <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)] transition-colors group-hover/video:text-[var(--accent-strong-hover)]">
           {item.title}
         </span>
         {attribution ?? null}
-        <span className="num mt-auto flex items-center gap-3.5 pt-2 text-[12px] leading-[16px] text-[var(--text-2)]">
+        <span className="num mt-auto flex items-center gap-3.5 pt-2 text-page-meta text-[var(--text-2)]">
           <span className="flex items-center gap-1" aria-label={`播放 ${formatCount(item.views)}`}>
             <Icon name="play" size={12} />
             {formatCount(item.views)}
@@ -191,7 +191,7 @@ function DynamicArticle({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenD
       className="group/read t flex w-full gap-3 rounded-[6px] bg-[var(--ga1)] p-3 text-left transition-colors duration-150 hover:bg-[var(--ga2)]"
     >
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-2 text-[15px] font-medium leading-[22px] text-[var(--text-1)] transition-colors group-hover/read:text-[var(--accent-strong-hover)]">
+        <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)] transition-colors group-hover/read:text-[var(--accent-strong-hover)]">
           {item.title}
         </span>
         {text ? (
@@ -461,7 +461,7 @@ function DynamicCard({
             <button
               type="button"
               onClick={onAuthor}
-              className="t block max-w-full truncate text-left text-[15px] font-medium leading-[20px] text-[var(--text-1)] hover:text-[var(--accent-strong-hover)]"
+              className="t line-clamp-2 min-w-0 break-words text-left text-work-name text-[var(--text-1)] hover:text-[var(--accent-strong-hover)]"
             >
               {item.author}
             </button>
@@ -479,7 +479,7 @@ function DynamicCard({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-[12px] leading-[16px] text-[var(--text-3)]">
+          <p className="mt-1 text-page-meta text-[var(--text-3)]">
             {kindLabel}
             {item.pub_time ? (
               <>

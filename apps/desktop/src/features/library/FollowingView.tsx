@@ -478,7 +478,7 @@ export function FollowingView() {
                       <Avatar src={user.face} alt={user.name} size={compact ? 38 : 44} />
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate text-[14px] font-medium text-[var(--text-1)]" title={user.name}>
+                          <span className="line-clamp-2 break-words text-work-name text-[var(--text-1)]" title={user.name}>
                             {user.name}
                           </span>
                           <AuthorMarks user={user} />
@@ -537,14 +537,14 @@ export function FollowingView() {
               <Avatar src={selected.face} alt={selected.name} size={64} />
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="truncate text-[19px] font-semibold text-[var(--text-1)]" title={selected.name}>
+                  <h2 className="line-clamp-2 break-words text-[19px] font-semibold text-[var(--text-1)]" title={selected.name}>
                     {selected.name}
                   </h2>
                   <AuthorMarks user={selected} />
                 </div>
-                <p className="num mt-1 text-[12px] text-[var(--text-3)]">UID {selected.mid}</p>
+                <p className="num mt-1 text-page-meta text-[var(--text-3)]">UID {selected.mid}</p>
                 {selected.sign ? (
-                  <p className="mt-2 line-clamp-3 break-words text-[13px] leading-relaxed text-[var(--text-2)]">
+                  <p className="mt-2 line-clamp-3 break-words text-reading-body text-[var(--text-2)]">
                     {selected.sign}
                   </p>
                 ) : null}
@@ -600,10 +600,10 @@ export function FollowingView() {
                             {formatDuration(track.duration_ms)}
                           </span>
                         </span>
-                        <span className="mt-1.5 line-clamp-2 text-[13px] leading-[19px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                        <span className="mt-1.5 line-clamp-2 break-words text-work-name text-[var(--text-1)] group-hover:text-[var(--accent)]">
                           {track.title}
                         </span>
-                        <span className="num mt-0.5 block text-[11px] text-[var(--text-3)]">
+                        <span className="num mt-0.5 block text-page-meta text-[var(--text-3)]">
                           {formatCount(track.views ?? 0)} 播放
                         </span>
                       </button>
