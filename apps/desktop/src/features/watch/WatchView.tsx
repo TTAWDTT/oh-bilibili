@@ -24,6 +24,8 @@ import { OwnerCard } from './OwnerCard'
 import { PageList } from './PageList'
 import { RelatedAside } from './RelatedAside'
 import { SeasonList } from './SeasonList'
+import { NoteReader } from './NoteReader'
+import type { CommentNote } from './NoteReader'
 import { rememberSeason } from '../tracks/seasonMark'
 import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
@@ -200,6 +202,8 @@ export function WatchView({
     saveWatchPage(track.key, no)
   }
   /** 评论里的时间点：写明了别的 P 就先切过去，加载后落在同一毫秒。 */
+  /** 「边看边读」正在读的那条评论。宽窗渲染进右栏，窄窗留在评论区里。 */
+  const [watchNote, setWatchNote] = useState<CommentNote | null>(null)
   /** 评论笔记跨 P 的一次定位：目标 P 的媒体就绪后落位，并按跳转前恢复暂停。 */
   const [noteSeek, setNoteSeek] = useState<{
     page: number
@@ -913,6 +917,8 @@ export function WatchView({
                 ownerMid={data?.owner_mid ?? null}
                 pages={data?.pages ?? []}
                 onSeek={seekFromComment}
+                note={watchNote}
+                onNote={setWatchNote}
                 flow
               />
             </div>
@@ -924,6 +930,25 @@ export function WatchView({
             data-watch-rail
             className="hidden min-h-0 w-[var(--rail-w)] shrink-0 overflow-y-auto border-l border-hairline xl:block"
           >
+            {/* 正在读的笔记贴在最上面：宽窗读评论时它一直留在右栏，
+                不用跟着评论区滚走（#263）。 */}
+            {watchNote ? (
+              <NoteReader
+                note={watchNote}
+                pages={data?.pages ?? []}
+                onSeek={(anchor) => seekFromComment(anchor.ms, anchor.page ?? undefined)}
+                onBack={() => {
+                  const id = watchNote.id
+                  setWatchNote(null)
+                  window.setTimeout(() => {
+                    const row = document.querySelector<HTMLElement>(`[data-comment-id="${id}"]`)
+                    row?.scrollIntoView({ block: 'center' })
+                    row?.focus({ preventScroll: true })
+                  }, 0)
+                }}
+                onClose={() => setWatchNote(null)}
+              />
+            ) : null}
             {/* 目录贴住视频顶边：连续看教程时先找「在放哪一集」，再关心别的。 */}
             {data && data.pages.length > 1 ? (
               <PageList
