@@ -262,6 +262,8 @@ export function WatchPlayer({
   nextUp,
   onNext,
   seekSignal,
+  noteSeek,
+  onNoteSeekDone,
   currentPage,
   onPage,
   resumeAt,
@@ -288,6 +290,9 @@ export function WatchPlayer({
   onNext: () => void
   /** 外部点时间戳时发来的一次定位；播放器自己改声音与画面，保证暂停时也立刻落位。 */
   seekSignal: { at: number; nonce: number } | null
+  /** 评论笔记跨 P 的定位：等目标分 P 的媒体就绪后再落位，并按跳转前恢复暂停。 */
+  noteSeek: { page: number; ms: number; nonce: number; paused: boolean } | null
+  onNoteSeekDone: () => void
   /** 多 P 时控制条上的选集。 */
   currentPage: number
   onPage: (no: number) => void
@@ -314,6 +319,8 @@ export function WatchPlayer({
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  /** 每次换到一份新媒体时加一，跨 P 定位靠它等到画面能 seek。 */
+  const [mediaSeq, setMediaSeq] = useState(0)
   /** 播放器自己报的缓冲态：卡住时画面上要有转圈，不然只能看到画面定格。 */
   const [buffering, setBuffering] = useState(false)
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -447,6 +454,23 @@ export function WatchPlayer({
     setNow(seekSignal.at)
     void ipc.playerSeek(seekSignal.at).catch(() => {})
   }, [seekSignal])
+
+  /** 笔记跨 P 只落一次；换 P 后画面还没元数据时不动，等 mediaSeq 变了再来。 */
+  const noteSeekDone = useRef<number | null>(null)
+  useEffect(() => {
+    if (!noteSeek || noteSeekDone.current === noteSeek.nonce) return
+    if (data.current_page !== noteSeek.page) return
+    const video = videoRef.current
+    if (!video || video.readyState < 1) return
+    noteSeekDone.current = noteSeek.nonce
+    video.currentTime = noteSeek.ms / 1000
+    setNow(noteSeek.ms)
+    void ipc
+      .playerSeek(noteSeek.ms)
+      .then(() => (noteSeek.paused ? ipc.playerPause() : null))
+      .catch(() => {})
+      .finally(onNoteSeekDone)
+  }, [noteSeek, mediaSeq, data.current_page, onNoteSeekDone])
   useEffect(() => {
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current)
@@ -1115,6 +1139,7 @@ export function WatchPlayer({
         ref={videoRef}
         muted
         playsInline
+        onLoadedMetadata={() => setMediaSeq((n) => n + 1)}
         onClick={(event) => {
           // 双击的第二下不再当成暂停，否则双击全屏会顺手把视频停下来。
           if (event.detail > 1) return
