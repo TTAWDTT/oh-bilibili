@@ -607,7 +607,11 @@ export function WatchView({
     setError(null)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, pendingResume.paused)
+        const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, {
+          paused: pendingResume.paused,
+          preserveListenQueue: currentWatchSession(track.key) !== null
+            || useAppStore.getState().history.at(-1)?.view.kind === 'watchLater',
+        })
         if (!cancelled) {
           initialStoredPage.current = false
           if (page !== undefined) saveWatchPage(track.key, page)

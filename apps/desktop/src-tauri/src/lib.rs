@@ -345,15 +345,19 @@ async fn watch_open(
     page: Option<u32>,
     resume_at: Option<u64>,
     paused: Option<bool>,
+    preserve_listen_queue: Option<bool>,
 ) -> Result<bilimusic_core::wire::WatchView, WireError> {
     let origin = format!("http://127.0.0.1:{}", port.0);
     engine
-        .open_watch_page_with_pause(
+        .open_watch_page_with_options(
             &TrackKey::from_provider(key),
             &origin,
             page,
             resume_at,
-            paused.unwrap_or(false),
+            bilimusic_core::engine::WatchOptions {
+                paused: paused.unwrap_or(false),
+                preserve_listen_queue: preserve_listen_queue.unwrap_or(false),
+            },
         )
         .await
 }

@@ -765,12 +765,18 @@ export function hotSearch(): Promise<HotSearchItem[]> {
 }
 
 /** 打开观看页。返回的清单地址指向本机代理，不含任何远端地址。 */
-export function watchOpen(key: string, page?: number, resumeAt?: number, paused = false): Promise<WatchView> {
+export function watchOpen(
+  key: string,
+  page?: number,
+  resumeAt?: number,
+  { paused = false, preserveListenQueue = false } = {},
+): Promise<WatchView> {
   return call<WatchView>('watch_open', {
     key,
     page: page ?? null,
     resume_at: resumeAt ?? null,
     paused,
+    preserve_listen_queue: preserveListenQueue,
   })
 }
 
