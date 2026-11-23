@@ -377,7 +377,7 @@ export function TitleBar() {
             e.preventDefault()
             submit()
           }}
-          className="bili-focus-scale flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3"
+          className="bili-focus-scale flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] border border-[var(--line)] bg-[var(--ga1)] px-3 focus-within:border-[var(--accent)]"
         >
           <Icon name="search" size={15} className="shrink-0 text-[var(--text-3)]" />
           <input
@@ -410,7 +410,12 @@ export function TitleBar() {
           )}
           <button
             type="submit"
-            className="bili-press flex h-7 shrink-0 items-center rounded-[6px] bg-[var(--accent-strong)] px-3 text-[13px] font-medium text-white hover:bg-[var(--accent-strong-hover)]"
+            className={[
+              'bili-press flex h-7 shrink-0 items-center rounded-[6px] px-3 text-[13px]',
+              focused || text.trim()
+                ? 'bg-[var(--accent-strong)] font-medium text-white hover:bg-[var(--accent-strong-hover)]'
+                : 'text-[var(--text-2)] hover:bg-[var(--ga2)] hover:text-[var(--text-1)]',
+            ].join(' ')}
           >
             搜索
           </button>
@@ -466,15 +471,16 @@ export function TitleBar() {
             </button>
           ))}
         </div>
-        {/* B 站顶栏最右边那颗实心投稿：站里唯一一个实心品牌色按钮。
-            投稿本身在网页端完成，这里用 B 站式菜单把四个投稿入口交给系统浏览器。 */}
+        {/* 投稿本身在网页端完成，这里用 B 站式菜单把四个入口交给系统浏览器。
+            它是次级动作，和搜索一样在中性状态下不抢品牌色。 */}
         <button
           type="button"
           onClick={(event) => openSubmit(event.currentTarget)}
           aria-expanded={submitMenu !== null}
           aria-haspopup="menu"
-          className="bili-press hidden h-8 shrink-0 items-center rounded-[4px] bg-[var(--accent-strong)] px-3.5 text-[13px] text-white hover:bg-[var(--accent-strong-hover)] sm:flex"
+          className="bili-press hidden h-8 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] sm:flex"
         >
+          <Icon name="plus" size={15} />
           投稿
         </button>
         {user ? (
