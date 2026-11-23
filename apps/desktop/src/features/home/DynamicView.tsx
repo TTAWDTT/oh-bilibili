@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useAuthStore } from '../auth/authStore'
+import { cachedFollowing } from '../library/followingIndex'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { DynamicReturn, DynamicTab } from '../../app/appStore'
@@ -555,6 +557,8 @@ export function DynamicView() {
   /** 已加载批数同时留一份 state：筛选态末尾的说明要跟着它更新。 */
   const [pageCount, setPageCount] = useState(0)
   const [following, setFollowing] = useState<Followed[] | null>(null)
+  /** 关注列表本身没取到（限流或断网）。和「没关注任何人」要分开说。 */
+  const [followingFailed, setFollowingFailed] = useState(false)
   /** 点头像在这一页筛该作者；null 表示全部关注。 */
   const [author, setAuthor] = useState<number | null>(returnPosition?.author ?? null)
   const authorHover = useAuthorHover()
@@ -611,12 +615,31 @@ export function DynamicView() {
     void load(null, false)
   }, [load])
 
-  useEffect(() => {
+  /**
+   * 关注列表：先用关注页已经建好的索引，没有再自己取第一页。
+   * 两者都会限流，所以顺序是先白拿缓存、后发请求。
+   */
+  const loadFollowing = useCallback((): void => {
+    const account = useAuthStore.getState().auth?.user?.mid ?? null
+    const ready = cachedFollowing(account)
+    if (ready) {
+      setFollowing(ready)
+      setFollowingFailed(false)
+      return
+    }
+    setFollowingFailed(false)
     void ipc
       .following(1)
       .then(([users]) => setFollowing(users))
-      .catch(() => setFollowing([]))
+      .catch(() => {
+        setFollowing([])
+        setFollowingFailed(true)
+      })
   }, [])
+
+  useEffect(() => {
+    loadFollowing()
+  }, [loadFollowing])
 
   // 一页只有 20 条，滑两屏就断粮。首屏之后连补 4 页，把可视区之外垫到 100 条。
   useEffect(() => {
@@ -814,6 +837,20 @@ export function DynamicView() {
           </nav>
         </div>
       </header>
+      {followingFailed && !following?.length ? (
+        <div className={`${FEED} pt-3`}>
+          <p className="flex items-center gap-2 text-[12px] text-[var(--text-3)]">
+            关注列表没取到，暂时不能按作者筛选。
+            <button
+              type="button"
+              onClick={loadFollowing}
+              className="t text-[var(--accent)] hover:underline"
+            >
+              重试
+            </button>
+          </p>
+        </div>
+      ) : null}
       {following?.length ? (
         <div className={`${FEED} pt-4 xl:hidden`}>
           <div className="mb-2 flex items-center justify-between gap-2">
