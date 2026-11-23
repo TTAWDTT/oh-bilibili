@@ -10,6 +10,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { PARTS } from '../../shared/lib/biliParts'
 import { useAppStore } from '../../app/appStore'
 import { HotPageHeader } from './HotPageHeader'
+import { PageSpine } from '../tracks/PageSpine'
 
 /** 按分区记住读到哪：从视频返回同一分区时回到原位置，换分区从第一名开始。 */
 const rankMemory: { rid: number; top: number } = { rid: -1, top: 0 }
@@ -63,6 +64,7 @@ function RankRow({ track, rank, active, onOpen, onAuthor }: {
       >
         <span className="relative block aspect-video overflow-hidden rounded-[6px]">
           <Cover cover={track.cover} title={track.title} width={216} className="h-full w-full" />
+          <PageSpine pages={track.pages} trackKey={track.key} />
           <span
             aria-hidden
             className="num absolute bottom-1 right-1 rounded-[2px] bg-black/60 px-1 text-[11px] leading-[16px] text-white"
