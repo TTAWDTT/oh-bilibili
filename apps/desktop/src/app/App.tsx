@@ -88,6 +88,8 @@ function viewTitle(view: View): string {
       return '稍后再看'
     case 'following':
       return '我关注的人'
+    case 'search':
+      return `搜索：${view.query}`
   }
 }
 
@@ -142,6 +144,8 @@ function CurrentView({ view }: { view: View }) {
       return <WatchLaterView />
     case 'following':
       return <FollowingView />
+    case 'search':
+      return <SearchPanel />
   }
 }
 
@@ -260,7 +264,6 @@ export default function App() {
   // 关闭与最小化按钮，藏掉窗口就没法关了。
   const osFullscreen = useAppStore((state) => state.osFullscreen)
   const cinema = useAppStore((state) => state.cinema)
-  const searchOpen = useAppStore((state) => state.searchOpen)
   const track = usePlayerStore((state) => state.snapshot?.track ?? null)
   const queued = usePlayerStore((state) => state.queue?.items.length ?? 0)
 
@@ -345,9 +348,7 @@ export default function App() {
         {musicView && listening ? <DanmakuStrip /> : null}
       </div>
 
-      {/* 搜索是顶栏下拉出来的面板：盖住整页，但顶栏的输入框始终可编辑。 */}
-      {searchOpen ? <SearchPanel /> : null}
-      {searchOpen ? null : <BackToTop targetId="scroll-main" />}
+      <BackToTop targetId="scroll-main" />
       <PlayerBar />
       {/* 影院与系统全屏是沉浸态：底部主导航收起，退出后回到原标签。 */}
       {view.kind === 'watch' && (cinema || osFullscreen) ? null : <MobileTabBar />}

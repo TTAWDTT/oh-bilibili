@@ -21,6 +21,8 @@ export type View =
   | { kind: 'watch'; track: Track; page?: number; atMs?: number }
   | { kind: 'watchLater' }
   | { kind: 'following' }
+  /** 搜索结果作为一页放进正文；顶栏输入框仍是唯一的入口。 */
+  | { kind: 'search'; query: string }
   | { kind: 'profile' }
   | { kind: 'settings' }
 
@@ -276,8 +278,14 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   closeRail: () => set({ rail: null }),
   focusSearch: () => set((state) => ({ searchFocus: state.searchFocus + 1 })),
   // null 只表示「这一条请求已被面板消费」，不该把面板重新打开。
-  setHeroQuery: (q) =>
-    q === null ? set({ heroQuery: null }) : set({ heroQuery: q, currentQuery: q, searchOpen: true }),
+  setHeroQuery: (q) => {
+    if (q === null) {
+      set({ heroQuery: null })
+      return
+    }
+    set({ heroQuery: q, currentQuery: q })
+    get().navigate({ kind: 'search', query: q })
+  },
   closeSearch: () => set({ searchOpen: false, searchReturn: null }),
   clearSearchFocusResult: () => set({ searchFocusResult: null }),
   setCurrentQuery: (q) => set({ currentQuery: q }),
