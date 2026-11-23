@@ -2273,14 +2273,16 @@ async function checkChannelNav(page) {
       prev: rect(header?.querySelector('button[aria-label="上一期"]')),
       picker: rect(header?.querySelector('[aria-haspopup="listbox"]')),
       next: rect(header?.querySelector('button[aria-label="下一期"]')),
-      first: rect(document.querySelector('[data-weekly-issue] .bili-card')),
-      cards: document.querySelectorAll('[data-weekly-issue] .bili-card').length,
+      issue: rect(document.querySelector('[data-weekly-issue]')),
+      subject: rect(document.querySelector('[data-weekly-issue] > h3')),
+      first: rect(document.querySelector('[data-weekly-issue] [data-wide-card]')),
+      cards: document.querySelectorAll('[data-weekly-issue] [data-wide-card]').length,
       select: [...document.querySelectorAll('[data-hot-channel-select]')]
         .filter((select) => select.getClientRects().length > 0).length,
     }
   })()`)
   check(
-    '每周必看换期组紧邻标题、紧接作品，中间没有跨频道入口',
+    '每周必看换期组紧邻页标题，当期主题和作品紧随其后',
     weeklyLayout.title && weeklyLayout.prev && weeklyLayout.picker && weeklyLayout.next &&
       weeklyLayout.prev.top >= weeklyLayout.title.top - 4 &&
       weeklyLayout.prev.top <= weeklyLayout.title.bottom &&
@@ -2288,8 +2290,10 @@ async function checkChannelNav(page) {
       weeklyLayout.picker.right <= weeklyLayout.next.left + 1 &&
       weeklyLayout.prev.left >= weeklyLayout.title.right &&
       weeklyLayout.prev.left - weeklyLayout.title.right <= 24 &&
-      weeklyLayout.first.top >= weeklyLayout.header.bottom - 1 &&
-      weeklyLayout.first.top - weeklyLayout.header.bottom <= 24 &&
+      weeklyLayout.issue.top >= weeklyLayout.header.bottom - 1 &&
+      weeklyLayout.issue.top - weeklyLayout.header.bottom <= 24 &&
+      weeklyLayout.first.top >= (weeklyLayout.subject?.bottom ?? weeklyLayout.issue.top) - 1 &&
+      weeklyLayout.first.top - (weeklyLayout.subject?.bottom ?? weeklyLayout.issue.top) <= 24 &&
       weeklyLayout.cards > 0 && weeklyLayout.select === 0,
   )
 
@@ -2440,7 +2444,7 @@ async function checkChannelNav(page) {
   check('期数下拉按 Esc 收起，焦点回到触发按钮', !afterEsc.list && afterEsc.focus === 'listbox')
 
   const weeklyOpened = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-weekly-issue] .bili-card')
+    const card = document.querySelector('[data-weekly-issue] [data-wide-card] button[data-focus-id]')
     if (!card) return ''
     const focusId = card.dataset.focusId ?? ''
     card.click()
@@ -4242,41 +4246,37 @@ async function main() {
     }
     await sleep(6000)
 
-    const primaryButtons = await page.evaluate(`(() => {
-      const button = (text) =>
-        [...document.querySelectorAll('button')].find((element) => (element.textContent || '').trim() === text)
-      return ['搜索', '投稿', '登录'].map((label) => {
-        const element = button(label)
-        if (!element) return null
-        const style = getComputedStyle(element)
-        const box = element.getBoundingClientRect()
-        return {
-          label,
-          color: style.color,
-          background: style.backgroundColor,
-          center: [box.left + box.width / 2, box.top + box.height / 2],
-        }
-      })
+    const readBarButton = (label) => page.evaluate(`(() => {
+      const element = [...document.querySelectorAll('.safe-top button')].find(
+        (button) => button.textContent.trim() === ${JSON.stringify(label)},
+      )
+      if (!element) return null
+      let surface = element
+      while (surface.parentElement && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') {
+        surface = surface.parentElement
+      }
+      const box = element.getBoundingClientRect()
+      return {
+        color: getComputedStyle(element).color,
+        background: getComputedStyle(surface).backgroundColor,
+        center: [box.left + box.width / 2, box.top + box.height / 2],
+      }
     })()`)
+    const labels = ['搜索', '投稿', '登录']
+    const primaryButtons = await Promise.all(labels.map(readBarButton))
     check(
-      '顶栏主按钮白字达到 4.5:1',
+      '顶栏按钮文字在实际背景上达到 4.5:1',
       primaryButtons.every(
         (button) => button && contrastRatio(button.color, button.background) >= 4.5,
       ),
     )
-    for (const button of primaryButtons) {
+    for (const [i, button] of primaryButtons.entries()) {
       if (!button) continue
       await page.mouseEvent({ type: 'mouseMoved', x: button.center[0], y: button.center[1] })
       await sleep(250)
-      const hovered = await page.evaluate(`(() => {
-        const element = [...document.querySelectorAll('button')].find(
-          (candidate) => (candidate.textContent || '').trim() === ${JSON.stringify(button.label)},
-        )
-        const style = element ? getComputedStyle(element) : null
-        return style ? { color: style.color, background: style.backgroundColor } : null
-      })()`)
+      const hovered = await readBarButton(labels[i])
       check(
-        `${button.label}悬停时仍达到 4.5:1`,
+        `${labels[i]}悬停时仍达到 4.5:1`,
         hovered && contrastRatio(hovered.color, hovered.background) >= 4.5,
       )
     }
@@ -4304,13 +4304,9 @@ async function main() {
     )
 
     const heroAuthor = await page.evaluate(`(() => {
-      const card = document.querySelector('[data-home-recommend] div.bili-hero-swap button')
-      const authorRow = card
-        ? [...card.querySelectorAll(':scope > span')].find((row) => row.textContent.includes('UP'))
-        : null
-      const coverStats = card
-        ? [...card.querySelectorAll(':scope > span')].find((row) => row.querySelector('svg'))
-        : null
+      const card = document.querySelector('[data-home-hero-grid] > div')
+      const authorRow = card?.querySelector('[data-focus-id^="hero-author:"], span[title]')
+      const coverStats = card?.querySelector('button[data-focus-id^="herocard:"] > span')
       const statsOverlay = coverStats?.lastElementChild
       const countText = statsOverlay?.firstElementChild?.textContent?.trim() ?? ''
       const durationText = statsOverlay?.lastElementChild?.textContent?.trim() ?? ''
