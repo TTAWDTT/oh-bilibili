@@ -1,10 +1,13 @@
 import { readResumePage, spineLabel } from './pageSpineLabel'
 
 /**
- * 封面右缘的分 P 书脊。
+ * 封面侧边的分 P 书脊。
  *
  * 只有列表确实带回了分 P 数才显示；单 P 或没有数据时不占位、不猜。
  * 有本地断点就写成 `P3 / 8`，没有就只写 `8 P`。
+ *
+ * 贴左缘中段而不是右缘：B 站封面习惯把 4K、Hi-Res 贴在右上角，
+ * 右下角还有时长，放右边会和角标叠在一起。
  */
 export function PageSpine({
   pages,
@@ -24,7 +27,7 @@ export function PageSpine({
       data-page-spine={pages}
       aria-label={spoken}
       title={spoken}
-      className="num pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 rounded-l-[3px] bg-black/65 px-1 py-0.5 text-[10px] leading-[13px] text-white"
+      className="num pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 rounded-r-[3px] bg-black/65 px-1 py-0.5 text-[10px] leading-[13px] text-white"
     >
       {label}
     </span>
