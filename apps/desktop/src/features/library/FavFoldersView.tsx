@@ -244,6 +244,9 @@ export function FavFoldersView() {
       const { tracks: all, complete } = await collectFavTracks(
         (nextPage) => ipc.favTracks(picked.id, nextPage),
         {
+          // 已翻过的页直接沿用当前列表，只补后面的。
+          initial: tracks ?? [],
+          fromPage: tracks && tracks.length > 0 ? page + 1 : 1,
           expected: picked.count,
           stopped: () => prepTicket.current !== ticket,
           onProgress: (loaded, nextPage) => {

@@ -1,6 +1,10 @@
 import type { Track } from '../../shared/lib/contract'
 
 export type CollectOptions = {
+  /** 已经加载出来的前几页，按原顺序带入，不再重读。 */
+  initial?: Track[]
+  /** 从哪一页继续；默认第 1 页。 */
+  fromPage?: number
   /** 目录里写的总数；可能过期，只当参考。 */
   expected?: number | null
   pageSize?: number
@@ -21,11 +25,27 @@ export type CollectResult = { tracks: Track[]; complete: boolean }
  */
 export async function collectFavTracks(
   fetchPage: (page: number) => Promise<Track[]>,
-  { expected = null, pageSize = 40, maxPages = 50, stopped, onProgress }: CollectOptions = {},
+  {
+    initial = [],
+    fromPage = 1,
+    expected = null,
+    pageSize = 40,
+    maxPages = 50,
+    stopped,
+    onProgress,
+  }: CollectOptions = {},
 ): Promise<CollectResult> {
-  const seen = new Set<string>()
   const tracks: Track[] = []
-  let page = 1
+  const seen = new Set<string>()
+  for (const track of initial) {
+    if (seen.has(track.key)) continue
+    seen.add(track.key)
+    tracks.push(track)
+  }
+  if (expected !== null && expected > 0 && tracks.length >= expected) {
+    return { tracks, complete: true }
+  }
+  let page = Math.max(1, fromPage)
   while (page <= maxPages) {
     const list = await fetchPage(page)
     if (stopped?.()) return { tracks, complete: false }
