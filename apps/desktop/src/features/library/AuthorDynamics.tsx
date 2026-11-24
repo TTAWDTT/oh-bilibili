@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAppStore, type AuthorRoute } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import { openExternal, spaceDynamics, type DynamicItem } from '../../shared/lib/ipc'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -6,37 +7,33 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 import { FeedCard } from '../home/DynamicView'
 
-export function AuthorDynamics({ mid }: { mid: number }) {
+export function AuthorDynamics({ mid, view }: { mid: number; view: AuthorRoute }) {
+  const { dynamicQuery: query = '', dynamicPages: wanted = 1 } = view
+  const replace = useAppStore(state => state.replace)
   const [items, setItems] = useState<DynamicItem[]>([])
   const [next, setNext] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [busy, setBusy] = useState(true)
+  const [pages, setPages] = useState(0)
   const [failed, setFailed] = useState(false)
-  const pending = useRef(false)
+  const [attempt, retry] = useState(0)
+  const busy = !failed && pages < wanted && (pages === 0 || !!next)
   const site = `https://space.bilibili.com/${mid}/dynamic`
 
-  const load = useCallback(async (cursor: string | null) => {
-    if (pending.current) return
-    pending.current = true
-    setBusy(true)
+  useEffect(() => {
+    if (pages >= wanted || (pages > 0 && !next)) return
+    let active = true
     setFailed(false)
-    try {
-      const page = await spaceDynamics(mid, cursor)
+    void spaceDynamics(mid, next).then(page => {
+      if (!active) return
       setItems((old) => {
-        if (!cursor) return page.items
+        if (!next) return page.items
         const seen = new Set(old.map(item => item.id))
         return [...old, ...page.items.filter(item => !seen.has(item.id))]
       })
       setNext(page.has_more ? page.offset : null)
-    } catch {
-      setFailed(true)
-    } finally {
-      setBusy(false)
-      pending.current = false
-    }
-  }, [mid])
-
-  useEffect(() => { void load(null) }, [load])
+      setPages(pages + 1)
+    }).catch(() => { if (active) setFailed(true) })
+    return () => { active = false }
+  }, [mid, wanted, pages, next, attempt])
 
   const keyword = query.trim().toLocaleLowerCase()
   const shown = keyword ? items.filter(item => {
@@ -51,7 +48,7 @@ export function AuthorDynamics({ mid }: { mid: number }) {
       <label className="flex min-w-0 items-center gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2.5">
         <Icon name="search" size={14} className="text-[var(--text-3)]" />
         <input type="search" aria-label="搜索已加载的动态" placeholder="搜索已加载的动态"
-          className="h-8 w-36 min-w-0 bg-transparent text-[13px] outline-none" value={query} onChange={event => setQuery(event.target.value)} />
+          className="h-8 w-36 min-w-0 bg-transparent text-[13px] outline-none" value={query} onChange={event => replace({ ...view, dynamicQuery: event.target.value })} />
       </label>
       <a href={site} onClick={(event) => {
         event.preventDefault()
@@ -64,9 +61,9 @@ export function AuthorDynamics({ mid }: { mid: number }) {
     {shown.map(item => <FeedCard key={item.id} item={item} />)}
     {busy ? <BiliLoader compact label="正在取作者动态…" /> : failed ? (
       <EmptyState compact icon="alert" title={items.length ? '后续动态暂时没取到' : '作者动态暂时没取到'}
-        action={{ label: '重试', onClick: () => void load(next) }} />
+        action={{ label: '重试', onClick: () => retry(n => n + 1) }} />
     ) : next ? (
-      <button type="button" onClick={() => void load(next)}
+      <button type="button" onClick={() => replace({ ...view, dynamicPages: pages + 1 })}
         className="t mx-auto py-3 text-[14px] text-[var(--accent)] hover:underline">更多动态</button>
     ) : !items.length && <p className="py-8 text-center text-[14px] text-[var(--text-2)]">还没有公开动态</p>}
   </section>

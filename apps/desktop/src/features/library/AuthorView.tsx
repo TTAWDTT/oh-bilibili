@@ -379,7 +379,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
         </nav>
       )}
       {mid && section === 'dynamics' ? (
-        <AuthorDynamics key={mid} mid={mid} />
+        <AuthorDynamics key={mid} mid={mid} view={view} />
       ) : mid && section === 'collections' ? (
         <AuthorCollections key={`${view.shelf?.kind}-${view.shelf?.id}-${view.shelfPage ?? 1}`} view={view} mid={mid} />
       ) : section === 'masterpieces' ? (

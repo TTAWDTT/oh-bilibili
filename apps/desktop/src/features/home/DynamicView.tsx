@@ -61,6 +61,7 @@ function RichText({ text, nodes, body, discuss }: {
   text: string; nodes: ipc.DynamicNode[] | undefined; body: DynamicBody; discuss?: string
 }) {
   const position = useContext(CardPosition)
+  const fromFocus = (event: DynamicOpenEvent) => position ? undefined : event.currentTarget.closest<HTMLElement>('[data-focus-id]')?.dataset.focusId
   const navigate = useAppStore((state) => state.navigate)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const [expanded, setExpanded] = useState(body.initiallyExpanded)
@@ -73,9 +74,9 @@ function RichText({ text, nodes, body, discuss }: {
       case 'emoji': return <img key={index} src={node.image} alt={node.text} title={node.text}
         referrerPolicy="no-referrer" className="inline-block h-[1.35em] w-[1.35em] align-text-bottom object-contain" />
       case 'mention': return <button key={index} type="button" className={linkClass} data-dynamic-open={`mention-${body.id}-${index}`}
-        onClick={event => navigate({ kind: 'author', mid: node.mid, name: node.text.trim().replace(/^@/, '') }, position?.(event))}>{node.text}</button>
+        onClick={event => navigate({ kind: 'author', mid: node.mid, name: node.text.trim().replace(/^@/, '') }, position?.(event), fromFocus(event))}>{node.text}</button>
       case 'video': return <button key={index} type="button" className={linkClass} data-dynamic-open={`video-${body.id}-${index}`}
-        onClick={event => navigate({ kind: 'watch', track: { key: node.bvid, title: node.text, artist: '', cover: null, duration_ms: null } }, position?.(event))}>
+        onClick={event => navigate({ kind: 'watch', track: { key: node.bvid, title: node.text, artist: '', cover: null, duration_ms: null } }, position?.(event), fromFocus(event))}>
         {node.text}
       </button>
       case 'topic': return <button key={index} type="button" className={linkClass}
@@ -472,6 +473,23 @@ function ForwardContent({ item, expandedBodies, onOpen, onAuthor }: {
   )
 }
 
+function AuthorDecoration({ card }: { card: NonNullable<ipc.DynamicItem['decoration']> }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) return null
+  const art = <>
+    <img src={card.image} srcSet={card.large ? `${card.large} 2x` : undefined} alt={card.name}
+      loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="w-full" />
+    {card.number && <span className="num absolute bottom-[20%] right-[31%] text-[9px] font-semibold leading-none sm:text-[11px]"
+      style={{ color: card.color ?? undefined }}>{card.number}</span>}
+  </>
+  const className = 'relative my-auto w-[78px] shrink-0 sm:w-[106px]'
+  const url = card.url
+  return url ? <a href={url} title={card.name} className={className}
+    onClick={event => { event.preventDefault(); void ipc.openExternal(url).catch(cause => toastFailure('打开动态装扮', cause)) }}>
+    {art}
+  </a> : <span title={card.name} className={className}>{art}</span>
+}
+
 function DynamicCard({
   item,
   expandedBodies,
@@ -500,6 +518,7 @@ function DynamicCard({
   return (
     <article
       data-dynamic-id={item.id}
+      data-focus-id={`dynamic:${item.id}`}
       tabIndex={-1}
       className="group rounded-[6px] bg-[var(--panel)] px-4 py-[18px] md:px-5"
     >
@@ -550,6 +569,7 @@ function DynamicCard({
             ) : null}
           </p>
         </div>
+        {item.decoration && <AuthorDecoration key={item.decoration.image} card={item.decoration} />}
         <button
           type="button"
           onClick={onExternal}
@@ -607,9 +627,9 @@ export function FeedCard({ item, expandedBodies = [], position }: {
         key: opened.bvid, title: opened.title, artist: opened.author, cover: opened.cover,
         duration_ms: opened.duration_ms, views: opened.views, danmaku: opened.danmaku,
         up_avatar: opened.face, up_mid: opened.mid,
-      } }, position?.(event))
+      } }, position?.(event), position ? undefined : `dynamic:${item.id}`)
     }}
-    onAuthor={(opened, event) => navigate({ kind: 'author', name: opened.author, mid: opened.mid }, position?.(event))}
+    onAuthor={(opened, event) => navigate({ kind: 'author', name: opened.author, mid: opened.mid }, position?.(event), position ? undefined : `dynamic:${item.id}`)}
     onExternal={() => openSite(item)} /></CardPosition.Provider>
 }
 

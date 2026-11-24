@@ -694,6 +694,9 @@ export type DynamicItem = {
   pub_ts: number
   nodes?: DynamicNode[]
   pinned?: boolean
+  decoration?: {
+    name: string; image: string; large: string | null; number: string | null; color: string | null; url: string | null
+  } | null
   attachment?: DynamicAttachment | null
   text: string
   bvid: string

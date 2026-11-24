@@ -132,6 +132,10 @@ export async function checkSocialPages(page, web, wait, check) {
     const entry = document.querySelector(${JSON.stringify(dynamics + ' [data-dynamic-id]')})
     return entry.textContent.includes('置顶') && entry.querySelector('a[href*="vote_id"]')?.textContent.includes('下一期想看什么')
   })()`))
+  check('作者行展示站方装扮、保留编号前导零，并能打开对应装扮', await page.evaluate(`(() => {
+    const card = document.querySelector(${JSON.stringify(dynamics + ' a[href*="item_id=1685952496002"]')})
+    return card?.textContent.includes('000102') && card.querySelector('img')?.alt === '2233夏日摇滚派对粉丝'
+  })()`))
   const filter = element(dynamics + ' input[type="search"]')
   await page.evaluate(`(() => {
     const input = ${filter}
@@ -142,6 +146,10 @@ export async function checkSocialPages(page, web, wait, check) {
   await byName(dynamics, '更多动态')
   await wait(`${element(dynamics + ' [data-dynamic-id]')}?.textContent.includes('晴天')`)
   check('空间动态搜索也能找到随后翻页加载的内容', true)
+  await click(element(dynamics + ' [data-dynamic-open="video"]'))
+  await click(element('button[aria-label="返回"]'))
+  await wait(`${filter}?.value === '晴天' && ${element(dynamics + ' [data-dynamic-id]')}?.textContent.includes('晴天')`)
+  check('从后续动态里的视频返回，搜索词和所在页得到恢复', true)
   await newPage('spaceDynamicsBlocked=1')
   await openSpace()
   await byName('nav[aria-label="空间内容"]', '动态')

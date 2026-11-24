@@ -23,6 +23,48 @@ pub struct DynamicAttachment {
     pub ends_at: Option<u64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicDecoration {
+    pub name: String,
+    pub image: String,
+    pub large: Option<String>,
+    pub number: Option<String>,
+    pub color: Option<String>,
+    pub url: Option<String>,
+}
+
+pub(super) fn dynamic_decoration(card: &Value) -> Option<DynamicDecoration> {
+    let large = dynamic_web_url(&card["big_card_url"]);
+    let image = dynamic_web_url(&card["card_url"]).or_else(|| large.clone())?;
+    let fan = &card["fan"];
+    let number = if dynamic_mid(&fan["is_fan"]) == Some(1) {
+        fan["num_desc"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(|n| format!("{}{n}", fan["num_prefix"].as_str().unwrap_or_default()))
+    } else {
+        None
+    };
+    Some(DynamicDecoration {
+        name: card["name"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("动态装扮")
+            .to_owned(),
+        large: large.filter(|src| *src != image),
+        image,
+        number,
+        color: fan["color"]
+            .as_str()
+            .filter(|s| {
+                s.strip_prefix('#')
+                    .is_some_and(|hex| hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
+            })
+            .map(str::to_string),
+        url: dynamic_web_url(&card["jump_url"]),
+    })
+}
+
 fn dynamic_web_url(value: &Value) -> Option<String> {
     let raw = value.as_str()?;
     let absolute = if raw.starts_with("//") {
@@ -197,6 +239,25 @@ mod tests {
         let mut hidden = item;
         hidden["visible"] = false.into();
         assert!(dynamic_item(&hidden).is_none());
+    }
+
+    #[test]
+    fn author_decoration_keeps_fan_number_and_pin() {
+        let data = json!({
+            "type": "DYNAMIC_TYPE_WORD", "id_str": "980592575466438663",
+            "modules": { "module_author": { "is_top": true, "decoration_card": {
+                "name":"2233夏日摇滚派对粉丝", "card_url":"https://i0.hdslb.com/bfs/garb/07926f3b3ce1aeaf5bb7701e2475bad8b6a5ce4e.png",
+                "jump_url":"https://www.bilibili.com/h5/mall/equity-link/collect-home?item_id=1685952496002",
+                "fan":{"is_fan":"1","num_desc":"000102","num_prefix":"","color":"#FB72BC"}
+            } } }
+        });
+        let item = dynamic_item(&data).unwrap();
+        assert!(item.pinned);
+        let dress = item.decoration.unwrap();
+        assert_eq!(dress.number.as_deref(), Some("000102"));
+        assert_eq!(dress.color.as_deref(), Some("#FB72BC"));
+        assert!(dress.url.unwrap().contains("item_id=1685952496002"));
+        assert!(dynamic_decoration(&Value::Null).is_none());
     }
 
     #[test]

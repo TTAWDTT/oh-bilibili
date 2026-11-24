@@ -7,6 +7,7 @@ export type SpaceSection = 'videos' | 'masterpieces' | 'collections' | 'dynamics
 export type SpaceShelf = { id: number; kind: 'season' | 'series'; name: string }
 export type AuthorRoute = {
   kind: 'author'; name: string; mid?: number | null; section?: SpaceSection; shelf?: SpaceShelf; shelfPage?: number
+  dynamicQuery?: string; dynamicPages?: number
 }
 
 export type View =

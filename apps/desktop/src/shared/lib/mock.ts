@@ -981,7 +981,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         if (args.offset) return { items: [{ ...item, id: '1129036400123456390', pinned: false }], offset: '', has_more: false }
         return { items: [{ ...item, kind: 'opus', pinned: true, title: '', text: '投票 [doge]', nodes: [
           { kind: 'text', text: '投票 ' }, { kind: 'emoji', text: '[doge]', image: '/assets/2233-coin.png' },
-        ], attachment: { label: '投票', title: '下一期想看什么？', detail: '345人参与', cover: null,
+        ], decoration: { name: '2233夏日摇滚派对粉丝', image: '/assets/cover-fallback.jpg', large: null,
+          url: 'https://www.bilibili.com/h5/mall/equity-link/collect-home?item_id=1685952496002', number: '000102', color: '#FB72BC' },
+          attachment: { label: '投票', title: '下一期想看什么？', detail: '345人参与', cover: null,
           ends_at: null, url: 'https://www.bilibili.com/h5/vote?vote_id=14989681' } }], offset: '1129036400123456391', has_more: true }
       }
       if (typographyMode !== null) {

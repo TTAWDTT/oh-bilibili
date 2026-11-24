@@ -4,8 +4,8 @@
 //! 两个接口都要 csrf（bili_jct），也必须登录。
 
 mod dynamic_content;
-pub use dynamic_content::{DynamicAttachment, DynamicNode};
-use dynamic_content::{dynamic_attachment, dynamic_nodes};
+pub use dynamic_content::{DynamicAttachment, DynamicDecoration, DynamicNode};
+use dynamic_content::{dynamic_attachment, dynamic_decoration, dynamic_nodes};
 use crate::client::{Client, API, LIVE_API};
 use crate::error::BiliError;
 use serde::{Deserialize, Serialize};
@@ -282,6 +282,8 @@ pub struct DynamicItem {
     pub nodes: Vec<DynamicNode>,
     #[serde(default)]
     pub pinned: bool,
+    #[serde(default)]
+    pub decoration: Option<DynamicDecoration>,
     #[serde(default)]
     pub attachment: Option<DynamicAttachment>,
     pub text: String,
@@ -1779,7 +1781,8 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
     let mut dynamic = DynamicItem {
         id,
         nodes: dynamic_nodes(&body["rich_text_nodes"], &discussion),
-        pinned: item["modules"]["module_tag"]["text"] == "置顶",
+        pinned: author["is_top"] == true || item["modules"]["module_tag"]["text"] == "置顶",
+        decoration: dynamic_decoration(&author["decoration_card"]).or_else(|| dynamic_decoration(&author["decorate"])),
         attachment: dynamic_attachment(&module["additional"], &discussion),
         kind,
         mid: dynamic_mid(&author["mid"]).unwrap_or(0),
