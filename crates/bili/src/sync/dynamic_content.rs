@@ -159,6 +159,68 @@ pub(super) fn dynamic_attachment(value: &Value, discussion: &str) -> Option<Dyna
                 vec![&card["desc1"], &card["desc2"]],
             )
         }
+        "ADDITIONAL_TYPE_GOODS" => {
+            let goods = &value["goods"];
+            let label = goods["head_text"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .unwrap_or("推荐商品");
+            let items = goods["items"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            if let [item] = items {
+                return Some(DynamicAttachment {
+                    label: label.into(),
+                    title: item["name"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("查看商品")
+                        .into(),
+                    detail: [&item["price"], &item["brief"]]
+                        .into_iter()
+                        .filter_map(Value::as_str)
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(" · "),
+                    cover: dynamic_web_url(&item["cover"]),
+                    url: dynamic_web_url(&item["jump_url"]).unwrap_or_else(|| discussion.into()),
+                    ends_at: None,
+                });
+            }
+            let titles = items
+                .iter()
+                .filter_map(|item| item["name"].as_str())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>();
+            return Some(DynamicAttachment {
+                label: label.into(),
+                title: if items.is_empty() {
+                    "在 B 站查看商品".into()
+                } else {
+                    format!("{} 件商品", items.len())
+                },
+                detail: titles.join("、"),
+                cover: items
+                    .first()
+                    .and_then(|item| dynamic_web_url(&item["cover"])),
+                url: discussion.into(),
+                ends_at: None,
+            });
+        }
+        "ADDITIONAL_TYPE_UPOWER_LOTTERY" => {
+            let card = &value["upower_lottery"];
+            let mut detail: Vec<_> = [&card["hint"], &card["desc"]]
+                .into_iter()
+                .filter(|field| field["visible"] == true)
+                .map(|field| &field["text"])
+                .collect();
+            let button = &card["button"];
+            if button["status"] == 2 && button["check"]["disable"] == 1 {
+                detail.push(&button["check"]["text"]);
+            }
+            ("充电抽奖", card, detail)
+        }
         "ADDITIONAL_TYPE_NONE" | "" => return None,
         _ => {
             return Some(DynamicAttachment {
@@ -258,6 +320,48 @@ mod tests {
         assert_eq!(dress.color.as_deref(), Some("#FB72BC"));
         assert!(dress.url.unwrap().contains("item_id=1685952496002"));
         assert!(dynamic_decoration(&Value::Null).is_none());
+    }
+
+    #[test]
+    fn product_card_keeps_the_cover_price_and_destination() {
+        let origin = "https://t.bilibili.com/721282703208480790";
+        let item = json!({"name":"啊脑袋周边抱枕","brief":"","price":"¥0",
+            "cover":"https://i0.hdslb.com/bfs/sycp/dpa/202210/34dc0c3c990f87dc838893a9345d0ff0.jpg",
+            "jump_url":"https://s.click.taobao.com/t?e=example","jump_desc":"去看看"});
+        let mut value = json!({"type":"ADDITIONAL_TYPE_GOODS","goods":{"head_text":"UP主的推荐","items":[item]}});
+        let card = dynamic_attachment(&value, origin).unwrap();
+        assert_eq!(card.label, "UP主的推荐");
+        assert_eq!(card.title, "啊脑袋周边抱枕");
+        assert_eq!(card.detail, "¥0");
+        assert_eq!(card.cover.as_deref(), item["cover"].as_str());
+        assert_eq!(Some(card.url.as_str()), item["jump_url"].as_str());
+
+        value["goods"]["items"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"name":"立牌"}));
+        let group = dynamic_attachment(&value, origin).unwrap();
+        assert_eq!(group.detail, "啊脑袋周边抱枕、立牌");
+        assert_eq!(group.url, origin);
+    }
+
+    #[test]
+    fn charging_lottery_shows_the_result_and_respects_hidden_fields() {
+        let official = "https://www.bilibili.com/h5/lottery/result?business_id=907162007084466193&business_type=12";
+        let mut attached = json!({"type":"ADDITIONAL_TYPE_UPOWER_LOTTERY","upower_lottery":{
+            "title":"为TA充电专属抽奖","hint":{"text":"加入当前UP主的「6元档包月充电」即可参与","visible":false},
+            "desc":{"text":"【大月卡】*5份","visible":false},"jump_url":official,
+            "button":{"type":2,"check":{"text":"已结束","disable":1},"status":2}
+        }});
+        let parse = |value: &Value| {
+            dynamic_attachment(value, "https://t.bilibili.com/907162007084466193").unwrap()
+        };
+        let ended = parse(&attached);
+        assert_eq!(ended.title, "为TA充电专属抽奖");
+        assert_eq!(ended.detail, "已结束");
+        assert_eq!(ended.url, official);
+        attached["upower_lottery"]["desc"]["visible"] = Value::Bool(true);
+        assert_eq!(parse(&attached).detail, "【大月卡】*5份 · 已结束");
     }
 
     #[test]
