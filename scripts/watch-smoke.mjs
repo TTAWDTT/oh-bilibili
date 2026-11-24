@@ -140,12 +140,15 @@ async function connect() {
   const nativeScale = typography ? (await send('Runtime.evaluate', { expression: 'devicePixelRatio' }, sid)).result.result.value : 1
   await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: nativeScale, mobile: false }, sid)
 
-  const viewport = (width, height) =>
-    send(
+  const viewport = async (width, height) => {
+    await send(
       'Emulation.setDeviceMetricsOverride',
       { width, height, deviceScaleFactor: nativeScale, mobile: false },
       sid,
     )
+    // Chrome 可能先确认窗口尺寸，下一帧才派发 resize；等布局落定再点会随窗口关闭的浮层。
+    await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  }
   const evaluate = async (expression) => {
     const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sid)
     return res.result?.result?.value
