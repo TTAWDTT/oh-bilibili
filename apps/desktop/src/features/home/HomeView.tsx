@@ -373,15 +373,7 @@ export function HomeView() {
       className="discovery-page min-h-0 flex-1 overflow-y-auto pb-10"
     >
       <header className="discovery-bar">
-        <h1>发现</h1>
-        <div className="discovery-shortcuts md:hidden">
-          <button type="button" onClick={() => navigate({ kind: 'popular' })}>
-            <Icon name="flame" size={15} />热门
-          </button>
-          <button type="button" onClick={() => navigate({ kind: 'ranking' })}>
-            <Icon name="rank" size={15} />排行
-          </button>
-        </div>
+        <h1 className="sr-only">发现</h1>
         <nav aria-label="发现分区" className="discovery-channels">
           <div ref={channelRef} className="discovery-channel-list no-scrollbar">
             {PARTS.map((part) => (
@@ -408,6 +400,14 @@ export function HomeView() {
             </button>
           )}
         </nav>
+        <div className="discovery-shortcuts md:hidden">
+          <button type="button" onClick={() => navigate({ kind: 'popular' })}>
+            <Icon name="popularFlame" size={20} />热门
+          </button>
+          <button type="button" onClick={() => navigate({ kind: 'ranking' })}>
+            <Icon name="rankRosette" size={20} />排行
+          </button>
+        </div>
         {scope === 0 && hero.length > 0 && (
           <button type="button" onClick={() => void refreshHero()} disabled={heroLoading}
             className="discovery-refresh t press disabled:pointer-events-none">

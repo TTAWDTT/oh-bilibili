@@ -5205,8 +5205,11 @@ async function main() {
     check('清空草稿保留已提交的结果与阅读位置', await page.evaluate(`(() => {
       const results = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      const query = results?.querySelector('.search-committed-query')
+      const card = results?.querySelectorAll('[data-track-card]')[2]?.querySelector('button[aria-label^="观看"]')
       return input?.value === '' && document.activeElement === input &&
-        results?.querySelector('h2')?.textContent.includes('周杰伦') &&
+        query?.getBoundingClientRect().width > 0 && query.innerText === '「周杰伦」的搜索结果' &&
+        card?.getAttribute('aria-label') === ${JSON.stringify(manyResults?.focused)} &&
         results.scrollTop === ${returnedMany.scrollTop}
     })()`))
     await page.evaluate(`[...document.querySelectorAll('[data-search-results] button')].find(b => b.textContent.trim() === '返回')?.click()`)

@@ -16,15 +16,15 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
     title: null,
     items: [
       { view: { kind: 'home' }, label: '发现', icon: 'biliTv' },
-      { view: { kind: 'dynamic' }, label: '动态', icon: 'dynamic' },
-      { view: { kind: 'messages' }, label: '消息', icon: 'message' },
+      { view: { kind: 'dynamic' }, label: '动态', icon: 'feedPaperplane' },
+      { view: { kind: 'messages' }, label: '消息', icon: 'msgEnvelope' },
       ...HOT_CHANNELS.map((channel) => ({
         view: { kind: channel.view } as View,
         label: channel.label,
         icon: channel.icon,
       })),
-      { view: { kind: 'live' }, label: '直播', icon: 'live' },
-      { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumi' },
+      { view: { kind: 'live' }, label: '直播', icon: 'liveCamera' },
+      { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumiClapper' },
     ],
   },
   {
@@ -79,8 +79,8 @@ export function Sidebar() {
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-          <Icon name={entry.icon} size={entry.icon === 'biliTv' ? 24 : 18} className={active ? 'bili-icon-pop' : ''} />
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center [&_img]:size-6">
+          <Icon name={entry.icon} size={18} className={active ? 'bili-icon-pop' : ''} />
         </span>
         {collapsed ? null : <span className="bili-sidebar-label min-w-0 truncate">{entry.label}</span>}
       </button>

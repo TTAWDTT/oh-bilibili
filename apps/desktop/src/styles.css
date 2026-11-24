@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "./ui.css";
 
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("/fonts/LXGWWenKai-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 /*
  * 设计语言：仿 Cursor。
  *
@@ -17,14 +25,9 @@
   --color-ink-raised: #ffffff;
   --color-hairline: #e3e5e7;
   --color-muted: #9499a0;
-  /*
-   * 字体栈照 B 站网页端：系统黑体优先，没有就用雅黑/思源，最后无衬线。
-   * 之前挂的是 LXGW 文楷（楷体），中文全变成手写感，这是「不像 B 站」最大的一处。
-   */
-  --font-sans: "PingFang SC", -apple-system, BlinkMacSystemFont, "HarmonyOS Sans SC", "Microsoft YaHei",
-    "Source Han Sans SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
-  /* 展示字号（歌词、播放器标题）用同一套黑体，只是字重更重。 */
+  --font-sans: "LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-display: var(--font-sans);
+  --font-mono: var(--font-sans);
 }
 
 :root {

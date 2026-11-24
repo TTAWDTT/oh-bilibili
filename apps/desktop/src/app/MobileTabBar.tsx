@@ -11,7 +11,7 @@ import type { IconName } from '../shared/ui/Icon'
  */
 const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
   { kind: 'home', label: '发现', icon: 'biliTv' },
-  { kind: 'dynamic', label: '动态', icon: 'dynamic' },
+  { kind: 'dynamic', label: '动态', icon: 'feedPaperplane' },
   { kind: 'library', label: '曲库', icon: 'library' },
   { kind: 'liked', label: '赞过', icon: 'heart' },
   { kind: 'profile', label: '我的', icon: 'user' },
@@ -40,8 +40,8 @@ export function MobileTabBar() {
               active ? 'font-semibold text-[var(--accent-strong)]' : 'text-[var(--text-3)]',
             ].join(' ')}
           >
-            <span className={`flex h-6 w-10 items-center justify-center rounded-full ${active ? 'bg-[var(--accent-soft)]' : ''}`}>
-              <Icon name={tab.icon} size={tab.icon === 'biliTv' ? 24 : 19} />
+            <span className={`flex h-6 w-10 items-center justify-center rounded-full [&_img]:size-6 ${active ? 'bg-[var(--accent-soft)]' : ''}`}>
+              <Icon name={tab.icon} size={19} />
             </span>
             {tab.label}
           </button>

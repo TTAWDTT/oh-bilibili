@@ -31,6 +31,7 @@ export function HotPageHeader({
 }) {
   const navigate = useAppStore((state) => state.navigate)
   const selectRef = useRef<HTMLSelectElement | null>(null)
+  const channel = HOT_CHANNELS.find((entry) => entry.view === active)!
 
   useEffect(() => {
     if (!focusChannelSelect) return
@@ -57,6 +58,11 @@ export function HotPageHeader({
         <div className="col-start-2 row-start-1 flex items-center justify-end gap-3 md:col-start-3">
           {aside}
           <span className="relative md:hidden">
+            <Icon
+              name={channel.icon}
+              size={18}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+            />
             <select
               ref={selectRef}
               data-hot-channel-select
@@ -68,7 +74,7 @@ export function HotPageHeader({
                 focusChannelSelect = true
                 navigate({ kind: next })
               }}
-              className="t h-8 appearance-none rounded-[6px] border border-[var(--line)] bg-[var(--panel)] pl-2.5 pr-7 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="t h-8 appearance-none rounded-[6px] border border-[var(--line)] bg-[var(--panel)] pl-8 pr-7 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               {HOT_CHANNELS.map((channel) => (
                 <option key={channel.view} value={channel.view}>

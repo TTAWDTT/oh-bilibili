@@ -408,6 +408,7 @@ export function TitleBar() {
             onFocus={() => setFocused(true)}
             placeholder="搜索视频、UP 主"
             aria-label="顶栏搜索"
+            data-search-draft-changed={text.trim() !== currentQuery.trim() || undefined}
             className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
           />
           {text ? (
@@ -459,7 +460,7 @@ export function TitleBar() {
           aria-label={unread?.total ? `消息，${unread.total} 条未读` : '消息'}
           className="bili-icon-btn t press relative flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
         >
-          <Icon name="message" size={18} />
+          <Icon name="msgEnvelope" size={20} />
           {unread && unread.total > 0 ? (
             <span className="num absolute -right-1 -top-0.5 min-w-4 rounded-full bg-[var(--accent)] px-1 text-[10px] leading-4 text-white">
               {unread.total > 99 ? '99+' : unread.total}
@@ -552,7 +553,7 @@ export function TitleBar() {
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
               >
-                <Icon name="bangumi" size={15} className="text-[var(--text-3)]" />
+                <Icon name="bangumiClapper" size={20} />
                 番剧
               </button>
               <button
@@ -565,7 +566,7 @@ export function TitleBar() {
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
               >
-                <Icon name="live" size={15} className="text-[var(--text-3)]" />
+                <Icon name="liveCamera" size={20} />
                 直播
               </button>
               <div className="my-1 h-px bg-hairline" />

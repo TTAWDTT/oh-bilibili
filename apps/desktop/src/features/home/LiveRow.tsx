@@ -33,7 +33,9 @@ export function LiveRow() {
   return (
     <section className="discovery-shelf px-4 md:px-8" aria-labelledby="home-live-heading">
       <div className="discovery-shelf-heading">
-        <h2 id="home-live-heading" className="discovery-heading">正在直播</h2>
+        <h2 id="home-live-heading" className="discovery-heading">
+          <Icon name="liveCamera" size={20} />正在直播
+        </h2>
         <span className="discovery-browser-note"><Icon name="external" size={12} />在浏览器观看</span>
         <button type="button" onClick={() => navigate({ kind: 'live' })}>
           全部直播 <Icon name="chevronRight" size={14} />

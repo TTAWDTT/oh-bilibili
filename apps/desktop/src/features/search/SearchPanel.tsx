@@ -361,58 +361,53 @@ export function SearchPanel({ query }: { query: string }) {
       data-search-results
       className="search-results-page min-h-0 flex-1 overflow-y-auto"
     >
-      <div className="search-results-heading">
-        <h2 title={trimmed}>
-          <span className="truncate">{trimmed || '搜索'}</span>
-          {trimmed && <span className="shrink-0 text-[14px] font-normal text-[var(--text-2)]">的搜索结果</span>}
-        </h2>
-        <button type="button" onClick={goBack} className="search-go-back">
-          <Icon name="chevronLeft" size={15} />返回
-        </button>
-      </div>
-        {trimmed.length === 0 ? (
-          <div className="flex min-h-[320px] items-center justify-center text-[13px] text-[var(--text-3)]">
-            在顶部搜索栏输入关键词
-          </div>
-        ) : (
-          <section>
-            {/* B 站搜索页的分类 tab：综合里同时有 UP 主和视频，也可以只看其中一类。 */}
-            <nav
-              aria-label="搜索结果分类"
-              className="search-results-tabs"
+      <div className="search-results-bar">
+        {trimmed && (
+          <nav aria-label="搜索结果分类" className="search-results-tabs">
+            {([
+              ['all', '综合'],
+              ['video', '视频'],
+              ['user', 'UP 主'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-current={tab === value ? 'page' : undefined}
+                onClick={() => selectTab(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        )}
+        {trimmed && <p className="search-committed-query truncate" title={trimmed}>「{trimmed}」的搜索结果</p>}
+        <div className="search-results-actions">
+          {trimmed && tab !== 'user' && (
+            <button
+              className="search-filter-toggle"
+              type="button"
+              aria-controls="search-video-filters"
+              aria-expanded={filtersOpen}
+              onClick={() => {
+                setFiltersOpen(!filtersOpen)
+                scrollerRef.current?.scrollTo({ top: 0 })
+              }}
             >
-              {(
-                [
-                  ['all', '综合'],
-                  ['video', '视频'],
-                  ['user', 'UP 主'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-current={tab === value ? 'page' : undefined}
-                  onClick={() => selectTab(value)}
-                >
-                  {label}
-                </button>
-              ))}
-              {tab !== 'user' && (
-                <button
-                  className="search-filter-toggle"
-                  type="button"
-                  aria-controls="search-video-filters"
-                  aria-expanded={filtersOpen}
-                  onClick={() => {
-                    setFiltersOpen(!filtersOpen)
-                    scrollerRef.current?.scrollTo({ top: 0 })
-                  }}
-                >
-                  {filtersOpen ? '收起筛选' : '筛选'}
-                  <Icon name="chevronRight" size={14} className={filtersOpen ? '-rotate-90' : 'rotate-90'} />
-                </button>
-              )}
-            </nav>
+              筛选
+              <Icon name="chevronRight" size={14} className={filtersOpen ? '-rotate-90' : 'rotate-90'} />
+            </button>
+          )}
+          <button type="button" onClick={goBack} className="search-go-back" aria-label="返回" title="返回">
+            <Icon name="chevronLeft" size={15} /><span>返回</span>
+          </button>
+        </div>
+      </div>
+      {trimmed.length === 0 ? (
+        <div className="flex min-h-[320px] items-center justify-center text-[13px] text-[var(--text-3)]">
+          在顶部搜索栏输入关键词
+        </div>
+      ) : (
+          <section>
             {tab === 'user' && usersReady && users.length > 0 ? (
               <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {users.map((user) => (
@@ -563,7 +558,7 @@ export function SearchPanel({ query }: { query: string }) {
             )}
             <div className="search-video-heading">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-[19px] font-semibold text-[var(--text-1)]">视频</h3>
+                <h2 className="text-[19px] font-semibold text-[var(--text-1)]">视频</h2>
                 {tracks.length > 0 ? (
                   <span className="num text-[12px] text-[var(--text-3)]">已加载 {formatCount(tracks.length)} 个</span>
                 ) : null}

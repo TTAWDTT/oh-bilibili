@@ -382,6 +382,46 @@
   animation: bili-live-pulse 1.6s ease-in-out infinite;
 }
 
+.precious-editing-desk {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .precious-editing-desk,
+  .messages-header-content::after {
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: right center;
+  }
+
+  .precious-editing-desk {
+    display: block;
+    width: clamp(180px, 25vw, 320px);
+    height: 52px;
+    margin-block: -9px;
+    background-image: url('/assets/illustrations/precious-editing-desk.webp');
+  }
+
+  .messages-header-content {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 1rem;
+  }
+
+  .messages-header-content nav {
+    grid-column: 1;
+  }
+
+  .messages-header-content::after {
+    content: '';
+    grid-area: 1 / 2 / 3 / 3;
+    justify-self: end;
+    width: min(100%, 320px);
+    margin-block: -10px 5px;
+    background-image: url('/assets/illustrations/messages-mail-desk.webp');
+  }
+}
+
 @media (min-width: 1024px) {
   [data-hot-page="weekly"] {
     background-image: url('/assets/illustrations/weekly-projector.png');
@@ -839,11 +879,13 @@
 }
 
 /* 带图标的按钮：悬停时让图标自己弹一下，而不是整颗按钮变大 */
-.bili-icon-btn svg {
+.bili-icon-btn svg,
+.bili-nav-item img {
   transition: transform 160ms var(--spring);
 }
 
-.bili-icon-btn:not(.bili-tri-btn):hover svg {
+.bili-icon-btn:not(.bili-tri-btn):hover svg,
+.bili-nav-item:hover img {
   transform: scale(1.12);
 }
 

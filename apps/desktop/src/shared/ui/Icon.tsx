@@ -2,6 +2,14 @@ import type { ReactNode } from 'react'
 import { BiliTvMark } from './BiliTvMark'
 
 const ICONS = {
+  feedPaperplane: 'feed-paperplane',
+  msgEnvelope: 'msg-envelope',
+  popularFlame: 'popular-flame',
+  preciousTicket: 'precious-ticket',
+  weeklyCalendar: 'weekly-calendar',
+  rankRosette: 'rank-rosette',
+  liveCamera: 'live-camera',
+  bangumiClapper: 'bangumi-clapper',
   /** 投币：B 站的硬币是圆形加两道横纹，投出去会翻面。 */
   coin: (
     <>
@@ -405,20 +413,16 @@ const ICONS = {
       <path d="M8.4 12h7.2M8.4 15.2h5.2" />
     </>
   ),
-  /** 番剧：一张竖版海报，右上角压一颗星，表示追番。 */
-  bangumi: (
-    <>
-      <rect x="4.4" y="3.4" width="15.2" height="17.2" rx="2" />
-      <path d="M8.2 20.6V17h7.6v3.6" />
-      <path d="m14.8 7.4 1.1 2.2 2.4.4-1.7 1.7.4 2.4-2.2-1.1-2.2 1.1.4-2.4L11.3 10l2.4-.4 1.1-2.2Z" fill="currentColor" stroke="none" />
-    </>
-  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof ICONS | 'biliTv'
 
 export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {
   if (name === 'biliTv') return <BiliTvMark size={size} className={className} />
+  const glyph = ICONS[name]
+  if (typeof glyph === 'string') {
+    return <img src={`/assets/illustrations/${glyph}.png`} alt="" width={size} height={size} draggable={false} className={className} />
+  }
   return (
     <svg
       viewBox="0 0 24 24"
@@ -432,7 +436,7 @@ export function Icon({ name, size = 18, className }: { name: IconName; size?: nu
       strokeLinejoin="round"
       aria-hidden
     >
-      {ICONS[name]}
+      {glyph}
     </svg>
   )
 }
