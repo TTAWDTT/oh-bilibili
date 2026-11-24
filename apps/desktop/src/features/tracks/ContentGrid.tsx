@@ -164,7 +164,7 @@ const TrackCard = memo(function TrackCard({
       data-index={index}
       className="bili-card group"
     >
-      <div className="relative">
+      <div className="bili-card-media relative aspect-[16/10]">
         <button
           type="button"
           onClick={() => onOpen(track)}
@@ -173,8 +173,7 @@ const TrackCard = memo(function TrackCard({
           aria-describedby={pinned ? `space-pin-${track.key}` : undefined}
           /* 封面本身就是卡片：不描边，靠图片与留白分隔，鼠标悬停时整块抬升。
              之前每张封面套 1px 灰边，一屏几十张全是框线，页面读起来像表格。 */
-          className="relative block w-full overflow-hidden rounded-[8px]"
-          style={{ aspectRatio: '16 / 10' }}
+          className="relative block size-full overflow-hidden rounded-[8px]"
         >
           <Cover cover={track.cover} title={track.title} width={260} className="bili-card-cover h-full w-full" />
           {ranked ? (

@@ -61,51 +61,6 @@ export type Toast = { id: number; tone: ToastTone; title: string; detail: string
 
 let toastSeq = 0
 
-let pendingGlide: Map<HTMLElement, DOMRect> | null = null
-let glideAnimations: Animation[] = []
-
-/**
- * 侧边栏换宽度会让整个网格重排一次，可见卡片的位置跟着变。
- * 先记下旧位置，等新布局提交后再补一段位移动画。
- *
- * 旧位置必须在点下去的这一帧读，不能在 React 提交之后读；动画则必须等
- * 提交后、绘制前启动，所以分成 capture 和 glide 两步。
- */
-function captureCards(): void {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const scroller = document.getElementById('scroll-main')
-  if (!scroller) return
-  const before = new Map<HTMLElement, DOMRect>()
-  for (const card of scroller.querySelectorAll<HTMLElement>('article[data-track-card]')) {
-    const rect = card.getBoundingClientRect()
-    if (rect.bottom > 0 && rect.top < window.innerHeight) before.set(card, rect)
-  }
-  pendingGlide = before.size > 0 ? before : null
-}
-
-/** 在新布局提交后、绘制前调用：把卡片从旧位置滑回新位置。 */
-export function glideCards(): void {
-  const before = pendingGlide
-  pendingGlide = null
-  if (!before) return
-  for (const animation of glideAnimations) animation.cancel()
-  glideAnimations = []
-  for (const [card, oldRect] of before) {
-    if (!card.isConnected) continue
-    const rect = card.getBoundingClientRect()
-    const dx = oldRect.left - rect.left
-    const dy = oldRect.top - rect.top
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
-    // WAAPI 的 transform 动画走合成器，主线程忙着重排时也不会掉帧。
-    glideAnimations.push(
-      card.animate(
-        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
-        { duration: 180, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' },
-      ),
-    )
-  }
-}
-
 /** 左栏收起状态跟着窗口走：关掉再打开还是上次那种宽度。 */
 const SIDEBAR_KEY = 'oh-bilibili:sidebar'
 
@@ -197,7 +152,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   toggleSidebar: () => {
     const next: SidebarMode = get().sidebar === 'full' ? 'rail' : 'full'
     saveSidebar(next)
-    captureCards()
     set({ sidebar: next })
   },
   // 默认收起：没在播放时右栏没有内容，让它占宽度就是把中间白白挤窄。
