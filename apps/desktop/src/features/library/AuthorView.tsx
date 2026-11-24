@@ -51,7 +51,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const [isFallback, setIsFallback] = useState(false)
   /** 排序：B 站空间页那三档。 */
   const [order, setOrder] = useState<'pubdate' | 'click' | 'stow'>('pubdate')
-  const [page, setPage] = useState(1)
+  const [cursor, setCursor] = useState({ epoch: 0, page: 1 })
   const [loadingMore, setLoadingMore] = useState(false)
   /** 第几次取数：换排序/换作者后，旧的翻页响应直接丢掉。 */
   const loadEpoch = useRef(0)
@@ -123,9 +123,9 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
 
   useEffect(() => {
     let cancelled = false
-    // 换排序也要从第 1 页重新开始，否则下一页会从旧的页码继续。
-    setPage(1)
     const epoch = ++loadEpoch.current
+    loadingRef.current = false
+    setLoadingMore(false)
     if (mid) {
       void ipc
         .spaceVideos(mid, 1, order)
@@ -134,6 +134,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
           setIsFallback(false)
           setTracks(list)
           setTotal(total)
+          setCursor({ epoch, page: 1 })
         })
         .catch(() => {
           // 空间接口不通时退回搜索聚合，并在界面上标注
@@ -172,10 +173,10 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
 
   /** 往下滚到底再取下一页；空间接口一页 50 条。 */
   const loadMore = async (): Promise<void> => {
-    if (!mid || loadingRef.current || isFallback || !tracks || tracks.length >= total) return
+    if (!mid || cursor.epoch !== loadEpoch.current || loadingRef.current || isFallback || !tracks || tracks.length >= total) return
     loadingRef.current = true
     setLoadingMore(true)
-    const epoch = loadEpoch.current
+    const { epoch, page } = cursor
     try {
       const [list] = await ipc.spaceVideos(mid, page + 1, order)
       if (loadEpoch.current !== epoch) return
@@ -184,13 +185,15 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
         setTotal(tracks.length)
       } else {
         setTracks((prev) => [...(prev ?? []), ...list])
-        setPage((n) => n + 1)
+        setCursor({ epoch, page: page + 1 })
       }
     } catch {
       // 取不到就停在已加载的那一页，不假装到底
     } finally {
-      loadingRef.current = false
-      setLoadingMore(false)
+      if (loadEpoch.current === epoch) {
+        loadingRef.current = false
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -324,7 +327,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
       </header>
 
       <div className={`space-inner space-body${showProfile ? ' with-profile' : ''}`}>
-        {showProfile && <SpaceProfile mid={mid} card={card} isSelf={isSelf} profile={profile} />}
+        {mid && <SpaceProfile hidden={!showProfile} mid={mid} card={card} isSelf={isSelf} profile={profile} />}
         <div className="space-content min-w-0">
           {mid && section === 'catalog' ? (
             <AuthorCatalog view={view} mid={mid} />
@@ -341,7 +344,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
               <ContentGrid tracks={masterpieces} activeKey={snapshot?.track?.key ?? null} playing={snapshot?.phase === 'playing'} />
             ) : <p className="text-[14px] text-[var(--text-3)]">还没有设置代表作</p>
           ) : (
-            <AuthorSubmissions view={view} tracks={tracks} pinned={pinned} order={order} onOrder={setOrder}
+            <AuthorSubmissions view={view} tracks={tracks} pinned={pinned} listVersion={cursor.epoch} order={order} onOrder={setOrder}
               isFallback={isFallback} loadingMore={loadingMore} onNeedMore={loadMore} />
           )}
         </div>

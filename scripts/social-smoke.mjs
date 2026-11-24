@@ -189,6 +189,15 @@ export async function checkSocialPages(page, web, wait, check) {
   await wait(buttons('#scroll-main', '充电'))
   check('资料重试成功后显示公开生日、充电和已佩戴粉丝牌', await page.evaluate(`document.querySelector('section[aria-label="空间资料"]').textContent.includes('05-16') &&
     document.querySelector('[title="佩戴的粉丝勋章"]').textContent.includes('剪辑 18')`))
+  const uid = await page.evaluate("document.querySelector('header[data-up-mid]').dataset.upMid")
+  await byName('nav[aria-label="空间内容"]', '动态')
+  await wait(`document.querySelector('section[aria-label="作者动态"]') && !${notice}?.getClientRects().length`)
+  await byName('nav[aria-label="空间内容"]', '投稿')
+  await wait(`${pinned}?.getClientRects().length`)
+  check('看过动态再回到投稿，刚展开的资料和勋章墙仍在', await page.evaluate(`
+    (${buttons('#scroll-main', '空间资料')})?.getAttribute('aria-expanded') === 'true' &&
+    document.querySelector('section[aria-label="空间资料"]')?.innerText.includes(${JSON.stringify(uid)}) &&
+    document.querySelector('ul[aria-label="粉丝勋章"]')?.innerText.includes('同行 18')`))
   await page.viewport(390, 844)
   await wait(`${banner}.currentSrc.endsWith('cover-fallback.jpg') && ${banner}.naturalWidth > 0`)
   check('窄窗展开资料可以读公告、看直播间，且没有横向溢出', await page.evaluate(`

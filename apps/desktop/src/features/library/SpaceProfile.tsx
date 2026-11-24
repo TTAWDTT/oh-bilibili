@@ -35,7 +35,8 @@ function open(url: string) {
   void ipc.openExternal(url).catch((cause) => toastFailure('打开 B 站', cause))
 }
 
-export function SpaceProfile({ mid, card, isSelf, profile }: {
+export function SpaceProfile({ mid, card, isSelf, profile, hidden }: {
+  hidden: boolean
   mid: number
   card: ipc.AuthorCard | null
   isSelf: boolean
@@ -52,7 +53,7 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
   const liveRoom = room.value
   const roomLabel = liveRoom?.live ? '直播中' : liveRoom?.looping ? '轮播中' : '直播间'
   return (
-    <aside aria-label="作者资料栏" className="space-profile" data-expanded={expanded}>
+    <aside hidden={hidden} aria-label="作者资料栏" className="space-profile" data-expanded={expanded}>
       <button type="button" aria-expanded={expanded}
         onClick={() => { setExpanded(!expanded); if (!expanded) profile.request() }}
         className="space-profile-heading w-full py-2 text-left hover:text-[var(--accent-strong)]">

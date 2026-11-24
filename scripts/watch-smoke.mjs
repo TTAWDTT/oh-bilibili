@@ -2671,11 +2671,23 @@ async function checkAuthorSpace(page) {
   const card = 'document.querySelector("#scroll-main [data-track-card]")'
   const header = 'document.querySelector("header[data-up-mid]")'
   const scroll = 'document.getElementById("scroll-main")'
+  const keys = () => page.evaluate(`Array.from(${scroll}.querySelectorAll('[data-track-card]'), card => card.dataset.key)`)
+  const loadAll = async () => {
+    let current = []
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      current = await keys()
+      if (current.length === 125) break
+      await page.evaluate(`${scroll}.scrollTop = ${scroll}.scrollHeight`)
+      await sleep(300)
+    }
+    return current
+  }
 
   await page.viewport(1320, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?authorLong=1`)}`)
-  const discoveryCover = 'document.querySelector("[data-track-card] button[aria-label^=观看]")'
-  await wait(`location.search === '?authorLong=1' && ${discoveryCover}`)
+  const query = '?authorLong=1&spaceSlowMid=900015'
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + query)}`)
+  const discoveryCover = `document.querySelector('[data-track-card]:has(button[aria-label="UP 张学友"]) button[aria-label^=观看]')`
+  await wait(`location.search === ${JSON.stringify(query)} && ${discoveryCover}`)
   await page.evaluate(`${discoveryCover}.click()`)
   const owner = `document.querySelector('button[aria-label^="看 "][aria-label$="的更多视频"]')`
   await wait(owner)
@@ -2693,30 +2705,23 @@ async function checkAuthorSpace(page) {
     ${card}.dataset.trackTitle.endsWith('第 1 期') &&
     ${card}.querySelector('h3').getBoundingClientRect().bottom <= ${scroll}.getBoundingClientRect().bottom`))
 
+  // 第一页 50 条刚显示时，第二页仍在路上；此刻换序也要拿全新排序的后两页。
+  await wait(`${header}.dataset.upMid === '900015' && ${scroll}.querySelectorAll('[data-track-card]').length === 50 &&
+    [...${scroll}.querySelectorAll('[role=status]')].some(node => node.textContent.includes('正在取更多投稿'))`)
   await page.clickExactText('最多播放')
   await wait(`${card}.dataset.trackTitle.endsWith('第 125 期')`)
   check('最多播放首位换成播放数最高的一期', await page.evaluate(`${card}.dataset.trackTitle !== ${JSON.stringify(firstTitle)}`))
 
+  const played = await loadAll()
+  check(`第二页加载中切换排序，能继续取完新排序的 125 条（实际 ${played.length} 条）`,
+    played.length === 125 && new Set(played).size === 125)
   await page.evaluate(`${scroll}.scrollTop = 380`)
   await page.clickExactText('最多收藏')
   await wait(`[...document.querySelectorAll('button[aria-pressed=true]')].some(b => b.textContent.trim() === '最多收藏')`)
   check('切最多收藏时仍停留在原滚动位置', await page.evaluate(`${header} && ${scroll}.scrollTop >= 300`))
 
-  const keys = () => page.evaluate(`Array.from(${scroll}.querySelectorAll('[data-track-card]'), card => card.dataset.key)`)
-  const loadAll = async () => {
-    let current = []
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      current = await keys()
-      if (current.length === 125) break
-      await page.evaluate(`${scroll}.scrollTop = ${scroll}.scrollHeight`)
-      await sleep(300)
-    }
-    return current
-  }
+  await wait(`!${card}.dataset.trackTitle.endsWith('第 125 期')`)
   const collected = await loadAll()
-  await page.clickExactText('最多播放')
-  await wait(`${card}.dataset.trackTitle.endsWith('第 125 期')`)
-  const played = await loadAll()
   check('切换排序前后，两次都能翻到完整的 125 个不同投稿和正确总数',
     new Set(collected).size === 125 && new Set(played).size === 125 &&
     collected.slice().sort().join() === played.slice().sort().join() &&

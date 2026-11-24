@@ -15,6 +15,7 @@ type Order = (typeof orders)[number][0]
 type Props = {
   view: AuthorRoute
   tracks: Track[] | null
+  listVersion: number
   pinned: Track | null
   order: Order
   onOrder: (order: Order) => void
@@ -23,7 +24,7 @@ type Props = {
   onNeedMore: () => void
 }
 
-export function AuthorSubmissions({ view, tracks, pinned, order, onOrder, isFallback, loadingMore, onNeedMore }: Props) {
+export function AuthorSubmissions({ view, tracks, pinned, listVersion, order, onOrder, isFallback, loadingMore, onNeedMore }: Props) {
   const activeKey = usePlayerStore(state => state.snapshot?.track?.key ?? null)
   const playing = usePlayerStore(state => state.snapshot?.phase === 'playing')
   const focusSearch = useAppStore(state => state.focusSearch)
@@ -61,7 +62,8 @@ export function AuthorSubmissions({ view, tracks, pinned, order, onOrder, isFall
           {tracks.length ? `来自搜索结果，共 ${tracks.length} 个` : '空间投稿暂时没取到'}
         </p>
       )}
-      {gallery.length > 0 && <ContentGrid tracks={gallery} pinnedKey={pinned?.key}
+      {/* 新排序的第一页也可能刚好是 50 条；替换列表时要重新启动网格预取。 */}
+      {gallery.length > 0 && <ContentGrid key={listVersion} tracks={gallery} pinnedKey={pinned?.key}
         activeKey={activeKey} playing={playing} onNeedMore={onNeedMore} />}
       {tracks === null ? <BiliLoader label="正在取投稿…" /> : gallery.length === 0 ? (
         <EmptyState icon="biliTv" compact
