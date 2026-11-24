@@ -1021,6 +1021,12 @@ mod queue_restore_tests {
         assert_eq!(resumed.track.unwrap().key, x);
         assert!((193_000..=196_000).contains(&resumed.position_ms));
         assert_eq!(engine.active_page(&x).as_ref(), Some(p2));
+        for at in [254_000, 130_000] {
+            let sought = engine.seek(at);
+            assert_eq!(sought.phase, "paused");
+            assert_eq!(sought.position_ms, at, "暂停时跳转回执应包含解码后的进度");
+            assert_eq!(lock(&engine.player).clock().position_ms(), at);
+        }
         println!(
             "X P1={} P2={} / Y={} / 恢复位置={}ms",
             view.pages[0].cid, p2.cid, temporary.pages[0].cid, resumed.position_ms
@@ -2431,8 +2437,9 @@ impl Engine {
                 _ => false,
             }
         };
-        if local {
-            lock(&self.player).seek_local(target);
+        if local || state.phase() == "paused" {
+            let finished = lock(&self.player).seek_with_receipt(target);
+            let _ = finished.recv();
         } else {
             lock(&self.player).seek(target);
         }

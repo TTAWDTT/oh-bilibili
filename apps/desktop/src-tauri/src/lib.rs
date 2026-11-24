@@ -485,8 +485,14 @@ async fn player_prev(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn player_seek(engine: tauri::State<'_, Arc<Engine>>, position_ms: u64) -> PlayerSnapshot {
-    engine.seek(position_ms)
+async fn player_seek(
+    engine: tauri::State<'_, Arc<Engine>>,
+    position_ms: u64,
+) -> Result<PlayerSnapshot, WireError> {
+    let engine = engine.inner().clone();
+    tokio::task::spawn_blocking(move || engine.seek(position_ms))
+        .await
+        .map_err(|error| WireError::internal(error.to_string()))
 }
 
 #[tauri::command(rename_all = "snake_case")]
