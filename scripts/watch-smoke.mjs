@@ -593,6 +593,27 @@ async function checkStageLyrics(page) {
     '打开舞台先聚焦退出键，Tab 不进入被遮住的底栏',
     openedFocus.label === '退出舞台' && openedFocus.inside && tabFocusInside,
   )
+  const volumePanel = `document.querySelector('.stage [data-volume-panel]')`
+  const volume = await page.evaluate(`(() => {
+    const panel = ${volumePanel}
+    const button = panel.previousElementSibling.getBoundingClientRect()
+    const track = panel.querySelector('[role="slider"]').firstElementChild.getBoundingClientRect()
+    return {
+      speakerX: button.x + button.width / 2, speakerY: button.y + button.height / 2,
+      left: track.left, right: track.right, y: track.y + track.height / 2,
+      title: document.querySelector('.stage h2').innerText,
+    }
+  })()`)
+  await page.mouseEvent({ type: 'mouseMoved', x: volume.speakerX, y: volume.speakerY })
+  await watchUiWait(page)(`getComputedStyle(${volumePanel}).opacity === '1'`)
+  await page.mouseEvent({ type: 'mouseMoved', x: volume.right, y: volume.y })
+  await page.mouseEvent({ type: 'mousePressed', x: volume.right, y: volume.y, button: 'left', buttons: 1, clickCount: 1 })
+  await page.mouseEvent({ type: 'mouseMoved', x: volume.left, y: volume.y, buttons: 1 })
+  check('舞台拖动音量时读数随手势到 0%', await page.evaluate(`${volumePanel}.querySelector('[data-volume-value]').innerText === '0%'`))
+  await page.mouseEvent({ type: 'mouseReleased', x: volume.left, y: volume.y, button: 'left', buttons: 0, clickCount: 1 })
+  await sleep(250)
+  check('松开音量滑杆继续听同一首', volume.title === await page.evaluate(`document.querySelector('.stage h2').innerText`))
+
   const stage = await page.evaluate(`(() => {
     const root = document.querySelector('.stage')
     const lyrics = document.querySelector('[data-stage-lyric-scroll]')
@@ -5135,26 +5156,74 @@ async function main() {
       check(`${width} 宽保留画中画、音量、网页全屏、全屏`, !!fit && fit.pip && fit.volume && fit.web && fit.full)
       check(`${width} 宽截图入口按空间收起`, !!fit && !fit.shot)
 
-      const mute = await page.evaluate(`(() => {
-        const btn = document.querySelector('button[aria-label="静音"], button[aria-label="取消静音"]')
+      const speaker = `document.querySelector('[data-watch-controls] button:is([aria-label="静音"], [aria-label="取消静音"])')`
+      const speakerCenter = () => page.evaluate(`(() => {
+        const btn = ${speaker}
         if (!btn) return null
         const box = btn.getBoundingClientRect()
         return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
       })()`)
+      const mute = await speakerCenter()
       check(`${width} 宽有音量按钮`, !!mute)
       if (!mute) continue
-      const volumeWidth = () => page.evaluate(`(() => {
-        const slider = document.querySelector('[role="slider"][aria-label="音量"]')
-        return slider?.parentElement?.getBoundingClientRect().width ?? 0
-      })()`)
-      const before = await volumeWidth()
-      await page.mouseEvent({ type: 'mouseMoved', x: mute.x, y: mute.y })
-      await sleep(300)
-      const after = await volumeWidth()
+      const volume = `document.querySelector('[data-watch-controls] [role="slider"][aria-label="音量"]')`
+      const panel = `document.querySelector('[data-watch-controls] [data-volume-panel]')`
+      const hit = `(() => {
+        const slider = ${volume}
+        const box = slider.getBoundingClientRect()
+        return slider.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+      })()`
+      const visible = `getComputedStyle(${panel}).opacity === '1' && ${hit}`
+      const closed = `getComputedStyle(${panel}).opacity === '0' && !${hit}`
+      check(`${width} 宽音量浮层起初收起`, await page.evaluate(closed))
+      await page.mouseEvent({ type: 'mouseMoved', ...mute })
+      await watchUiWait(page)(visible)
+      const after = await speakerCenter()
+      check(`${width} 宽悬停后喇叭留在原位`, after && Math.abs(after.x - mute.x) < 1 && Math.abs(after.y - mute.y) < 1)
       const expanded = await controlFit(page)
-      check(`${width} 宽音量滑杆真的展开`, after > before + 40)
       check(`${width} 宽音量展开后控制条仍完整`, !!expanded && expanded.overflow <= 1 && expanded.outside === 0)
+      for (const [key, value] of [['Home', 0], ['End', 100]]) {
+        await page.evaluate(`${volume}.focus()`)
+        await page.keyEvent({ type: 'keyDown', key, code: key })
+        await page.keyEvent({ type: 'keyUp', key, code: key })
+        await watchUiWait(page)(`${volume}.getAttribute('aria-valuenow') === '${value}'`)
+        await page.evaluate(`${volume}.blur()`)
+        check(`${width} 宽音量 ${value}% 时读数正确、圆点完整可见`, await page.evaluate(`(() => {
+          const slider = ${volume}
+          const thumb = slider.querySelector('[data-slider-thumb]')
+          const circle = thumb.getBoundingClientRect()
+          const bounds = slider.getBoundingClientRect()
+          const readout = ${panel}.querySelector('[data-volume-value]')
+          return ${speaker}.matches(':hover') && readout?.innerText === '${value}%' &&
+            getComputedStyle(thumb).opacity === '1' && circle.width > 0 &&
+            circle.left >= bounds.left && circle.right <= bounds.right &&
+            circle.top >= bounds.top && circle.bottom <= bounds.bottom
+        })()`))
+      }
+      const track = await page.evaluate(`(() => {
+        const box = ${volume}.firstElementChild.getBoundingClientRect()
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      })()`)
+      for (let step = 1; step <= 12; step++) {
+        await page.mouseEvent({
+          type: 'mouseMoved',
+          x: mute.x + (track.x - mute.x) * step / 12,
+          y: mute.y + (track.y - mute.y) * step / 12,
+        })
+      }
+      check(`${width} 宽从喇叭斜移到滑杆仍能调节`, await page.evaluate(`${visible} && ${volume}.matches(':hover')`))
       await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
+      await watchUiWait(page)(closed)
+      const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 }
+      await page.evaluate(`${speaker}.focus()`)
+      await page.keyEvent({ type: 'keyDown', ...tab })
+      await page.keyEvent({ type: 'keyUp', ...tab })
+      check(`${width} 宽 Tab 可以从喇叭进入滑杆`, await page.evaluate(`document.activeElement === ${volume}`))
+      await watchUiWait(page)(visible)
+      await page.keyEvent({ type: 'keyDown', ...tab })
+      await page.keyEvent({ type: 'keyUp', ...tab })
+      await watchUiWait(page)(closed)
+      check(`${width} 宽 Tab 移出后收起音量浮层`, !await page.evaluate(`${panel}?.contains(document.activeElement)`))
     }
 
     await page.viewport(700, 860)

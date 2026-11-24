@@ -24,7 +24,7 @@ export function useSwipe({
     onPointerDown: (event) => {
       // 从按钮、输入框起手是要点它们，不是滑动
       const target = event.target as HTMLElement
-      if (target.closest('button, input, textarea, a, [role="button"]')) {
+      if (target.closest('button, input, textarea, a, [role="button"], [role="slider"]')) {
         start.current = null
         return
       }
