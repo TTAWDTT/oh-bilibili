@@ -1835,6 +1835,25 @@ async function checkDiscoveryEditor(page) {
   await edit('取消')
   check('关闭编辑器后键盘焦点回到全部分区',
     await page.evaluate(`document.activeElement === document.querySelector(${JSON.stringify(discoveryNav + ' [aria-haspopup="dialog"]')})`))
+  await page.viewport(960, 820)
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '科技数码')
+  await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 科技数码')")
+  const selected = discoveryNav + ' [aria-pressed="true"]'
+  const close = await sampleSidebarMotion(page, selected)
+  const open = await sampleSidebarMotion(page, selected)
+  const first = close.frames[0]
+  check('960px 开合侧栏时快捷分区数量稳定，选中的科技数码随正文一起移动',
+    Math.abs(first.edge - close.frames.at(-1).edge) > 100 && first.edge === open.frames.at(-1).edge &&
+    [...close.frames, ...open.frames].every(f => f.visibleRegions === first.visibleRegions && f.itemWidth > 0 &&
+      Math.abs((f.itemRight - f.content) - (first.itemRight - first.content)) <= 1))
+  await page.viewport(390, 820)
+  check('窗口缩窄后快捷分区会减少，仍能看见选中的科技数码', await waitFor(`(() => {
+    const tab = document.querySelector(${JSON.stringify(selected)})
+    const visible = [...tab.parentElement.querySelectorAll('button')].filter(b => b.getClientRects().length)
+    return visible.length < ${first.visibleRegions} && visible.includes(tab) && tab.textContent.trim() === '科技数码' &&
+      tab.getBoundingClientRect().right <= innerWidth
+  })()`))
 }
 
 function sampleSidebarMotion(page, selector, reverseAt = null) {
@@ -1842,6 +1861,7 @@ function sampleSidebarMotion(page, selector, reverseAt = null) {
     const nav = document.querySelector('nav[aria-label="主导航"]')
     const main = document.getElementById('main-content')
     const item = document.querySelector(${JSON.stringify(selector)})
+    const regionNav = item.closest('nav[aria-label="发现分区"]')
     const grid = item.closest('[data-shown]')
     const profilePanel = document.querySelector('aside[aria-label="作者资料栏"]')
     const toggle = nav.querySelector('button[aria-expanded]')
@@ -1855,6 +1875,7 @@ function sampleSidebarMotion(page, selector, reverseAt = null) {
         sliding: nav.getAnimations().some(animation => animation.playState === 'running'),
         content: body.left, right: body.right, width: body.width,
         itemWidth: rect.width, itemRight: rect.right, itemHeight: rect.height, itemTop: rect.top,
+        visibleRegions: regionNav && [...regionNav.querySelectorAll('button[aria-pressed]')].filter(b => b.getClientRects().length).length,
         columns: grid && getComputedStyle(grid).gridTemplateColumns.split(' ').length,
         profileBeside: grid && profilePanel && profilePanel.getBoundingClientRect().left >= grid.getBoundingClientRect().right - 1,
         row: Math.round(profile.getBoundingClientRect().top),
