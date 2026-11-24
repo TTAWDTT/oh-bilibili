@@ -507,6 +507,38 @@ fn 评论能取到真实数据与嵌套回复() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
+async fn 观看后从列表继续听会显示音频控制() {
+    use bilimusic_core::wire::PlayMode;
+    use bilimusic_model::TrackKey;
+
+    let dir = TestDir::new("watch-to-listen-entry");
+    let engine = Engine::new(&dir.join("library.sqlite")).unwrap();
+    engine.set_volume(0.0);
+    let first = TrackKey::from_provider("BV1Tb4y1a7sZ");
+    let second = TrackKey::from_provider("BV1Sx411T7QQ");
+    let origin = "http://127.0.0.1:9";
+    engine.open_watch(&second, origin).await.unwrap();
+    let video = engine.open_watch_page(&first, origin, Some(2), Some(58_000)).await.unwrap();
+    assert_eq!(video.current_page, 2);
+    assert_eq!(engine.snapshot().mode, PlayMode::Watch);
+    engine.close_watch(Some(&first));
+
+    let keys = [first.as_opaque().to_string(), second.as_opaque().to_string()];
+    let from_list = engine.play_context(&keys, 1).await.unwrap();
+    assert_eq!(from_list.mode, PlayMode::Listen, "列表点继续播放或只听要进入听模式");
+    assert_eq!(from_list.track.unwrap().key, second);
+
+    engine.open_watch(&first, origin).await.unwrap();
+    assert_eq!(engine.snapshot().mode, PlayMode::Watch);
+    let single = engine.play_key(&second).await.unwrap();
+    assert_eq!(single.mode, PlayMode::Listen);
+    let after_close = engine.close_watch(Some(&first));
+    assert_eq!(after_close.track.unwrap().key, second);
+    assert!(matches!(after_close.phase.as_str(), "loading" | "playing"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
 async fn paused_comment_jump_preserves_page_and_position() {
     let dir = TestDir::new("comment-jump");
     let engine = Engine::new(&dir.join("library.sqlite")).unwrap();

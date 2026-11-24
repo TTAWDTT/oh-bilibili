@@ -26,7 +26,7 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
         state.keys = [key]
         index = 0
       }
-      state.index = index
+      state.mode = 'listen'
       playIndex(index)
       return snapshot()
     }
@@ -54,6 +54,7 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       const index = clamp(Math.trunc(num(args, 'index')), 0, keys.length - 1)
       trackOf(keys[index] ?? '')
       state.keys = [...keys]
+      state.mode = 'listen'
       playIndex(index)
       return snapshot()
     }

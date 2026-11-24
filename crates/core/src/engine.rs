@@ -1572,6 +1572,8 @@ impl Engine {
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
         let track = self.track_of(key)?;
+        self.watch_gate.cancel();
+        *lock(&self.mode) = crate::wire::PlayMode::Listen;
         self.restore_queue_bookmark();
         lock(&self.queue).jump_by_key(key);
         self.start_playback(&track, false, None).await
