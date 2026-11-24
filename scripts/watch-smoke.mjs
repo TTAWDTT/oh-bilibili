@@ -598,8 +598,11 @@ async function checkStageLyrics(page) {
     const panel = ${volumePanel}
     const button = panel.previousElementSibling.getBoundingClientRect()
     const track = panel.querySelector('[role="slider"]').firstElementChild.getBoundingClientRect()
-    return { speakerX: button.x + button.width / 2, speakerY: button.y + button.height / 2,
-      left: track.left, right: track.right, y: track.y + track.height / 2, title: document.querySelector('.stage h2').innerText }
+    return {
+      speakerX: button.x + button.width / 2, speakerY: button.y + button.height / 2,
+      left: track.left, right: track.right, y: track.y + track.height / 2,
+      title: document.querySelector('.stage h2').innerText,
+    }
   })()`)
   await page.mouseEvent({ type: 'mouseMoved', x: volume.speakerX, y: volume.speakerY })
   await watchUiWait(page)(`getComputedStyle(${volumePanel}).opacity === '1'`)
@@ -5165,14 +5168,14 @@ async function main() {
       if (!mute) continue
       const volume = `document.querySelector('[data-watch-controls] [role="slider"][aria-label="音量"]')`
       const panel = `document.querySelector('[data-watch-controls] [data-volume-panel]')`
-      const visible = `(() => {
+      const hit = `(() => {
         const slider = ${volume}
-        if (!slider) return false
         const box = slider.getBoundingClientRect()
-        return getComputedStyle(${panel}).opacity === '1' && box.width > 0 &&
-          slider.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+        return slider.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
       })()`
-      check(`${width} 宽音量浮层起初收起`, !await page.evaluate(visible))
+      const visible = `getComputedStyle(${panel}).opacity === '1' && ${hit}`
+      const closed = `getComputedStyle(${panel}).opacity === '0' && !${hit}`
+      check(`${width} 宽音量浮层起初收起`, await page.evaluate(closed))
       await page.mouseEvent({ type: 'mouseMoved', ...mute })
       await watchUiWait(page)(visible)
       const after = await speakerCenter()
@@ -5210,7 +5213,7 @@ async function main() {
       }
       check(`${width} 宽从喇叭斜移到滑杆仍能调节`, await page.evaluate(`${visible} && ${volume}.matches(':hover')`))
       await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
-      await watchUiWait(page)(`!${visible}`)
+      await watchUiWait(page)(closed)
       const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 }
       await page.evaluate(`${speaker}.focus()`)
       await page.keyEvent({ type: 'keyDown', ...tab })
@@ -5219,7 +5222,7 @@ async function main() {
       await watchUiWait(page)(visible)
       await page.keyEvent({ type: 'keyDown', ...tab })
       await page.keyEvent({ type: 'keyUp', ...tab })
-      await watchUiWait(page)(`!${visible}`)
+      await watchUiWait(page)(closed)
       check(`${width} 宽 Tab 移出后收起音量浮层`, !await page.evaluate(`${panel}?.contains(document.activeElement)`))
     }
 

@@ -8,13 +8,20 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
   const volume = usePlayerStore((state) => state.snapshot?.volume ?? 0.7)
   const setVolume = usePlayerStore((state) => state.setVolume)
   const [draft, setDraft] = useState<number | null>(null)
+  const [pointerOver, setPointerOver] = useState(false)
   const shown = draft ?? volume
   const percentage = `${Math.round(shown * 100)}%`
 
   return (
     <div
       className={`flex items-center text-[var(--text-2)] ${compact ? 'volume-compact relative' : 'gap-2'}`}
-      data-dragging={compact && draft !== null ? true : undefined}
+      data-open={compact && (pointerOver || draft !== null) ? true : undefined}
+      onPointerEnter={compact ? () => setPointerOver(true) : undefined}
+      onPointerLeave={compact ? () => setPointerOver(false) : undefined}
+      onPointerUp={compact ? (event) => {
+        // WebKit 拖出滑杆再松手时，可能要等鼠标再次移动才更新 :hover。
+        setPointerOver(event.currentTarget.contains(document.elementFromPoint(event.clientX, event.clientY)))
+      } : undefined}
     >
       <button
         type="button"

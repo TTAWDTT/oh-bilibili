@@ -28,7 +28,7 @@
   height: 5px;
 }
 
-.volume-compact:is(:hover, :has(:focus-visible), [data-dragging]) [data-volume-panel] {
+.volume-compact:is([data-open], :has(:focus-visible)) [data-volume-panel] {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
