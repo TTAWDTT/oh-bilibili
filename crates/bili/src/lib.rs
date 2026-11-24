@@ -390,6 +390,10 @@ impl Source {
         self.client.dynamic_feed(offset).await
     }
 
+    pub async fn space_dynamics(&self, mid: u64, offset: Option<String>) -> Result<sync::DynamicPage, BiliError> {
+        self.client.space_dynamics(mid, offset).await
+    }
+
     pub async fn message_unread(&self) -> Result<messages::MessageUnread, BiliError> {
         self.client.message_unread().await
     }

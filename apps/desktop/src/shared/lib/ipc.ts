@@ -714,6 +714,17 @@ export function homeFeed(fresh: number): Promise<Track[]> {
   return call<Track[]>('home_feed', { fresh })
 }
 
+export type DynamicNode =
+  | { kind: 'text' | 'topic'; text: string }
+  | { kind: 'emoji'; text: string; image: string }
+  | { kind: 'mention'; text: string; mid: number }
+  | { kind: 'video'; text: string; bvid: string }
+  | { kind: 'link'; text: string; url: string }
+
+export type DynamicAttachment = {
+  label: string; title: string; detail: string; cover: string | null; url: string; ends_at: number | null
+}
+
 export type DynamicItem = {
   id: string
   kind: 'video' | 'opus' | 'forward' | 'article' | 'live'
@@ -726,6 +737,12 @@ export type DynamicItem = {
   vip: boolean
   pub_time: string
   pub_ts: number
+  nodes?: DynamicNode[]
+  pinned?: boolean
+  decoration?: {
+    name: string; image: string; large: string | null; number: string | null; color: string | null; url: string | null
+  } | null
+  attachment?: DynamicAttachment | null
   text: string
   bvid: string
   title: string
@@ -756,6 +773,10 @@ export type DynamicPage = {
 /** 关注动态。`offset` 是上一页返回的游标。 */
 export function dynamicFeed(offset?: string | null): Promise<DynamicPage> {
   return call<DynamicPage>('dynamic_feed', { offset: offset ?? null })
+}
+
+export function spaceDynamics(mid: number, offset: string | null): Promise<DynamicPage> {
+  return call<DynamicPage>('space_dynamics', { mid, offset })
 }
 
 export type MessageKind = 'reply' | 'at' | 'like'
