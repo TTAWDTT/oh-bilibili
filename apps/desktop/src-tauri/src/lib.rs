@@ -810,6 +810,22 @@ async fn region_new(
     engine.region_new(rid, page).await
 }
 
+#[tauri::command]
+async fn discovery_regions(
+    engine: tauri::State<'_, Arc<Engine>>,
+) -> Result<Vec<bilimusic_core::wire::DiscoveryRegion>, WireError> {
+    engine.discovery_regions().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn discovery_region_feed(
+    engine: tauri::State<'_, Arc<Engine>>,
+    rid: u32,
+    page: u32,
+) -> Result<Vec<Track>, WireError> {
+    engine.discovery_region_feed(rid, page).await
+}
+
 #[tauri::command(rename_all = "snake_case")]
 async fn popular(
     engine: tauri::State<'_, Arc<Engine>>,
@@ -1318,6 +1334,8 @@ pub fn run() {
             comment_emotes,
             search_users,
             ranking,
+            discovery_regions,
+            discovery_region_feed,
             region_new,
             live_rooms,
             bangumi_rank,

@@ -1583,13 +1583,6 @@ async function checkHeroAllocation(page) {
   await page.viewport(1024, 900)
   await sleep(500)
   const restored = await read()
-  // 有可续播记录时，首屏左边就让给续播卡，轮播不再出现。
-  const hasResume = await page.evaluate(
-    `(() => {
-      const card = document.querySelector('[data-home-resume="wide"]')
-      return !!card && card.getClientRects().length > 0
-    })()`,
-  )
   const initialTitles = Array.from({ length: 16 }, (_, index) => `首页分配 ${index + 1}`)
   const placedOnce = (expected, titles) =>
     expected.every((title) => titles.filter((entry) => entry === title).length === 1) &&
@@ -1597,7 +1590,7 @@ async function checkHeroAllocation(page) {
   check(
     '首屏推荐在 1024 与 1023 两侧各有一次入口',
     ready &&
-      (hasResume ? wide.carousel.length === 0 : wide.carousel.length === 5) &&
+      wide.carousel.length === 5 &&
       wide.grid.length === 6 &&
       placedOnce(initialTitles, [...wide.carousel, ...wide.grid, ...wide.feed]) &&
       placedOnce(initialTitles, [...narrow.carousel, ...narrow.grid, ...narrow.feed]) &&
@@ -1698,150 +1691,92 @@ async function checkHistoryParts(page) {
   })()`)
 }
 
-/** 发现页续播卡：宽窗占左半屏，换一换不动它，窄窗收成一条。 */
-async function checkHomeResume(page) {
+async function checkDiscoveryFeed(page) {
+  const waitFor = watchUiWait(page)
   await page.viewport(1320, 900)
-  // 看视频的条目：位置与时长来自本地分 P 记录，卡和实际落点要一致。
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  let resumeKey = null
-  for (let i = 0; i < 40 && !resumeKey; i += 1) {
-    await sleep(250)
-    resumeKey = await page.evaluate(
-      `document.querySelector('[data-home-resume="wide"]')?.dataset.key ?? null`,
-    )
-  }
-  await page.evaluate(`(() => {
-    const key = ${JSON.stringify(resumeKey)}
-    if (!key) return
-    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
-    localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
-    localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + '?historyLong=1')}`)
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await page.clickExactText('历史')
+  await waitFor("document.querySelector('[data-history-row] [data-history-play]')")
+  check('有可续播的记录时仍能从历史找回', await page.evaluate(
+    `[...document.querySelectorAll('[data-history-play]')].some((button) => button.getAttribute('aria-label')?.startsWith('继续播放'))`,
+  ))
+  await page.clickExactText('发现')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  const feedOnly = `(() => {
+    const home = document.getElementById('scroll-main')
+    const tab = home?.querySelector('[aria-label="发现分区"] [aria-pressed="true"]')
+    return tab?.textContent.trim() === '全部' &&
+      !!home.querySelector('[aria-label="推荐轮播"] [data-track-title]') &&
+      !!home.querySelector('[data-home-hero-grid] [data-focus-id^="herocard:"]') &&
+      !home.querySelector('[data-home-resume], [data-home-region], .discovery-shelf') &&
+      ![...home.querySelectorAll('h2')].some((heading) =>
+        ['正在直播', '番剧', '动画', '音乐', '游戏'].includes(heading.textContent.trim()))
+  })()`
+  check('宽窗全部直接显示推荐投稿，没有续播和分区楼层', await page.evaluate(feedOnly))
+  await page.viewport(390, 820)
+  check('窄窗全部同样只显示推荐投稿', await page.evaluate(feedOnly))
+  await checkDiscoveryEditor(page)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + '?failHome=1')}`)
+  await waitFor("document.body.innerText.includes('连不上 B 站')")
+  check('推荐失败时提示重试，不用历史或分区内容填充', await page.evaluate(`(() => {
+    const home = document.getElementById('scroll-main')
+    return [...home.querySelectorAll('button')].some((button) => button.textContent.trim() === '重新取一次') &&
+      !home.querySelector('[data-home-recommend], [data-home-resume], [data-track-card], .discovery-shelf')
+  })()`))
+}
+
+async function checkDiscoveryEditor(page) {
+  const waitFor = watchUiWait(page)
+  const tabNames = () => page.evaluate(`[...document.querySelectorAll('[aria-label="发现分区"] [aria-pressed]')]
+    .map((button) => button.textContent.trim())`)
+  const openEditor = () => page.evaluate(`document.querySelector('button[aria-label="编辑分区"]').click()`)
+  const chooseChip = (name) => page.evaluate(`[...document.querySelectorAll('[role="dialog"] [aria-pressed]')]
+    .find((button) => button.textContent.trim() === ${JSON.stringify(name)}).click()`)
+  const setField = (selector, value) => page.evaluate(`(() => {
+    const input = document.querySelector(${JSON.stringify(selector)})
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
   })()`)
-  await page.evaluate(`location.reload()`)
-  let watchCard = { text: '' }
-  for (let i = 0; i < 40 && !watchCard.text.includes('继续观看'); i += 1) {
-    await sleep(250)
-    watchCard = await page.evaluate(`(() => {
-      const card = document.querySelector('[data-home-resume="wide"]')
-      return { text: (card?.textContent || '').trim() }
-    })()`)
-  }
-  const watchBar = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    const bar = card?.querySelector('[aria-hidden] > span')
-    return bar ? (bar.style.width || '') : ''
-  })()`)
-  check(
-    '有本地观看记录时按分 P 的进度显示继续观看',
-    watchCard.text.includes('继续观看') &&
-      watchCard.text.includes('已看 0:08') &&
-      watchBar.startsWith('30'),
-  )
-  await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
-  let watchReady = false
-  for (let i = 0; i < 20 && !watchReady; i += 1) {
-    await sleep(300)
-    watchReady = await page.evaluate(`!!document.querySelector('video')`)
-  }
-  await sleep(1500)
-  const watchPick = await page.evaluate(`(() => {
-    const slider = document.querySelector('[aria-label="播放进度"]')
-    return { ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null }
-  })()`)
-  // 无头预览取不到流，观看页的 seek 观察不到；卡上的分 P 进度已在上一条校验。
-  check('继续观看进入观看页', watchReady && watchPick.ratio !== null)
-  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(300)
-  // 上一次运行留下的观看记录会让这条卡变成「继续观看」，这里只清掉观看记录。
-  await page.evaluate(`(() => {
-    for (const name of Object.keys(localStorage)) {
-      if (name.startsWith('oh-bilibili:watch-')) localStorage.removeItem(name)
-    }
-  })()`)
-  await page.evaluate(`location.reload()`)
-  let ready = false
-  for (let i = 0; i < 40 && !ready; i += 1) {
-    await sleep(250)
-    ready = await page.evaluate(
-      `!!document.querySelector('[data-home-resume="wide"]') &&
-       document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6`,
-    )
-  }
-  const wide = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return {
-      text: (card?.textContent || '').trim(),
-      carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-      grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
-    }
-  })()`)
-  check(
-    '有未播完的记录时首屏左半屏是续播卡',
-    ready && wide.text.includes('继续听') && wide.text.includes('已听 0:12') && !wide.carousel && wide.grid === 6,
-  )
-  await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
-  await sleep(1200)
-  const resumed = await page.evaluate(`(() => {
-    const slider = document.querySelector('[aria-label="播放进度"]')
-    return {
-      ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null,
-      playing: !!document.querySelector('button[aria-label="暂停"]'),
-    }
-  })()`)
-  check(
-    '点续播卡接着上次的位置播放',
-    resumed.playing && resumed.ratio !== null && resumed.ratio >= 40 && resumed.ratio <= 60,
-  )
-  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
-  await sleep(300)
-  await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '换一换')
-    hit?.click()
-  })()`)
-  await sleep(1200)
-  const afterRefresh = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return { exists: !!card, text: (card?.textContent || '').trim() }
-  })()`)
-  check('换一换只换推荐，续播卡留在原地', afterRefresh.exists && afterRefresh.text.includes('继续听'))
-  await page.viewport(380, 820)
-  await sleep(600)
-  const narrow = await page.evaluate(`(() => {
-    const compact = document.querySelector('[data-home-resume="compact"]')
-    const wide = document.querySelector('[data-home-resume="wide"]')
-    return {
-      compact: !!compact && compact.getClientRects().length > 0,
-      wide: !!wide && wide.getClientRects().length > 0,
-      carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-    }
-  })()`)
-  check('窄窗先给一条紧凑续播卡，推荐紧接在后面', narrow.compact && !narrow.wide && narrow.carousel)
-  await page.viewport(1320, 900)
-  await sleep(300)
-  const failUrl = new URL(WEB)
-  failUrl.searchParams.set('failHome', '1')
-  await page.evaluate(`location.href = ${JSON.stringify(failUrl.href)}`)
-  let failReady = false
-  for (let i = 0; i < 20 && !failReady; i += 1) {
-    await sleep(300)
-    failReady = await page.evaluate(`document.body.innerText.includes('连不上 B 站')`)
-  }
-  const failedFeed = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return { card: !!card, text: (card?.textContent || '').trim() }
-  })()`)
-  check(
-    '推荐单独失败时续播卡仍然可用',
-    failReady && failedFeed.card && failedFeed.text.includes('继续听'),
-  )
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(1200)
-  const recovered = await page.evaluate(`({
-    grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
-    error: document.body.innerText.includes('连不上 B 站'),
-  })`)
-  check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
+  await openEditor()
+  await page.clickExactText('恢复默认')
+  await page.clickExactText('保存')
+  const defaults = await tabNames()
+  await openEditor()
+  await chooseChip('音乐')
+  await page.clickExactText('移除')
+  await setField('#discovery-keyword', '周杰伦')
+  await page.clickExactText('添加')
+  await setField('[role="dialog"] .discovery-name-row input', '我的歌单')
+  await page.evaluate(`document.querySelector('[aria-label="向前移动"]').click()`)
+  await page.clickExactText('保存')
+  const edited = await tabNames()
+  await page.evaluate('location.reload()')
+  await waitFor("document.querySelector('[aria-label=\"发现分区\"] [aria-pressed]')")
+  check('窄窗新增、移除、改名、排序在重新打开后保留',
+    defaults.includes('音乐') && !edited.includes('音乐') && edited.at(-2) === '我的歌单' &&
+    edited[0] === '全部' && JSON.stringify(edited) === JSON.stringify(await tabNames()))
+  await page.clickExactText('我的歌单')
+  await waitFor("document.querySelector('[data-home-region] [data-track-card]')")
+  check('改了兴趣的显示名称后仍按原关键词找视频', await page.evaluate(`(() => {
+    const region = document.querySelector('[data-home-region]')
+    return region.querySelector('h2').textContent.includes('我的歌单') &&
+      region.querySelector('[data-track-card]').innerText.includes('周杰伦') && !document.querySelector('[data-home-recommend]')
+  })()`))
+  await openEditor()
+  await chooseChip('我的歌单')
+  await page.clickExactText('移除')
+  await page.evaluate(`document.querySelector('[aria-label="添加音乐"]').click()`)
+  await page.clickExactText('保存')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  const afterRemove = await tabNames()
+  check('移除正在看的兴趣后回到全部，也能重新添加官方分区',
+    afterRemove.includes('音乐') && !afterRemove.includes('我的歌单') && await page.evaluate(
+      `document.querySelector('[aria-label="发现分区"] [aria-pressed="true"]').textContent.trim() === '全部'`))
+  await openEditor()
+  await page.clickExactText('恢复默认')
+  await page.clickExactText('保存')
+  check('恢复默认还原官方目录及顺序', JSON.stringify(await tabNames()) === JSON.stringify(defaults))
 }
 
 /** 导航约定：歌单详情仍在曲库下，观看页返回把焦点还给进来的那张卡。 */
@@ -1924,24 +1859,30 @@ async function checkNavConventions(page) {
     watching && opened !== null && back.key === opened && back.label.startsWith('观看'),
   )
 
-  // 分区行的入口 id 带 rid：同一曲目也在续播卡/推荐流里时，仍要回到这一行。
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(4500)
-  const partition = await page.evaluate(`(() => {
-    const row = document.querySelector('[data-focus-id^="partition:"]')
-    if (!row) return null
-    row.click()
-    return row.dataset.focusId
+  await page.evaluate(`(() => {
+    const tabs = document.querySelector('[aria-label="发现分区"]')
+    const music = [...tabs.querySelectorAll('button')].find((button) => button.textContent.trim() === '音乐')
+    music?.click()
   })()`)
-  let partitionVideo = false
-  for (let i = 0; i < 20 && !partitionVideo; i += 1) {
-    await sleep(300)
-    partitionVideo = await page.evaluate(`!!document.querySelector('video')`)
-  }
-  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
-  await sleep(1600)
-  const partitionBack = await page.evaluate(`document.activeElement?.dataset?.focusId ?? ''`)
-  check('分区行返回后回到原分区卡', !!partition && partitionVideo && partitionBack === partition)
+  const waitFor = watchUiWait(page)
+  const cardButton = '[data-home-region] [data-track-card] button[aria-label^="观看"]'
+  await waitFor(`document.querySelector(${JSON.stringify(cardButton)})`)
+  const partitionKey = await page.evaluate(`(() => {
+    const button = document.querySelector(${JSON.stringify(cardButton)})
+    const key = button.closest('[data-track-card]').dataset.key
+    button.click()
+    return key
+  })()`)
+  await waitFor("document.querySelector('video')")
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+  await waitFor("document.activeElement?.closest('[data-home-region] [data-track-card]')")
+  const partitionBack = await page.evaluate(`({
+    selected: document.querySelector('[aria-label="发现分区"] [aria-pressed="true"]')?.textContent.trim(),
+    key: document.activeElement.closest('[data-track-card]')?.dataset.key,
+    recommend: !!document.querySelector('[data-home-recommend]'),
+  })`)
+  check('选中音乐后打开投稿，返回仍在音乐分区并聚焦原视频',
+    partitionBack.selected === '音乐' && partitionBack.key === partitionKey && !partitionBack.recommend)
 }
 
 /** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
@@ -4375,6 +4316,12 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--discovery-only')) {
+      await checkDiscoveryFeed(page)
+      await checkHeroAllocation(page)
+      await checkNavConventions(page)
+      return
+    }
     if (process.argv.includes('--watch-link-only')) {
       await checkWatchLink(page)
       return
@@ -4445,7 +4392,7 @@ async function main() {
     await checkLiveRooms(page)
     await checkTriple(page)
     await checkFollowingDirectory(page)
-    await checkHomeResume(page)
+    await checkDiscoveryFeed(page)
     await checkHistoryParts(page)
     await checkWatchPartHistory(page)
     await checkNavConventions(page)

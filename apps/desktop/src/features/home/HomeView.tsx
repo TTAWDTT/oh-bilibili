@@ -8,26 +8,17 @@ import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
-import { PARTS } from '../../shared/lib/biliParts'
+import { DISCOVERY_REGIONS } from '../../shared/lib/discoveryRegions'
+import { DiscoveryChannelEditor } from './DiscoveryChannelEditor'
+import { discoveryTabKey, useDiscoveryTabs } from './discoveryTabs'
+import { FeedMoreButton } from './FeedMoreButton'
 import './discovery.css'
 import { HeroBanner } from './HeroBanner'
-import { HeroQuoteLine, useHeroQuote } from './HeroQuote'
-import { LiveRow } from './LiveRow'
-import { BangumiRow } from './BangumiRow'
-import { PartitionRow } from './PartitionRow'
 import { RegionFeed, regionMemory } from './RegionFeed'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Cover } from '../../shared/ui/Cover'
 import { formatCount, formatDuration } from '../../shared/lib/format'
-import { ResumeCard, resumeFrom, type Resume } from './ResumeCard'
-
-const PARTITION_FLOORS = [
-  { rid: 1, title: '动画', illustration: 'animation-cels' },
-  { rid: 3, title: '音乐', illustration: 'cassette' },
-  { rid: 4, title: '游戏', illustration: 'handheld' },
-]
-
 /** 首页推荐等这么久还没回来就提示「加载较慢」，但请求继续等，不提前判死。 */
 const FEED_SLOW_MS = 8000
 
@@ -35,90 +26,48 @@ const FEED_SLOW_MS = 8000
  * 发现页。
  *
  * 推荐接口是全站风控最严的一处，所以取数节奏跟着用户走：
- * 首屏 12 条，滚到底再取下一批（fresh_idx 递增），不后台预取。
+ * 靠近列表底部时才取下一批（fresh_idx 递增）。
  * 被拒时给明确文案和「换一批」，不假装有内容。
  */
 
 /** 按会话记住这一屏：从视频页返回时，推荐流和滚动位置都要原样回来。 */
 const feedMemory: {
   items: Track[]
-  resume: Resume | null
   /** 首屏那十一条（轮播 5 + 右侧 6）。它可以被「换一换」单独换掉，下面推荐流不动。 */
   hero: Track[]
-  fresh: number
   nextFresh: number
-  scrollTop: number
+  top: number
   index: number
 } = {
   items: [],
-  resume: null,
   hero: [],
-  fresh: 1,
   nextFresh: 2,
-  scrollTop: 0,
+  top: 0,
   index: 0,
 }
 export function HomeView() {
   const navigate = useAppStore((s) => s.navigate)
   const activeKey = usePlayerStore((s) => s.snapshot?.track?.key ?? null)
   const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
-  const playContext = usePlayerStore((s) => s.playContext)
-  const scope = useAppStore((state) => state.view.kind === 'home' ? (state.view.rid ?? 0) : 0)
+  const channel = useAppStore((state) => state.view.kind === 'home' ? state.view.channel : undefined)
+  const [catalog, setCatalog] = useState(DISCOVERY_REGIONS)
+  const { tabs, saveTabs } = useDiscoveryTabs(catalog)
+  const selected = tabs.find((tab) => discoveryTabKey(tab) === channel)
+  const scope = selected && discoveryTabKey(selected)
   const replace = useAppStore((state) => state.replace)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
-  // 从分 P 目录或首推返回时保留原卡位，新产生的观看历史不应把焦点目标顶走。
-  const keepLayout = useRef(/^(directory|hero|hero-quote|hero-author|herocard):/.test(useAppStore.getState().returnFocus?.id ?? '')).current
-  const [resume, setResume] = useState<Resume | null>(keepLayout ? feedMemory.resume : null)
-  // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
-  useEffect(() => {
-    if (keepLayout) return
-    feedMemory.resume = null
-    let alive = true
-    void ipc
-      .libraryHistoryTimed(12)
-      .then(async (list) => {
-        if (!alive) return
-        const next = resumeFrom(list)
-        feedMemory.resume = next
-        setResume(next)
-        if (!next?.page) return
-        const meta = await ipc.videoMeta(next.entry.track.key)
-        const partTitle = meta.pages.find((part) => part.no === next.page)?.title.trim()
-        if (alive && partTitle && partTitle !== next.entry.track.title) {
-          feedMemory.resume = { ...next, partTitle }
-          setResume(feedMemory.resume)
-        }
-      })
-      .catch(() => {
-        // 历史和分 P 名称分别到达；详情失败时仍可用现有断点续播。
-      })
-    return () => {
-      alive = false
-    }
-  }, [keepLayout])
-
-  const openResume = (item: Resume): void => {
-    if (item.watching) {
-      navigate({ kind: 'watch', track: item.entry.track, page: item.page ?? 1, atMs: item.position }, undefined, `resume:${item.entry.track.key}`)
-      return
-    }
-    void playContext([item.entry.track.key], 0, { page: item.page ?? 1, position_ms: item.position })
-  }
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
   const itemsRef = useRef<Track[]>(feedMemory.items)
   const heroRef = useRef<Track[]>(feedMemory.hero)
-  const [fresh, setFresh] = useState(feedMemory.fresh)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [slow, setSlow] = useState(false)
   /** 上次失败是网络抖动：只有这种情况才给「重试」，到底了给的是「换一批」。 */
   const [canRetry, setCanRetry] = useState(false)
-  /** 下一批的 fresh_idx。接口按它返回「另一批」，同值重复取会拿到一样的。 */
-  const nextFresh = useRef(feedMemory.nextFresh)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   /** 滚动事件比 React 状态回写快，用它挡住同一批的重复请求。 */
   const pending = useRef(false)
@@ -131,6 +80,10 @@ export function HomeView() {
   const exhausted = useRef(false)
   const channelRef = useRef<HTMLDivElement | null>(null)
   const [channelScroll, setChannelScroll] = useState({ left: false, right: false })
+
+  useEffect(() => {
+    void ipc.discoveryRegions().then(setCatalog).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)')
@@ -155,7 +108,7 @@ export function HomeView() {
       observer.disconnect()
       el.removeEventListener('scroll', update)
     }
-  }, [])
+  }, [tabs])
 
   useLayoutEffect(() => {
     const list = channelRef.current
@@ -167,25 +120,20 @@ export function HomeView() {
     if (left < list.scrollLeft + 32 || right > list.scrollLeft + list.clientWidth - 32) {
       list.scrollLeft = (left + right - list.clientWidth) / 2
     }
-  }, [scope])
+  }, [scope, tabs])
 
-  const resumeKey = resume?.entry.track.key ?? null
-  /** 续播那一条不再出现在推荐里，宽窄窗都一样。 */
-  const heroPool = resumeKey ? hero.filter((track) => track.key !== resumeKey) : hero
-  const carouselCount = resume && wideHero ? 0 : 5
-  const topCount = carouselCount + (wideHero ? 6 : 2)
-  const heroCards = heroPool.slice(carouselCount, topCount)
-  const featuredQuote = useHeroQuote(resume && wideHero ? heroCards[0]?.key : undefined)
-  const topKeys = new Set(heroPool.slice(0, topCount).map((track) => track.key))
+  const topCount = 5 + (wideHero ? 6 : 2)
+  const heroCards = hero.slice(5, topCount)
+  const topKeys = new Set(hero.slice(0, topCount).map((track) => track.key))
   const feedTracks = [...new Map([
-    ...heroPool.slice(topCount),
-    ...items.filter((track) => track.key !== resumeKey && !topKeys.has(track.key)),
+    ...hero.slice(topCount),
+    ...items.filter((track) => !topKeys.has(track.key)),
   ].map((track) => [track.key, track])).values()]
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
     const ticket = ++requestSeq.current
-    pending.current = append
+    pending.current = true
     if (slowTimer.current !== null) window.clearTimeout(slowTimer.current)
     slowTimer.current = window.setTimeout(() => {
       if (requestSeq.current === ticket) setSlow(true)
@@ -197,17 +145,16 @@ export function HomeView() {
     try {
       const list = await ipc.homeFeed(next)
       if (requestSeq.current !== ticket) return
-      // 成功才推进：失败就留在这一页，重试时不会再跳过一个 fresh_idx。
-      if (append) {
-        nextFresh.current = next + 1
-        feedMemory.nextFresh = next + 1
-      }
       setCanRetry(false)
       // 推荐流会重复推同一条，按 key 去重后再追加。
       const base = append ? itemsRef.current : []
       const seen = new Set(base.map((t) => t.key))
-      const fresh = append ? list.filter((t) => !seen.has(t.key)) : list
-      // 整批都是见过的：继续取只会原地打转，而且新数组会让预取 effect 再跑一轮。
+      const fresh = list.filter((track) => {
+        if (seen.has(track.key)) return false
+        seen.add(track.key)
+        return true
+      })
+      // 整批都见过时停止自动翻页，等用户主动换一批。
       if (append && fresh.length === 0) {
         exhausted.current = true
         setError('这一轮的推荐已经到底了，换一批看看。')
@@ -222,10 +169,7 @@ export function HomeView() {
         heroRef.current = top
         setHero(top)
       }
-      if (list.length === 0) {
-        if (append) exhausted.current = true
-        setError(append ? '这一轮的推荐已经到底了，换一批看看。' : '这次没拿到推荐，换一批试试。')
-      }
+      if (!merged.length) setError('这次没拿到推荐，换一批试试。')
     } catch (e) {
       if (requestSeq.current !== ticket) return
       setError(toWireError(e).message)
@@ -246,20 +190,21 @@ export function HomeView() {
 
   useEffect(
     () => () => {
+      ++requestSeq.current
+      pending.current = false
       if (slowTimer.current !== null) window.clearTimeout(slowTimer.current)
     },
     [],
   )
 
   useEffect(() => {
-    nextFresh.current = feedMemory.nextFresh
-    if (feedMemory.items.length === 0) void load(1)
-  }, [load])
+    if (!scope && !itemsRef.current.length && !pending.current) void load(1)
+  }, [scope, load])
 
   useLayoutEffect(() => {
     const el = scrollerRef.current
     if (!el) return
-    el.scrollTop = scope === 0 ? feedMemory.scrollTop : regionMemory.get(scope)?.top ?? 0
+    el.scrollTop = scope ? regionMemory.get(scope)?.top ?? 0 : feedMemory.top
   }, [scope])
 
   useEffect(() => {
@@ -270,33 +215,25 @@ export function HomeView() {
     feedMemory.hero = hero
   }, [hero])
 
-  useEffect(() => {
-    feedMemory.fresh = fresh
-  }, [fresh])
-
-  const chooseScope = (rid: number): void => {
-    if (rid === scope) return
-    regionMemory.delete(rid)
-    replace(rid ? { kind: 'home', rid } : { kind: 'home' })
+  const chooseScope = (key?: string): void => {
+    if (scope !== key) replace(key ? { kind: 'home', channel: key } : { kind: 'home' })
   }
 
   const more = (): void => {
     // 到底了就不再请求：滚动事件会一直触发，不挡住就是无限空请求。
-    if (pending.current || loading || loadingMore || exhausted.current) return
-    void load(nextFresh.current, true)
+    if (pending.current || exhausted.current) return
+    void load(feedMemory.nextFresh++, true)
   }
 
   /**
    * 轮播右侧那颗「换一换」只换首屏那十一条：换一个 fresh_idx 取一页，
-   * 把新的一页里推荐流还没出现过、也不在旧首屏里的条目挑出来补进顶部。
-   * 下面的推荐流、滚动位置都不动——B 站这颗按钮也只作用于上面那一块。
+   * 从中挑出与当前首屏不同的投稿，下方已取回的推荐继续保留。
    */
   const refreshHero = async (): Promise<void> => {
     if (heroLoading) return
     setHeroLoading(true)
     scrollerRef.current?.scrollTo({ top: 0 })
-    const next = fresh + 1
-    setFresh(next)
+    const next = feedMemory.nextFresh++
     try {
       const list = await ipc.homeFeed(next)
       // 只跟当前首屏比：拿整条推荐流去重的话，划得越深新一页被筛掉的越多，
@@ -319,14 +256,11 @@ export function HomeView() {
 
   /** 列表末尾的「换一批」才是换整页：连推荐流一起重来，并回到顶部。 */
   const refreshAll = (): void => {
-    const next = fresh + 1
+    const next = feedMemory.nextFresh++
     scrollerRef.current?.scrollTo({ top: 0 })
     itemsRef.current = []
     heroRef.current = []
-    setFresh(next)
-    nextFresh.current = 2
-    feedMemory.nextFresh = 2
-    feedMemory.scrollTop = 0
+    feedMemory.top = 0
     feedMemory.index = 0
     exhausted.current = false
     void load(next)
@@ -356,18 +290,13 @@ export function HomeView() {
       id="scroll-main"
       onScroll={(event) => {
         const el = event.currentTarget
-        // 分区里的滚动不是推荐流的位置，别把它写进返回时要用的记忆。
-        if (scope !== 0) {
-          const region = regionMemory.get(scope)
-          if (region) region.top = el.scrollTop
-          return
-        }
-        feedMemory.scrollTop = el.scrollTop
+        const memory = scope ? regionMemory.get(scope) : feedMemory
+        if (!memory) return
+        memory.top = el.scrollTop
         const max = el.scrollHeight - el.clientHeight
-        // 滚动高度只覆盖已挂出来的卡片，比例要按渲染窗口算，不能按取回的条数算。
         const rendered = Number(el.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 0)
         if (max > 0 && rendered > 1) {
-          feedMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
+          memory.index = Math.round((el.scrollTop / max) * (rendered - 1))
         }
       }}
       className="discovery-page min-h-0 flex-1 overflow-y-auto pb-10"
@@ -376,16 +305,15 @@ export function HomeView() {
         <h1 className="sr-only">发现</h1>
         <nav aria-label="发现分区" className="discovery-channels">
           <div ref={channelRef} className="discovery-channel-list no-scrollbar">
-            {PARTS.map((part) => (
-              <button
-                key={part.rid}
-                type="button"
-                aria-pressed={scope === part.rid}
-                onClick={() => chooseScope(part.rid)}
-              >
-                {part.rid === 0 ? '全部' : part.name}
-              </button>
-            ))}
+            <button type="button" aria-pressed={!selected} onClick={() => chooseScope()}>全部</button>
+            {tabs.map((tab) => {
+              const key = discoveryTabKey(tab)
+              return (
+                <button key={key} type="button" title={tab.label} aria-pressed={scope === key} onClick={() => chooseScope(key)}>
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
           {channelScroll.left && (
             <button type="button" className="discovery-channel-scroll left-0" aria-label="向左浏览分区"
@@ -400,25 +328,29 @@ export function HomeView() {
             </button>
           )}
         </nav>
+        <DiscoveryChannelEditor catalog={catalog} tabs={tabs} onSave={(next) => {
+          saveTabs(next)
+          if (scope && !next.some((tab) => discoveryTabKey(tab) === scope)) chooseScope()
+        }} />
         <div className="discovery-shortcuts md:hidden">
-          <button type="button" onClick={() => navigate({ kind: 'popular' })}>
-            <Icon name="popularFlame" size={20} />热门
+          <button type="button" title="热门" aria-label="热门" onClick={() => navigate({ kind: 'popular' })}>
+            <Icon name="popularFlame" size={20} /><span>热门</span>
           </button>
-          <button type="button" onClick={() => navigate({ kind: 'ranking' })}>
-            <Icon name="rankRosette" size={20} />排行
+          <button type="button" title="排行" aria-label="排行" onClick={() => navigate({ kind: 'ranking' })}>
+            <Icon name="rankRosette" size={20} /><span>排行</span>
           </button>
         </div>
-        {scope === 0 && hero.length > 0 && (
-          <button type="button" onClick={() => void refreshHero()} disabled={heroLoading}
+        {!scope && hero.length > 0 && (
+          <button type="button" aria-label="换一换" title="换一换" onClick={() => void refreshHero()} disabled={heroLoading}
             className="discovery-refresh t press disabled:pointer-events-none">
             <Icon name="refresh" size={14} className={heroLoading ? 'animate-spin' : ''} />
-            换一换
+            <span>换一换</span>
           </button>
         )}
       </header>
 
       {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}
-      {scope === 0 && error && items.length === 0 ? (
+      {!scope && error && items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">
           <p className="text-[13px] text-[var(--text-3)]">{error}</p>
           <button
@@ -430,34 +362,14 @@ export function HomeView() {
           </button>
         </div>
       ) : null}
-      {scope === 0 && slow && !attempt.current.append ? slowNotice : null}
+      {!scope && slow && !attempt.current.append ? slowNotice : null}
 
-      {scope === 0 && resume && !wideHero ? (
-        <div className="px-4 pt-4 md:px-8 lg:hidden">
-          <ResumeCard compact resume={resume} onOpen={openResume} />
-        </div>
-      ) : null}
-
-      {/* 推荐单独失败时，续播卡不跟着消失。 */}
-      {scope === 0 && resume && wideHero && hero.length === 0 ? (
-        <div className="px-4 pt-4 md:px-8">
-          <div className="hidden max-w-[560px] lg:block">
-            <ResumeCard resume={resume} onOpen={openResume} />
-          </div>
-        </div>
-      ) : null}
-
-      {scope === 0 && hero.length > 0 ? (
+      {!scope && hero.length > 0 ? (
         <div data-home-recommend className="discovery-recommend px-4 md:px-8">
           <h2 className="sr-only">推荐</h2>
           <div className="discovery-lead-grid">
-          {resume && wideHero ? (
-            <div className="hidden lg:block">
-              <ResumeCard resume={resume} onOpen={openResume} />
-            </div>
-          ) : (
             <HeroBanner
-              tracks={heroPool.slice(0, 5)}
+              tracks={hero.slice(0, 5)}
               onOpen={(track, start) =>
                 navigate(
                   start
@@ -468,11 +380,10 @@ export function HomeView() {
                 )
               }
             />
-          )}
           {heroCards.length > 0 ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
             <div key={heroCards[0]?.key} data-home-hero-grid className="discovery-picks bili-hero-swap">
-              {heroCards.map((track, i) => (
+              {heroCards.map((track) => (
                 <div key={track.key} className="min-w-0">
                 <button
                   type="button"
@@ -512,19 +423,6 @@ export function HomeView() {
                 <div className="mt-1 text-[12px] text-[var(--text-3)]">
                   <TrackByline track={track} focusId={`hero-author:${track.key}`} />
                 </div>
-                {i === 0 && featuredQuote ? (
-                  <HeroQuoteLine
-                    track={track}
-                    quote={featuredQuote}
-                    onOpen={(target, start) =>
-                      navigate(
-                        { kind: 'watch', track: target, page: start.page, atMs: start.atMs },
-                        undefined,
-                        `hero-quote:${target.key}`,
-                      )
-                    }
-                  />
-                ) : null}
                 </div>
               ))}
             </div>
@@ -533,41 +431,33 @@ export function HomeView() {
         </div>
       ) : null}
 
-      {scope !== 0 ? (
-        <RegionFeed key={scope} rid={scope} illustration={PARTITION_FLOORS.find((part) => part.rid === scope)?.illustration} activeKey={activeKey} playing={playing} />
-      ) : (
-        <>
-          {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
-          <LiveRow />
-          <BangumiRow />
-          {PARTITION_FLOORS.map((part) => (
-            <PartitionRow key={part.rid} {...part} />
-          ))}
-        </>
+      {selected && scope && (
+        <RegionFeed key={scope} tab={selected}
+          regionName={selected.kind === 'region' ? catalog.find((region) => region.rid === selected.rid)?.name : undefined}
+          activeKey={activeKey} playing={playing} />
       )}
 
-      {scope === 0 && items.length > 0 ? (
-        <div data-home-feed className="px-4 md:px-8">
-          {feedTracks.length > 0 && <h2 className="discovery-heading mb-4 mt-9">更多推荐</h2>}
+      {!scope && items.length > 0 ? (
+        <div data-home-feed className="mt-6 px-4 md:px-8">
+          <h2 className="sr-only">更多推荐</h2>
           <ContentGrid
             tracks={feedTracks}
             activeKey={activeKey}
             playing={playing}
-            onNeedMore={more}
-            lookahead={600}
             initialIndex={feedMemory.index}
           />
+          {!loading && !loadingMore && !error && <FeedMoreButton onMore={more} />}
         </div>
       ) : null}
-      {scope === 0 && loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
-      {scope === 0 && loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
-      {scope === 0 && slow && attempt.current.append ? slowNotice : null}
-      {scope === 0 && error && items.length > 0 ? (
+      {!scope && loading && items.length === 0 ? <BiliLoader label="正在取推荐…" /> : null}
+      {!scope && loadingMore ? <BiliLoader compact label="正在加载更多…" /> : null}
+      {!scope && slow && attempt.current.append ? slowNotice : null}
+      {!scope && error && items.length > 0 ? (
         <div className="flex flex-col items-center gap-2 py-6">
           <p className="text-center text-[12.5px] text-[var(--text-3)]">{error}</p>
           <button
             type="button"
-            onClick={canRetry ? more : refreshAll}
+            onClick={canRetry ? retrySlow : refreshAll}
             className="t press rounded-[6px] border border-[var(--line)] px-3 py-1 text-[12.5px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             {canRetry ? '重试这一页' : '换一批'}

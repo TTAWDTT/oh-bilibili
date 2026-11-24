@@ -22,6 +22,10 @@
   position: relative;
   flex: none;
   height: 54px;
+  max-width: 11em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   padding-inline: 2px;
   color: var(--text-2);
   font-size: 14px;
@@ -108,4 +112,15 @@
   .discovery-lead-grid { grid-template-columns: minmax(0, 1fr); }
   .discovery-lead-grid > :first-child, .discovery-picks { grid-column: auto; }
   .discovery-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 519px) {
+  .discovery-bar { gap: 4px; padding-inline: 10px; }
+  .discovery-shortcuts { gap: 0; }
+  .discovery-refresh, .discovery-shortcuts button {
+    justify-content: center;
+    width: 32px;
+    height: 36px;
+  }
+  .discovery-refresh span, .discovery-shortcuts span { display: none; }
 }

@@ -86,6 +86,20 @@ async fn 每周必看能取到期数与片单() {
 
 #[tokio::test]
 #[ignore = "真实网络"]
+async fn 官网视频分区可获取两页有封面和作者的投稿() {
+    let source = Source::new().expect("Source 应该能打开");
+    let regions = source.discovery_regions().await.expect("应能取得官网分区");
+    let dance = regions.iter().find(|region| region.name == "舞蹈").expect("应有舞蹈区");
+    assert!(regions.iter().any(|region| region.name == "人工智能"));
+    assert!(regions.iter().all(|region| region.rid > 0));
+    let first = source.discovery_region_feed(dance.rid, 1).await.expect("应能取得舞蹈首页");
+    let second = source.discovery_region_feed(dance.rid, 2).await.expect("应能取得次页");
+    assert!(first.iter().any(|track| !track.artist.is_empty() && track.cover.is_some()));
+    assert!(second.iter().any(|track| !first.iter().any(|prev| prev.key == track.key)));
+}
+
+#[tokio::test]
+#[ignore = "真实网络"]
 async fn 游客二维码接口能生成挑战() {
     let source = Source::new().expect("Source 应该能打开");
     let qr = source.login_qr().await.expect("二维码应该能生成");

@@ -3340,6 +3340,18 @@ impl Engine {
         Ok(tracks)
     }
 
+    pub async fn discovery_regions(&self) -> Result<Vec<crate::wire::DiscoveryRegion>, WireError> {
+        Ok(self.source.discovery_regions().await?)
+    }
+
+    pub async fn discovery_region_feed(&self, rid: u32, page: u32) -> Result<Vec<Track>, WireError> {
+        let tracks = self.source.discovery_region_feed(rid, page).await?;
+        for track in &tracks {
+            self.remember(track);
+        }
+        Ok(tracks)
+    }
+
     /// 直播推荐位。
     pub async fn live_rooms(
         &self,

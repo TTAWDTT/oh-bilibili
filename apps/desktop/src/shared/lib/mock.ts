@@ -1,5 +1,6 @@
 import type { DownloadView, QrStatus, Track, WireError } from './contract'
 import type { HistoryEntry, PlaybackResume } from './ipc'
+import { DISCOVERY_REGIONS } from './discoveryRegions'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -358,6 +359,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return CATALOG.slice(0, 20).map((track, index) =>
         index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,
       )
+    }
+    case 'discovery_regions':
+      return DISCOVERY_REGIONS
+    case 'discovery_region_feed': {
+      const rid = num(args, 'rid')
+      const page = num(args, 'page')
+      const region = DISCOVERY_REGIONS.find((item) => item.rid === rid)
+      if (!region) return []
+      const start = (page - 1) * 15
+      return CATALOG.slice(start, start + 15).map((track, index) => {
+        const item = { ...track, title: `${track.title} · ${region.name}`, tname: region.name }
+        return start + index === 0 ? eightPartTrack(item) : item
+      })
     }
     case 'region_new': {
       // 预览里分区内容也换标题，能看出范围真的切换了。

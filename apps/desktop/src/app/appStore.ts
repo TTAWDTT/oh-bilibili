@@ -4,7 +4,7 @@ import type { MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
 
 export type View =
-  | { kind: 'home'; rid?: number }
+  | { kind: 'home'; channel?: string }
   | { kind: 'dynamic' }
   | { kind: 'messages' }
   | { kind: 'ranking'; rid?: number }

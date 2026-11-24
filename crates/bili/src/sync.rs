@@ -20,6 +20,12 @@ pub struct FavTrackPage {
     pub has_more: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiscoveryRegion {
+    pub rid: u32,
+    pub name: String,
+}
+
 /// 搜索出来的 UP 主。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserHit {
@@ -947,6 +953,35 @@ impl Client {
         Ok(tracks_from_list(&v["data"]["archives"]))
     }
 
+    pub async fn discovery_regions(&self) -> Result<Vec<DiscoveryRegion>, BiliError> {
+        let value = self
+            .get_json(
+                &format!("{API}/x/kv-frontend/namespace/data?appKey=333.1339&nscode=10"),
+                std::time::Duration::from_millis(400),
+            )
+            .await?;
+        discovery_regions_from(&value["data"]["data"])
+    }
+
+    pub async fn discovery_region_feed(
+        &self,
+        rid: u32,
+        page: u32,
+    ) -> Result<Vec<bilimusic_model::Track>, BiliError> {
+        let result = self
+            .get_json(
+                &format!("{API}/x/web-interface/region/feed/rcmd?from_region={rid}&display_id={page}&request_cnt=15&device=web&plat=30"),
+                std::time::Duration::from_millis(400),
+            )
+            .await;
+        match result {
+            Ok(value) => Ok(tracks_from_list(&value["data"]["archives"])),
+            // 官网把 62013 用作推荐翻完，也可能出现在暂无内容的分区首页。
+            Err(BiliError::Api { code: 62013, .. }) => Ok(Vec::new()),
+            Err(error) => Err(error),
+        }
+    }
+
     /// 综合热门（B 站 popular/all）。一次 50 条，`no_more` 为 true 表示翻到底了。
     ///
     /// 每条还带一个 `rcmd_reason.content`，B 站把它印在标题下面当橙色小标签
@@ -1513,27 +1548,60 @@ pub struct PreciousItem {
     pub note: String,
 }
 
+fn discovery_regions_from(data: &serde_json::Value) -> Result<Vec<DiscoveryRegion>, BiliError> {
+    #[derive(Deserialize)]
+    struct Channel {
+        #[serde(rename = "channelId")]
+        order: u32,
+        tid: u32,
+        name: String,
+        url: String,
+    }
+
+    let entries = data
+        .as_object()
+        .ok_or_else(|| BiliError::Parse("缺少视频分区目录".into()))?;
+    // channel_list 同时包含排序数组、番剧/电影等独立入口和普通投稿分区。
+    let mut channels: Vec<Channel> = entries
+        .iter()
+        .filter(|(key, _)| key.starts_with("channel_list."))
+        .filter_map(|(_, raw)| serde_json::from_str::<Channel>(raw.as_str()?).ok())
+        .filter(|channel| {
+            channel.tid > 0 && channel.url.contains("bilibili.com/c/") && !channel.name.is_empty()
+        })
+        .collect();
+    if channels.is_empty() {
+        return Err(BiliError::Parse("视频分区目录为空".into()));
+    }
+    channels.sort_by_key(|entry| entry.order);
+    Ok(channels.into_iter().map(|entry| DiscoveryRegion {
+        rid: entry.tid,
+        name: entry.name,
+    }).collect())
+}
+
 /// `data.list` 里的一条视频卡片。排行榜、综合热门与入站必刷是同一个形状，共用这一份解析。
 fn track_from_item(m: &serde_json::Value) -> Option<bilimusic_model::Track> {
     use bilimusic_model::{Millis, Track, TrackKey};
 
     let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;
+    let author = m.get("owner").unwrap_or(&m["author"]);
     let duration = m["duration"].as_u64().filter(|d| *d > 0);
     Some(Track {
         key: TrackKey::from_provider(bvid),
         title: m["title"].as_str().unwrap_or_default().to_string(),
-        artist: m["owner"]["name"].as_str().unwrap_or_default().to_string(),
+        artist: author["name"].as_str().unwrap_or_default().to_string(),
         duration: duration.map(|d| Millis(d * 1000)),
-        cover: m["pic"]
+        cover: m.get("pic").unwrap_or(&m["cover"])
             .as_str()
             .map(|c| c.replacen("http://", "https://", 1)),
         accent: None,
         views: m["stat"]["view"].as_u64(),
         danmaku: m["stat"]["danmaku"].as_u64(),
-        up_avatar: m["owner"]["face"]
+        up_avatar: author["face"]
             .as_str()
             .map(|f| f.replacen("http://", "https://", 1)),
-        up_mid: m["owner"]["mid"].as_u64(),
+        up_mid: author["mid"].as_u64(),
         tname: m["tname"]
             .as_str()
             .filter(|s| !s.is_empty())
