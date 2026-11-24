@@ -517,16 +517,8 @@
 
 /* 正文按窄栏时的宽度滑动，外层裁掉右边多出来的部分。展开结束才收窄正文，
    避免空间页的数百张投稿在同一次开合中来回换列。 */
-.bili-sidebar + main {
+.bili-sidebar[data-toggled='true'] + main {
   flex: 1 0 calc(100% - var(--sidebar-rail));
-}
-
-.bili-sidebar[data-collapsed='false'] + main {
-  flex-shrink: 1;
-}
-
-.bili-sidebar[data-toggled='true'][data-collapsed='false'] + main {
-  transition: flex-shrink 0s var(--dur);
 }
 
 /* 图标列在两种宽度下一样宽，常驻滚动条占位时也能居中。 */
@@ -568,7 +560,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bili-sidebar[data-toggled='true'],
-  .bili-sidebar[data-toggled='true'][data-collapsed='false'] + main,
   .bili-sidebar-label,
   .bili-sidebar-chevron {
     transition: none;

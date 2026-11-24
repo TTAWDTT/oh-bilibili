@@ -1845,8 +1845,9 @@ async function checkSidebarMotion(page) {
     const profile = Array.from(nav.querySelectorAll('button')).find(button =>
       (button.getAttribute('aria-label') || button.textContent.trim()) === '个人中心')
     const read = () => ({
-      edge: Math.round(nav.getBoundingClientRect().right),
+      edge: nav.getBoundingClientRect().right,
       content: Math.round(main.getBoundingClientRect().left),
+      width: Math.round(main.getBoundingClientRect().width),
       row: Math.round(profile.getBoundingClientRect().top),
     })
     const frames = [read()]
@@ -1883,6 +1884,12 @@ async function checkSidebarMotion(page) {
   check('收起途中再点一次，侧栏从中途折返到展开位置', reversed.turned && reversed.expanded === 'true' &&
     Math.min(...reversed.frames.map(f => f.edge)) > close.frames.at(-1).edge &&
     reversed.frames.at(-1).edge === open.frames.at(-1).edge)
+  const expanded = open.frames.at(-1)
+  const sidebarSettled = 1 + reversed.frames.findLastIndex(f => f.edge !== expanded.edge)
+  const contentSettled = 1 + reversed.frames.findLastIndex(f => Math.abs(f.width - expanded.width) > 1)
+  check('折返后正文最晚在侧栏停下的下一帧恢复宽度',
+    reversed.turned && sidebarSettled < reversed.frames.length && contentSettled < reversed.frames.length &&
+    contentSettled <= sidebarSettled + 1)
 
   await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
   try {
@@ -2803,6 +2810,27 @@ async function checkAuthorSpace(page) {
     collected.slice().sort().join() === played.slice().sort().join() &&
     await page.evaluate(`${header}.textContent.includes('共 125 个投稿')`))
 
+  check('空间翻到第 85 条投稿，收起和展开侧栏后都还能看见它', await page.evaluate(`(async () => {
+    const box = ${scroll}
+    const card = box.querySelectorAll('[data-track-card]')[84]
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const toggle = nav.querySelector('button[aria-expanded]')
+    const frame = () => new Promise(requestAnimationFrame)
+    card.scrollIntoView({ block: 'start', behavior: 'instant' })
+    await frame()
+    for (const expanded of ['false', 'true']) {
+      toggle.click()
+      await frame()
+      await Promise.allSettled(nav.getAnimations().map(slide => slide.finished))
+      await frame()
+      await frame()
+      const rect = card.getBoundingClientRect()
+      const viewport = box.getBoundingClientRect()
+      if (toggle.getAttribute('aria-expanded') !== expanded ||
+        rect.bottom <= viewport.top || rect.top >= viewport.bottom) return false
+    }
+    return true
+  })()`))
   await page.viewport(380, 820)
   await page.evaluate(`${scroll}.scrollTop = 0`)
   check('窄窗作者在前，首屏有作品封面和标题，内容没有横向溢出', await page.evaluate(`(() => {

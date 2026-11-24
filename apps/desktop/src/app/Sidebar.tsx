@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
 import { PERSONAL_NAV } from './personalNavigation'
@@ -55,8 +55,30 @@ export function Sidebar() {
   const onWatch = view.kind === 'watch'
   const mode = onWatch ? 'watch' : 'browse'
   const [toggledIn, setToggledIn] = useState<typeof mode | null>(null)
-  useEffect(() => setToggledIn(null), [mode])
+  const navRef = useRef<HTMLElement>(null)
+  const restoreCard = useRef<(() => void) | undefined>(undefined)
   const collapsed = (onWatch ? watchNav : preference) === 'rail'
+
+  // 连点时浏览器会缩短折返动画，正文应在侧栏真正停下的那一帧换宽度。
+  useLayoutEffect(() => {
+    restoreCard.current?.()
+    restoreCard.current = undefined
+    if (toggledIn === null) return
+    const slide = toggledIn === mode && navRef.current?.getAnimations()
+      .find((animation) => animation instanceof CSSTransition && animation.transitionProperty === 'width')
+    if (!slide) {
+      setToggledIn(null)
+      return
+    }
+    let current = true
+    const finish = () => {
+      if (!current) return
+      restoreCard.current = rememberVisibleCard()
+      setToggledIn(null)
+    }
+    void slide.finished.then(finish, finish)
+    return () => { current = false }
+  }, [collapsed, mode, toggledIn])
 
   const item = (entry: Item): ReactNode => {
     // 歌单详情还是曲库的一部分，左栏继续停在「曲库」。
@@ -90,6 +112,7 @@ export function Sidebar() {
 
   return (
     <nav
+      ref={navRef}
       aria-label="主导航"
       data-collapsed={collapsed}
       data-toggled={toggledIn === mode}
@@ -116,7 +139,8 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => {
-            setToggledIn(mode)
+            restoreCard.current = rememberVisibleCard()
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) setToggledIn(mode)
             if (onWatch) toggleWatchNav()
             else toggleSidebar()
           }}
@@ -133,4 +157,30 @@ export function Sidebar() {
       </div>
     </nav>
   )
+}
+
+/** 换列时用首个可见投稿保持阅读位置。网格按行排列，只需比较几张卡的高度。 */
+function rememberVisibleCard(): (() => void) | undefined {
+  const scroller = document.getElementById('scroll-main')
+  if (!scroller?.scrollTop) return
+  const top = scroller.getBoundingClientRect().top
+  for (const grid of scroller.querySelectorAll('[data-shown]')) {
+    const bounds = grid.getBoundingClientRect()
+    if (bounds.top > top || bounds.bottom <= top) continue
+    if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 1) {
+      return () => { scroller.scrollTop = scroller.scrollHeight }
+    }
+    const cards = grid.getElementsByTagName('article')
+    let start = 0
+    let end = cards.length
+    while (start < end) {
+      const middle = Math.floor((start + end) / 2)
+      if (cards[middle]!.getBoundingClientRect().bottom <= top) start = middle + 1
+      else end = middle
+    }
+    const card = cards[start]
+    if (!card) continue
+    const before = card.getBoundingClientRect().top
+    return () => { scroller.scrollTop += card.getBoundingClientRect().top - before }
+  }
 }
