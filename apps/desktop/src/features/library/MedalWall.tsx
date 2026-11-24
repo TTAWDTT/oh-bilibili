@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toWireError } from '../../shared/lib/errors'
-import { spaceMedalWall, type WallMedal } from '../../shared/lib/ipc'
+import { spaceMedalWall, type SpaceMedalWall } from '../../shared/lib/ipc'
 
 export function MedalWall({ mid }: { mid: number }) {
   const [open, setOpen] = useState(false)
-  const [medals, setMedals] = useState<WallMedal[]>()
+  const [medals, setMedals] = useState<SpaceMedalWall>()
   const [error, setError] = useState<ReturnType<typeof toWireError>>()
   async function load() {
     setError(undefined)
@@ -15,8 +15,10 @@ export function MedalWall({ mid }: { mid: number }) {
   return <div>
     <button type="button" aria-expanded={open} className="text-[var(--accent)] hover:underline"
       onClick={() => { setOpen(!open); if (!open && !medals) void load() }}>粉丝勋章墙</button>
-    {open && (medals ? medals.length ? <ul className="mt-1 flex max-h-44 flex-wrap gap-2 overflow-auto" aria-label="粉丝勋章">
-      {medals.map((medal, index) => <li key={index} className="rounded border border-[var(--line)] px-2 py-1">
+    {open && (medals ? medals.status === 'private' ? <p>作者未公开勋章墙</p>
+      : medals.status === 'wearing_only' ? <p>作者仅公开佩戴中的勋章</p>
+      : medals.status === 'public' && medals.items.length ? <ul className="mt-1 flex max-h-44 flex-wrap gap-2 overflow-auto" aria-label="粉丝勋章">
+      {medals.items.map((medal, index) => <li key={index} className="rounded border border-[var(--line)] px-2 py-1">
         {medal.name} {medal.level}{medal.creator && <span className="ml-1 text-[var(--text-3)]">{medal.creator}</span>}
       </li>)}
     </ul> : <p>暂无公开勋章</p> : error ? <div role="status">

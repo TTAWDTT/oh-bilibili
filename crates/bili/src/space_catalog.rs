@@ -64,14 +64,14 @@ pub enum CatalogPage {
 }
 
 impl Source {
-    async fn catalog_settings(&self, mid: u64) -> Result<Value, BiliError> {
+    pub(crate) async fn space_settings(&self, mid: u64) -> Result<Value, BiliError> {
         self.client
             .get_json(&format!("{API}/x/space/setting?mid={mid}"), INTERVAL)
             .await
     }
 
     pub async fn space_catalog_order(&self, mid: u64) -> Result<Vec<u64>, BiliError> {
-        let response = self.catalog_settings(mid).await?;
+        let response = self.space_settings(mid).await?;
         let order = response["data"]["index_order"]
             .as_array()
             .ok_or_else(|| BiliError::Parse("缺少空间栏目顺序".into()))?;
@@ -89,7 +89,7 @@ impl Source {
         offset: Option<&str>,
     ) -> Result<CatalogPage, BiliError> {
         if let Some(setting) = catalog.privacy_setting() {
-            let settings = self.catalog_settings(mid).await?;
+            let settings = self.space_settings(mid).await?;
             match settings["data"]["privacy"][setting].as_u64() {
                 Some(0) => return Ok(CatalogPage::Private),
                 Some(1) => {}

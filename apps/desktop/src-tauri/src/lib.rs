@@ -786,7 +786,7 @@ async fn space_room(
 async fn space_medal_wall(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
-) -> Result<Vec<bilimusic_core::wire::WallMedal>, WireError> {
+) -> Result<bilimusic_core::wire::MedalWall, WireError> {
     engine.space_medal_wall(mid).await
 }
 

@@ -201,6 +201,26 @@ pub struct WallMedal {
     pub creator: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", content = "items", rename_all = "snake_case")]
+pub enum MedalWall {
+    Private,
+    WearingOnly,
+    Public(Vec<WallMedal>),
+}
+
+fn wall_visibility(privacy: &Value) -> Result<Option<MedalWall>, BiliError> {
+    match (
+        privacy["close_space_medal"].as_u64(),
+        privacy["only_show_wearing"].as_u64(),
+    ) {
+        (Some(1), _) => Ok(Some(MedalWall::Private)),
+        (Some(0), Some(1)) => Ok(Some(MedalWall::WearingOnly)),
+        (Some(0), Some(0)) => Ok(None),
+        _ => Err(BiliError::Parse("无法确认勋章墙是否公开".into())),
+    }
+}
+
 fn wall_medals(data: &Value) -> Result<Vec<WallMedal>, BiliError> {
     let rows = data["list"]
         .as_array()
@@ -223,7 +243,11 @@ fn wall_medals(data: &Value) -> Result<Vec<WallMedal>, BiliError> {
 }
 
 impl Source {
-    pub async fn space_medal_wall(&self, mid: u64) -> Result<Vec<WallMedal>, BiliError> {
+    pub async fn space_medal_wall(&self, mid: u64) -> Result<MedalWall, BiliError> {
+        let settings = self.space_settings(mid).await?;
+        if let Some(status) = wall_visibility(&settings["data"]["privacy"])? {
+            return Ok(status);
+        }
         let response = self
             .client
             .get_json(
@@ -231,7 +255,14 @@ impl Source {
                 Duration::from_millis(400),
             )
             .await?;
-        wall_medals(&response["data"])
+        let data = &response["data"];
+        if data["close_space_medal"] == 1 {
+            return Ok(MedalWall::Private);
+        }
+        if data["only_show_wearing"] == 1 {
+            return Ok(MedalWall::WearingOnly);
+        }
+        wall_medals(data).map(MedalWall::Public)
     }
 
     pub async fn space_notice(&self, mid: u64) -> Result<Option<String>, BiliError> {
@@ -267,13 +298,7 @@ impl Source {
     }
 
     pub async fn space_profile(&self, mid: u64) -> Result<SpaceProfile, BiliError> {
-        let settings = self
-            .client
-            .get_json(
-                &format!("{API}/x/space/setting?mid={mid}"),
-                Duration::from_millis(400),
-            )
-            .await;
+        let settings = self.space_settings(mid).await;
         let details = self
             .client
             .signed_get(
@@ -297,6 +322,20 @@ mod tests {
 
     #[test]
     fn wall_uses_list_and_profession_respects_display_switch() {
+        assert!(matches!(
+            wall_visibility(&json!({"close_space_medal":1})).unwrap(),
+            Some(MedalWall::Private)
+        ));
+        assert!(matches!(
+            wall_visibility(&json!({"close_space_medal":0,"only_show_wearing":1})).unwrap(),
+            Some(MedalWall::WearingOnly)
+        ));
+        assert!(
+            wall_visibility(&json!({"close_space_medal":0,"only_show_wearing":0}))
+                .unwrap()
+                .is_none()
+        );
+        assert!(wall_visibility(&json!({})).is_err());
         let medals = wall_medals(&json!({"list":[{"medal_info":{"medal_name":"示例牌","level":18},"target_name":"示例主播"}]})).unwrap();
         assert_eq!((medals[0].name.as_str(), medals[0].level), ("示例牌", 18));
         assert!(wall_medals(&json!({"list":[]})).unwrap().is_empty());

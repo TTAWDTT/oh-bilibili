@@ -3408,7 +3408,7 @@ impl Engine {
         Ok(self.source.space_room(mid).await?)
     }
 
-    pub async fn space_medal_wall(&self, mid: u64) -> Result<Vec<crate::wire::WallMedal>, WireError> {
+    pub async fn space_medal_wall(&self, mid: u64) -> Result<crate::wire::MedalWall, WireError> {
         Ok(self.source.space_medal_wall(mid).await?)
     }
 

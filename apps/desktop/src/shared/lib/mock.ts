@@ -321,7 +321,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       ? { id: 173551, title: '剪辑室', cover: '/assets/cover-fallback.jpg', live: false, looping: true } : null
     case 'space_medal_wall':
       if (!state.auth.logged_in) throw fail('needs_login', '请登录后查看粉丝勋章墙')
-      return spaceShowcase ? [{ name: '同行', level: 18, creator: '云上的实验室' }] : []
+      return spaceEmpty ? { status: 'private' } : { status: 'public', items: spaceShowcase ? [{ name: '同行', level: 18, creator: '云上的实验室' }] : [] }
     case 'space_profile': {
       if (profileFailurePending) {
         profileFailurePending = false

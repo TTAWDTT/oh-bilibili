@@ -264,8 +264,9 @@ export type SpaceProfile = {
   school: string | null
 }
 export type WallMedal = { name: string; level: number; creator: string | null }
-export function spaceMedalWall(mid: number): Promise<WallMedal[]> {
-  return call<WallMedal[]>('space_medal_wall', { mid })
+export type SpaceMedalWall = { status: 'public'; items: WallMedal[] } | { status: 'private' | 'wearing_only' }
+export function spaceMedalWall(mid: number): Promise<SpaceMedalWall> {
+  return call<SpaceMedalWall>('space_medal_wall', { mid })
 }
 export function spaceNotice(mid: number): Promise<string | null> {
   return call<string | null>('space_notice', { mid })
