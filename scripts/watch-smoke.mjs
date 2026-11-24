@@ -1579,12 +1579,7 @@ async function checkHeroAllocation(page) {
   const wide = await read()
   await page.viewport(1023, 900)
   await sleep(500)
-  const narrow = await page.evaluate(`(() => ({
-    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
-      .map((image) => image.dataset.trackTitle ?? ''),
-    grid: document.querySelector('[data-home-hero-grid]') !== null,
-    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
-  }))()`)
+  const narrow = await read()
   await page.viewport(1024, 900)
   await sleep(500)
   const restored = await read()
@@ -1605,8 +1600,8 @@ async function checkHeroAllocation(page) {
       (hasResume ? wide.carousel.length === 0 : wide.carousel.length === 5) &&
       wide.grid.length === 6 &&
       placedOnce(initialTitles, [...wide.carousel, ...wide.grid, ...wide.feed]) &&
-      placedOnce(initialTitles, [...narrow.carousel, ...narrow.feed]) &&
-      !narrow.grid &&
+      placedOnce(initialTitles, [...narrow.carousel, ...narrow.grid, ...narrow.feed]) &&
+      narrow.grid.length === 2 &&
       restored.grid.length === 6 &&
       placedOnce(initialTitles, [...restored.carousel, ...restored.grid, ...restored.feed]),
   )
@@ -1626,12 +1621,7 @@ async function checkHeroAllocation(page) {
   const refreshed = await read()
   await page.viewport(1023, 900)
   await sleep(500)
-  const refreshedNarrow = await page.evaluate(`(() => ({
-    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
-      .map((image) => image.dataset.trackTitle ?? ''),
-    grid: document.querySelector('[data-home-hero-grid]') !== null,
-    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
-  }))()`)
+  const refreshedNarrow = await read()
   const refreshedTitles = [
     ...Array.from({ length: 6 }, (_, index) => `换一换 ${index + 1}`),
     ...Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`),
@@ -1643,12 +1633,12 @@ async function checkHeroAllocation(page) {
       refreshedReady &&
       refreshed.grid.length === 6 &&
       refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) &&
-      !refreshedNarrow.grid &&
-      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed]),
+      refreshedNarrow.grid.length === 2 &&
+      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.grid, ...refreshedNarrow.feed]),
   )
   if (
     !refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) ||
-    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed])
+    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.grid, ...refreshedNarrow.feed])
   ) {
     console.log(JSON.stringify({ refreshed, refreshedNarrow, refreshedTitles }))
   }

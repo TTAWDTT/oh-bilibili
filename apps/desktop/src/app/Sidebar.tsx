@@ -72,14 +72,16 @@ export function Sidebar() {
         aria-label={collapsed ? entry.label : undefined}
         title={collapsed ? entry.label : undefined}
         className={[
-          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] text-[14px]',
+          'bili-nav-item bili-icon-btn t relative flex h-9 items-center gap-2.5 rounded-lg text-[14px]',
           collapsed ? 'justify-center px-0' : 'px-2.5',
           active
-            ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+            ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]'
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <Icon name={entry.icon} size={16} className={active ? 'bili-icon-pop' : ''} />
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+          <Icon name={entry.icon} size={entry.icon === 'biliTv' ? 24 : 18} className={active ? 'bili-icon-pop' : ''} />
+        </span>
         {collapsed ? null : <span className="bili-sidebar-label min-w-0 truncate">{entry.label}</span>}
       </button>
     )
@@ -98,7 +100,7 @@ export function Sidebar() {
       {GROUPS.map((group, index) => (
         <div key={group.title ?? `g${index}`} className="flex flex-col gap-0.5">
           {group.title && !collapsed ? (
-            <h2 className="px-2.5 pb-1 text-[12px] font-normal text-[var(--text-3)]">{group.title}</h2>
+            <h2 className="mx-2.5 mb-1 border-t border-hairline pt-3 text-[12px] font-semibold text-[var(--text-2)]">{group.title}</h2>
           ) : null}
           {group.title && collapsed && index > 0 ? (
             <span className="mx-1 mb-1 border-t border-hairline" />
@@ -111,7 +113,7 @@ export function Sidebar() {
         {item({ view: { kind: 'settings' }, label: '设置', icon: 'settings' })}
         <button
           type="button"
-        onClick={onWatch ? toggleWatchNav : toggleSidebar}
+          onClick={onWatch ? toggleWatchNav : toggleSidebar}
           aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
           aria-expanded={!collapsed}
           title={collapsed ? '展开侧边栏' : '收起侧边栏'}
@@ -119,7 +121,9 @@ export function Sidebar() {
             collapsed ? 'justify-center px-0' : 'px-2.5'
           }`}
         >
-          <Icon name="chevronLeft" size={15} className={collapsed ? 'rotate-180' : ''} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+            <Icon name="chevronLeft" size={16} className={collapsed ? 'rotate-180' : ''} />
+          </span>
           {collapsed ? null : <span className="bili-sidebar-label">收起</span>}
         </button>
       </div>

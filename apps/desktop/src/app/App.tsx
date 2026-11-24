@@ -340,7 +340,7 @@ export default function App() {
           {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
                 父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
           <div key={view.kind} className="bili-page flex h-full flex-col">
-            <h1 className="sr-only">{viewTitle(view)}</h1>
+            {view.kind !== 'home' && <h1 className="sr-only">{viewTitle(view)}</h1>}
             <CurrentView view={view} />
           </div>
         </main>

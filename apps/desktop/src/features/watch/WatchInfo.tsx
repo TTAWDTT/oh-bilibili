@@ -20,6 +20,7 @@ import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import { SharePanel } from './SharePanel'
 import { SummaryCard } from './SummaryCard'
 import { watchUrl } from './watchUrl'
+import './watch-details.css'
 
 const TRIPLE_HOLD_MS = 550
 
@@ -107,11 +108,11 @@ export function WatchHead({
 }) {
   const page = data.pages.find((entry) => entry.no === currentPage)
   return (
-    <div className="pb-2">
+    <div className="watch-head">
       {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
       <div className="flex items-start gap-2">
         <h1
-          className="min-w-0 flex-1 text-[20px] font-medium leading-[1.35] text-[var(--text-1)]"
+          className="min-w-0 flex-1 text-[20px] leading-[1.32] font-semibold md:text-[24px] text-[var(--text-1)]"
           title={track.title}
         >
           {track.title}
@@ -119,9 +120,9 @@ export function WatchHead({
         <button
           type="button"
           onClick={() => onListen(Math.round(readPlayhead()))}
-          className="t press mt-0.5 h-7 shrink-0 rounded-[6px] border border-[var(--line)] px-2.5 text-[12px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          className="t press mt-0.5 inline-flex h-7 shrink-0 items-center gap-1 rounded-[6px] px-2 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]"
         >
-          听视频
+          <Icon name="headphones" size={14} /> 听视频
         </button>
       </div>
 
@@ -136,9 +137,9 @@ export function WatchHead({
         </div>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-3)]">
-        <span className="num">{formatCount(data.stats.views)} 播放</span>
-        <span className="num">{formatCount(data.stats.danmaku)} 弹幕</span>
+      <div className="watch-head-stats">
+        <span className="num"><Icon name="play" size={13} />{formatCount(data.stats.views)} 播放</span>
+        <span className="num"><Icon name="danmaku" size={14} />{formatCount(data.stats.danmaku)} 弹幕</span>
         <button
           type="button"
           onClick={() =>
@@ -259,7 +260,7 @@ export function WatchInfo({
     observer.observe(el)
     return () => observer.disconnect()
   }, [data.desc, descOpen])
-  /** 投币浮层的位置，null 表示没开。操作排是 overflow-x-auto，absolute 会被裁掉。 */
+  /** 投币面板锚定到触发按钮。 */
   const [coinAt, setCoinAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
   const [shareAt, setShareAt] = useState<{ left: number; top: number; anchorTop: number } | null>(null)
   const [noteOpen, setNoteOpen] = useState(false)
@@ -425,16 +426,17 @@ export function WatchInfo({
    */
   const action = (on: boolean): string =>
     [
-      'bili-icon-btn t press flex h-10 shrink-0 items-center gap-2 rounded-[6px] px-2.5 text-[13px]',
+      'bili-icon-btn t press inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px]',
       on
         ? 'text-[var(--accent)]'
-        : 'text-[var(--text-2)] hover:bg-[var(--panel-alt)] hover:text-[var(--accent)]',
+        : 'text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--text-1)]',
     ].join(' ')
 
   return (
-    <div className="pb-4 pt-3">
+    <div className="watch-details">
       <div
-        className="no-scrollbar mt-2 flex items-center gap-3 overflow-x-auto border-y border-hairline py-1.5"
+        data-watch-actions
+        className="watch-actions"
         style={{ '--hold-duration': `${TRIPLE_HOLD_MS}ms` } as React.CSSProperties}
       >
         <button
@@ -513,7 +515,7 @@ export function WatchInfo({
           <Icon name="share" size={22} />
           {formatCount(data.stats.shares)}
         </button>
-        <button type="button" aria-label="视频笔记" onClick={openNote} className={action(false)}>
+        <button type="button" aria-label="视频笔记" onClick={openNote} className={`${action(false)} watch-personal watch-tools-start`}>
           <Icon name="note" size={20} />
           笔记
         </button>
@@ -524,12 +526,11 @@ export function WatchInfo({
             if (downloading || downloaded) return
             void enqueueDownload(downloadKey)
           }}
-          className={action(downloaded)}
+          className={`${action(downloaded)} watch-personal`}
         >
           <Icon name={downloaded ? 'check' : downloading ? 'clock' : 'download'} size={20} />
           {downloaded ? '已下载' : downloading ? '下载中' : '下载'}
         </button>
-        <span className="mx-1.5 h-5 w-px shrink-0 bg-[var(--line)]" />
         <button
           type="button"
           aria-pressed={saved}
@@ -545,7 +546,7 @@ export function WatchInfo({
                 toastDone(next ? '加入稍后再看失败' : '移出稍后再看失败', '登录后再试'),
               )
           }}
-          className={action(false)}
+          className={`${action(saved)} watch-personal`}
         >
           <Icon name="watchLater" size={20} />
           {saved ? '已加入' : '稍后再看'}
@@ -678,7 +679,7 @@ export function WatchInfo({
       </Modal>
 
       {/* B 站宽屏只在右栏放 UP 名片；窄屏没有右栏，这里补一行。 */}
-      {ownerRow ? <div className="mt-1">{ownerRow}</div> : null}
+      {ownerRow}
 
       {data.desc ? (
         <div className="mt-3 max-w-[820px]">
@@ -719,7 +720,7 @@ export function WatchInfo({
               key={tag}
               type="button"
               onClick={() => setHeroQuery(tag)}
-              className="t rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_10%,white)] px-2 text-[12px] leading-[22px] text-[var(--accent)] hover:bg-[color-mix(in_oklab,var(--accent)_18%,white)]"
+              className="t rounded-[3px] bg-[var(--ga0)] px-2 text-[12px] leading-[22px] text-[var(--text-2)] hover:bg-[var(--ga1)] hover:text-[var(--text-1)]"
             >
               {tag}
             </button>

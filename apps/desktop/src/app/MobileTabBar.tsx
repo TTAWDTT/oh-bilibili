@@ -1,6 +1,5 @@
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
-import { usePlayerStore } from '../features/player/playerStore'
 import { Icon } from '../shared/ui/Icon'
 import type { IconName } from '../shared/ui/Icon'
 
@@ -21,7 +20,6 @@ const TABS: readonly { kind: View['kind']; label: string; icon: IconName }[] = [
 export function MobileTabBar() {
   const view = useAppStore((state) => state.view)
   const navigate = useAppStore((state) => state.navigate)
-  const track = usePlayerStore((state) => state.snapshot?.track ?? null)
 
   return (
     <nav
@@ -31,8 +29,6 @@ export function MobileTabBar() {
       {TABS.map((tab) => {
         const active =
           view.kind === tab.kind || (tab.kind === 'library' && view.kind === 'playlist')
-        // 「赞过」在没有可点的内容时依然可点，只是不高亮
-        void track
         return (
           <button
             key={tab.kind}
@@ -40,11 +36,13 @@ export function MobileTabBar() {
             onClick={() => navigate({ kind: tab.kind } as View)}
             aria-current={active ? 'page' : undefined}
             className={[
-              'flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]',
-              active ? 'text-[var(--accent)]' : 'text-[var(--text-3)]',
+              'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5 text-[11px]',
+              active ? 'font-semibold text-[var(--accent-strong)]' : 'text-[var(--text-3)]',
             ].join(' ')}
           >
-            <Icon name={tab.icon} size={19} />
+            <span className={`flex h-6 w-10 items-center justify-center rounded-full ${active ? 'bg-[var(--accent-soft)]' : ''}`}>
+              <Icon name={tab.icon} size={tab.icon === 'biliTv' ? 24 : 19} />
+            </span>
             {tab.label}
           </button>
         )

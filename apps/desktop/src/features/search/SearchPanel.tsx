@@ -15,11 +15,14 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAuthStore } from '../auth/authStore'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { PARTITIONS, PartitionFilter } from './PartitionFilter'
-import { DurationFilter } from './DurationFilter'
+import { DURATION_OPTIONS, DurationFilter } from './DurationFilter'
 import { useSearchHistory } from '../../shared/lib/searchHistory'
+import './search.css'
 
+const ORDERS = [
+  ['totalrank', '综合排序'], ['click', '最多播放'], ['pubdate', '最新发布'], ['danmaku', '最多弹幕'],
+] as const
 const SUGGESTIONS = ['晴天', '周深', '纯音乐', '夜空中最亮的星', '起风了']
-// 三条事实压成一行：它们是说明，不是可点击的卡片，框起来只会挡住搜索。
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -33,6 +36,7 @@ type SearchMemory = {
   usersPage: number
   usersEnded: boolean
   tab: SearchTab
+  filtersOpen: boolean
   scrollTop: number
   lastRenderedIndex: number
 }
@@ -83,6 +87,12 @@ export function SearchPanel({ query }: { query: string }) {
   const [usersNonce, setUsersNonce] = useState(0)
   /** B 站搜索页的结果分类。默认综合，视频与 UP 主分开看。 */
   const [tab, setTab] = useState<SearchTab>(restored?.tab ?? 'all')
+  const [filtersOpen, setFiltersOpen] = useState(restored?.filtersOpen ?? false)
+  const activeFilters = [
+    partition !== '全部' && partition,
+    order !== 'totalrank' && ORDERS.find(([value]) => value === order)?.[1],
+    duration !== 0 && DURATION_OPTIONS.find(({ key }) => key === duration)?.label,
+  ].filter(Boolean)
   const navigate = useAppStore((state) => state.navigate)
   const history = useSearchHistory((s) => s.items)
   /** 热搜榜。取不到就退回内置建议，给空结果提供可点的替代词。 */
@@ -159,6 +169,7 @@ export function SearchPanel({ query }: { query: string }) {
         usersPage: currentUsersPage,
         usersEnded: currentUsersEnded,
         tab,
+        filtersOpen,
         scrollTop: 0,
         lastRenderedIndex: 0,
       }
@@ -170,8 +181,9 @@ export function SearchPanel({ query }: { query: string }) {
       searchMemory.usersPage = currentUsersPage
       searchMemory.usersEnded = currentUsersEnded
       searchMemory.tab = tab
+      searchMemory.filtersOpen = filtersOpen
     }
-  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page, ended, tab])
+  }, [trimmed, partition, order, duration, dataKey, tracks, users, usersReady, usersPage, usersEnded, page, ended, tab, filtersOpen])
 
   // UP 主结果按关键词与分区重置；视频翻页、排序和时长筛选不动它。先排队以免被视频预取挡住。
   useEffect(() => {
@@ -332,6 +344,12 @@ export function SearchPanel({ query }: { query: string }) {
     scrollerRef.current?.scrollTo({ top: 0 })
   }
 
+  const changeVideoFilters = (update: Parameters<typeof setSearchFilters>[0]): void => {
+    setSearchFilters(update)
+    setPage(1)
+    scrollerRef.current?.scrollTo({ top: 0 })
+  }
+
   const openUser = (user: ipc.UserHit): void => {
     navigate({ kind: 'author', name: user.name, mid: user.mid }, undefined, `search-user:${user.mid}`)
   }
@@ -341,18 +359,15 @@ export function SearchPanel({ query }: { query: string }) {
       ref={scrollerRef}
       id="scroll-main"
       data-search-results
-      className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
+      className="search-results-page min-h-0 flex-1 overflow-y-auto"
     >
-      <div className="mb-3 flex items-center gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-page-title text-[var(--text-1)]" title={trimmed}>
-          搜索 “{trimmed}”
+      <div className="search-results-heading">
+        <h2 title={trimmed}>
+          <span className="truncate">{trimmed || '搜索'}</span>
+          {trimmed && <span className="shrink-0 text-[14px] font-normal text-[var(--text-2)]">的搜索结果</span>}
         </h2>
-        <button
-          type="button"
-          onClick={goBack}
-          className="t press shrink-0 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]"
-        >
-          返回
+        <button type="button" onClick={goBack} className="search-go-back">
+          <Icon name="chevronLeft" size={15} />返回
         </button>
       </div>
         {trimmed.length === 0 ? (
@@ -364,7 +379,7 @@ export function SearchPanel({ query }: { query: string }) {
             {/* B 站搜索页的分类 tab：综合里同时有 UP 主和视频，也可以只看其中一类。 */}
             <nav
               aria-label="搜索结果分类"
-              className="sticky top-0 z-10 -mx-4 mb-3 flex gap-6 border-b border-[var(--line)] bg-[var(--color-ink)] px-4 md:-mx-8 md:px-8"
+              className="search-results-tabs"
             >
               {(
                 [
@@ -378,15 +393,25 @@ export function SearchPanel({ query }: { query: string }) {
                   type="button"
                   aria-current={tab === value ? 'page' : undefined}
                   onClick={() => selectTab(value)}
-                  className={`t border-b-2 pb-2 text-[14px] ${
-                    tab === value
-                      ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
-                      : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'
-                  }`}
                 >
                   {label}
                 </button>
               ))}
+              {tab !== 'user' && (
+                <button
+                  className="search-filter-toggle"
+                  type="button"
+                  aria-controls="search-video-filters"
+                  aria-expanded={filtersOpen}
+                  onClick={() => {
+                    setFiltersOpen(!filtersOpen)
+                    scrollerRef.current?.scrollTo({ top: 0 })
+                  }}
+                >
+                  {filtersOpen ? '收起筛选' : '筛选'}
+                  <Icon name="chevronRight" size={14} className={filtersOpen ? '-rotate-90' : 'rotate-90'} />
+                </button>
+              )}
             </nav>
             {tab === 'user' && usersReady && users.length > 0 ? (
               <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -509,9 +534,36 @@ export function SearchPanel({ query }: { query: string }) {
             ) : null}
             {tab === 'user' ? null : (
             <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div
+              id="search-video-filters"
+              className="search-video-filters"
+              data-expanded={filtersOpen}
+            >
+              <div role="group" aria-label="视频排序" className="search-filter-row">
+                <span>排序</span>
+                <div>
+                  {ORDERS.map(([value, label]) => (
+                    <button key={value} type="button" aria-pressed={order === value}
+                      onClick={() => changeVideoFilters({ currentOrder: value })}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <DurationFilter active={duration} onChange={(key) => changeVideoFilters({ currentDuration: key })} />
+              <PartitionFilter active={partition} onChange={(label) => changeVideoFilters({ currentPartition: label })} />
+            </div>
+            {activeFilters.length > 0 && (
+              <div className="search-filter-summary">
+                <span>{activeFilters.join(' · ')}</span>
+                <button type="button" onClick={() => changeVideoFilters({ currentPartition: '全部', currentOrder: 'totalrank', currentDuration: 0 })}>
+                  清除筛选
+                </button>
+              </div>
+            )}
+            <div className="search-video-heading">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-[17px] font-medium text-[var(--text-1)]">视频</h3>
+                <h3 className="text-[19px] font-semibold text-[var(--text-1)]">视频</h3>
                 {tracks.length > 0 ? (
                   <span className="num text-[12px] text-[var(--text-3)]">已加载 {formatCount(tracks.length)} 个</span>
                 ) : null}
@@ -526,7 +578,7 @@ export function SearchPanel({ query }: { query: string }) {
                       data-focus-id={`search-user:${user.mid}`}
                       aria-label={`查看 UP 主 ${user.name}`}
                       onClick={() => openUser(user)}
-                      className="t press flex min-w-0 max-w-32 items-center gap-1.5 rounded-full bg-[var(--panel)] py-1 pl-1 pr-2 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)]"
+                      className="t press flex min-w-0 max-w-32 items-center gap-1.5 rounded-full bg-[var(--ga0)] py-1 pl-1 pr-2 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)]"
                     >
                       <Avatar src={user.face} alt="" size={22} />
                       <span className="truncate">{user.name}</span>
@@ -541,57 +593,6 @@ export function SearchPanel({ query }: { query: string }) {
                   </button>
                 </div>
               ) : null}
-            </div>
-
-            {/* 筛选条常驻：加载中、零结果时也能就地改条件，不必先清空关键词。 */}
-            <div className="mb-2 flex flex-col gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <DurationFilter
-                    active={duration}
-                    onChange={(key) => {
-                      setSearchFilters({ currentDuration: key })
-                      setPage(1)
-                      scrollerRef.current?.scrollTo({ top: 0 })
-                    }}
-                  />
-                  <div role="group" aria-label="视频排序" className="flex items-center gap-1">
-                  {([
-                    ['totalrank', '综合'],
-                    ['click', '最多播放'],
-                    ['pubdate', '最新发布'],
-                    ['danmaku', '最多弹幕'],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => {
-                        setSearchFilters({ currentOrder: value })
-                        setPage(1)
-                        scrollerRef.current?.scrollTo({ top: 0 })
-                      }}
-                      aria-pressed={order === value}
-                      className={[
-                        't rounded-[4px] px-2 py-1 text-[13px]',
-                        order === value
-                          ? 'font-semibold text-[var(--accent-strong)] underline underline-offset-4'
-                          : 'text-[var(--text-3)] hover:text-[var(--text-1)]',
-                      ].join(' ')}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                  </div>
-                </div>
-
-                <PartitionFilter
-                  active={partition}
-                  onChange={(label) => {
-                    setSearchFilters({ currentPartition: label })
-                    // 换分区等于换一次查询，必须从第 1 页开始，否则会追加到旧结果后面
-                    setPage(1)
-                    scrollerRef.current?.scrollTo({ top: 0 })
-                  }}
-                />
             </div>
 
             {status === 'loading' && tracks.length === 0 ? <BiliLoader label="正在 B 站里翻…" /> : null}
@@ -624,7 +625,7 @@ export function SearchPanel({ query }: { query: string }) {
                   }
                   action={
                     selectedPartition.tid
-                      ? { label: '全站搜这个词', onClick: () => { setSearchFilters({ currentPartition: '全部' }); setPage(1) } }
+                      ? { label: '全站搜这个词', onClick: () => { changeVideoFilters({ currentPartition: '全部' }) } }
                       : { label: '返回', onClick: goBack }
                   }
                 />

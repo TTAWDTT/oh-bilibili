@@ -73,8 +73,8 @@ export function PageList({
 
   return (
     <div data-watch-pages className={bare ? '' : 'px-2 pb-2'}>
-      <div className={bare ? '' : 'overflow-hidden rounded-[8px] border border-[var(--line)]'}>
-        <div className="flex items-baseline gap-2 border-b border-hairline px-3 py-2">
+      <div className={bare ? '' : 'overflow-hidden'}>
+        <div className="flex items-baseline gap-2 px-2 py-2">
           <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]">{title}</h3>
           <span className="num shrink-0 text-[11px] text-[var(--text-3)]">
             {' '}P{current}/{pages.length}

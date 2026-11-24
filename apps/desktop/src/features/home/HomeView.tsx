@@ -7,7 +7,9 @@ import { toWireError } from '../../shared/lib/errors'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
+import { toastFailure } from '../../app/notice'
 import { PARTS } from '../../shared/lib/biliParts'
+import './discovery.css'
 import { HeroBanner } from './HeroBanner'
 import { HeroQuoteLine, useHeroQuote } from './HeroQuote'
 import { LiveRow } from './LiveRow'
@@ -127,9 +129,8 @@ export function HomeView() {
   const attempt = useRef({ next: 1, append: false })
   /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
   const exhausted = useRef(false)
-  /** 频道条只在真的横向溢出时才给渐隐：滚到两端时不能还遮住首尾胶囊。 */
   const channelRef = useRef<HTMLDivElement | null>(null)
-  const [channelFade, setChannelFade] = useState({ left: false, right: false })
+  const [channelScroll, setChannelScroll] = useState({ left: false, right: false })
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)')
@@ -144,7 +145,7 @@ export function HomeView() {
     const update = (): void => {
       const left = el.scrollLeft > 1
       const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
-      setChannelFade((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
+      setChannelScroll((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
     }
     update()
     const observer = new ResizeObserver(update)
@@ -156,28 +157,30 @@ export function HomeView() {
     }
   }, [])
 
+  useLayoutEffect(() => {
+    const list = channelRef.current
+    const active = list?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')
+    if (!list || !active || list.scrollWidth <= list.clientWidth) return
+    // 只横移分区栏，从视频返回时保留整页的阅读位置。
+    const left = active.offsetLeft - list.offsetLeft
+    const right = left + active.offsetWidth
+    if (left < list.scrollLeft + 32 || right > list.scrollLeft + list.clientWidth - 32) {
+      list.scrollLeft = (left + right - list.clientWidth) / 2
+    }
+  }, [scope])
+
   const resumeKey = resume?.entry.track.key ?? null
   /** 续播那一条不再出现在推荐里，宽窄窗都一样。 */
   const heroPool = resumeKey ? hero.filter((track) => track.key !== resumeKey) : hero
-  /** 续播卡占了轮播的位置时，右边从推荐第一批的开头取六张，剩下的接进下方推荐流。 */
-  const heroCards = resume ? heroPool.slice(0, 6) : heroPool.slice(5, 11)
-  /** 续播卡占左列时，右侧第一张就是首推；它才是唯一要补弹幕引文的那张。 */
+  const carouselCount = resume && wideHero ? 0 : 5
+  const topCount = carouselCount + (wideHero ? 6 : 2)
+  const heroCards = heroPool.slice(carouselCount, topCount)
   const featuredQuote = useHeroQuote(resume && wideHero ? heroCards[0]?.key : undefined)
-  const heroKeys = new Set(hero.map((track) => track.key))
-  const cardKeys = new Set(heroCards.map((track) => track.key))
-  const feedRemainder = items.filter((track) => !heroKeys.has(track.key) && track.key !== resumeKey)
-  const feedTracks = wideHero
-    ? resume
-      ? [
-          ...new Map(
-            [
-              ...heroPool.slice(6),
-              ...items.filter((track) => !cardKeys.has(track.key) && track.key !== resumeKey),
-            ].map((track) => [track.key, track]),
-          ).values(),
-        ]
-      : feedRemainder
-    : [...new Map([...heroPool.slice(5), ...feedRemainder].map((track) => [track.key, track])).values()]
+  const topKeys = new Set(heroPool.slice(0, topCount).map((track) => track.key))
+  const feedTracks = [...new Map([
+    ...heroPool.slice(topCount),
+    ...items.filter((track) => track.key !== resumeKey && !topKeys.has(track.key)),
+  ].map((track) => [track.key, track])).values()]
 
   const load = useCallback(async (next: number, append = false): Promise<void> => {
     attempt.current = { next, append }
@@ -291,6 +294,7 @@ export function HomeView() {
   const refreshHero = async (): Promise<void> => {
     if (heroLoading) return
     setHeroLoading(true)
+    scrollerRef.current?.scrollTo({ top: 0 })
     const next = fresh + 1
     setFresh(next)
     try {
@@ -303,9 +307,11 @@ export function HomeView() {
         heroRef.current = swapped
         feedMemory.hero = swapped
         setHero(swapped)
+      } else {
+        useAppStore.getState().pushToast('info', '暂时没有新推荐', null)
       }
-    } catch {
-      // 换失败就保留当前首屏，不把已经能看的内容清空。
+    } catch (cause) {
+      toastFailure('换推荐', cause)
     } finally {
       setHeroLoading(false)
     }
@@ -364,85 +370,52 @@ export function HomeView() {
           feedMemory.index = Math.round((el.scrollTop / max) * (rendered - 1))
         }
       }}
-      className="bili-canvas min-h-0 flex-1 overflow-y-auto py-0 px-0 pb-10 md:px-0"
+      className="discovery-page min-h-0 flex-1 overflow-y-auto pb-10"
     >
-      {/*
-       * 频道条照 B 站首页：左边两颗圆形入口，右边一排窄胶囊。
-       * B 站胶囊实测 #f6f7f8、无描边、深色字、28 高、宽约 60——一格只放得下两个分区名。
-       * 之前把 12 个胶囊拉成 6 列网格、每格 100 宽，整条带子像一组表单输入框；
-       * 右侧那块快捷入口又和左栏完全重复，删掉后 12 个胶囊正好一行排完。
-       */}
-      <nav className="mb-4 bg-[var(--panel)] py-3">
-        <div className="flex items-center gap-5 px-4 md:px-8">
-          {/* 宽窗左栏已经有热门/排行榜，这里只留给窄窗的可发现入口。 */}
-          <div className="flex shrink-0 items-start gap-3 md:hidden">
-            {[
-              { label: '热门', icon: 'flame' as const, tone: '#ff7a45', run: () => navigate({ kind: 'popular' }) },
-              { label: '排行', icon: 'rank' as const, tone: 'var(--accent)', run: () => navigate({ kind: 'ranking' }) },
-            ].map((entry) => (
+      <header className="discovery-bar">
+        <h1>发现</h1>
+        <div className="discovery-shortcuts md:hidden">
+          <button type="button" onClick={() => navigate({ kind: 'popular' })}>
+            <Icon name="flame" size={15} />热门
+          </button>
+          <button type="button" onClick={() => navigate({ kind: 'ranking' })}>
+            <Icon name="rank" size={15} />排行
+          </button>
+        </div>
+        <nav aria-label="发现分区" className="discovery-channels">
+          <div ref={channelRef} className="discovery-channel-list no-scrollbar">
+            {PARTS.map((part) => (
               <button
-                key={entry.label}
+                key={part.rid}
                 type="button"
-                onClick={entry.run}
-                /* 不写固定宽度：按钮宽 = 圆形直径，圆的左缘就和下面胶囊、轮播、卡片同一条线。 */
-                className="t press flex w-10 flex-col items-center gap-1 rounded-[8px] py-0.5 text-[12px] text-[var(--text-2)] hover:text-[var(--text-1)]"
+                aria-pressed={scope === part.rid}
+                onClick={() => chooseScope(part.rid)}
               >
-                <span
-                  className="bili-channel-icon flex h-10 w-10 items-center justify-center rounded-full text-white"
-                  style={{ background: entry.tone }}
-                >
-                  <Icon name={entry.icon} size={18} />
-                </span>
-                <span className="whitespace-nowrap">{entry.label}</span>
+                {part.rid === 0 ? '全部' : part.name}
               </button>
             ))}
           </div>
-          <div className="relative min-w-0 flex-1">
-            <div
-              ref={channelRef}
-              className={`no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto border-l border-[var(--line)] pl-5 ${
-                channelFade.left && channelFade.right
-                  ? 'bili-channels-fade-lr'
-                  : channelFade.right
-                    ? 'bili-channels-fade-r'
-                    : channelFade.left
-                      ? 'bili-channels-fade-l'
-                      : ''
-              }`}
-            >
-              <button
-                type="button"
-                aria-pressed={scope === 0}
-                onClick={() => chooseScope(0)}
-                className={[
-                  't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
-                  scope === 0
-                    ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                    : 'bg-[var(--ga0)] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]',
-                ].join(' ')}
-              >
-                全部
-              </button>
-              {PARTS.filter((part) => part.rid !== 0).map((part) => (
-                <button
-                  key={part.rid}
-                  type="button"
-                  aria-pressed={scope === part.rid}
-                  onClick={() => chooseScope(part.rid)}
-                  className={[
-                    't h-7 w-[62px] shrink-0 rounded-[4px] text-[12.5px]',
-                    scope === part.rid
-                      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                      : 'bg-[var(--ga0)] text-[var(--text-1)] hover:bg-[var(--line)] hover:text-[var(--accent)]',
-                  ].join(' ')}
-                >
-                  {part.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </nav>
+          {channelScroll.left && (
+            <button type="button" className="discovery-channel-scroll left-0" aria-label="向左浏览分区"
+              onClick={() => channelRef.current?.scrollBy({ left: -channelRef.current.clientWidth * 0.7 })}>
+              <Icon name="chevronLeft" size={16} />
+            </button>
+          )}
+          {channelScroll.right && (
+            <button type="button" className="discovery-channel-scroll right-0" aria-label="向右浏览分区"
+              onClick={() => channelRef.current?.scrollBy({ left: channelRef.current.clientWidth * 0.7 })}>
+              <Icon name="chevronRight" size={16} />
+            </button>
+          )}
+        </nav>
+        {scope === 0 && hero.length > 0 && (
+          <button type="button" onClick={() => void refreshHero()} disabled={heroLoading}
+            className="discovery-refresh t press disabled:pointer-events-none">
+            <Icon name="refresh" size={14} className={heroLoading ? 'animate-spin' : ''} />
+            换一换
+          </button>
+        )}
+      </header>
 
       {/* 首屏没内容才把错误摆在顶部；已经有一屏推荐时，这句话属于列表末尾。 */}
       {scope === 0 && error && items.length === 0 ? (
@@ -474,32 +447,10 @@ export function HomeView() {
         </div>
       ) : null}
 
-      {/*
-       * B 站首页首屏是「大轮播 + 右侧卡片网格」：右侧给四张带封面的卡，
-       * 而不是一列文字条目。轮播用前 5 条、右栏接 6 条，下面网格从第 11 条开始，
-       * 同一批推荐不会在屏上出现两次。
-       */}
       {scope === 0 && hero.length > 0 ? (
-        <div data-home-recommend className="mb-4 px-4 pt-4 md:px-8">
-          {/* 标题行给「换一换」一个和内容左右对齐的落点。之前是贴在右边缘的一整条竖卡，
-              宽度顶出内容区，整页就多出一条横向滚动条。 */}
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <h2 className="text-[17px] font-medium text-[var(--text-1)]">推荐</h2>
-            <button
-              type="button"
-              onClick={() => void refreshHero()}
-              disabled={heroLoading}
-              className="t press flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] text-[var(--text-3)] hover:bg-[var(--ga0)] hover:text-[var(--accent)] disabled:pointer-events-none"
-            >
-              <Icon name="refresh" size={13} className={heroLoading ? 'animate-spin' : ''} />
-              换一换
-            </button>
-          </div>
-          {/*
-           * B 站 1280 视口实测：轮播约占内容宽 44%，右侧是 3 列 × 2 行六张 16:9 小卡。
-           * 45/55 下右栏每张约 186 宽，轮播 7:5 与两行卡片正好等高，不用给哪一边留空。
-           */}
-          <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)]">
+        <div data-home-recommend className="discovery-recommend px-4 md:px-8">
+          <h2 className="sr-only">推荐</h2>
+          <div className="discovery-lead-grid">
           {resume && wideHero ? (
             <div className="hidden lg:block">
               <ResumeCard resume={resume} onOpen={openResume} />
@@ -518,9 +469,9 @@ export function HomeView() {
               }
             />
           )}
-          {(resume ? heroCards.length > 0 : hero.length > 5) && wideHero ? (
+          {heroCards.length > 0 ? (
             /* key 绑首条：换一换之后 key 变，整块重挂载，淡入从第一帧开始。 */
-            <div key={heroCards[0]?.key} data-home-hero-grid className="bili-hero-swap grid grid-cols-3 gap-3">
+            <div key={heroCards[0]?.key} data-home-hero-grid className="discovery-picks bili-hero-swap">
               {heroCards.map((track, i) => (
                 <div key={track.key} className="min-w-0">
                 <button
@@ -529,10 +480,10 @@ export function HomeView() {
                   data-focus-id={`herocard:${track.key}`}
                   className="bili-card group block w-full min-w-0 text-left"
                 >
-                  <span className="relative block aspect-video overflow-hidden rounded-[6px]">
-                    <Cover cover={track.cover} title={track.title} width={220} className="h-full w-full" />
+                  <span className="relative block aspect-video overflow-hidden rounded-[8px]">
+                    <Cover cover={track.cover} title={track.title} width={360} className="h-full w-full" />
                     {/* 左下角播放/弹幕两枚计数、右下角时长：跟下面推荐流同一套压角规则。 */}
-                    <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                    <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                       <span className="num flex min-w-0 items-center gap-1">
                         {track.views ? (
                           <>
@@ -553,7 +504,7 @@ export function HomeView() {
                     </span>
                   </span>
                   {/* B 站首屏这几张比推荐流小一档：宽只有 186，15px 两行标题会顶到封面。 */}
-                  <span className="mt-1.5 line-clamp-2 text-[13.5px] leading-[19px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+                  <span className="mt-2 line-clamp-2 text-[14px] font-medium leading-5 text-[var(--text-1)] group-hover:text-[var(--accent)]">
                     {track.title}
                   </span>
                 </button>
@@ -583,7 +534,7 @@ export function HomeView() {
       ) : null}
 
       {scope !== 0 ? (
-        <RegionFeed key={scope} rid={scope} activeKey={activeKey} playing={playing} />
+        <RegionFeed key={scope} rid={scope} illustration={PARTITION_FLOORS.find((part) => part.rid === scope)?.illustration} activeKey={activeKey} playing={playing} />
       ) : (
         <>
           {/* 直播与番剧紧贴首屏：放在无限推荐流后面等于永远看不到，推荐流本身没有底 */}
@@ -597,6 +548,7 @@ export function HomeView() {
 
       {scope === 0 && items.length > 0 ? (
         <div data-home-feed className="px-4 md:px-8">
+          {feedTracks.length > 0 && <h2 className="discovery-heading mb-4 mt-9">更多推荐</h2>}
           <ContentGrid
             tracks={feedTracks}
             activeKey={activeKey}

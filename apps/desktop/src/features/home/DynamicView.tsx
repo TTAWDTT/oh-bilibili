@@ -310,7 +310,7 @@ function DynamicContent({
               aria-label={`在浏览器打开原图文，第 ${index + 1} 张图片`}
               className={`t relative flex items-center justify-center overflow-hidden rounded-[6px] bg-[var(--ga1)] ${item.images.length === 1 ? 'min-h-[180px]' : 'aspect-square'}`}
             >
-              <Icon name="biliTv" size={22} className="absolute text-[var(--ga3)]" />
+              <Icon name="biliTv" size={22} className="absolute opacity-50" />
               <img
                 src={url}
                 alt=""

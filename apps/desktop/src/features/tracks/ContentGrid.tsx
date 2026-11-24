@@ -50,7 +50,7 @@ function highlightTitle(title: string, keyword: string | undefined): React.React
   for (let hit = haystack.indexOf(needle); hit !== -1; hit = haystack.indexOf(needle, cursor)) {
     if (hit > cursor) parts.push(title.slice(cursor, hit))
     parts.push(
-      <mark key={hit} className="bg-transparent text-[var(--accent)]">
+      <mark key={hit} className="bg-transparent text-[var(--accent-strong)]">
         {title.slice(hit, hit + needle.length)}
       </mark>,
     )
@@ -209,7 +209,7 @@ const TrackCard = memo(function TrackCard({
               />
             </span>
           ) : null}
-          <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-1 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+          <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[12px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
             <span className="num flex min-w-0 items-center gap-1">
               {track.views ? (
                 <>
@@ -230,7 +230,7 @@ const TrackCard = memo(function TrackCard({
           </span>
           <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity duration-150 group-hover:bg-black/20 group-hover:opacity-100">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-              <Icon name={active && playing ? 'pause' : 'play'} size={18} />
+              <Icon name="play" size={18} />
             </span>
           </span>
         </button>
@@ -255,6 +255,7 @@ const TrackCard = memo(function TrackCard({
         title={track.title}
       >
         <button type="button" onClick={() => onOpen(track)} className="line-clamp-2 text-left">
+          {active && playing && <Icon name="headphones" size={14} className="mr-1 inline align-text-bottom" />}
           {highlightTitle(track.title, highlight)}
         </button>
       </h3>
@@ -403,12 +404,12 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
 
   return (
     <>
-      <h2 className="sr-only">曲目</h2>
+      <h2 className="sr-only">视频列表</h2>
       <div
         data-shown={shown}
         /* 190 是让 1320 窗口（内容 1056）落成 5 列的分界：5*190+4*20=1030。
            B 站首页推荐流同宽也是 5 列，206 的写法会掉成 4 列、卡片大一圈。 */
-        className="relative grid gap-x-5 gap-y-7 pb-6 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
+        className="relative grid grid-cols-2 gap-x-3 gap-y-5 pb-6 sm:gap-x-5 sm:gap-y-7 sm:[grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
       >
         {tracks.slice(0, shown).map((track, index) => {
           const active = track.key === activeKey

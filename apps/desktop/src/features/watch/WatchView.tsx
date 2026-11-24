@@ -681,7 +681,7 @@ export function WatchView({
   }, [track.key])
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col bg-[var(--panel)]">
       {cinema && !osFullscreen ? (
         <button
           type="button"
@@ -729,7 +729,7 @@ export function WatchView({
           /* 回到顶部按钮按 id 找容器：观看页是最长的一页，少了这个 id 按钮永远不出现。 */
           id="scroll-main"
           className={
-            cinema ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto px-6 pt-4'
+            cinema ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto px-4 pt-4 md:px-6'
           }
         >
           {/* B 站网页端把标题压在画面之上：先知道在放什么，再决定看不看。 */}
@@ -876,7 +876,7 @@ export function WatchView({
           {/* 右栏在窄屏收起，推荐改到评论区上方，否则手机上看完这条就没有下一个可点。 */}
           {!cinema ? (
             <div data-watch-inline className="border-t border-hairline xl:hidden">
-              <RelatedAside items={related} />
+              <RelatedAside items={related} inline />
             </div>
           ) : null}
           {!cinema ? (

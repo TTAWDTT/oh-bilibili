@@ -34,9 +34,7 @@ export function EmptyState({ icon, mascot, title, detail, action, compact = fals
       {mascot && !compact ? (
         <Mascot2233 height={200} className="opacity-95" />
       ) : mascot ? null : icon === 'biliTv' ? (
-        <span className="text-[var(--accent)]">
-          <BiliTvMark size={48} />
-        </span>
+        <BiliTvMark size={48} />
       ) : (
         <Icon name={icon} size={22} className="text-[var(--text-2)]" />
       )}

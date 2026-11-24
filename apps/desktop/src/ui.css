@@ -455,6 +455,17 @@
   contain: layout paint;
 }
 
+.bili-nav-item[aria-current="page"]::before {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-strong);
+  content: '';
+}
+
 .bili-sidebar-label {
   animation: bili-sidebar-label-in 120ms var(--ease);
 }
@@ -751,7 +762,6 @@
   animation: bili-suggest-in 180ms var(--ease) both;
 }
 
-/* 加载时那只小电视：上下弹跳 + 眨眼 */
 .bili-loader {
   animation: bili-loader-bounce 900ms cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 }
@@ -762,14 +772,10 @@
   70% { transform: translateY(0) scale(1.04, 0.94); }
 }
 
-.bili-loader__eyes {
-  transform-origin: 36px 36px;
-  animation: bili-loader-blink 1.6s ease-in-out infinite;
-}
-
-@keyframes bili-loader-blink {
-  0%, 80%, 100% { transform: scaleY(1); }
-  88% { transform: scaleY(0.15); }
+@media (prefers-reduced-motion: reduce) {
+  .bili-loader {
+    animation: none;
+  }
 }
 
 /* ── 弹性动效 ─────────────────────────────────────────

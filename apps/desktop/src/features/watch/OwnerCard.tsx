@@ -66,8 +66,8 @@ export function OwnerCard({
 
   if (inline) {
     return (
-      <div className="min-w-0 py-1">
-      <div className="flex w-fit max-w-full flex-wrap items-center gap-3">
+      <div className="watch-owner-inline">
+      <div className="flex w-full items-center gap-2">
         <button
           type="button"
           onClick={goAuthor}
@@ -77,13 +77,13 @@ export function OwnerCard({
         >
           <Avatar src={data.owner_avatar} alt={data.owner} size={38} />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={goAuthor}
               title={`看 ${data.owner} 的更多视频`}
-              className="t max-w-[220px] truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
+              className="t min-w-0 truncate text-[15px] font-semibold text-[var(--text-1)] hover:text-[var(--accent)]"
               {...hoverProps}
             >
               {data.owner}
@@ -127,8 +127,8 @@ export function OwnerCard({
           onClick={onFollow}
           className={`t press flex h-7 shrink-0 items-center rounded-[4px] px-3 text-[12.5px] ${
             followed === true
-              ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-              : 'bg-[var(--accent)] text-white hover:opacity-90'
+              ? 'border border-transparent bg-[var(--accent-soft)] text-[var(--accent-strong)] hover:bg-[var(--panel-raised)]'
+              : 'border border-[var(--line)] font-medium text-[var(--text-1)] hover:bg-[var(--ga0)]'
           }`}
         >
           {followed === true ? '已关注' : '关注'}
@@ -141,7 +141,7 @@ export function OwnerCard({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 px-3 py-3">
+    <div className="watch-owner-rail flex flex-col gap-2.5">
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -158,7 +158,7 @@ export function OwnerCard({
               type="button"
               onClick={goAuthor}
               title={`看 ${data.owner} 的更多视频`}
-              className="t max-w-full truncate text-[14px] font-medium text-[var(--accent)] hover:underline"
+              className="t max-w-full truncate text-[16px] font-semibold text-[var(--text-1)] hover:text-[var(--accent)]"
               {...hoverProps}
             >
               {data.owner}
@@ -213,8 +213,8 @@ export function OwnerCard({
             onClick={onFollow}
             className={`t press flex h-8 items-center rounded-[4px] px-4 text-[13px] ${
               followed === true
-                ? 'border border-[var(--line)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                : 'bg-[var(--accent)] text-white hover:opacity-90'
+                ? 'border border-transparent bg-[var(--accent-soft)] text-[var(--accent-strong)] hover:bg-[var(--panel-raised)]'
+                : 'border border-[var(--line)] font-medium text-[var(--text-1)] hover:bg-[var(--ga0)]'
             }`}
           >
             {followed === true ? '已关注' : '+ 关注'}

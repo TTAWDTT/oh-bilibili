@@ -15,14 +15,13 @@ export function DanmakuList({ items }: { items: DanmakuItem[] }) {
   const sorted = [...items].sort((a, b) => a.at - b.at)
 
   return (
-    <div className="px-2 pb-2">
-      {/* B 站把弹幕列表做成一条灰底圆角卡片，收起时只剩这条标题。 */}
-      <div className="overflow-hidden rounded-[8px] border border-[var(--line)]">
+    <div className="px-2 py-1">
+      <div className="overflow-hidden">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="t flex h-9 w-full items-center gap-2 bg-[var(--ga0)] px-3 text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
+          className="t flex h-9 w-full items-center gap-2 rounded-[4px] px-2 text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
         >
           <span className="min-w-0 flex-1 text-left">弹幕列表</span>
           <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>

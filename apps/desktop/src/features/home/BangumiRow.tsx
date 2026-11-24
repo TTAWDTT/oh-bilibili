@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { useAppStore } from '../../app/appStore'
+import { toastFailure } from '../../app/notice'
+import { Icon } from '../../shared/ui/Icon'
+import './discovery-shelves.css'
 
 /**
  * 发现页底部的番剧区。
@@ -32,60 +35,42 @@ export function BangumiRow() {
   if (error || !items || items.length === 0) return null
 
   return (
-    <section className="mt-8 px-4 md:px-8">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-medium text-[var(--text-1)]">番剧</h2>
-        <button
-          type="button"
-          onClick={() => navigate({ kind: 'bangumi' })}
-          className="t press flex items-center gap-1 text-[12.5px] text-[var(--text-3)] hover:text-[var(--accent)]"
-        >
-          全部番剧
-          <span aria-hidden>›</span>
+    <section className="discovery-shelf px-4 md:px-8" aria-labelledby="home-bangumi-heading">
+      <div className="discovery-shelf-heading">
+        <h2 id="home-bangumi-heading" className="discovery-heading">番剧</h2>
+        <span className="discovery-browser-note"><Icon name="external" size={12} />在浏览器观看</span>
+        <button type="button" onClick={() => navigate({ kind: 'bangumi' })}>
+          全部番剧 <Icon name="chevronRight" size={14} />
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <ol className="discovery-poster-list">
         {items.map((item) => (
-          <button
-            key={item.season_id}
-            type="button"
-            onClick={() => void ipc.openExternal(item.url).catch(() => {})}
-            title={item.title}
-            className="group min-w-0 text-left"
-          >
-            <span className="relative block overflow-hidden rounded-[6px] bg-[var(--ga1)]" style={{ aspectRatio: '3 / 4' }}>
-              {item.cover ? (
-                <img
-                  src={item.cover}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover transition-transform duration-[220ms] group-hover:scale-[1.03]"
-                />
-              ) : null}
-              {/* 名次压在左上角，前三名用蓝 / 橙 / 黄 */}
-              <span
-                className="num absolute left-0 top-0 px-1.5 text-[12px] font-medium leading-[18px] text-white"
-                style={{
-                  background: item.rank === 1 ? 'var(--accent)' : item.rank === 2 ? '#ff8f3f' : item.rank === 3 ? '#f6c34a' : 'rgba(0,0,0,0.55)',
-                }}
-              >
-                {item.rank}
+          <li key={item.season_id} className="min-w-0">
+            <button
+              type="button"
+              onClick={() => void ipc.openExternal(item.url).catch((cause) => toastFailure('打开番剧', cause))}
+              title={`${item.title} · 在浏览器打开`}
+              className="discovery-poster-card"
+            >
+              <span className="discovery-poster-art">
+                {item.cover && (
+                  <img src={item.cover} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                )}
+                <span className="discovery-cover-stats justify-between num">
+                  <span className="truncate">{item.play_text}</span>
+                  {item.rating && <span className="shrink-0">{item.rating}</span>}
+                </span>
+                <span className="discovery-open-label">在浏览器打开 <Icon name="external" size={11} /></span>
               </span>
-              <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-1.5 pb-1 text-[11px] leading-[15px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
-                <span className="num truncate">{item.play_text}</span>
-                {/* 未开分的番剧 rating 是空串，这时只留播放量，别显示一个空的金色块 */}
-                {item.rating ? <span className="num shrink-0 text-[#ffe0a3]">{item.rating}</span> : null}
+              <span className="discovery-card-title">{item.title}</span>
+              <span className="discovery-card-meta">
+                {item.index_show && <span className="truncate">{item.index_show}</span>}
+                {item.rank > 0 && <span className="ml-auto shrink-0 num">第 {item.rank} 名</span>}
               </span>
-            </span>
-            <span className="mt-1.5 line-clamp-1 text-[13.5px] leading-[19px] text-[var(--text-1)] group-hover:text-[var(--accent)]">
-              {item.title}
-            </span>
-            <span className="mt-0.5 line-clamp-1 text-[12px] text-[var(--text-3)]">{item.index_show}</span>
-          </button>
+            </button>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   )
 }

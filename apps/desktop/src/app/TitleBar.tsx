@@ -9,6 +9,7 @@ import { toastFailure } from './notice'
 import { isMacOS, isTauri } from '../shared/lib/runtime'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon, type IconName } from '../shared/ui/Icon'
+import { BiliTvMark } from '../shared/ui/BiliTvMark'
 import { useSearchHistory } from '../shared/lib/searchHistory'
 import { AnchoredPanel } from '../shared/ui/AnchoredPanel'
 import type { Anchor } from '../shared/ui/AnchoredPanel'
@@ -337,8 +338,8 @@ export function TitleBar() {
           </button>
         ) : (
           <div className="pointer-events-none flex shrink-0 items-center gap-1">
-            <img src="/assets/illustrations/wink-tv.png" alt="oh-bilibili" width={24} height={24} />
-            <span aria-hidden="true" className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">oh-bilibili</span>
+            <BiliTvMark alt="oh-bilibili" className="sm:hidden" />
+            <span className="hidden text-[16px] font-bold tracking-tight text-[var(--accent-strong)] sm:inline">oh-bilibili</span>
           </div>
         )}
 

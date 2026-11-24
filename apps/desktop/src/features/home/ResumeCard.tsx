@@ -56,35 +56,37 @@ export function ResumeCard({
       data-key={track.key}
       data-focus-id={`resume:${track.key}`}
       onClick={() => onOpen(resume)}
-      className={`group w-full min-w-0 overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--panel)] text-left ${compact ? 'flex items-center gap-3 p-2' : 'block'}`}
+      className={`group w-full min-w-0 rounded-lg text-left ${compact ? 'flex items-center gap-3' : 'block'}`}
     >
-      <span className={`relative block overflow-hidden bg-[var(--ga1)] ${compact ? 'aspect-video w-[26%] max-w-[136px] shrink-0 rounded-[5px]' : 'aspect-video w-full'}`}>
-        <Cover cover={track.cover} title={track.title} width={compact ? 160 : 560} className="h-full w-full" />
-        <span aria-hidden className="absolute inset-x-0 bottom-0 block h-[3px] bg-black/45">
+      <span className={`relative block aspect-video overflow-hidden rounded-lg bg-[var(--ga1)] ${compact ? 'w-[28%] max-w-[136px] shrink-0' : 'w-full'}`}>
+        <Cover cover={track.cover} title={track.title} width={compact ? 136 : 600} className="h-full w-full object-contain!" />
+        <span aria-hidden className="absolute inset-x-0 bottom-0 block h-[3px] bg-black/35">
           <span className="block h-full bg-[var(--accent)]" style={{ width: `${ratio * 100}%` }} />
         </span>
       </span>
-      <span className={compact ? 'min-w-0 flex-1 py-0.5 pr-1' : 'block px-3.5 py-3'}>
-        <span className={`line-clamp-2 font-semibold text-[var(--text-1)] group-hover:text-[var(--accent-strong)] ${compact ? 'text-[14px] leading-[19px]' : 'text-[17px] leading-[1.4]'}`}>
+      <span className={`block min-w-0 ${compact ? 'flex-1' : 'mt-2'}`}>
+        <span className={`line-clamp-2 font-semibold text-[var(--text-1)] group-hover:text-[var(--accent-strong)] ${compact ? 'text-[15px] leading-5' : 'text-[17px] leading-[23px]'}`}>
           {track.title}
         </span>
-        {track.artist && (
-          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-2)]">
-            <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-            <span className="truncate">{track.artist}</span>
+        <span className="mt-1 flex min-w-0 items-center gap-2.5 text-[12px] leading-[18px] text-[var(--text-3)]">
+          {track.artist && (
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
+              <span className="truncate">{track.artist}</span>
+            </span>
+          )}
+          {resume.page && (
+            <span className="flex min-w-0 items-baseline gap-1">
+              <span className="num shrink-0">P{resume.page}</span>
+              {resume.partTitle && <span className="truncate">{resume.partTitle}</span>}
+            </span>
+          )}
+        </span>
+        <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 text-[12px] leading-[18px]">
+          <span className="inline-flex items-center gap-1 font-medium text-[var(--accent-strong)]">
+            <Icon name={resume.watching ? 'play' : 'headphones'} size={14} />{action}
           </span>
-        )}
-        {resume.page && (
-          <span className="mt-1 flex min-w-0 items-baseline gap-1.5 text-[12px] text-[var(--text-2)]">
-            <span className="num shrink-0 font-medium">P{resume.page}</span>
-            {resume.partTitle && <span className="truncate">{resume.partTitle}</span>}
-          </span>
-        )}
-        <span className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 ${compact ? 'mt-1' : 'mt-2.5 border-t border-[var(--line)] pt-2.5'}`}>
-          <span className="num text-[12px] text-[var(--text-2)]">{watchedFor} / {formatTime(resume.duration)}</span>
-          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-strong)]">
-            <Icon name={resume.watching ? 'play' : 'music'} size={13} />{action}
-          </span>
+          <span className="num text-[var(--text-3)]">{watchedFor} / {formatTime(resume.duration)}</span>
         </span>
       </span>
     </button>

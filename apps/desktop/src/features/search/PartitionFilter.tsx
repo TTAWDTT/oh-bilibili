@@ -14,26 +14,23 @@ export function PartitionFilter({
   onChange: (label: string) => void
 }) {
   return (
-    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
-      {PARTITIONS.map((p) => {
-        const on = p.label === active
-        return (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => onChange(on ? '全部' : p.label)}
-            aria-pressed={on}
-            className={[
-              't shrink-0 whitespace-nowrap rounded-[4px] px-2.5 py-1 text-[14px]',
-              on
-                ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]'
-                : 'bg-[var(--panel-raised)] text-[var(--text-2)] hover:text-[var(--text-1)]',
-            ].join(' ')}
-          >
-            {p.label}
-          </button>
-        )
-      })}
+    <div className="search-filter-row" role="group" aria-label="视频分区">
+      <span>分区</span>
+      <div>
+        {PARTITIONS.map((p) => {
+          const on = p.label === active
+          return (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => onChange(on ? '全部' : p.label)}
+              aria-pressed={on}
+            >
+              {p.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
