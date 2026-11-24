@@ -802,6 +802,14 @@ async fn space_room(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn space_medal_wall(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<bilimusic_core::wire::MedalWall, WireError> {
+    engine.space_medal_wall(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn space_profile(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
@@ -1461,6 +1469,7 @@ pub fn run() {
             space_notice,
             space_room,
             space_profile,
+            space_medal_wall,
             fav_tracks,
             unfav_from,
             fav_set,

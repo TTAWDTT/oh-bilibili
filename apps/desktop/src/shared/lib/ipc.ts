@@ -260,7 +260,13 @@ export type SpaceProfile = {
   charging: { url: string; icon: string | null; count: number | null } | null
   sex: string | null
   birthday: string | null
+  profession: string | null
   school: string | null
+}
+export type WallMedal = { name: string; level: number; creator: string | null }
+export type SpaceMedalWall = { status: 'public'; items: WallMedal[] } | { status: 'private' | 'wearing_only' }
+export function spaceMedalWall(mid: number): Promise<SpaceMedalWall> {
+  return call<SpaceMedalWall>('space_medal_wall', { mid })
 }
 export function spaceNotice(mid: number): Promise<string | null> {
   return call<string | null>('space_notice', { mid })

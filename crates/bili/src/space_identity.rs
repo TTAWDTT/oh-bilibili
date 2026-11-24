@@ -124,6 +124,7 @@ pub struct SpaceProfile {
     pub sex: Option<String>,
     pub birthday: Option<String>,
     pub school: Option<String>,
+    pub profession: Option<String>,
 }
 
 fn profile(data: &Value, privacy: &Value) -> SpaceProfile {
@@ -172,11 +173,19 @@ fn profile(data: &Value, privacy: &Value) -> SpaceProfile {
             None
         },
         birthday: if public {
-            text(&data["birthday"])
-                .filter(|s| !matches!(s.as_str(), "0000-00-00" | "00-00"))
+            text(&data["birthday"]).filter(|s| !matches!(s.as_str(), "0000-00-00" | "00-00"))
         } else {
             None
         },
+        profession: (data["profession"]["is_show"] == 1)
+            .then(|| {
+                ["department", "name", "title"]
+                    .iter()
+                    .filter_map(|key| text(&data["profession"][key]))
+                    .collect::<Vec<_>>()
+                    .join(" · ")
+            })
+            .filter(|title| !title.is_empty()),
         school: if public && privacy["disable_show_school"] == 0 {
             text(&data["school"]["name"])
         } else {
@@ -185,7 +194,77 @@ fn profile(data: &Value, privacy: &Value) -> SpaceProfile {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct WallMedal {
+    pub name: String,
+    pub level: u64,
+    pub creator: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", content = "items", rename_all = "snake_case")]
+pub enum MedalWall {
+    Private,
+    WearingOnly,
+    Public(Vec<WallMedal>),
+}
+
+fn wall_visibility(privacy: &Value) -> Result<Option<MedalWall>, BiliError> {
+    match (
+        privacy["close_space_medal"].as_u64(),
+        privacy["only_show_wearing"].as_u64(),
+    ) {
+        (Some(1), _) => Ok(Some(MedalWall::Private)),
+        (Some(0), Some(1)) => Ok(Some(MedalWall::WearingOnly)),
+        (Some(0), Some(0)) => Ok(None),
+        _ => Err(BiliError::Parse("无法确认勋章墙是否公开".into())),
+    }
+}
+
+fn wall_medals(data: &Value) -> Result<Vec<WallMedal>, BiliError> {
+    let rows = data["list"]
+        .as_array()
+        .ok_or_else(|| BiliError::Parse("没有收到勋章墙列表".into()))?;
+    rows.iter()
+        .map(|entry| {
+            let medal = &entry["medal_info"];
+            let name = text(&medal["medal_name"]);
+            let level = medal["level"].as_u64();
+            match (name, level) {
+                (Some(name), Some(level)) => Ok(WallMedal {
+                    name,
+                    level,
+                    creator: text(&entry["target_name"]),
+                }),
+                _ => Err(BiliError::Parse("勋章信息不完整".into())),
+            }
+        })
+        .collect()
+}
+
 impl Source {
+    pub async fn space_medal_wall(&self, mid: u64) -> Result<MedalWall, BiliError> {
+        let settings = self.space_settings(mid).await?;
+        if let Some(status) = wall_visibility(&settings["data"]["privacy"])? {
+            return Ok(status);
+        }
+        let response = self
+            .client
+            .get_json(
+                &format!("{LIVE_API}/xlive/web-ucenter/user/MedalWall?target_id={mid}"),
+                Duration::from_millis(400),
+            )
+            .await?;
+        let data = &response["data"];
+        if data["close_space_medal"] == 1 {
+            return Ok(MedalWall::Private);
+        }
+        if data["only_show_wearing"] == 1 {
+            return Ok(MedalWall::WearingOnly);
+        }
+        wall_medals(data).map(MedalWall::Public)
+    }
+
     pub async fn space_notice(&self, mid: u64) -> Result<Option<String>, BiliError> {
         let v = self
             .client
@@ -219,13 +298,7 @@ impl Source {
     }
 
     pub async fn space_profile(&self, mid: u64) -> Result<SpaceProfile, BiliError> {
-        let settings = self
-            .client
-            .get_json(
-                &format!("{API}/x/space/setting?mid={mid}"),
-                Duration::from_millis(400),
-            )
-            .await;
+        let settings = self.space_settings(mid).await;
         let details = self
             .client
             .signed_get(
@@ -246,6 +319,35 @@ impl Source {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn wall_uses_list_and_profession_respects_display_switch() {
+        assert!(matches!(
+            wall_visibility(&json!({"close_space_medal":1})).unwrap(),
+            Some(MedalWall::Private)
+        ));
+        assert!(matches!(
+            wall_visibility(&json!({"close_space_medal":0,"only_show_wearing":1})).unwrap(),
+            Some(MedalWall::WearingOnly)
+        ));
+        assert!(
+            wall_visibility(&json!({"close_space_medal":0,"only_show_wearing":0}))
+                .unwrap()
+                .is_none()
+        );
+        assert!(wall_visibility(&json!({})).is_err());
+        let medals = wall_medals(&json!({"list":[{"medal_info":{"medal_name":"示例牌","level":18},"target_name":"示例主播"}]})).unwrap();
+        assert_eq!((medals[0].name.as_str(), medals[0].level), ("示例牌", 18));
+        assert!(wall_medals(&json!({"list":[]})).unwrap().is_empty());
+        assert!(wall_medals(&json!({})).is_err());
+        let mut data = json!({"profession":{"is_show":0,"name":"医师"}});
+        assert!(profile(&data, &Value::Null).profession.is_none());
+        data["profession"]["is_show"] = json!(1);
+        assert_eq!(
+            profile(&data, &Value::Null).profession.as_deref(),
+            Some("医师")
+        );
+    }
 
     #[test]
     fn negative_legacy_pendant_id_and_inactive_membership() {

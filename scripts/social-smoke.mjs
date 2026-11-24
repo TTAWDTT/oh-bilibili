@@ -163,6 +163,9 @@ export async function checkSocialPages(page, web, wait, check) {
   await byName('#scroll-main', '空间资料')
   await wait(buttons('#scroll-main', '重新加载空间资料'))
   check('扩展资料取不到时仍可看公告、置顶投稿及 B 站空间', await page.evaluate(`!!${hero} && !!${element('[data-space-notice]')} && !!(${buttons('#scroll-main', '去 B 站空间查看勋章')})`))
+  await byName('#scroll-main', '粉丝勋章墙')
+  await wait(`document.querySelector('ul[aria-label="粉丝勋章"]')?.textContent.includes('同行 18')`)
+  check('整面勋章墙可以单独查看，扩展资料失败也能打开', true)
   await byName('#scroll-main', '重新加载空间资料')
   await wait(buttons('#scroll-main', '充电'))
   check('资料重试成功后显示公开生日、充电和已佩戴粉丝牌', await page.evaluate(`document.querySelector('section[aria-label="空间资料"]').textContent.includes('05-16') &&

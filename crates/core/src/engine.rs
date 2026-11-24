@@ -3426,6 +3426,10 @@ impl Engine {
         Ok(self.source.space_room(mid).await?)
     }
 
+    pub async fn space_medal_wall(&self, mid: u64) -> Result<crate::wire::MedalWall, WireError> {
+        Ok(self.source.space_medal_wall(mid).await?)
+    }
+
     pub async fn space_profile(&self, mid: u64) -> Result<crate::wire::SpaceProfile, WireError> {
         Ok(self.source.space_profile(mid).await?)
     }
