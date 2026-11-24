@@ -20,10 +20,15 @@ function conversations() {
     for (const [index, mid] of [5000, 5002, 5003].entries()) {
       const peer = { mid, name: ['造梦阿瑄', '不睡觉的鹿', '云上的实验室'][index]!, avatar: avatarArt() }
       const at = Math.floor(Date.now() / 1000) - index * 3600 - 600
-      const messages = ['看到你发的片段啦。', '谢谢，下次一起看！', '[图片]', '这期投稿更新了。'].map((text, i) => ({
+      const messages: DirectMessage[] = ['看到你发的片段啦。', '谢谢，下次一起看！', '[图片]', '这期投稿更新了。'].map((text, i) => ({
         id: String(++nextId), sender_mid: i === 1 ? me : mid, text,
         image: i === 2 ? '/assets/illustrations/animation-cels.png' : null, at: at + i * 60,
       }))
+      if (index === 0 && import.meta.env.DEV && new URLSearchParams(window.location.search).has('directMedia')) {
+        messages.push({ id: String(++nextId), sender_mid: mid, at: at + 240, image: null, text: '[视频]一起看这期',
+          cards: [{ title: '一起看这期', cover: '/assets/illustrations/animation-cels.png', description: '朋友分享的视频',
+            author: peer.name, url: 'https://www.bilibili.com/video/BV1AeLBzBE9s' }] })
+      }
       threads.set(mid, { peer, messages, unread: index === 0 ? 2 : 0 })
     }
   }
@@ -69,7 +74,7 @@ export function mockDirectAck(mid: number, seqno: string) {
   }
 }
 
-export function mockSendDirect(mid: number, text: string) {
+export function mockSendDirect(mid: number, text: string, image: string | null = null) {
   const all = conversations()
   if (failSend) {
     failSend = false
@@ -79,7 +84,7 @@ export function mockSendDirect(mid: number, text: string) {
   const chat = all.get(mid) ?? {
     peer: { mid, name: source?.artist ?? `UID ${mid}`, avatar: source?.up_avatar ?? '' }, messages: [], unread: 0,
   }
-  const message = { id: String(++nextId), sender_mid: state.auth.user!.mid, text, at: Math.floor(Date.now() / 1000), image: null }
+  const message = { id: String(++nextId), sender_mid: state.auth.user!.mid, text, at: Math.floor(Date.now() / 1000), image }
   chat.messages.push(message)
   all.set(mid, chat)
   return message

@@ -3,12 +3,13 @@ import type { Track } from '../shared/lib/contract'
 import type { CatalogChild, CatalogKind, DirectPeer, MessageKind, MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
 
-export type SpaceSection = 'videos' | 'masterpieces' | 'collections' | 'catalog'
+export type SpaceSection = 'videos' | 'masterpieces' | 'collections' | 'catalog' | 'dynamics'
 export type SpaceShelf = { id: number; kind: 'season' | 'series'; name: string }
 export type AuthorRoute = {
   kind: 'author'; name: string; mid?: number | null; section?: SpaceSection; shelf?: SpaceShelf; shelfPage?: number
   catalog?: CatalogKind; catalogChild?: CatalogChild & { title: string }; catalogPage?: number; catalogOffsets?: string[]
   videoQuery?: string; videoPage?: number
+  dynamicQuery?: string; dynamicPages?: number
 }
 
 export type View =

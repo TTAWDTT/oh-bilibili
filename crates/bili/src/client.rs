@@ -479,6 +479,14 @@ impl Client {
         url: &str,
         form: Vec<(&str, String)>,
     ) -> Result<Value, BiliError> {
+        self.post_session(url, |request| request.form(&form)).await
+    }
+
+    pub(crate) async fn post_session(
+        &self,
+        url: &str,
+        body: impl FnOnce(reqwest::RequestBuilder) -> reqwest::RequestBuilder,
+    ) -> Result<Value, BiliError> {
         self.wait_cooldown().await?;
         self.ensure_fingerprint().await?;
         self.gate(Duration::from_millis(400)).await;
@@ -487,9 +495,8 @@ impl Client {
             .session_request(reqwest::Method::POST, url)
             .header("Referer", REFERER)
             .header("Origin", "https://www.bilibili.com")
-            .header("Accept", "application/json, text/plain, */*")
-            .form(&form);
-        let resp = self.send(req).await?;
+            .header("Accept", "application/json, text/plain, */*");
+        let resp = self.send(body(req)).await?;
         let status = resp.status();
         if session_origin(resp.url()) {
             self.absorb_cookies(resp.headers());

@@ -260,6 +260,15 @@ async fn dynamic_feed(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn space_dynamics(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    offset: Option<String>,
+) -> Result<bilimusic_core::wire::DynamicPage, WireError> {
+    engine.space_dynamics(mid, offset).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn message_unread(
     engine: tauri::State<'_, Arc<Engine>>,
 ) -> Result<bilimusic_core::wire::MessageUnread, WireError> {
@@ -300,6 +309,16 @@ async fn send_direct_text(
     text: String,
 ) -> Result<bilimusic_core::wire::DirectMessage, WireError> {
     engine.send_direct_text(mid, text).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn send_direct_image(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    mime: String,
+    encoded: String,
+) -> Result<bilimusic_core::wire::DirectMessage, WireError> {
+    engine.send_direct_image(mid, mime, encoded).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -1366,11 +1385,13 @@ pub fn run() {
             comment_hate,
             home_feed,
             dynamic_feed,
+            space_dynamics,
             message_unread,
             messages,
             direct_sessions,
             direct_history,
             send_direct_text,
+            send_direct_image,
             direct_ack,
             watch_later_list,
             following,

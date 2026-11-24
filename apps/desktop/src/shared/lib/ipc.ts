@@ -720,6 +720,17 @@ export function homeFeed(fresh: number): Promise<Track[]> {
   return call<Track[]>('home_feed', { fresh })
 }
 
+export type DynamicNode =
+  | { kind: 'text' | 'topic'; text: string }
+  | { kind: 'emoji'; text: string; image: string }
+  | { kind: 'mention'; text: string; mid: number }
+  | { kind: 'video'; text: string; bvid: string }
+  | { kind: 'link'; text: string; url: string }
+
+export type DynamicAttachment = {
+  label: string; title: string; detail: string; cover: string | null; url: string; ends_at: number | null
+}
+
 export type DynamicItem = {
   id: string
   kind: 'video' | 'opus' | 'forward' | 'article' | 'live'
@@ -732,6 +743,12 @@ export type DynamicItem = {
   vip: boolean
   pub_time: string
   pub_ts: number
+  nodes?: DynamicNode[]
+  pinned?: boolean
+  decoration?: {
+    name: string; image: string; large: string | null; number: string | null; color: string | null; url: string | null
+  } | null
+  attachment?: DynamicAttachment | null
   text: string
   bvid: string
   title: string
@@ -764,11 +781,16 @@ export function dynamicFeed(offset?: string | null): Promise<DynamicPage> {
   return call<DynamicPage>('dynamic_feed', { offset: offset ?? null })
 }
 
+export function spaceDynamics(mid: number, offset: string | null): Promise<DynamicPage> {
+  return call<DynamicPage>('space_dynamics', { mid, offset })
+}
+
 export type MessageKind = 'reply' | 'at' | 'like'
 
 export type DirectPeer = { mid: number; name: string; avatar: string }
 export type DirectSession = DirectPeer & { preview: string; at: number; unread: number }
-export type DirectMessage = { id: string; sender_mid: number; text: string; image: string | null; at: number }
+export type DirectCard = { title: string; cover: string | null; url: string | null; description: string | null; author: string | null }
+export type DirectMessage = { id: string; sender_mid: number; text: string; image: string | null; cards?: DirectCard[]; emotes?: [string, string][]; at: number }
 export type DirectPage<T> = { items: T[]; next_cursor: string | null }
 
 export type DirectSessionPage = DirectPage<DirectSession>
@@ -792,6 +814,16 @@ export function directAck(mid: number, seqno: string): Promise<void> {
 
 export function sendDirectText(mid: number, text: string): Promise<DirectMessage> {
   return call<DirectMessage>('send_direct_text', { mid, text })
+}
+
+export async function sendDirectImage(mid: number, file: File): Promise<DirectMessage> {
+  const encoded = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('无法读取图片'))
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.readAsDataURL(file)
+  })
+  return call<DirectMessage>('send_direct_image', { mid, mime: file.type, encoded })
 }
 
 export type MessageUser = {

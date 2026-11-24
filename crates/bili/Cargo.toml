@@ -11,7 +11,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 bilimusic-model = { path = "../model" }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "charset", "blocking"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "charset", "blocking", "multipart"] }
+base64 = "0.22"
 md-5 = "0.10"
 qrcode = "0.14.1"
 flate2 = "1.1.11"

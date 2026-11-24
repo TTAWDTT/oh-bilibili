@@ -2164,6 +2164,10 @@ impl Engine {
         Ok(self.source.dynamic_feed(offset).await?)
     }
 
+    pub async fn space_dynamics(&self, mid: u64, offset: Option<String>) -> Result<crate::wire::DynamicPage, WireError> {
+        Ok(self.source.space_dynamics(mid, offset).await?)
+    }
+
     pub async fn message_unread(&self) -> Result<crate::wire::MessageUnread, WireError> {
         Ok(self.source.message_unread().await?)
     }
@@ -2208,6 +2212,20 @@ impl Engine {
         Ok(self
             .source
             .send_direct_text(owner, mid, text, &device)
+            .await?)
+    }
+
+    pub async fn send_direct_image(
+        &self,
+        mid: u64,
+        mime: String,
+        encoded: String,
+    ) -> Result<crate::wire::DirectMessage, WireError> {
+        let owner = self.direct_participant(mid)?;
+        let device = self.direct_device(owner)?;
+        Ok(self
+            .source
+            .send_direct_image(owner, mid, &mime, &encoded, &device)
             .await?)
     }
 
