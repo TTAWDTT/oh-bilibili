@@ -107,14 +107,27 @@ function DirectThread({ peer, me, composer, onChange, onSend, onBack, onRead }: 
   onBack: () => void
   onRead: (mid: number, at: number) => void
 }) {
-  const read = useCallback((cursor: string | null) => ipc.directHistory(peer.mid, cursor), [peer.mid])
-  const history = useDirectPages(read, messageKey, false)
+  const withdrawals = useRef(new Map<string, boolean>())
+  const read = useCallback(async (cursor: string | null) => {
+    const page = await ipc.directHistory(peer.mid, cursor)
+    for (const { target_id, remove } of page.withdrawals) {
+      withdrawals.current.set(target_id, remove || withdrawals.current.get(target_id) === true)
+    }
+    return page
+  }, [peer.mid])
+  const applyWithdrawals = useCallback((items: ipc.DirectMessage[]) => items.flatMap((msg) => {
+    const remove = withdrawals.current.get(msg.id)
+    if (remove === undefined) return [msg]
+    if (remove) return []
+    return [{ id: msg.id, sender_mid: msg.sender_mid, at: msg.at, text: '消息已撤回', image: null }]
+  }), [])
+  const history = useDirectPages(read, messageKey, false, applyWithdrawals)
   const navigate = useAppStore((state) => state.navigate)
   const list = useRef<HTMLDivElement>(null)
   const previous = useRef<{ top: number; height: number } | null>(null)
   const [atEnd, setAtEnd] = useState(true)
   const lastAck = useRef<string | null>(null)
-  const lastAt = history.items.at(-1)?.at
+  const lastAt = history.latestAt
 
   useLayoutEffect(() => {
     const box = list.current
@@ -126,7 +139,7 @@ function DirectThread({ peer, me, composer, onChange, onSend, onBack, onRead }: 
 
   useEffect(() => {
     const seq = history.latestSeq
-    if (!seq || lastAt === undefined || !atEnd) return
+    if (!seq || lastAt === null || !atEnd) return
     const acknowledge = () => {
       if (document.hidden || lastAck.current === seq) return
       lastAck.current = seq
@@ -137,7 +150,7 @@ function DirectThread({ peer, me, composer, onChange, onSend, onBack, onRead }: 
     acknowledge()
     document.addEventListener('visibilitychange', acknowledge)
     return () => document.removeEventListener('visibilitychange', acknowledge)
-  }, [history.latestSeq, lastAt, atEnd, peer.mid, onRead])
+  }, [history.latestSeq, history.items, lastAt, atEnd, peer.mid, onRead])
 
   function more(cursor: string | null) {
     const box = list.current

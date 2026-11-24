@@ -753,7 +753,10 @@ export function directSessions(cursor: string | null): Promise<DirectSessionPage
   return call<DirectSessionPage>('direct_sessions', { cursor })
 }
 
-export type DirectHistoryPage = DirectPage<DirectMessage> & { latest_seqno: string | null }
+export type DirectHistoryPage = DirectPage<DirectMessage> & {
+  latest_seqno: string | null; latest_at: number | null
+  withdrawals: { target_id: string; remove: boolean }[]
+}
 
 export function directHistory(mid: number, cursor: string | null): Promise<DirectHistoryPage> {
   return call<DirectHistoryPage>('direct_history', { mid, cursor })

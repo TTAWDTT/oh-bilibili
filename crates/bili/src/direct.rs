@@ -38,8 +38,16 @@ pub struct DirectMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectHistory {
     pub items: Vec<DirectMessage>,
+    pub withdrawals: Vec<DirectWithdrawal>,
     pub next_cursor: Option<String>,
     pub latest_seqno: Option<String>,
+    pub latest_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectWithdrawal {
+    pub target_id: String,
+    pub remove: bool,
 }
 
 impl Source {
@@ -259,20 +267,34 @@ fn history_from(
     cursor: Option<u64>,
 ) -> Result<DirectHistory, BiliError> {
     let rows = page_rows(data, "messages")?;
+    let mut withdrawals = Vec::new();
+    let mut latest = None;
+    let mut first = None;
     let mut entries: Vec<_> = rows
         .iter()
         .filter_map(|msg| {
             let sender_mid = number(&msg["sender_uid"])?;
             let receiver = number(&msg["receiver_id"])?;
-            if number(&msg["msg_type"]) == Some(5)
-                || number(&msg["receiver_type"]) != Some(1)
+            if number(&msg["receiver_type"]) != Some(1)
                 || !((sender_mid == mid && receiver == owner)
                     || (sender_mid == owner && receiver == mid))
             {
                 return None;
             }
             let seqno = number(&msg["msg_seqno"])?;
+            let at = number(&msg["timestamp"]).unwrap_or_default();
+            if number(&msg["msg_type"]) == Some(5) {
+                withdrawals.push(DirectWithdrawal {
+                    target_id: number(&msg["content"])?.to_string(),
+                    remove: flag(&msg["sys_cancel"]),
+                });
+                latest = latest.max(Some((seqno, at)));
+                first = Some(first.map_or(seqno, |n: u64| n.min(seqno)));
+                return None;
+            }
             let id = number(&msg["msg_key"])?.to_string();
+            latest = latest.max(Some((seqno, at)));
+            first = Some(first.map_or(seqno, |n: u64| n.min(seqno)));
             let (text, image) = message_content(msg);
             Some((
                 seqno,
@@ -281,19 +303,20 @@ fn history_from(
                     sender_mid,
                     text,
                     image,
-                    at: number(&msg["timestamp"]).unwrap_or_default(),
+                    at,
                 },
             ))
         })
         .collect();
     entries.sort_by_key(|entry| entry.0);
-    let min_seqno = number(&data["min_seqno"]).or_else(|| entries.first().map(|entry| entry.0));
+    let min_seqno = number(&data["min_seqno"]).or(first);
     let next_cursor = older_cursor(data, cursor, min_seqno);
-    let latest_seqno = entries.last().map(|entry| entry.0.to_string());
     Ok(DirectHistory {
         items: entries.into_iter().map(|entry| entry.1).collect(),
+        withdrawals,
         next_cursor,
-        latest_seqno,
+        latest_seqno: latest.map(|(seq, _)| seq.to_string()),
+        latest_at: latest.map(|(_, at)| at),
     })
 }
 
@@ -454,7 +477,8 @@ mod tests {
         let data = json!({"has_more":1,"min_seqno":90,"max_seqno":101,"messages":[
             {"msg_seqno":"101","msg_key":9007199254740999_u64,"receiver_type":1,"receiver_id":6,"sender_uid":2,"msg_type":1},
             {"msg_seqno":"100","msg_key":9007199254740998_u64,"receiver_type":2,"receiver_id":4,"sender_uid":2,"msg_type":1},
-            {"msg_seqno":"99","msg_key":"9007199254740997","receiver_type":1,"receiver_id":4,"sender_uid":2,"msg_type":5},
+            {"msg_seqno":"99","msg_key":"9007199254740997","receiver_type":1,"receiver_id":4,"sender_uid":2,"msg_type":5,
+             "content":"9007199254740690","timestamp":7,"sys_cancel":1},
             {"msg_seqno":"98","msg_key":9007199254740996_u64,"receiver_type":1,"receiver_id":"4","sender_uid":"2","msg_type":1,
              "msg_status":1,"content":"{\"content\":\"已经撤回的原文\"}","timestamp":6},
             {"msg_seqno":97,"msg_key":"9007199254740995","receiver_type":1,"receiver_id":2,"sender_uid":4,"msg_type":2,
@@ -462,7 +486,11 @@ mod tests {
         ]});
         let page = history_from(&data, 2, 4, None).unwrap();
         assert_eq!(page.next_cursor.as_deref(), Some("90"));
-        assert_eq!(page.latest_seqno.as_deref(), Some("98"));
+        assert_eq!(page.latest_seqno.as_deref(), Some("99"));
+        assert_eq!(page.latest_at, Some(7));
+        assert_eq!(page.withdrawals.len(), 1);
+        assert_eq!(page.withdrawals[0].target_id, "9007199254740690");
+        assert!(page.withdrawals[0].remove);
         assert_eq!(page.items.len(), 2);
         assert_eq!(
             page.items[0],
