@@ -1,3 +1,4 @@
+import { useCardGrid } from '../../shared/ui/useCardGrid'
 import { useEffect, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
@@ -14,6 +15,7 @@ const pickedMemory: { weekday: number | null } = { weekday: null }
  * 默认选今天，没有今天这一格就选第一个有更新的。
  */
 export function BangumiTimeline() {
+  const gridRef = useCardGrid(212)
   const [days, setDays] = useState<ipc.BangumiDay[] | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -96,7 +98,7 @@ export function BangumiTimeline() {
         })}
       </div>
       {/* 换成可换行的网格：一天四部时横向排会右侧留一大片白，和上面的周标签也不对齐 */}
-      <div className="mt-1 grid gap-x-4 gap-y-2 px-4 pb-4 [grid-template-columns:repeat(auto-fill,minmax(212px,1fr))]">
+      <div ref={gridRef} className="mt-1 grid grid-cols-(--card-tracks) gap-x-4 gap-y-2 px-4 pb-4">
         {active && active.episodes.length > 0 ? (
           active.episodes.map((ep) => (
             <button

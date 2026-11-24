@@ -1,3 +1,4 @@
+import { useCardGrid } from '../../shared/ui/useCardGrid'
 import { TrackByline } from './TrackByline'
 import { formatCount } from '../../shared/lib/format'
 import { partColor } from '../../shared/lib/biliParts'
@@ -312,6 +313,8 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, pinnedKey, ext
   const [picking, setPicking] = useState<Track | null>(null)
   const [favBusy, setFavBusy] = useState(false)
 
+  const gridRef = useCardGrid(190)
+
   /** 已经挂到 DOM 的卡片数。 */
   const [shown, setShown] = useState(() =>
     Math.min(tracks.length, Math.max(RENDER_INITIAL, (initialIndex ?? 0) + RENDER_CHUNK)),
@@ -414,10 +417,9 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, pinnedKey, ext
     <>
       <h2 className="sr-only">视频列表</h2>
       <div
+        ref={gridRef}
         data-shown={shown}
-        /* 190 是让 1320 窗口（内容 1056）落成 5 列的分界：5*190+4*20=1030。
-           B 站首页推荐流同宽也是 5 列，206 的写法会掉成 4 列、卡片大一圈。 */
-        className="relative grid grid-cols-2 gap-x-3 gap-y-5 pb-6 sm:gap-x-5 sm:gap-y-7 sm:[grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]"
+        className="relative grid grid-cols-2 gap-x-3 gap-y-5 pb-6 sm:gap-x-5 sm:gap-y-7 sm:grid-cols-(--card-tracks)"
       >
         {tracks.slice(0, shown).map((track, index) => {
           const active = track.key === activeKey

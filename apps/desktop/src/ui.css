@@ -502,6 +502,10 @@
   --sidebar-rail: 60px;
 }
 
+.bili-workspace:has([data-hot-page]) {
+  container: hot-feed / inline-size;
+}
+
 .bili-sidebar {
   width: var(--sidebar-full);
   contain: layout paint;
@@ -513,12 +517,6 @@
 
 .bili-sidebar[data-collapsed='true'] {
   width: var(--sidebar-rail);
-}
-
-/* 正文按窄栏时的宽度滑动，外层裁掉右边多出来的部分。展开结束才收窄正文，
-   避免空间页的数百张投稿在同一次开合中来回换列。 */
-.bili-sidebar[data-toggled='true'] + main {
-  flex: 1 0 calc(100% - var(--sidebar-rail));
 }
 
 /* 图标列在两种宽度下一样宽，常驻滚动条占位时也能居中。 */

@@ -1835,28 +1835,59 @@ async function checkDiscoveryEditor(page) {
   await edit('取消')
   check('关闭编辑器后键盘焦点回到全部分区',
     await page.evaluate(`document.activeElement === document.querySelector(${JSON.stringify(discoveryNav + ' [aria-haspopup="dialog"]')})`))
+  await page.viewport(960, 820)
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '科技数码')
+  await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 科技数码')")
+  const selected = discoveryNav + ' [aria-pressed="true"]'
+  const close = await sampleSidebarMotion(page, selected)
+  const open = await sampleSidebarMotion(page, selected)
+  const first = close.frames[0]
+  check('960px 开合侧栏时快捷分区数量稳定，选中的科技数码随正文一起移动',
+    Math.abs(first.edge - close.frames.at(-1).edge) > 100 && first.edge === open.frames.at(-1).edge &&
+    [...close.frames, ...open.frames].every(f => f.visibleRegions === first.visibleRegions && f.itemWidth > 0 &&
+      Math.abs((f.itemRight - f.content) - (first.itemRight - first.content)) <= 1))
+  await page.viewport(390, 820)
+  check('窗口缩窄后快捷分区会减少，仍能看见选中的科技数码', await waitFor(`(() => {
+    const tab = document.querySelector(${JSON.stringify(selected)})
+    const visible = [...tab.parentElement.querySelectorAll('button')].filter(b => b.getClientRects().length)
+    return visible.length < ${first.visibleRegions} && visible.includes(tab) && tab.textContent.trim() === '科技数码' &&
+      tab.getBoundingClientRect().right <= innerWidth
+  })()`))
 }
 
-async function checkSidebarMotion(page) {
-  const sample = (reverseAt = null) => page.evaluate(`(async () => {
+function sampleSidebarMotion(page, selector, reverseAt = null) {
+  return page.evaluate(`(async () => {
     const nav = document.querySelector('nav[aria-label="主导航"]')
     const main = document.getElementById('main-content')
+    const item = document.querySelector(${JSON.stringify(selector)})
+    const regionNav = item.closest('nav[aria-label="发现分区"]')
+    const grid = item.closest('[data-shown]')
+    const profilePanel = document.querySelector('aside[aria-label="作者资料栏"]')
     const toggle = nav.querySelector('button[aria-expanded]')
     const profile = Array.from(nav.querySelectorAll('button')).find(button =>
       (button.getAttribute('aria-label') || button.textContent.trim()) === '个人中心')
-    const read = () => ({
-      edge: nav.getBoundingClientRect().right,
-      sliding: nav.getAnimations().some(animation => animation.playState === 'running'),
-      content: Math.round(main.getBoundingClientRect().left),
-      width: Math.round(main.getBoundingClientRect().width),
-      row: Math.round(profile.getBoundingClientRect().top),
-    })
+    const read = () => {
+      const body = main.getBoundingClientRect()
+      const rect = item.getBoundingClientRect()
+      return {
+        edge: nav.getBoundingClientRect().right,
+        sliding: nav.getAnimations().some(animation => animation.playState === 'running'),
+        content: body.left, right: body.right, width: body.width,
+        itemWidth: rect.width, itemRight: rect.right, itemHeight: rect.height, itemTop: rect.top,
+        visibleRegions: regionNav && [...regionNav.querySelectorAll('button[aria-pressed]')].filter(b => b.getClientRects().length).length,
+        columns: grid && getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+        profileBeside: grid && profilePanel && profilePanel.getBoundingClientRect().left >= grid.getBoundingClientRect().right - 1,
+        row: Math.round(profile.getBoundingClientRect().top),
+      }
+    }
     const frames = [read()]
     toggle.click()
     const start = performance.now()
     let turned = false
     do {
-      await new Promise(requestAnimationFrame)
+      // WebKit 在 rAF 之后才用 ResizeObserver 校正滚动位置，采已完成布局的画面。
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)))
       const frame = read()
       frames.push(frame)
       if (${reverseAt} !== null && !turned && frame.edge <= ${reverseAt}) {
@@ -1866,10 +1897,32 @@ async function checkSidebarMotion(page) {
     } while (performance.now() - start < 600)
     return { frames, turned, expanded: toggle.getAttribute('aria-expanded') }
   })()`)
-  const close = await sample()
-  const open = await sample()
+}
+
+// 用起止实测尺寸对照中间帧，防止组件在侧栏停下的那一刻才跳到新宽度。
+function checkContentResize(label, frames) {
+  const first = frames[0]
+  const last = frames.at(-1)
+  const widthChange = last.itemWidth - first.itemWidth
+  const edgeChange = last.edge - first.edge
+  const middle = frames.filter(f => f.itemWidth > Math.min(first.itemWidth, last.itemWidth) + 1 &&
+    f.itemWidth < Math.max(first.itemWidth, last.itemWidth) - 1)
+  check(label, Math.abs(widthChange) > 4 && new Set(middle.map(f => Math.round(f.itemWidth))).size >= 2 &&
+    frames.every(f => {
+      const progress = (f.edge - first.edge) / edgeChange
+      const expected = first.itemWidth + widthChange * progress
+      return Math.abs(f.right - first.right) <= 1 && f.itemRight <= first.right + 1 &&
+        Math.abs(f.itemWidth - expected) <= Math.max(2, Math.abs(widthChange) * 0.15)
+    }))
+}
+
+async function checkSidebarMotion(page) {
+  const cover = '[data-home-hero-grid] > :last-child .aspect-video'
+  const close = await sampleSidebarMotion(page, cover)
+  const open = await sampleSidebarMotion(page, cover)
   for (const [name, run] of [['收起', close], ['展开', open]]) {
     const { frames } = run
+    checkContentResize(`侧栏${name}时右侧推荐封面随正文连续缩放，右边缘保持可见`, frames)
     const first = frames[0].edge
     const last = frames.at(-1).edge
     const moving = frames.filter(f => f.edge > Math.min(first, last) && f.edge < Math.max(first, last))
@@ -1881,10 +1934,13 @@ async function checkSidebarMotion(page) {
   }
   check('开合时「我的」分组下的导航按钮留在原高度', [...close.frames, ...open.frames].every(frame =>
     Math.abs(frame.row - close.frames[0].row) <= 1))
-  const reversed = await sample((close.frames[0].edge + close.frames.at(-1).edge) / 2)
-  check('收起途中再点一次，侧栏从中途折返到展开位置', reversed.turned && reversed.expanded === 'true' &&
+  const reversed = await sampleSidebarMotion(page, cover, (close.frames[0].edge + close.frames.at(-1).edge) / 2)
+  check('收起途中再点一次，侧栏和封面都从中途折返', reversed.turned && reversed.expanded === 'true' &&
     Math.min(...reversed.frames.map(f => f.edge)) > close.frames.at(-1).edge &&
-    reversed.frames.at(-1).edge === open.frames.at(-1).edge)
+    reversed.frames.at(-1).edge === open.frames.at(-1).edge &&
+    Math.max(...reversed.frames.map(f => f.itemWidth)) < close.frames.at(-1).itemWidth - 1 &&
+    reversed.frames.some(f => f.itemWidth > close.frames[0].itemWidth + 2) &&
+    reversed.frames.every(f => Math.abs(f.right - close.frames[0].right) <= 1))
   const expanded = open.frames.at(-1)
   // 最后一个亚像素可能被取整到终点，此时浏览器仍未结束侧栏动画。
   const sidebarSettled = 1 + reversed.frames.findLastIndex(f => f.sliding || f.edge !== expanded.edge)
@@ -1897,10 +1953,11 @@ async function checkSidebarMotion(page) {
   try {
     const nav = `document.querySelector('nav[aria-label="主导航"]')`
     await page.evaluate(`${nav}.querySelector('[aria-label="展开侧边栏"]')?.click()`)
-    const reduced = await sample()
-    check('减少动态效果时直接收起侧栏', reduced.expanded === 'false' &&
+    const reduced = await sampleSidebarMotion(page, cover)
+    check('减少动态效果时侧栏与推荐封面均直接切换宽度', reduced.expanded === 'false' &&
       reduced.frames.at(-1).edge === close.frames.at(-1).edge &&
-      reduced.frames.every(f => f.edge === close.frames[0].edge || f.edge === close.frames.at(-1).edge))
+      reduced.frames.every(f => (f.edge === close.frames[0].edge && f.itemWidth === close.frames[0].itemWidth) ||
+        (f.edge === close.frames.at(-1).edge && f.itemWidth === close.frames.at(-1).itemWidth)))
     await page.evaluate(`${nav}.querySelector('[aria-label="展开侧边栏"]').click()`)
   } finally {
     await page.emulateMedia([])
@@ -1972,15 +2029,9 @@ async function checkNavConventions(page) {
   )
   check('进入观看页时点赞按钮在首帧就能点中原位置',
     opened && Math.abs(opened.likeX - watchShell.likeX) <= 1)
-  await page.evaluate(
-    `document.querySelector('nav[aria-label="主导航"] button[aria-label="展开侧边栏"]')?.click()`,
-  )
-  await sleep(400)
-  const expanded = await page.evaluate(`(() => {
-    const nav = document.querySelector('nav[aria-label="主导航"]')
-    return { width: nav ? Math.round(nav.getBoundingClientRect().width) : 0 }
-  })()`)
-  check('观看页左栏可以展开', expanded.width >= 200)
+  const watchExpand = await sampleSidebarMotion(page, '[data-watch-player]')
+  check('观看页左栏可以展开', watchExpand.frames.at(-1).edge >= 200)
+  checkContentResize('展开观看页侧栏时播放器随剩余空间连续变窄', watchExpand.frames)
 
   await page.evaluate(`document.querySelector('nav[aria-label="主导航"] [aria-label="收起侧边栏"]').click()`)
   await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
@@ -2836,7 +2887,29 @@ async function checkAuthorSpace(page) {
     }
     return true
   })()`))
+  const columns = () => page.evaluate(`getComputedStyle(${scroll}.querySelector('[data-shown]')).gridTemplateColumns.split(' ').length`)
+  const wideColumns = await columns()
+  const readingCover = '[data-shown] > [data-track-card]:nth-child(82) .bili-card-media'
+  for (const width of [1320, 960]) {
+    await page.viewport(width, 900)
+    await page.evaluate(`document.querySelector(${JSON.stringify(readingCover)}).scrollIntoView({ block: 'start', behavior: 'instant' })`)
+    const close = await sampleSidebarMotion(page, readingCover)
+    const open = await sampleSidebarMotion(page, readingCover)
+    const start = close.frames[0]
+    const frames = [...close.frames, ...open.frames]
+    for (const [name, run] of [['收起', close], ['展开', open]]) {
+      checkContentResize(`${width}px 空间${name}侧栏时，正在看的投稿封面连续缩放`, run.frames)
+    }
+    check(`${width}px 开合侧栏时投稿列数、顺序与作者资料位置保持稳定`,
+      start.columns > 0 && start.profileBeside !== null &&
+      frames.every(f => f.columns === start.columns && f.profileBeside === start.profileBeside &&
+        Math.abs(f.itemHeight - f.itemWidth * start.itemHeight / start.itemWidth) <= 1) &&
+      JSON.stringify(await keys()) === JSON.stringify(collected))
+    check(`${width}px 开合侧栏时仍能读同一排投稿，展开后回到原来高度`,
+      frames.every(f => Math.abs(f.itemTop - start.itemTop) <= 2))
+  }
   await page.viewport(380, 820)
+  check('窗口缩窄后空间投稿仍能减少列数', await columns() < wideColumns)
   await page.evaluate(`${scroll}.scrollTop = 0`)
   check('窄窗作者在前，首屏有作品封面和标题，内容没有横向溢出', await page.evaluate(`(() => {
     const box = ${scroll}
