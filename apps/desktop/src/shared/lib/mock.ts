@@ -1,8 +1,9 @@
-import type { DownloadView, PageRef, QrStatus, Track, WireError } from './contract'
+import type { DownloadView, QrStatus, Track, WireError } from './contract'
+import type { HistoryEntry, PlaybackResume } from './ipc'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
-import { emit, ensureClock, fail, playlistOf, setDuration, snapshot, state, trackOf } from './mockEngine'
+import { emit, ensureClock, fail, playlistOf, previewPages, setDuration, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
 
 export { mockSubscribe } from './mockEngine'
@@ -190,18 +191,6 @@ const popularFailOnce =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('popularFailOnce')
 let popularFailedOnce = false
 
-function previewPages(track: Track): PageRef[] {
-  const params = new URLSearchParams(window.location.search)
-  const many = params.has('manyPages')
-  const commentJumps = params.has('commentJumps')
-  const count = many ? 80 : params.has('multiP') || commentJumps ? 2 : track.pages ?? 1
-  return Array.from({ length: count }, (_, index) => ({
-    no: index + 1,
-    cid: (many ? 100 : 1) + index,
-    title: index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : index === 1 ? '第二 P · 预览' : `第 ${index + 1} 集 · 预览`,
-    duration_ms: many ? 30_000 + index * 1000 : commentJumps ? 300_000 : track.duration_ms ?? 30_000,
-  }))
-}
 
 function eightPartTrack(track: Track): Track {
   const result = { ...track, pages: 8 }
@@ -603,14 +592,23 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const seed = CATALOG[0]
       if (!seed) return []
       const long = import.meta.env.DEV && new URLSearchParams(window.location.search).has('historyLong')
+      const manyPages = new URLSearchParams(window.location.search).has('manyPages')
+      const watchHistory = new URLSearchParams(window.location.search).has('watchHistory')
       const all = long
         ? [
-            ...Array.from({ length: 98 }, (_, i) => ({
-              id: i + 1,
-              track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
-              played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
-              position_ms: i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000,
-            })),
+            ...Array.from({ length: 98 }, (_, i) => {
+              const track = { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` }
+              const page = manyPages && (i === 1 || i === 2) ? previewPages(track)[1] : undefined
+              const position = i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000
+              return {
+                id: i + 1,
+                track,
+                played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
+                page_no: page?.no,
+                page_duration_ms: page?.duration_ms,
+                position_ms: page && i === 2 ? page.duration_ms - 500 : position,
+              }
+            }),
             {
               id: 99,
               track: {
@@ -633,7 +631,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             id: i + 1,
             track,
             played_at: now - i * 9.5 * 3600_000,
-            position_ms: [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
+            page_no: watchHistory && i === 0 ? 2 : null,
+            page_duration_ms: watchHistory && i === 0 ? previewPages(track)[1]?.duration_ms : null,
+            position_ms: watchHistory && i === 0 ? 77_000 : [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
           }))
       for (const entry of all) registerTrack(entry.track)
       return all
@@ -1005,10 +1005,20 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (!track) throw fail('input', '预览模式没有这条视频')
       const commentJumps = import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
       const pages = previewPages(track)
-      const requestedPage = Number(args.page ?? 1) || 1
-      if (commentJumps && requestedPage === 2) await sleep(600)
-      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused, at: args.resume_at } })
-      const part = pages.find((entry) => entry.no === requestedPage) ?? pages[0]!
+      const rows = await mockInvoke('library_history_timed', { limit: 500 }) as HistoryEntry[]
+      const saved = rows.find((entry) => entry.track.key === track.key)
+      const local = args.local_resume as PlaybackResume | null
+      const savedPage = pages.find((entry) => entry.no === saved?.page_no)
+      const localPage = pages.find((entry) => entry.no === local?.page)
+      const chosen = args.page == null ? savedPage ?? localPage : pages.find((entry) => entry.no === args.page)
+      const part = chosen ?? pages[0]!
+      const savedAt = saved?.page_no === part.no ? saved.position_ms : null
+      const legacyAt = args.page == null && part.no === 1 && saved?.page_no == null ? saved?.position_ms : null
+      const localAt = local?.page === part.no ? local.position_ms : null
+      const explicitAt = args.page == null || args.page === part.no ? args.resume_at as number | null : null
+      const resume = Math.min(explicitAt ?? savedAt ?? localAt ?? legacyAt ?? 0, part.duration_ms)
+      if (commentJumps && part.no === 2) await sleep(600)
+      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: part.no, paused: args.paused, at: args.resume_at } })
       const currentPage = part.no
       state.watchPage = { key: track.key, page: part }
       setDuration(part.duration_ms)
@@ -1035,6 +1045,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         tname: track.tname ?? null,
         pages,
         current_page: currentPage,
+        resume_ms: resume,
         // 预览给一个三集合集：换成别的视频时把当前这条换进第一集，右栏合集能验到。
         season: {
           id: 1,
@@ -1061,7 +1072,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
                 { mid: 9004, name: '一个很长的合作成员昵称用来验证换行', face: null, title: '动画' },
               ],
         // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
-        manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
+        manifest_url: `http://127.0.0.1:1/m/${track.key}-${currentPage}.mpd`,
         // 观看页拿到的 duration 是当前这一 P 的时长，不是整条投稿的总长。
         duration_ms: pages.find((entry) => entry.no === currentPage)?.duration_ms ?? track.duration_ms ?? 30_000,
         qualities: [{ id: 80, label: '1080P', height: 1080, bandwidth: 2_400_000 }],

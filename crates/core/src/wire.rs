@@ -269,6 +269,14 @@ pub struct VideoMetaView {
     pub pages: Vec<bilimusic_bili::PageRef>,
 }
 
+pub use bilimusic_store::HistoryEntry;
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct HistoryResume {
+    pub page: u32,
+    pub position_ms: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueueView {
     pub items: Vec<Track>,
@@ -336,6 +344,7 @@ pub struct WatchView {
     pub pages: Vec<bilimusic_bili::PageRef>,
     /// 当前在放的分P 序号（从 1 开始）。
     pub current_page: u32,
+    pub resume_ms: u64,
     /// 所属合集；没有合集时为空。
     pub season: Option<SeasonView>,
     /// 联合投稿署名；单作者为空。`title` 是作者在这部作品里的角色。

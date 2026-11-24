@@ -140,6 +140,7 @@ export type WatchView = {
   tname: string | null
   pages: PageRef[]
   current_page: number
+  resume_ms: number
   /** 所属合集；没有合集时为 null。 */
   season: SeasonView | null
   /** 联合投稿署名；单作者为空。 */

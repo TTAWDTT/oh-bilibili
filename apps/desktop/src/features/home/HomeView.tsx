@@ -100,13 +100,10 @@ export function HomeView() {
 
   const openResume = (item: Resume): void => {
     if (item.watching) {
-      // 观看页自己会从本地记录恢复到分 P 与位置。
-      navigate({ kind: 'watch', track: item.entry.track }, undefined, `resume:${item.entry.track.key}`)
+      navigate({ kind: 'watch', track: item.entry.track, page: item.page ?? 1, atMs: item.position }, undefined, `resume:${item.entry.track.key}`)
       return
     }
-    void playContext([item.entry.track.key], 0).then(() => {
-      void usePlayerStore.getState().seek(item.position)
-    })
+    void playContext([item.entry.track.key], 0, { page: item.page ?? 1, position_ms: item.position })
   }
   /** 当前这批曲目的镜像。去重要在 setState 之外算，不然「新增了几条」永远是旧值。 */
   const itemsRef = useRef<Track[]>(feedMemory.items)

@@ -19,7 +19,8 @@ use bilimusic_store::{Library, Reaction, ReactionKind, ReactionState, StoredDown
 use crate::lyrics::{self, LyricDoc};
 use crate::state::{LoadToken, PlayerState, Prepared, Queue};
 use crate::wire::{
-    AppEvent, AuthSnapshot, AuthUser, PlayerSnapshot, QueueView, SyncOutcome, WatchView, WireError,
+    AppEvent, AuthSnapshot, AuthUser, HistoryEntry, HistoryResume, PlayerSnapshot, QueueView,
+    SyncOutcome, WatchView, WireError,
 };
 
 const LOCAL_AUDIO_DECODE_ERROR: &str = "本地音频无法解码，请重试下载";
@@ -355,7 +356,7 @@ mod download_restore_tests {
                 .save_download(&local, Some(path.to_str().unwrap()), "done", None)
                 .unwrap();
             let id = library.upsert_track(&local).unwrap();
-            library.push_history(id, saved_position).unwrap();
+            library.push_history(id, saved_position, None).unwrap();
             library
                 .save_queue(
                     &serde_json::json!({
@@ -1275,6 +1276,38 @@ pub struct WatchOptions {
     pub paused: bool,
     pub preserve_listen_queue: bool,
     pub continue_audio: bool,
+    pub local_resume: Option<HistoryResume>,
+}
+
+fn watch_start(
+    pages: &[PageRef],
+    requested: Option<u32>,
+    requested_at: Option<u64>,
+    history: Option<(Option<u32>, u64)>,
+    local: Option<HistoryResume>,
+) -> (Option<&PageRef>, u64) {
+    let find = |no| pages.iter().find(|p| p.no == no);
+    let native = history.and_then(|(page, position_ms)| {
+        page.map(|page| HistoryResume { page, position_ms })
+    });
+    let current = match requested {
+        Some(no) => find(no),
+        None => native
+            .and_then(|saved| find(saved.page))
+            .or_else(|| local.and_then(|saved| find(saved.page))),
+    }
+    .or_else(|| pages.first());
+    let no = current.map_or(1, |p| p.no);
+    let saved = [native, local].into_iter().flatten().find(|saved| saved.page == no);
+    let at = requested_at
+        .filter(|_| requested.map_or(true, |page| page == no))
+        .or_else(|| saved.map(|point| point.position_ms))
+        .or_else(|| match history {
+            Some((None, at)) if requested.is_none() && no == 1 => Some(at),
+            _ => None,
+        })
+        .unwrap_or(0);
+    (current, at)
 }
 
 struct QueueBookmark {
@@ -1571,12 +1604,19 @@ impl Engine {
 
     /// 播放一首，或换到某一首。取流失败会落进 Faulted 并发 notice。
     pub async fn play_key(self: &Arc<Self>, key: &TrackKey) -> Result<PlayerSnapshot, WireError> {
+        self.play_queue_track(key, None).await
+    }
+
+    async fn play_queue_track(
+        self: &Arc<Self>, key: &TrackKey, resume: Option<HistoryResume>,
+    ) -> Result<PlayerSnapshot, WireError> {
         let track = self.track_of(key)?;
+        self.persist_history_progress();
         self.watch_gate.cancel();
         *lock(&self.mode) = crate::wire::PlayMode::Listen;
         self.restore_queue_bookmark();
         lock(&self.queue).jump_by_key(key);
-        self.start_playback(&track, false, None).await
+        self.start_playback(&track, false, None, resume).await
     }
 
     async fn start_playback(
@@ -1584,6 +1624,7 @@ impl Engine {
         track: &Track,
         paused: bool,
         watch_duration: Option<Millis>,
+        history_resume: Option<HistoryResume>,
     ) -> Result<PlayerSnapshot, WireError> {
         let key = &track.key;
         self.discard_resume_for_other_track(Some(key));
@@ -1595,9 +1636,13 @@ impl Engine {
             track: track.clone(),
         });
 
-        match self.fetch_and_load(key, token).await {
+        match self.fetch_and_load(key, token, history_resume.map(|r| r.page)).await {
             Ok(prepared) => {
-                let resume = self.pending_resume_for(key).unwrap_or(0);
+                let resume = match history_resume {
+                    Some(target) if self.active_page(key).is_some_and(|p| p.no == target.page) => target.position_ms,
+                    Some(_) => 0,
+                    None => self.pending_resume_for(key).unwrap_or(0),
+                };
                 // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
                 // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
                 let bounded = match (watch_duration, prepared.duration) {
@@ -1605,6 +1650,9 @@ impl Engine {
                     (_, d) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
                     _ => resume,
                 };
+                if history_resume.is_some() {
+                    *lock(&self.pending_resume) = Some((key.clone(), bounded));
+                }
                 if bounded > 0 {
                     lock(&self.player).seek(bounded);
                 }
@@ -1751,8 +1799,7 @@ impl Engine {
         self.open_watch_page(key, proxy_origin, None, None).await
     }
 
-    /// 打开某个分P。`page` 是从 1 开始的序号，None 表示当前/第一个。
-    /// `resume_at_ms` 是这一 P 自己的续播点；显式给出时优先于按整条视频存的历史。
+    /// 显式分 P 与定位优先；从普通卡片打开时恢复历史里仍存在的分 P。
     pub async fn open_watch_page(
         self: &Arc<Self>,
         key: &TrackKey,
@@ -1790,6 +1837,7 @@ impl Engine {
         resume_at_ms: Option<u64>,
         options: WatchOptions,
     ) -> Result<WatchView, WireError> {
+        self.persist_history_progress();
         let generation = self.watch_gate.begin(key.as_opaque());
         // 打开观看页就是「看」模式：底部音频条按模式隐藏，
         // 不会出现「没在听却挂着一条音频」。
@@ -1808,9 +1856,13 @@ impl Engine {
             self.restore_queue_bookmark();
             self.select_listen_track(&detail.track);
         }
-        let current = page
-            .and_then(|no| detail.pages.iter().find(|p| p.no == no))
-            .or_else(|| detail.pages.first());
+        let (current, at) = watch_start(
+            &detail.pages,
+            page,
+            resume_at_ms,
+            self.library.history_resume(key.as_opaque())?,
+            options.local_resume,
+        );
         let page_cid = current.map(|p| p.cid);
         // 多 P 视频的总时长是整条投稿的 14 小时，不是当前这一 P 的时长。
         // 进度条和 MPD 都必须用当前 P 的时长，否则切到 P2 还显示 14:10:58。
@@ -1827,23 +1879,14 @@ impl Engine {
                 state.track() == Some(key) && matches!(state.phase(), "loading" | "playing" | "paused")
             };
         *lock(&self.page) = current.map(|p| (key.clone(), p.clone()));
-        // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
-        // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
-        // 不会出现「进度条先跳过去、音频还在 0」的竞态。
+        let resume_ms = if duration.0 > 0 { at.min(duration.0) } else { at };
         if !continuing {
-            let at = resume_at_ms.unwrap_or_else(|| {
-                if page.is_none() {
-                    self.library.history_position(key.as_opaque()).ok().flatten().unwrap_or(0)
-                } else {
-                    0
-                }
-            });
-            *lock(&self.pending_resume) = Some((key.clone(), at));
+            *lock(&self.pending_resume) = Some((key.clone(), resume_ms));
             let engine = Arc::clone(self);
             let track = detail.track.clone();
             tokio::spawn(async move {
                 if engine.watch_gate.is_current(generation) {
-                    let _ = engine.start_playback(&track, options.paused, Some(duration)).await;
+                    let _ = engine.start_playback(&track, options.paused, Some(duration), None).await;
                 }
             });
         }
@@ -1877,6 +1920,7 @@ impl Engine {
             tname: detail.track.tname.clone(),
             pages: detail.pages.clone(),
             current_page: page_no,
+            resume_ms,
             season: season_view(detail.season.as_ref(), key),
             staff: detail
                 .staff
@@ -1958,6 +2002,7 @@ impl Engine {
         } else {
             self.watch_gate.cancel();
         }
+        self.persist_history_progress();
         *lock(&self.pending_prepared) = None;
         lock(&self.player).stop();
         if closing_current && self.restore_queue_bookmark() {
@@ -2205,11 +2250,16 @@ impl Engine {
         &self,
         key: &TrackKey,
         token: LoadToken,
+        resume_page: Option<u32>,
     ) -> Result<Prepared, WireError> {
         let mut detail = self.source.detail(key).await?;
         // 多 P 视频的 `detail.cid` 是第一 P。观看页切到第 N P 时音轨也得跟着换，
         // 否则听到的仍是 P1 的声音，播到 P1 结尾就当成整集播完。
-        if let Some(page) = self.active_page(key) {
+        if let Some(no) = resume_page {
+            if let Some(page) = detail.pages.iter().find(|part| part.no == no) {
+                detail.cid = page.cid;
+            }
+        } else if let Some(page) = self.active_page(key) {
             detail.cid = page.cid;
         }
         // 详情是字段最全的一份（UP 主头像、分区名都在里面），把它写回 known。
@@ -2276,6 +2326,7 @@ impl Engine {
         self: &Arc<Self>,
         keys: &[String],
         index: usize,
+        resume: Option<HistoryResume>,
     ) -> Result<PlayerSnapshot, WireError> {
         let tracks: Vec<Track> = keys
             .iter()
@@ -2294,7 +2345,7 @@ impl Engine {
             q.replace_from_tracks(&tracks, start);
         }
         self.persist_queue();
-        self.play_key(&key).await
+        self.play_queue_track(&key, resume).await
     }
 
     /// 空闲但队列里有当前项时，把它真正加载起来。
@@ -2461,8 +2512,8 @@ impl Engine {
         let track = self.snapshot().track;
         let Some(track) = track else { return Ok(self.snapshot()) };
         *lock(&self.pending_resume) = None;
-        let snapshot = self.start_playback(&track, false, None).await?;
-        let _ = self.library.set_history_position(track.key.as_opaque(), 0);
+        let snapshot = self.start_playback(&track, false, None, None).await?;
+        let _ = self.library.set_history_position(track.key.as_opaque(), 0, self.active_page(&track.key).map(|p| (p.no, p.duration_ms)));
         Ok(snapshot)
     }
 
@@ -2708,7 +2759,7 @@ impl Engine {
                     let snapshot = engine.snapshot();
                     if let Some(track) = snapshot.track {
                         *lock(&engine.pending_resume) = Some((track.key.clone(), snapshot.position_ms));
-                        let _ = rt.block_on(engine.start_playback(&track, false, None));
+                        let _ = rt.block_on(engine.start_playback(&track, false, None, None));
                     }
                 }
             });
@@ -2723,9 +2774,8 @@ impl Engine {
             return;
         }
         if let Some(track) = snapshot.track {
-            let _ = self
-                .library
-                .set_history_position(track.key.as_opaque(), snapshot.position_ms);
+            let page = snapshot.page.map(|p| (p.no, p.duration_ms));
+            let _ = self.library.set_history_position(track.key.as_opaque(), snapshot.position_ms, page);
         }
     }
 
@@ -2851,7 +2901,8 @@ impl Engine {
                 } else {
                     lock(&self.player).clock().position_ms()
                 };
-                let _ = self.library.push_history(track_id, at);
+                let page = self.active_page(&track_key).map(|p| (p.no, p.duration_ms));
+                let _ = self.library.push_history(track_id, at, page);
             }
         }
         self.emit_state();
@@ -3142,12 +3193,12 @@ impl Engine {
         &self,
         limit: u32,
         before: Option<(i64, u64)>,
-    ) -> Result<Vec<(Track, i64, u64, i64)>, WireError> {
+    ) -> Result<Vec<HistoryEntry>, WireError> {
         let entries = self
             .library
             .history_with_time(limit, before.map(|(played_at, id)| (played_at, id as i64)))?;
-        for (track, _, _, _) in &entries {
-            self.remember_persisted(track);
+        for entry in &entries {
+            self.remember_persisted(&entry.track);
         }
         Ok(entries)
     }
@@ -4469,7 +4520,7 @@ mod offline_boot_tests {
         engine.remember(&track);
         engine.add_to_playlist(playlist.id, &track.key).expect("加入歌单");
         let stored_id = engine.library.upsert_track(&track).expect("写入曲目");
-        engine.library.push_history(stored_id, 12_000).expect("写入历史");
+        engine.library.push_history(stored_id, 12_000, None).expect("写入历史");
 
         lock(&engine.known).clear();
         let playlist_tracks = engine.playlist_tracks(playlist.id).expect("读歌单");

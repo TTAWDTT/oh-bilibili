@@ -18,7 +18,7 @@ type PlayerStore = {
   init: () => Promise<void>
   refreshQueue: () => Promise<void>
   play: (key: string) => Promise<void>
-  playContext: (keys: string[], index: number) => Promise<void>
+  playContext: (keys: string[], index: number, resume?: ipc.PlaybackResume) => Promise<void>
   toggle: () => Promise<void>
   next: () => Promise<void>
   prev: () => Promise<void>
@@ -131,8 +131,8 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       await run('播放', () => ipc.playerPlay(key))
       await refreshQueue()
     },
-    playContext: async (keys, index) => {
-      await run('开始播放', () => ipc.playerPlayContext(keys, index))
+    playContext: async (keys, index, resume) => {
+      await run('开始播放', () => ipc.playerPlayContext(keys, index, resume))
       await refreshQueue()
     },
     toggle: async () => {

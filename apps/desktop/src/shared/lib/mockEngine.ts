@@ -1,5 +1,6 @@
 import type { AppEvent, AuthSnapshot, DownloadView, PageRef, PlayerPhase, PlayerSnapshot, RepeatMode, Track } from './contract'
 import { CATALOG, findTrack, PLAYLIST_SEEDS, trackByTitle } from './mockCatalog'
+import type { PlaybackResume } from './ipc'
 import { clamp } from './format'
 
 export type MockPlaylist = { id: number; name: string; keys: string[] }
@@ -170,7 +171,21 @@ export function queueView() {
   return { items, index: state.index }
 }
 
-export function playIndex(index: number): void {
+export function previewPages(track: Track): PageRef[] {
+  const params = new URLSearchParams(window.location.search)
+  const many = params.has('manyPages')
+  const commentJumps = params.has('commentJumps')
+  const history = params.has('watchHistory') && track.key === CATALOG[0]?.key
+  const count = history ? 3 : many ? 80 : params.has('multiP') || commentJumps ? 2 : track.pages ?? 1
+  return Array.from({ length: count }, (_, index) => ({
+    no: index + 1,
+    cid: (many ? 100 : 1) + index,
+    title: index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : index === 1 ? '第二 P · 预览' : `第 ${index + 1} 集 · 预览`,
+    duration_ms: history ? (index === 1 ? 192_000 : 197_000) : many ? 30_000 + index * 1000 : commentJumps ? 300_000 : track.duration_ms ?? 30_000,
+  }))
+}
+
+export function playIndex(index: number, resume?: PlaybackResume): void {
   const track = findTrack(state.keys[index] ?? '')
   if (!track) {
     endPlayback()
@@ -178,11 +193,14 @@ export function playIndex(index: number): void {
   }
   state.index = index
   state.localKey = null
-  state.position = 0
-  state.duration = track.duration_ms ?? 30_000
+  const pages = resume ? previewPages(track) : []
+  const page = pages.find((part) => part.no === resume?.page) ?? pages[0]
+  if (page) state.watchPage = { key: track.key, page }
+  state.duration = page?.duration_ms ?? track.duration_ms ?? 30_000
+  state.position = resume && page?.no === resume.page ? clamp(resume.position_ms, 0, state.duration) : 0
   state.phase = 'playing'
   emit({ type: 'now_playing', track, index })
-  emit({ type: 'progress', position_ms: 0, duration_ms: state.duration, level: 0 })
+  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0 })
 }
 
 export function endPlayback(): void {

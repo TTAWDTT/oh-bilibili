@@ -2,6 +2,7 @@ import type { HistoryEntry } from '../../shared/lib/ipc'
 import { formatTime } from '../../shared/lib/format'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
+import { historyProgress, readWatchProgress } from '../tracks/historyProgress'
 import { knownPageCount } from '../tracks/pageSpineLabel'
 
 export type Resume = {
@@ -24,41 +25,12 @@ export type Resume = {
 export function resumeFrom(list: HistoryEntry[]): Resume | null {
   for (const entry of list) {
     const watch = readWatchProgress(entry.track.key)
-    const position = watch ? watch.position : entry.position_ms ?? 0
-    // 历史里的 duration 是整条投稿的总长；观看记录里有这一 P 自己的时长。
-    const duration = watch ? watch.duration : entry.track.duration_ms ?? 0
+    const { page: currentPage, position, duration } = historyProgress(entry, watch)
     if (!(position >= 5_000)) continue
     if (duration <= 0) continue
     if (position >= duration - 1_000) continue
-    const page = watch && (watch.page > 1 || (knownPageCount(entry.track.key, entry.track.pages) ?? 0) > 1) ? watch.page : null
-    return { entry, watching: watch !== null, page, position, duration }
-  }
-  return null
-}
-
-/** 观看页把分 P 进度写在本地；有这份记录才敢说这是「看过的视频」。 */
-function readWatchProgress(key: string): { page: number; position: number; duration: number } | null {
-  const read = (page: number) => {
-    const position = Number(localStorage.getItem(`oh-bilibili:watch-pos:${key}:${page}`))
-    const duration = Number(localStorage.getItem(`oh-bilibili:watch-len:${key}:${page}`))
-    return {
-      page,
-      position: Number.isFinite(position) ? position : 0,
-      duration: Number.isFinite(duration) ? duration : 0,
-    }
-  }
-  try {
-    const stored = Number(localStorage.getItem(`oh-bilibili:watch-page:${key}`))
-    if (Number.isInteger(stored) && stored > 0) return read(stored)
-    const prefix = `oh-bilibili:watch-pos:${key}:`
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const name = localStorage.key(i)
-      if (!name?.startsWith(prefix)) continue
-      const page = Number(name.slice(prefix.length))
-      if (Number.isInteger(page) && page > 0) return read(page)
-    }
-  } catch {
-    // 隐私模式读不到，按「听」处理
+    const page = currentPage > 1 || (knownPageCount(entry.track.key, entry.track.pages) ?? 0) > 1 ? currentPage : null
+    return { entry, watching: watch?.page === currentPage, page, position, duration }
   }
   return null
 }

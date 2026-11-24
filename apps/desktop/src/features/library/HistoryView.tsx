@@ -1,7 +1,7 @@
 import { Icon } from '../../shared/ui/Icon'
 import { reportActionError } from '../../shared/lib/actionError'
 import { toastDone } from '../../app/notice'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -10,6 +10,8 @@ import { Cover } from '../../shared/ui/Cover'
 import { usePlayerStore } from '../player/playerStore'
 import { PageTitle } from '../../shared/ui/PageTitle'
 import { AnchoredPanel, type Anchor } from '../../shared/ui/AnchoredPanel'
+import { historyProgress, type HistoryProgress as SavedProgress } from '../tracks/historyProgress'
+import { knownPageCount } from '../tracks/pageSpineLabel'
 import { formatTime } from '../../shared/lib/format'
 
 const HISTORY_PAGE = 60
@@ -210,7 +212,6 @@ export function HistoryView() {
     }
   }
 
-  type Entry = import('../../shared/lib/ipc').HistoryEntry
   const groups = (() => {
     if (entries === null) return [] as { key: string; label: string; items: Entry[] }[]
     const startOfDay = (ms: number): number => {
@@ -321,11 +322,11 @@ export function HistoryView() {
                 entry={entry}
                 active={entry.track.key === snapshot?.track?.key}
                 playing={snapshot?.phase === 'playing'}
-                onPlay={() => {
+                onPlay={(resume) => {
                   const keys = group.items.map((item) => item.track.key)
                   void usePlayerStore
                     .getState()
-                    .playContext(keys, index)
+                    .playContext(keys, index, resume)
                     .then(() => {
                       // 这一条刚被播过，played_at 和进度都变了；把第一页拉回来，
                       // 它会按真实记录挪到「今天」。
@@ -349,10 +350,6 @@ export function HistoryView() {
                           .then(applyFirstPage)
                           .catch(() => {})
                       }, 900)
-                      const resumeAt = resumablePosition(entry)
-                      if (resumeAt === null) return
-                      if (usePlayerStore.getState().snapshot?.track?.key !== entry.track.key) return
-                      void usePlayerStore.getState().seek(resumeAt)
                     })
                 }}
                 onDelete={() => void removeOne(entry.track.key)}
@@ -387,7 +384,7 @@ function HistoryRow({
   entry: Entry
   active: boolean
   playing: boolean
-  onPlay: () => void
+  onPlay: (resume: ipc.PlaybackResume) => void
   onDelete: () => void
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null)
@@ -395,7 +392,11 @@ function HistoryRow({
   const deleteRef = useRef<HTMLButtonElement | null>(null)
   const wasOpen = useRef(false)
   const title = entry.track.title
-  const action = finishedEntry(entry) ? '从头播放' : '继续播放'
+  const saved = useMemo(() => historyProgress(entry), [entry])
+  const finished = isFinished(saved.position, saved.duration)
+  const action = finished ? '从头播放' : '继续播放'
+  const showPage = saved.page > 1 || (knownPageCount(entry.track.key, entry.track.pages) ?? 0) > 1
+  const start = () => onPlay({ page: saved.page, position_ms: finished ? 0 : saved.position })
 
   useEffect(() => {
     if (anchor) {
@@ -415,7 +416,7 @@ function HistoryRow({
       data-history-row
       data-key={entry.track.key}
       data-played-at={entry.played_at}
-      data-position-ms={entry.position_ms}
+      data-position-ms={saved.position}
       aria-current={active ? 'true' : undefined}
       className={[
         'group flex items-center gap-3 border-b border-hairline px-2 py-3 transition-colors hover:bg-[var(--ga0)]',
@@ -426,7 +427,7 @@ function HistoryRow({
         {playedClock(entry.played_at)}
       </time>
       <div
-        onClick={onPlay}
+        onClick={start}
         title={`${action} ${title}`}
         className="relative h-12 w-20 shrink-0 cursor-pointer overflow-hidden rounded-[4px] border border-[var(--line)] sm:h-[54px] sm:w-24"
       >
@@ -439,7 +440,7 @@ function HistoryRow({
         <button
           type="button"
           data-history-play
-          onClick={onPlay}
+          onClick={start}
           aria-label={`${action} ${title}`}
           className={[
             'block w-full truncate text-left text-[14px]',
@@ -450,15 +451,16 @@ function HistoryRow({
           {title}
         </button>
         <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[12px] text-[var(--text-2)]">
+          {showPage && <span className="num shrink-0">P{saved.page}</span>}
           <span className="truncate">{entry.track.artist}</span>
           {active && playing ? <span className="shrink-0 text-[var(--accent)]">正在播放</span> : null}
         </div>
         <div className="sm:hidden">
-          <HistoryProgress entry={entry} live={active} playing={playing} />
+          <HistoryProgress saved={saved} live={active} playing={playing} />
         </div>
       </div>
       <div className="hidden w-[140px] shrink-0 sm:block">
-        <HistoryProgress entry={entry} live={active} playing={playing} />
+        <HistoryProgress saved={saved} live={active} playing={playing} />
       </div>
       <button
         ref={triggerRef}
@@ -493,30 +495,18 @@ function HistoryRow({
   )
 }
 
-function HistoryProgress({ entry, live, playing }: { entry: Entry; live: boolean; playing: boolean }) {
-  if (live) return <LiveHistoryProgress entry={entry} playing={playing} />
-  return <ProgressLine entry={entry} position={entry.position_ms} finished={finishedEntry(entry)} />
+function HistoryProgress({ saved, live, playing }: { saved: SavedProgress; live: boolean; playing: boolean }) {
+  if (live) return <LiveHistoryProgress playing={playing} />
+  return <ProgressLine position={saved.position} duration={saved.duration} finished={isFinished(saved.position, saved.duration)} />
 }
 
-/** 当前曲目直接读播放器进度；列表里的 position_ms 要等 watchdog 落库，会晚几秒。 */
-function LiveHistoryProgress({ entry, playing }: { entry: Entry; playing: boolean }) {
-  const position = usePlayerStore((state) => state.progress.position_ms)
-  const duration = entry.track.duration_ms ?? 0
-  const finished = !playing && duration > 0 && position >= duration - 1_000
-  return <ProgressLine entry={entry} position={position} finished={finished} />
+function LiveHistoryProgress({ playing }: { playing: boolean }) {
+  const { position_ms, duration_ms } = usePlayerStore((state) => state.progress)
+  return <ProgressLine position={position_ms} duration={duration_ms} finished={!playing && isFinished(position_ms, duration_ms)} />
 }
 
-function ProgressLine({
-  entry,
-  position,
-  finished,
-}: {
-  entry: Entry
-  position: number
-  finished: boolean
-}) {
+function ProgressLine({ position, duration, finished }: { position: number; duration: number; finished: boolean }) {
   if (!(position > 0)) return null
-  const duration = entry.track.duration_ms ?? 0
   const ratio = duration > 0 ? Math.min(1, position / duration) : null
   return (
     <div data-history-progress className="mt-1.5 min-w-0">
@@ -533,15 +523,8 @@ function ProgressLine({
 }
 
 /** 进度落在尾部 1 秒内才算播完；没有总时长就没有完成依据。 */
-function finishedEntry(entry: Entry): boolean {
-  const duration = entry.track.duration_ms ?? 0
-  return duration > 0 && entry.position_ms >= duration - 1_000
-}
-
-/** 播完的记录再点一次从头播，不要一进来就直接结束。 */
-function resumablePosition(entry: Entry): number | null {
-  if (!(entry.position_ms > 0) || finishedEntry(entry)) return null
-  return entry.position_ms
+function isFinished(position: number, duration: number): boolean {
+  return duration > 0 && position >= duration - 1_000
 }
 
 function playedClock(ms: number): string {

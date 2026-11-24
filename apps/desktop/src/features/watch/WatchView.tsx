@@ -146,9 +146,7 @@ export function WatchView({
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
-  const storedPage = useRef(startPage ?? loadWatchPage(track.key)).current
-  const storedPagePos = useRef(storedPage ? loadPagePos(track.key, storedPage) : null).current
-  const [page, setPage] = useState<number | undefined>(storedPage ?? undefined)
+  const [page, setPage] = useState(startPage)
   /** 中窄窗的选集面板。宽窗用右栏目录，影院用播放器自带的选集。 */
   const [pickingPage, setPickingPage] = useState(false)
   const pageTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -166,12 +164,11 @@ export function WatchView({
   }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
   const [pendingResume, setPendingResume] = useState({
-    at: atMs ?? storedPagePos,
+    at: atMs,
     paused: audioPaused ?? false,
     source: audioPaused === undefined ? 'history' : 'audio',
   })
   const pageLoading = useRef(false)
-  const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
     if (page === undefined) return
@@ -192,22 +189,20 @@ export function WatchView({
   }, [data, track.key])
   /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
   const changePage = (no: number, resumeAtMs?: number, commentPaused?: boolean): void => {
-    const from = page ?? data?.current_page
+    const from = data?.current_page
     const snap = usePlayerStore.getState().snapshot
     // 快照只在命令时更新，真实播放位置在 progress 切片里（10Hz）。
     const now = usePlayerStore.getState().progress.position_ms
-    if (!pageLoading.current && from === data?.current_page && from !== undefined && snap?.track?.key === track.key && now >= 5000) {
+    if (!pageLoading.current && from !== undefined && snap?.track?.key === track.key && now >= 5000) {
       savePagePos(track.key, from, now)
       // 历史里的 duration 是整条投稿总长，分 P 要看观看数据里这一页的时长。
       if ((data?.duration_ms ?? 0) > 0) savePageLen(track.key, from, data!.duration_ms)
     }
-    const at = resumeAtMs ?? loadPagePos(track.key, no)
-    setResume(at !== null ? { key: track.key, at } : null)
+    setResume(null)
     setSeekSignal(null)
     pageLoading.current = true
-    setPendingResume({ at, paused: commentPaused ?? false, source: commentPaused === undefined ? 'history' : 'comment' })
+    setPendingResume({ at: resumeAtMs, paused: commentPaused ?? false, source: commentPaused === undefined ? 'history' : 'comment' })
     setPage(no)
-    saveWatchPage(track.key, no)
   }
   const [watchNote, setWatchNote] = useState<CommentNote | null>(null)
   const openNote = (note: CommentNote): void => {
@@ -257,13 +252,7 @@ export function WatchView({
     setSeekSignal((previous) => ({ at: ms, nonce: (previous?.nonce ?? 0) + 1 }))
   }
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
-  const [resume, setResume] = useState<{ key: string; at: number } | null>(
-    atMs !== undefined
-      ? { key: track.key, at: atMs }
-      : storedPagePos
-        ? { key: track.key, at: storedPagePos }
-        : null,
-  )
+  const [resume, setResume] = useState<{ key: string; at: number } | null>(null)
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   const [followed, setFollowed] = useState<boolean | null>(null)
@@ -301,22 +290,6 @@ export function WatchView({
     setBurst(0)
   }, [track.key])
 
-  useEffect(() => {
-    let cancelled = false
-    // 从记住的 P 打开时不沿用 bvid 级历史：它可能属于上一 P。
-    if (initialStoredPage.current) return
-    setResume(null)
-    void ipc
-      .historyPosition(track.key)
-      .then((at) => {
-        if (!cancelled && at) setResume({ key: track.key, at })
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [track.key])
-
   /** 选集每一行下面那条「看到哪了」。读的是本地存的分 P 进度。 */
   const [pagePos, setPagePos] = useState<Record<number, number>>({})
   useEffect(() => {
@@ -337,8 +310,8 @@ export function WatchView({
     const save = (): void => {
       const snap = usePlayerStore.getState().snapshot
       if (!snap || snap.track?.key !== track.key) return
-      const no = page ?? data?.current_page
-      if (no === undefined || !data || data.current_page !== no) return
+      if (pageLoading.current || !data) return
+      const no = data.current_page
       if (snap.phase === 'ended') {
         clearPagePos(track.key, no)
         return
@@ -512,7 +485,7 @@ export function WatchView({
     }
   }
 
-  const currentPageNo = page ?? data?.current_page ?? 1
+  const currentPageNo = data?.current_page ?? page ?? 1
   const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
@@ -603,23 +576,17 @@ export function WatchView({
     setError(null)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, {
+        const localPage = page ?? loadWatchPage(track.key)
+        const next = await ipc.watchOpen(track.key, page, pendingResume.at, {
+          localResume: localPage ? { page: localPage, position_ms: loadPagePos(track.key, localPage) ?? 0 } : undefined,
           paused: pendingResume.paused,
           continueAudio: pendingResume.source === 'audio',
           preserveListenQueue: currentWatchSession(track.key) !== null
             || useAppStore.getState().history.at(-1)?.view.kind === 'watchLater',
         })
         if (!cancelled) {
-          initialStoredPage.current = false
-          if (page !== undefined) saveWatchPage(track.key, page)
-          if (page !== undefined && !next.pages.some((entry) => entry.no === page)) {
-            const fallback = next.current_page
-            const at = loadPagePos(track.key, fallback)
-            setPage(fallback)
-            setPendingResume({ at, paused: pendingResume.paused, source: 'history' })
-            setResume(at ? { key: track.key, at } : null)
-            saveWatchPage(track.key, fallback)
-          }
+          if (next.pages.length > 1) saveWatchPage(track.key, next.current_page)
+          setResume({ key: track.key, at: next.resume_ms })
           // 详情里带完整合集目录时记到本地：列表页的书脊靠它，
           // 不必为每个卡片额外请求一次详情。
           rememberPageCount(track.key, next.pages.length)
@@ -841,7 +808,7 @@ export function WatchView({
                 className="t press flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] text-[var(--text-2)] hover:text-[var(--text-1)]"
               >
                 <Icon name="queue" size={14} className="shrink-0 text-[var(--text-3)]" />
-                <span className="min-w-0 flex-1 truncate">{directoryTitle(data, page ?? data.current_page)}</span>
+                <span className="min-w-0 flex-1 truncate">{directoryTitle(data, currentPageNo)}</span>
                 <Icon name="chevronRight" size={13} className="shrink-0 rotate-90 text-[var(--text-3)]" />
               </button>
             </div>

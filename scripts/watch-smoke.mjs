@@ -1655,6 +1655,59 @@ async function checkHeroAllocation(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkHistoryParts(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('historyLong', '1')
+  url.searchParams.set('manyPages', '1')
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(url)}`)
+  const waitFor = watchUiWait(page)
+  const watch = "document.querySelector('[data-home-hero-grid] button[data-focus-id^=herocard]')"
+  await waitFor(`location.search.includes('historyLong') && ${watch}`)
+  await page.evaluate(`(() => {
+    for (const [key, page] of [['history-0', 2], ['history-1', 3]]) {
+      localStorage.setItem('oh-bilibili:watch-page:' + key, String(page))
+      localStorage.setItem('oh-bilibili:watch-pos:' + key + ':' + page, '8000')
+      localStorage.setItem('oh-bilibili:watch-len:' + key + ':' + page, '31000')
+    }
+    ${watch}.click()
+  })()`)
+  const watched = await waitFor(`!!document.querySelector('video')`)
+  await page.evaluate(`document.querySelector('button[title="历史"]')?.click()`)
+  await waitFor(`!!document.querySelector('[data-history-row]')`)
+  for (const [key, position, action, label] of [
+    ['history-0', 8000, '继续播放', '旧记录按本地 P2 和时间续听'],
+    ['history-1', 12000, '继续播放', '新历史用已存 P2 断点并保留当天队列'],
+    ['history-2', 0, '从头播放', '已播完的 P2 从本集开头重播'],
+  ]) {
+    const source = `document.querySelector('[data-history-row][data-key="${key}"]')`
+    const row = await page.evaluate(`(() => {
+      const row = ${source}
+      const button = row?.querySelector('[data-history-play]')
+      const keys = [...row?.closest('section').querySelectorAll('[data-history-row]') ?? []].map((r) => r.dataset.key)
+      const page = [...row?.querySelectorAll('span') ?? []].some((s) => s.textContent === 'P2')
+      const action = button?.getAttribute('aria-label')
+      button?.click()
+      return { keys, page, action }
+    })()`)
+    const selected = await waitFor(`${source}?.getAttribute('aria-current') === 'true' && !!document.querySelector('[aria-label="打开播放舞台"]')`)
+    const [state, queue] = await page.evaluate(`(async () => {
+      const module = performance.getEntriesByType('resource').find(entry => new URL(entry.name).pathname === '/src/shared/lib/ipc.ts')
+      const ipc = await import(module.name)
+      return Promise.all([ipc.playerState(), ipc.queueState()])
+    })()`)
+    check(label, watched && selected && row.page && row.action?.startsWith(action) && state.mode === 'listen' &&
+      state.track?.key === key && state.page?.no === 2 && state.duration_ms === 31000 &&
+      state.position_ms >= position && state.position_ms < position + 2000 &&
+      JSON.stringify(queue.items.map((item) => item.key)) === JSON.stringify(row.keys) && row.keys[queue.index] === key)
+  }
+  await page.evaluate(`(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (/watch-(page|pos|len):history-[01](:|$)/.test(key)) localStorage.removeItem(key)
+    }
+  })()`)
+}
+
 /** 发现页续播卡：宽窗占左半屏，换一换不动它，窄窗收成一条。 */
 async function checkHomeResume(page) {
   await page.viewport(1320, 900)
@@ -1670,6 +1723,7 @@ async function checkHomeResume(page) {
   await page.evaluate(`(() => {
     const key = ${JSON.stringify(resumeKey)}
     if (!key) return
+    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
     localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
     localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
   })()`)
@@ -4194,6 +4248,62 @@ function watchUiWait(page) {
   }
 }
 
+async function checkWatchPartHistory(page) {
+  const waitFor = watchUiWait(page)
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?watchHistory=1`)}`)
+  const input = `document.querySelector('[aria-label="顶栏搜索"]')`
+  await waitFor(`location.search.includes('watchHistory') && ${input} && window.shaka?.Player`)
+  await page.evaluate(`(() => {
+    // 预览的 MPD 没有媒体流。只代替网络加载，保留实际的播放器与视频定位。
+    window.shaka.Player.prototype.load = async () => {}
+    const input = ${input}
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '晴天')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.form.requestSubmit()
+  })()`)
+  const card = "document.querySelector('[data-search-results] [data-track-title=\"晴天\"]')"
+  const watch = `${card}.querySelector('[aria-label=\"观看 晴天\"]')`
+  await waitFor(card)
+  const key = await page.evaluate(`${card}.dataset.key`)
+  const keys = [
+    `oh-bilibili:watch-page:${key}`, `oh-bilibili:page-count:${key}`,
+    ...[1, 2, 3].flatMap(no => [`oh-bilibili:watch-pos:${key}:${no}`, `oh-bilibili:watch-len:${key}:${no}`]),
+  ]
+  const local = await page.evaluate(`${JSON.stringify(keys)}.map(key => localStorage.getItem(key))`)
+  const active = `document.querySelector('[data-watch-pages] button[aria-pressed=true]')?.innerText`
+  const restored = `${active}?.includes('P2') && document.body.innerText.includes('上次观看位置 1:17') && document.querySelector('video')?.currentTime === 77`
+  try {
+    await page.evaluate(`${JSON.stringify(keys)}.forEach(key => localStorage.removeItem(key))`)
+    await page.evaluate(`${watch}.click()`)
+    check('搜索卡无本地断点时打开数据库记录的 P2，画面回到 1:17', await waitFor(restored))
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+    await waitFor(card)
+    await page.evaluate(`(() => {
+      const input = ${input}
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify('https://www.bilibili.com/video/' + key + '?p=1')})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.form.requestSubmit()
+    })()`)
+    check('显式 P1 链接从 0:00 开始，不沿用 P2 的续播时间', await waitFor(
+      `window.__ohBilibiliWatch?.state().ready && ${active}?.includes('P1') && document.querySelector('video')?.currentTime === 0 && !document.body.innerText.includes('上次观看位置 1:17')`))
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+    await waitFor(card)
+    await page.evaluate(`(() => {
+      localStorage.setItem(${JSON.stringify(keys[0])}, '3')
+      localStorage.setItem(${JSON.stringify(`oh-bilibili:watch-pos:${key}:3`)}, '8000')
+      ${watch}.click()
+    })()`)
+    check('本地留有 P3 的 0:08 时，搜索卡仍恢复数据库 P2 的 1:17', await waitFor(restored))
+  } finally {
+    await page.evaluate(`${JSON.stringify(keys)}.forEach((key, i) => {
+      const value = ${JSON.stringify(local)}[i]
+      if (value === null) localStorage.removeItem(key)
+      else localStorage.setItem(key, value)
+    })`)
+  }
+}
+
 async function checkWatchLink(page) {
   const waitFor = watchUiWait(page)
   await page.viewport(1320, 900)
@@ -4283,6 +4393,14 @@ async function main() {
       await checkCommentPauseIntent(page)
       return
     }
+    if (process.argv.includes('--watch-history-only')) {
+      await checkWatchPartHistory(page)
+      return
+    }
+    if (process.argv.includes('--history-parts-only')) {
+      await checkHistoryParts(page)
+      return
+    }
     if (process.argv.includes('--stage-moments-only')) {
       await checkStageMoments(page)
       return
@@ -4338,6 +4456,8 @@ async function main() {
     await checkTriple(page)
     await checkFollowingDirectory(page)
     await checkHomeResume(page)
+    await checkHistoryParts(page)
+    await checkWatchPartHistory(page)
     await checkNavConventions(page)
     await checkRanking(page)
     await checkRankingSkeleton(page)
@@ -5289,10 +5409,14 @@ async function main() {
     const byTitle = await page.evaluate(pageRows)
     check('输入标题片段只留下匹配集', byTitle.count === 1 && byTitle.text.includes('晴天 · 现场版'))
     await typeIntoFilter('P62')
-    await sleep(200)
-    await page.evaluate(`${visiblePanel}?.querySelector('ol li button')?.click()`)
-    await sleep(1500)
-    const picked = await page.evaluate(pageRows)
+    const matchingPart = `${visiblePanel}?.querySelector('ol button[title="晴天 · 现场版"]')`
+    await watchUiWait(page)(matchingPart)
+    await page.evaluate(`${matchingPart}.click()`)
+    let picked = await page.evaluate(pageRows)
+    for (let i = 0; i < 80 && !picked.header.includes('P62/80'); i += 1) {
+      await sleep(100)
+      picked = await page.evaluate(pageRows)
+    }
     check('选中筛选结果才切到 P62', picked.header.includes('P62/80'))
     await page.evaluate(`${visiblePanel}?.querySelector('button[aria-label="清除筛选"]')?.click()`)
     await sleep(300)

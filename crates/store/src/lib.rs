@@ -9,7 +9,17 @@ use std::sync::Mutex;
 use bilimusic_model::{Millis, PageCursor, Track, TrackId, TrackKey};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 8;
+
+#[derive(Debug, serde::Serialize)]
+pub struct HistoryEntry {
+    pub id: i64,
+    pub track: Track,
+    pub played_at: i64,
+    pub position_ms: u64,
+    pub page_no: Option<u32>,
+    pub page_duration_ms: Option<u64>,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -367,21 +377,24 @@ impl Library {
     }
 
     /// 记录一次播放。
-    pub fn push_history(&self, track_id: TrackId, position_ms: u64) -> Result<()> {
+    pub fn push_history(
+        &self, track_id: TrackId, position_ms: u64, page: Option<(u32, u64)>,
+    ) -> Result<()> {
+        let (page_no, duration) = page.unzip();
         self.with(|conn| {
             conn.execute(
-                // 同一首歌只保留最近一次：历史是「上次看到哪」，不是播放流水。
-                // 位置一起更新，历史卡片才能画出那条播放进度。
-                // 0 是「刚打开、还没开始」：别用它覆盖上次看到的位置，
-                // 否则重新打开视频的瞬间就把续播点清掉了。
-                "INSERT INTO history (track_id, played_at, position_ms) VALUES (?1, ?2, ?3)
+                // 同一 P 重开先报 0，保留旧断点；换 P 时断点从新 P 的位置算。
+                "INSERT INTO history (track_id, played_at, position_ms, page_no, page_duration_ms) VALUES (?1, ?2, ?3, ?4, ?5)
                  ON CONFLICT(track_id) DO UPDATE SET
                    played_at = excluded.played_at,
+                   page_no = coalesce(excluded.page_no, history.page_no),
+                   page_duration_ms = coalesce(excluded.page_duration_ms, history.page_duration_ms),
                    position_ms = CASE
-                     WHEN excluded.position_ms > 0 THEN excluded.position_ms
+                     WHEN excluded.position_ms > 0 OR (excluded.page_no IS NOT NULL AND excluded.page_no IS NOT history.page_no)
+                     THEN excluded.position_ms
                      ELSE history.position_ms
                    END",
-                params![track_id.0, now_ms(), position_ms as i64],
+                params![track_id.0, now_ms(), position_ms as i64, page_no, duration.map(|ms| ms as i64)],
             )?;
             Ok(())
         })
@@ -390,12 +403,16 @@ impl Library {
     /// 只更新已存在的那条历史的位置，不新增行。
     ///
     /// 播放中每隔几秒回写一次，历史卡片的进度条才是「看到哪」而不是「从哪开始」。
-    pub fn set_history_position(&self, provider_key: &str, position_ms: u64) -> Result<()> {
+    pub fn set_history_position(
+        &self, provider_key: &str, position_ms: u64, page: Option<(u32, u64)>,
+    ) -> Result<()> {
+        let (page_no, duration) = page.unzip();
         self.with(|conn| {
             conn.execute(
-                "UPDATE history SET position_ms = ?2
+                "UPDATE history SET position_ms = ?2,
+                   page_no = coalesce(?3, page_no), page_duration_ms = coalesce(?4, page_duration_ms)
                  WHERE track_id = (SELECT id FROM tracks WHERE provider_key = ?1)",
-                params![provider_key, position_ms as i64],
+                params![provider_key, position_ms as i64, page_no, duration.map(|ms| ms as i64)],
             )?;
             Ok(())
         })
@@ -439,11 +456,11 @@ impl Library {
         &self,
         limit: u32,
         before: Option<(i64, i64)>,
-    ) -> Result<Vec<(Track, i64, u64, i64)>> {
+    ) -> Result<Vec<HistoryEntry>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
                 &format!(
-                    "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms, h.id
+                    "SELECT {TRACK_COLUMNS}, h.played_at, h.position_ms, h.id, h.page_no, h.page_duration_ms
                      FROM history h JOIN tracks t ON t.id = h.track_id
                      WHERE ?1 IS NULL OR h.played_at < ?1 OR (h.played_at = ?1 AND h.id < ?2)
                      ORDER BY h.played_at DESC, h.id DESC LIMIT ?3"
@@ -454,12 +471,14 @@ impl Library {
                 None => (None, None),
             };
             let rows = stmt.query_map(params![played_at, id, limit.clamp(1, 500) as i64], |row| {
-                Ok((
-                    row_to_track(row)?,
-                    row.get::<_, i64>(7)?,
-                    row.get::<_, i64>(8)?.max(0) as u64,
-                    row.get::<_, i64>(9)?,
-                ))
+                Ok(HistoryEntry {
+                    track: row_to_track(row)?,
+                    played_at: row.get(7)?,
+                    position_ms: row.get::<_, i64>(8)?.max(0) as u64,
+                    id: row.get(9)?,
+                    page_no: row.get(10)?,
+                    page_duration_ms: row.get::<_, Option<i64>>(11)?.map(|ms| ms.max(0) as u64),
+                })
             })?;
             rows.collect()
         })
@@ -467,16 +486,17 @@ impl Library {
 
     /// 某条视频上次看到的位置。没有历史时返回 None，和「看过但从 0 开始」区分开。
     pub fn history_position(&self, provider_key: &str) -> Result<Option<u64>> {
+        Ok(self.history_resume(provider_key)?.map(|(_, position)| position))
+    }
+
+    pub fn history_resume(&self, provider_key: &str) -> Result<Option<(Option<u32>, u64)>> {
         self.with(|conn| {
-            Ok(conn
-                .query_row(
-                    "SELECT h.position_ms FROM history h
-                     JOIN tracks t ON t.id = h.track_id
-                     WHERE t.provider_key = ?1",
-                    params![provider_key],
-                    |row| Ok(row.get::<_, i64>(0)?.max(0) as u64),
-                )
-                .optional()?)
+            conn.query_row(
+                "SELECT h.page_no, h.position_ms FROM history h
+                 JOIN tracks t ON t.id = h.track_id WHERE t.provider_key = ?1",
+                params![provider_key],
+                |row| Ok((row.get(0)?, row.get::<_, i64>(1)?.max(0) as u64)),
+            ).optional()
         })
     }
 
@@ -844,7 +864,7 @@ impl Migration {
 }
 
 /// 只追加。已经发布的迁移不许改，改了会让老用户的库停在半路。
-const MIGRATIONS: [Migration; 7] = [
+const MIGRATIONS: [Migration; 8] = [
     Migration::Sql(
         r#"
 CREATE TABLE tracks (
@@ -954,6 +974,10 @@ ALTER TABLE downloads ADD COLUMN error TEXT;
 "#,
     ),
     Migration::Sql("ALTER TABLE reactions ADD COLUMN version INTEGER NOT NULL DEFAULT 0;"),
+    Migration::Sql(
+        "ALTER TABLE history ADD COLUMN page_no INTEGER;
+         ALTER TABLE history ADD COLUMN page_duration_ms INTEGER;",
+    ),
 ];
 
 fn complete_v4_track_metadata(tx: &Transaction<'_>) -> rusqlite::Result<()> {
@@ -1257,9 +1281,25 @@ mod tests {
         assert_eq!(tracks[0].key.as_opaque(), "BVlegacy");
         let history = library.history_with_time(10, None)?;
         assert_eq!(history.len(), 1);
-        assert_eq!(history[0].0.key.as_opaque(), "BVlegacy");
-        assert_eq!((history[0].1, history[0].2, history[0].3), (1234, 0, 9));
+        assert_eq!(history[0].track.key.as_opaque(), "BVlegacy");
+        assert_eq!((history[0].page_no, history[0].page_duration_ms), (None, None));
+        assert_eq!((history[0].played_at, history[0].position_ms, history[0].id), (1234, 0, 9));
         Ok(())
+    }
+
+    #[test]
+    fn 迁移_第七版保留进度和未知分p() {
+        let dir = temp_dir("migrate-v7-history");
+        let db = dir.join("library.sqlite");
+        {
+            let conn = migration_fixture(&db, 7);
+            conn.execute("UPDATE history SET position_ms = 77000 WHERE id = 9", []).unwrap();
+        }
+        let library = Library::open(&db).unwrap();
+        let row = library.history_with_time(1, None).unwrap().remove(0);
+        assert_eq!((row.position_ms, row.page_no, row.page_duration_ms), (77_000, None, None));
+        drop(library);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -1474,11 +1514,11 @@ mod tests {
         let l = lib();
         let a = l.upsert_track(&track("BV1a")).unwrap();
         let b = l.upsert_track(&track("BV1b")).unwrap();
-        l.push_history(a, 0).unwrap();
-        l.push_history(b, 0).unwrap();
+        l.push_history(a, 0, None).unwrap();
+        l.push_history(b, 0, None).unwrap();
         // 真正的播放之间隔着秒，这里也要隔开一毫秒，否则 played_at 并列看不出顺序。
         std::thread::sleep(std::time::Duration::from_millis(2));
-        l.push_history(a, 0).unwrap();
+        l.push_history(a, 0, None).unwrap();
         // 同一个视频只留一条，重播的是把时间往前挪。
         let repeated = l.history(10).unwrap();
         assert_eq!(repeated.len(), 2);
@@ -1515,11 +1555,27 @@ mod tests {
     fn 历史位置能回写() {
         let l = lib();
         let a = l.upsert_track(&track("BVpos")).unwrap();
-        l.push_history(a, 0).unwrap();
-        l.set_history_position("BVBVpos", 42_500).unwrap();
+        l.push_history(a, 0, None).unwrap();
+        l.set_history_position("BVBVpos", 42_500, None).unwrap();
         let rows = l.history_with_time(10, None).unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].2, 42_500, "回写之后读到的应该是新位置");
+        assert_eq!(rows[0].position_ms, 42_500, "回写之后读到的应该是新位置");
+    }
+
+    #[test]
+    fn 历史位置随分p一起更新() {
+        let l = lib();
+        let id = l.upsert_track(&track("parts")).unwrap();
+        let p2 = Some((2, 192_000));
+        l.push_history(id, 77_000, p2).unwrap();
+        l.push_history(id, 0, p2).unwrap();
+        assert_eq!(l.history_position("BVparts").unwrap(), Some(77_000));
+        l.push_history(id, 0, Some((1, 197_000))).unwrap();
+        let row = l.history_with_time(1, None).unwrap().remove(0);
+        assert_eq!((row.page_no, row.page_duration_ms, row.position_ms), (Some(1), Some(197_000), 0));
+        l.set_history_position("BVparts", 42_500, p2).unwrap();
+        let row = l.history_with_time(1, None).unwrap().remove(0);
+        assert_eq!((row.page_no, row.page_duration_ms, row.position_ms), (Some(2), Some(192_000), 42_500));
     }
 
     #[test]
@@ -1528,22 +1584,22 @@ mod tests {
         // 倒序写入，让 A/B 成为最新两条，C/D 更早。
         for key in ["BVpage4", "BVpage3", "BVpage2", "BVpage1"] {
             let id = l.upsert_track(&track(key)).unwrap();
-            l.push_history(id, 0).unwrap();
+            l.push_history(id, 0, None).unwrap();
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         let first = l.history_with_time(2, None).unwrap();
         assert_eq!(first.len(), 2);
-        let cursor = (first[1].1, first[1].3);
+        let cursor = (first[1].played_at, first[1].id);
 
         // 把 D 重新播一次，它会跳到最前；旧的 B 游标仍应只带出 C。
         let d = l.upsert_track(&track("BVpage4")).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        l.push_history(d, 0).unwrap();
+        l.push_history(d, 0, None).unwrap();
         let older = l.history_with_time(2, Some(cursor)).unwrap();
         assert_eq!(older.len(), 1, "D 跳到最前后，C 仍应可读");
-        assert_eq!(older[0].0.key.as_opaque(), "BVBVpage3");
+        assert_eq!(older[0].track.key.as_opaque(), "BVBVpage3");
         assert!(
-            !older.iter().any(|row| row.0.key.as_opaque() == "BVBVpage2"),
+            !older.iter().any(|row| row.track.key.as_opaque() == "BVBVpage2"),
             "B 已经在上一页，不能重复"
         );
     }
@@ -1552,10 +1608,10 @@ mod tests {
     fn 重开时零位置不覆盖已看进度() {
         let l = lib();
         let a = l.upsert_track(&track("BVresume")).unwrap();
-        l.push_history(a, 0).unwrap();
-        l.set_history_position("BVBVresume", 42_500).unwrap();
+        l.push_history(a, 0, None).unwrap();
+        l.set_history_position("BVBVresume", 42_500, None).unwrap();
         // 重新打开视频时先写一条 0 历史，不能把续播点清掉。
-        l.push_history(a, 0).unwrap();
+        l.push_history(a, 0, None).unwrap();
         assert_eq!(l.history_position("BVBVresume").unwrap(), Some(42_500));
     }
 
@@ -1564,8 +1620,8 @@ mod tests {
         let l = lib();
         for (n, position) in [("batch1", 11_000), ("batch2", 22_000)] {
             let id = l.upsert_track(&track(n)).unwrap();
-            l.push_history(id, 0).unwrap();
-            l.set_history_position(&format!("BV{n}"), position).unwrap();
+            l.push_history(id, 0, None).unwrap();
+            l.set_history_position(&format!("BV{n}"), position, None).unwrap();
         }
         let rows = l
             .history_positions(&["BVbatch1".into(), "BVmissing".into()])
@@ -1579,9 +1635,9 @@ mod tests {
         let l = lib();
         let a = l.upsert_track(&track("1")).unwrap();
         let b = l.upsert_track(&track("2")).unwrap();
-        l.push_history(a, 0).unwrap();
+        l.push_history(a, 0, None).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(2));
-        l.push_history(b, 0).unwrap();
+        l.push_history(b, 0, None).unwrap();
         let h = l.history(10).unwrap();
         assert_eq!(h[0].title, "歌 2");
     }
