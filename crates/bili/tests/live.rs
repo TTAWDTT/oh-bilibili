@@ -1025,3 +1025,49 @@ async fn 空间头图置顶代表作与合集可读取() {
         }
     }
 }
+
+#[tokio::test]
+#[ignore = "读取多个 B 站公开作者空间"]
+async fn live_author_catalog() {
+    use bilimusic_bili::space_catalog::{Catalog::*, CatalogPage, Destination};
+    let source = Source::new().unwrap();
+    for (mid, catalog) in [
+        (946974, Opus), (946974, Articles), (946974, ReadingLists),
+        (946974, ReadingList { id: 89188 }), (946974, Audio), (946974, Courses),
+        (43981713, Created), (43981713, Folder { id: 3927166413 }),
+        (2, Anime), (2, Cinema), (2, Tags), (2, Games),
+        (10897717, Collected), (10897717, SubscribedSeason { id: 8634190, owner: 11314362 }),
+        (10897717, Folder { id: 2055539766 }), (8743466, Coins), (8743466, Likes),
+    ] {
+        let CatalogPage::Public { items, more, offset } = source.space_catalog(mid, catalog, 1, None).await.unwrap()
+            else { panic!("{mid} {catalog:?} 未公开") };
+        println!("{mid} {catalog:?}: {}, 下一页={more}", items.len());
+        let first = items.first().expect("应有公开样本");
+        if matches!(catalog, Folder { .. }) {
+            assert!(matches!(&first.destination, Destination::Video { track } if !track.artist.is_empty()));
+        }
+        if more {
+            let CatalogPage::Public { items: next, .. } = source.space_catalog(mid, catalog, 2, offset.as_deref()).await.unwrap()
+                else { panic!("翻页应仍公开") };
+            assert!(!next.is_empty() && next[0].title != first.title, "{catalog:?} 的第二页不能重复第一页");
+        }
+    }
+    assert!(source.space_catalog_order(8743466).await.unwrap().contains(&2));
+    // 预约会自然下线；有公开预约时才检查卡片，不能把过期的活动当固定样本。
+    let CatalogPage::Public { items, .. } = source.space_catalog(9617619, Reservations, 1, None).await.unwrap()
+        else { panic!("预约列表应可读取") };
+    println!("9617619 Reservations: {}", items.len());
+    assert!(items.iter().all(|item| matches!(item.destination, Destination::Reservation { mid: 9617619, .. })));
+    assert!(matches!(source.space_catalog(946974, Anime, 1, None).await.unwrap(), CatalogPage::Private));
+    assert!(matches!(source.space_catalog(2050607, Opus, 1, None).await.unwrap(), CatalogPage::Public { items, .. } if items.is_empty()));
+    assert!(matches!(source.space_catalog(43981713, Collected, 1, None).await.unwrap(), CatalogPage::Public { .. }));
+}
+
+#[tokio::test]
+#[ignore = "作者投稿搜索取决于上游的匿名访问限制"]
+async fn live_author_video_search() {
+    let source = Source::new().unwrap();
+    let (tracks, count) = source.search_space_videos(946974, 1, "pubdate", "卫星").await.unwrap();
+    assert!(count > 0 && !tracks.is_empty());
+    assert!(tracks.iter().all(|track| track.up_mid == Some(946974)));
+}

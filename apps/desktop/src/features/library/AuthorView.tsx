@@ -2,6 +2,8 @@ import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore, type AuthorRoute, type SpaceSection } from '../../app/appStore'
+import { AuthorCatalog } from './AuthorCatalog'
+import { AuthorVideoForm, AuthorVideoResults } from './AuthorVideoSearch'
 import { SpaceProfile, useSpaceProfile } from './SpaceProfile'
 import { AuthorCollections } from './AuthorCollections'
 import type { Track } from '../../shared/lib/contract'
@@ -211,8 +213,11 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const isSelf = mid != null && me?.mid === mid
   const submissionCount = tracks && !isFallback ? total : card?.videos
   const show = (next: SpaceSection) => {
-    if (view.shelf) goBack()
-    if (!view.shelf || next !== 'collections') replace({ kind: 'author', name, mid: mid ?? null, section: next })
+    if (view.shelf || view.catalogChild) {
+      goBack()
+      if (next === section) return
+    }
+    replace({ kind: 'author', name, mid: mid ?? null, section: next })
   }
 
   return (
@@ -379,7 +384,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
 
       {mid && (
         <nav aria-label="空间内容" className="mb-4 flex items-center gap-5 border-b border-[var(--line)]">
-          {([['videos', '投稿'], ['masterpieces', '代表作'], ['collections', '合集和系列']] as const)
+          {([['videos', '投稿'], ['masterpieces', '代表作'], ['collections', '合集和系列'], ['catalog', '更多内容']] as const)
             .filter(([id]) => id !== 'masterpieces' || !!masterpieces?.length || section === id)
             .map(([id, label]) => (
               <button type="button" key={id} aria-pressed={section === id} onClick={() => show(id)}
@@ -389,7 +394,12 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
             ))}
         </nav>
       )}
-      {mid && section === 'collections' ? (
+      {mid && section === 'videos' && <AuthorVideoForm key={view.videoQuery ?? ''} view={view} />}
+      {mid && section === 'videos' && view.videoQuery ? (
+        <AuthorVideoResults key={JSON.stringify([view.videoQuery, view.videoPage])} view={view} mid={mid} query={view.videoQuery} />
+      ) : mid && section === 'catalog' ? (
+        <AuthorCatalog view={view} mid={mid} />
+      ) : mid && section === 'collections' ? (
         <AuthorCollections key={`${view.shelf?.kind}-${view.shelf?.id}-${view.shelfPage ?? 1}`} view={view} mid={mid} />
       ) : section === 'masterpieces' ? (
         masterpieceFailed ? (

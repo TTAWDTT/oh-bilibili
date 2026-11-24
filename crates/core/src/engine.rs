@@ -2091,12 +2091,23 @@ impl Engine {
         mid: u64,
         page: u32,
         order: &str,
+        keyword: &str,
     ) -> Result<(Vec<bilimusic_model::Track>, u32), WireError> {
-        let (tracks, total) = self.source.space_videos(mid, page, order).await?;
+        let (tracks, total) = self.source.search_space_videos(mid, page, order, keyword).await?;
         for t in &tracks {
             self.remember(t);
         }
         Ok((tracks, total))
+    }
+
+    pub async fn space_catalog_order(&self, mid: u64) -> Result<Vec<u64>, WireError> {
+        Ok(self.source.space_catalog_order(mid).await?)
+    }
+
+    pub async fn space_catalog(
+        &self, mid: u64, catalog: crate::wire::Catalog, page: u32, offset: Option<&str>,
+    ) -> Result<crate::wire::CatalogPage, WireError> {
+        Ok(self.source.space_catalog(mid, catalog, page, offset).await?)
     }
 
     pub async fn space_picks(

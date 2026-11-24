@@ -1495,6 +1495,22 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const tracks = previewSpaceWorks(num(args, 'mid'))
       return str(args, 'kind') === 'pinned' ? tracks.slice(-1) : tracks.slice(0, 3)
     }
+    case 'space_catalog_order': return [2, 1, 8, 7, 3, 4, 5, 10, 9, 23, 26, 21, 22, 25]
+    case 'space_catalog': {
+      const { kind } = args.catalog as { kind: string }
+      const empty = { status: 'public', items: [], more: false, offset: null }
+      if (!spaceShowcase || spaceEmpty) return empty
+      const page = num(args, 'page')
+      if (kind === 'anime') return { status: 'private' }
+      const track = previewSpaceWorks(num(args, 'mid'))[0]
+      const item = kind === 'created' ? { title: '影像收藏', destination: { kind: 'folder', id: 100 } }
+        : kind === 'folder' && track ? { title: track.title, destination: { kind: 'video', track } }
+        : kind === 'reading_lists' ? { title: '拍摄笔记', destination: { kind: 'reading_list', id: 10 } }
+        : kind === 'reading_list' || kind === 'opus' ? { title: page > 1 ? '拍摄续记' : '开拍啦', destination: { kind: 'web', url: 'https://www.bilibili.com/' } }
+        : null
+      const more = kind === 'opus' && page === 1
+      return { ...empty, items: item ? [{ cover: track?.cover ?? null, detail: null, ...item }] : [], more, offset: more ? '1271245104890249267' : null }
+    }
     case 'space_collections': {
       const tracks = previewSpaceWorks(num(args, 'mid'))
       if (!spaceShowcase || spaceEmpty || !tracks.length) return [[], 0]
@@ -1538,7 +1554,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           }
         })
       }
-      const sorted = [...owned]
+      const keyword = str(args, 'keyword').trim().toLocaleLowerCase()
+      const sorted = keyword ? owned.filter(track => track.title.toLocaleLowerCase().includes(keyword)) : [...owned]
       if (typographyMode !== null && mid === sampleTrack.up_mid) sorted[0] = sampleTrack
       if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
       if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))
