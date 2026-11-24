@@ -78,6 +78,7 @@ type ContentGridProps = {
   initialIndex?: number
   /** 排行榜：封面左上角改画名次，前三名用 B 站的红/橙/黄。 */
   ranked?: boolean
+  pinnedKey?: string | undefined
   /** 额外动作（比如「从收藏夹移出」），渲染在动作行末尾。 */
   extraAction?: (track: Track) => React.ReactNode
   /** 已看进度 0~1。历史页用它画封面底部那条进度，没有就不画。 */
@@ -115,6 +116,7 @@ type CardProps = {
   active: boolean
   playing: boolean
   ranked: boolean
+  pinned: boolean
   ratio: number | null
   noteText: string | null
   highlight: string | undefined
@@ -139,6 +141,7 @@ const TrackCard = memo(function TrackCard({
   active,
   playing,
   ranked,
+  pinned,
   ratio,
   noteText,
   highlight,
@@ -155,6 +158,7 @@ const TrackCard = memo(function TrackCard({
   return (
     <article
       data-track-card
+      data-space-pinned={pinned || undefined}
       data-key={track.key}
       data-track-title={track.title}
       data-index={index}
@@ -166,6 +170,7 @@ const TrackCard = memo(function TrackCard({
           onClick={() => onOpen(track)}
           data-focus-id={`card:${track.key}`}
           aria-label={`观看 ${track.title}`}
+          aria-describedby={pinned ? `space-pin-${track.key}` : undefined}
           /* 封面本身就是卡片：不描边，靠图片与留白分隔，鼠标悬停时整块抬升。
              之前每张封面套 1px 灰边，一屏几十张全是框线，页面读起来像表格。 */
           className="relative block w-full overflow-hidden rounded-[8px]"
@@ -178,6 +183,10 @@ const TrackCard = memo(function TrackCard({
               style={{ background: rankTone(index + 1) }}
             >
               {index + 1}
+            </span>
+          ) : pinned ? (
+            <span id={`space-pin-${track.key}`} className="absolute left-1.5 top-1.5 rounded-[4px] bg-black/75 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-white">
+              置顶投稿
             </span>
           ) : track.tname ? (
             /* B 站分区角标：左上角的粉色小贴纸，右下角带一道折角。
@@ -291,7 +300,7 @@ const TrackCard = memo(function TrackCard({
  * 视频网站的身份是「封面主导」，不是「行主导」。这里照着 B 站网页端的比例做：
  * 16:10 封面、圆角 6px、播放量压左下角、时长压右下角、标题两行、UP 主一行灰字。
  */
-export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, progress, note, highlight, onNeedMore, lookahead, initialIndex }: ContentGridProps) {
+export function ContentGrid({ tracks, activeKey, playing, ranked, pinnedKey, extraAction, progress, note, highlight, onNeedMore, lookahead, initialIndex }: ContentGridProps) {
   const playContext = usePlayerStore((state) => state.playContext)
   const navigate = useAppStore((state) => state.navigate)
   const toggleFav = useReactionStore((state) => state.toggleFav)
@@ -423,6 +432,7 @@ export function ContentGrid({ tracks, activeKey, playing, ranked, extraAction, p
                  这样播放/暂停时 memo 不会把整列上千张卡全部重渲染。 */
               playing={active && playing}
               ranked={ranked === true}
+              pinned={track.key === pinnedKey}
               ratio={progress?.(track) ?? null}
               noteText={note?.(track) ?? null}
               highlight={highlight}

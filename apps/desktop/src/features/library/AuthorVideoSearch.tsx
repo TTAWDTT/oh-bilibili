@@ -11,15 +11,16 @@ export function AuthorVideoForm({ view }: { view: AuthorRoute }) {
   const [draft, setDraft] = useState(view.videoQuery ?? '')
   const replace = useAppStore(s => s.replace)
   const submit = (query: string) => replace({ ...view, videoQuery: query.trim(), videoPage: 1 })
-  return <form role="search" aria-label="搜索这个 UP 主的投稿" className="mb-4 flex items-center gap-2"
+  return <form role="search" aria-label="搜索这个 UP 主的投稿" className="flex min-w-0 max-w-full items-center gap-2"
     onSubmit={event => { event.preventDefault(); submit(draft) }}>
-    <label className="flex w-full max-w-[280px] items-center gap-2 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2.5 py-1.5">
-      <Icon name="search" size={15} />
+    <div className="flex h-8 w-[178px] min-w-0 items-center rounded-[6px] border border-[var(--line)] bg-[var(--panel)] pl-2.5 text-[var(--text-2)] focus-within:border-[var(--accent)]">
       <input type="search" value={draft} aria-label="搜索 TA 的投稿" placeholder="搜索 TA 的投稿"
-        className="min-w-0 flex-1 bg-transparent text-sm outline-none" onChange={e => setDraft(e.target.value)} />
-    </label>
-    <button type="submit" className="t press px-2 text-sm text-[var(--accent)]">搜索</button>
-    {view.videoQuery && <button type="button" className="t press px-2 text-sm" onClick={() => submit('')}>全部投稿</button>}
+        className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-1)] outline-none" onChange={e => setDraft(e.target.value)} />
+      <button type="submit" aria-label="搜索" title="搜索" className="t press grid h-full w-8 shrink-0 place-items-center hover:text-[var(--accent)]">
+        <Icon name="search" size={15} />
+      </button>
+    </div>
+    {view.videoQuery && <button type="button" className="t press shrink-0 text-[13px] text-[var(--accent-strong)]" onClick={() => submit('')}>全部投稿</button>}
   </form>
 }
 

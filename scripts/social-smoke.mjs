@@ -152,17 +152,36 @@ export async function checkSocialPages(page, web, wait, check) {
   await newPage('loggedIn=1&spaceShowcase=1&failSpaceProfileOnce=1')
   await openSpace()
   await wait(element('[data-space-banner]'))
-  const hero = element('[data-author-hero]')
-  await wait(`${hero}?.textContent.includes('置顶投稿')`)
-  check('作者设置的头图与置顶投稿出现在个人空间', true)
+  const firstCard = element('#scroll-main [data-track-card]')
+  const pinned = element('#scroll-main [data-track-card][data-space-pinned]')
+  await wait(`${pinned}?.innerText.includes('置顶投稿')`)
+  const pinKey = await page.evaluate(`${pinned}.dataset.key`)
+  const pinTitle = await page.evaluate(`${pinned}.dataset.trackTitle`)
+  const pinOnlyOnce = `${firstCard} === ${pinned} && ${pinned}?.dataset.key === ${JSON.stringify(pinKey)} && Array.from(document.querySelectorAll('#scroll-main [data-track-card]'))
+    .filter(card => card.dataset.key === ${JSON.stringify(pinKey)}).length === 1`
+  await wait("document.querySelectorAll('#scroll-main [data-track-card]').length > 1")
+  check('作者的置顶在网格第一格，投稿列表没有重复收录', await page.evaluate(pinOnlyOnce))
+  await byName('#scroll-main', '最多收藏')
+  await wait(`(${buttons('#scroll-main', '最多收藏')}).getAttribute('aria-pressed') === 'true'`)
+  check('切换投稿排序后首格仍是同一个置顶视频', await page.evaluate(pinOnlyOnce))
+  await click(`${pinned}.querySelector('button[aria-label^=观看]')`)
+  await wait(`document.querySelector('.watch-head h1')?.textContent === ${JSON.stringify(pinTitle)}`)
+  await click(element('button[aria-label="返回"]'))
+  await wait(pinOnlyOnce)
+  check('点开置顶能看对应视频，返回后仍在同一空间', true)
   const banner = element('[data-space-banner]')
   await wait(`${banner}.currentSrc.endsWith('precious-editing-desk.webp') && ${banner}.naturalWidth > 0`)
-  await wait(element('[data-space-notice]'))
-  check('页首展示公开公告、轮播间、挂件和有效会员标识', await page.evaluate(`!!document.querySelector('[aria-label="打开直播间：剪辑室"]') &&
-    !!document.querySelector('[alt="箱庭少女之梦头像"]') && !!document.querySelector('[alt="十年大会员"]') && !!document.querySelector('[title="见习偶像"]')`))
+  const notice = element('[data-space-notice]')
+  const room = element('[aria-label="打开直播间：剪辑室"]')
+  await wait(`${notice}?.getClientRects().length && ${room}?.getClientRects().length`)
+  check('宽窗投稿在左、公告与直播间在右，作者佩戴的标识可见', await page.evaluate(`
+    ${notice}.getBoundingClientRect().left >= ${firstCard}.parentElement.getBoundingClientRect().right &&
+    ${room}.getBoundingClientRect().left >= ${firstCard}.parentElement.getBoundingClientRect().right &&
+    !!document.querySelector('[alt="箱庭少女之梦头像"]') && !!document.querySelector('[alt="十年大会员"]') &&
+    !!document.querySelector('[title="见习偶像"]')`))
   await byName('#scroll-main', '空间资料')
   await wait(buttons('#scroll-main', '重新加载空间资料'))
-  check('扩展资料取不到时仍可看公告、置顶投稿及 B 站空间', await page.evaluate(`!!${hero} && !!${element('[data-space-notice]')} && !!(${buttons('#scroll-main', '去 B 站空间查看勋章')})`))
+  check('扩展资料取不到时仍可看公告、置顶投稿及 B 站空间', await page.evaluate(`!!${pinned} && !!${notice} && !!(${buttons('#scroll-main', '去 B 站空间查看勋章')})`))
   await byName('#scroll-main', '粉丝勋章墙')
   await wait(`document.querySelector('ul[aria-label="粉丝勋章"]')?.textContent.includes('同行 18')`)
   check('整面勋章墙可以单独查看，扩展资料失败也能打开', true)
@@ -172,9 +191,16 @@ export async function checkSocialPages(page, web, wait, check) {
     document.querySelector('[title="佩戴的粉丝勋章"]').textContent.includes('剪辑 18')`))
   await page.viewport(390, 844)
   await wait(`${banner}.currentSrc.endsWith('cover-fallback.jpg') && ${banner}.naturalWidth > 0`)
-  check('窄窗使用独立小头图，资料没有撑宽窗口', await page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
-  await page.viewport(1320, 900)
+  check('窄窗展开资料可以读公告、看直播间，且没有横向溢出', await page.evaluate(`
+    ${notice}.getClientRects().length && ${room}.getClientRects().length && document.documentElement.scrollWidth <= innerWidth`))
   await byName('#scroll-main', '空间资料')
+  await page.evaluate("document.getElementById('scroll-main').scrollTop = 0")
+  check('窄窗收起资料后，首屏能看到置顶封面和标题', await page.evaluate(`
+    !${notice}?.getClientRects().length && !${room}?.getClientRects().length &&
+    ${pinned}.getBoundingClientRect().top >= document.getElementById('scroll-main').getBoundingClientRect().top &&
+    ${pinned}.querySelector('h3').getBoundingClientRect().bottom <= document.getElementById('scroll-main').getBoundingClientRect().bottom`))
+  await page.viewport(1320, 900)
+  await wait(`${notice}?.getClientRects().length && ${room}?.getClientRects().length`)
   const missing = createServer((_, res) => { res.writeHead(404); res.end() })
   await new Promise(resolve => missing.listen(0, '127.0.0.1', resolve))
   try {
@@ -251,7 +277,8 @@ export async function checkSocialPages(page, web, wait, check) {
   await openSpace()
   await wait(buttons('#scroll-main', '发消息'))
   const author = await page.evaluate("document.querySelector('#scroll-main h2')?.textContent.trim()")
-  check('没有投稿的账号仍显示资料和发消息入口', !!author && !await page.evaluate(hero))
+  await wait("document.getElementById('scroll-main')?.innerText.includes('这个 UP 主还没有公开投稿')")
+  check('没有投稿的账号仍显示资料和发消息入口', !!author && !await page.evaluate(firstCard))
   await byName('#scroll-main', '发消息')
   await wait(`${field}?.getAttribute('aria-label')?.includes(${JSON.stringify(author)})`)
   check('从个人空间发消息直接进入该用户的站内对话', true)
