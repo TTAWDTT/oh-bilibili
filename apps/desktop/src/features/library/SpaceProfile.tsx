@@ -92,7 +92,7 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
           : !details && <p role="status" className="text-[var(--text-3)]">正在读取空间资料…</p>}
         {notice.failed && <button type="button" className={link} onClick={notice.retry}>重新加载公告</button>}
         {room.failed && <button type="button" className={link} onClick={room.retry}>重新加载直播间</button>}
-        <div><button type="button" className={link} onClick={() => open(`https://space.bilibili.com/${mid}`)}>在 B 站打开空间<Icon name="external" size={12} /></button></div>
+        <div><button type="button" className={link} onClick={() => open(`https://space.bilibili.com/${mid}`)}>去 B 站空间查看勋章<Icon name="external" size={12} /></button></div>
       </section>}
     </div>
   )
