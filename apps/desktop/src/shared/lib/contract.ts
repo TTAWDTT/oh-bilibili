@@ -20,6 +20,7 @@ export type PlayerPhase = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 
 export type RepeatMode = 'off' | 'all' | 'one'
 
 export type PlayerSnapshot = {
+  page?: PageRef | null
   phase: PlayerPhase
   track: Track | null
   local: boolean

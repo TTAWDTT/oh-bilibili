@@ -138,6 +138,7 @@ function CurrentView({ view }: { view: View }) {
           track={view.track}
           {...(view.page !== undefined ? { page: view.page } : {})}
           {...(view.atMs !== undefined ? { atMs: view.atMs } : {})}
+          {...(view.audioPaused !== undefined ? { audioPaused: view.audioPaused } : {})}
         />
       )
     case 'watchLater':
@@ -175,7 +176,7 @@ function FocusRestore() {
     const focus = useAppStore.getState().returnFocus
     if (!focus) return
     // 历史页自己按行恢复焦点（空态、删除相邻行都归它管），这里不插手。
-    if (focus.kind === 'history') return
+    if (focus.kind === 'history' && focus.id !== 'player-stage') return
     let stopped = false
     let tries = 0
     let timer: number | null = null

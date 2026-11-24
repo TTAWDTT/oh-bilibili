@@ -24,7 +24,8 @@ export function DanmakuField({
   opacity,
   size,
   speed,
-  area,
+  area = 1,
+  singleLine = false,
   fade = false,
   mergeSame = false,
   playbackRate = 1,
@@ -38,7 +39,8 @@ export function DanmakuField({
   size: number
   speed: number
   /** 弹幕只铺画面的这个比例：0.25 / 0.5 / 1。 */
-  area: number
+  area?: number
+  singleLine?: boolean
   /** 画面模式下降低不透明度，别挡画面。 */
   fade?: boolean
   /** 同一时段完全相同的滚动弹幕合成一条并累计条数。 */
@@ -59,9 +61,12 @@ export function DanmakuField({
     return () => ro.disconnect()
   }, [])
 
-  const lanes = Math.max(1, Math.round(LANES * area))
+  const lanes = singleLine ? 1 : Math.max(1, Math.round(LANES * area))
   const life = LIFE_MS / speed
-  const schedule = useMemo(() => scheduleDanmaku(items, mergeSame, lanes, life), [items, mergeSame, lanes, life])
+  const schedule = useMemo(
+    () => scheduleDanmaku(items, mergeSame, lanes, life, singleLine),
+    [items, mergeSame, lanes, life, singleLine],
+  )
   const [frame, setFrame] = useState({ now: 0, epoch: 0 })
   useEffect(() => {
     if (!enabled) return
@@ -84,10 +89,10 @@ export function DanmakuField({
   return (
     <div
       ref={boxRef}
-      className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+      className={`pointer-events-none absolute inset-x-0 z-10 overflow-hidden ${singleLine ? 'top-1/2 -translate-y-1/2' : 'inset-y-0'}`}
       aria-hidden
       /* 把容器宽度交给 CSS：关键帧里用 -100% - 这个值，正好跑到左边缘外。 */
-      style={{ ['--dm-travel' as string]: `${boxWidth}px` }}
+      style={{ ['--dm-travel' as string]: `${boxWidth}px`, height: singleLine ? size * 1.75 : undefined }}
     >
       {enabled
         ? flights

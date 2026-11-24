@@ -19,7 +19,7 @@ export type View =
   | { kind: 'downloads' | 'history' | 'favs' }
   | { kind: 'author'; name: string; mid?: number | null }
   /** `page`/`atMs` 用于从弹幕引文直接落到那一分 P 的那一刻。 */
-  | { kind: 'watch'; track: Track; page?: number; atMs?: number }
+  | { kind: 'watch'; track: Track; page?: number; atMs?: number; audioPaused?: boolean }
   | { kind: 'watchLater' }
   | { kind: 'following' }
   /** 搜索结果作为一页放进正文；顶栏输入框仍是唯一的入口。 */

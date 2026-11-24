@@ -1,4 +1,4 @@
-export type DanmakuItem = { at: number; text: string; color: string; mode: number }
+export type DanmakuItem = { at: number; text: string; color: string; mode: number; own?: boolean }
 
 export type Flight = DanmakuItem & {
   id: number
@@ -11,22 +11,31 @@ const MERGE_WINDOW_MS = 2000
 export const PINNED_MS = 4000
 
 /** 先按源记录分组，再分配车道。某条未能上屏，不会改变后续同句的两秒窗口。 */
-export function scheduleDanmaku(items: DanmakuItem[], merge: boolean, lanes: number, life: number): Flight[] {
+export function scheduleDanmaku(items: DanmakuItem[], merge: boolean, lanes: number, life: number, singleLine = false): Flight[] {
   const entries: Flight[] = []
   const groups = new Map<string, Flight>()
   const freeAt = new Array<number>(lanes).fill(-Infinity)
   for (const [id, item] of [...items].sort((a, b) => a.at - b.at).entries()) {
     const key = merge && item.mode === 1 ? `${item.color}\u0000${item.text}` : null
     const group = key === null ? undefined : groups.get(key)
-    if (group && item.at < group.at + MERGE_WINDOW_MS) {
+    if (group && !item.own && item.at < group.at + MERGE_WINDOW_MS) {
       group.repeats.push(item.at)
       continue
     }
     const pinned = item.mode === 4 || item.mode === 5
+    if (singleLine && item.own && item.at < freeAt[0]!) {
+      entries[entries.length - 1]!.until = item.at
+      freeAt[0] = item.at
+    }
     const lane = pinned ? -1 : freeAt.findIndex((at) => at <= item.at)
     const flight = { ...item, id, lane, until: item.at + (pinned ? PINNED_MS : life), repeats: [] as number[] }
     if (key !== null) groups.set(key, flight)
-    if (lane >= 0) freeAt[lane] = item.at + life * 0.16
+    if (singleLine) {
+      if (item.at < freeAt[0]!) continue
+      freeAt[0] = flight.until
+    } else if (lane >= 0) {
+      freeAt[lane] = item.at + life * 0.16
+    }
     if (pinned || lane >= 0) entries.push(flight)
   }
   return entries

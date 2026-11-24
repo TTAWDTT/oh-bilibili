@@ -651,6 +651,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
     case 'set_mode': {
+      const previous = snapshot()
       state.mode = str(args, 'mode') === 'watch' ? 'watch' : 'listen'
       // 「听视频」切到听模式时会带上当前曲目与位置：真实引擎从这里接着放，
       // 预览也要接上，否则回到列表就变成「还没有在播放」。
@@ -659,11 +660,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (key && state.mode === 'listen') {
         const track = findTrack(key)
         if (track) {
-          state.keys = [key]
-          state.index = 0
-          state.duration = track.duration_ms ?? 30_000
+          if (!state.keys.includes(key)) state.keys.push(key)
+          state.index = state.keys.indexOf(key)
+          state.localKey = null
+          state.duration = state.watchPage?.key === key ? state.watchPage.page.duration_ms : track.duration_ms ?? 30_000
           state.position = Number.isFinite(at) ? at : 0
-          state.phase = 'playing'
+          state.phase = previous.track?.key === key && previous.phase === 'paused' ? 'paused' : 'playing'
         }
       }
       // 真实引擎切模式后会推一条 state 事件；界面靠它更新底部播放条与右栏。
@@ -1002,14 +1004,18 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
       const commentJumps = import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
-      const pageDuration = commentJumps ? 300_000 : track.duration_ms ?? 30_000
-      // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
-      setDuration(pageDuration)
       const pages = previewPages(track)
       const requestedPage = Number(args.page ?? 1) || 1
       if (commentJumps && requestedPage === 2) await sleep(600)
       if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused } })
-      const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
+      const part = pages.find((entry) => entry.no === requestedPage) ?? pages[0]!
+      const currentPage = part.no
+      state.watchPage = { key: track.key, page: part }
+      setDuration(part.duration_ms)
+      if (args.continue_audio) {
+        state.mode = 'watch'
+        emit({ type: 'state', snapshot: snapshot() })
+      }
       return {
         key: track.key,
         desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD 下面的文字用来验证简介超过两行时的展开与收起，以及窄屏下的排版是否会把按钮挤掉。展开之后应该能看到这一段完整的介绍，收起时恢复到两行，按钮本身不遮挡下面的标签。\n原舞参考：BV1Mk4y11666\n伴奏下载：https://example.com/inst',

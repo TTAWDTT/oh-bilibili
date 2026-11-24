@@ -114,8 +114,10 @@ export function WatchView({
   track,
   page: startPage,
   atMs,
+  audioPaused,
 }: {
   track: Track
+  audioPaused?: boolean
   /** 从弹幕引文进来时直接落在这一分 P。 */
   page?: number
   /** 同一次跳转还要落到这条弹幕的时刻。 */
@@ -164,7 +166,11 @@ export function WatchView({
     pageTriggerRef.current?.focus()
   }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
-  const [pendingResume, setPendingResume] = useState({ at: atMs ?? storedPagePos, paused: false, comment: false })
+  const [pendingResume, setPendingResume] = useState({
+    at: atMs ?? storedPagePos,
+    paused: audioPaused ?? false,
+    source: audioPaused === undefined ? 'history' : 'audio',
+  })
   const pageLoading = useRef(false)
   const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
@@ -200,7 +206,7 @@ export function WatchView({
     setResume(at !== null ? { key: track.key, at } : null)
     setSeekSignal(null)
     pageLoading.current = true
-    setPendingResume({ at, paused: commentPaused ?? false, comment: commentPaused !== undefined })
+    setPendingResume({ at, paused: commentPaused ?? false, source: commentPaused === undefined ? 'history' : 'comment' })
     setPage(no)
     saveWatchPage(track.key, no)
   }
@@ -288,14 +294,6 @@ export function WatchView({
       cancelled = true
     }
   }, [track.key, data])
-
-  // 离开观看页就收声音。引擎感知不到页面切换，之前退出后声音会一直放，
-  // 而那时连播放条都不显示，用户没有任何地方能把它停掉。
-  useEffect(() => {
-    return () => {
-      void ipc.playerPause().catch(() => {})
-    }
-  }, [])
 
   useEffect(() => {
     setLikeDelta(0)
@@ -611,6 +609,7 @@ export function WatchView({
       try {
         const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, {
           paused: pendingResume.paused,
+          continueAudio: pendingResume.source === 'audio',
           preserveListenQueue: currentWatchSession(track.key) !== null
             || useAppStore.getState().history.at(-1)?.view.kind === 'watchLater',
         })
@@ -621,7 +620,7 @@ export function WatchView({
             const fallback = next.current_page
             const at = loadPagePos(track.key, fallback)
             setPage(fallback)
-            setPendingResume({ at, paused: pendingResume.paused, comment: false })
+            setPendingResume({ at, paused: pendingResume.paused, source: 'history' })
             setResume(at ? { key: track.key, at } : null)
             saveWatchPage(track.key, fallback)
           }
@@ -829,7 +828,7 @@ export function WatchView({
                 currentPage={currentPageNo}
                 onPage={changePage}
                 resumeAt={pageLoading.current || resume?.key !== track.key ? null : resume.at}
-                commentSeek={pendingResume.comment}
+                commentSeek={pendingResume.source !== 'history'}
                 chapters={chapters}
               />
             </div>

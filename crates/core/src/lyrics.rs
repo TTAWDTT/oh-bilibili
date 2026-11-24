@@ -100,6 +100,7 @@ fn parse_stamp(tag: &str) -> Option<u64> {
 
 #[derive(Deserialize)]
 struct LrclibHit {
+    duration: f64,
     #[serde(default)]
     #[serde(rename = "syncedLyrics")]
     synced_lyrics: Option<String>,
@@ -191,6 +192,7 @@ pub async fn from_lrclib(http: &reqwest::Client, track: &Track) -> Option<LyricD
     //
     // 折中：等第一个结果之后再多给 250ms，让优先级更高的候选有机会追上；
     // 超过这个窗口就用当前最优的那条。实测健康网络下整体仍在 500~800ms。
+    let duration = track.duration.filter(|duration| duration.0 > 0);
     let keywords = lyric_queries(&track.title);
     if keywords.is_empty() {
         return None;
@@ -200,10 +202,8 @@ pub async fn from_lrclib(http: &reqwest::Client, track: &Track) -> Option<LyricD
         let client = http.clone();
         let tx = tx.clone();
         tokio::spawn(async move {
-            if let Some(hit) = query_lrclib(&client, &keyword).await {
-                if let Some(doc) = hit_to_doc(hit) {
-                    let _ = tx.send((priority, doc)).await;
-                }
+            if let Some(doc) = query_lrclib(&client, &keyword, duration).await {
+                let _ = tx.send((priority, doc)).await;
             }
         });
     }
@@ -241,7 +241,7 @@ pub async fn from_lrclib(http: &reqwest::Client, track: &Track) -> Option<LyricD
 
 /// 一条查询 + 2 秒超时。健康的 lrclib 200~600ms 就回；
 /// 被限流时要早放手，别把整首歌的等待拖长。
-async fn query_lrclib(http: &reqwest::Client, keyword: &str) -> Option<LrclibHit> {
+async fn query_lrclib(http: &reqwest::Client, keyword: &str, duration: Option<Millis>) -> Option<LyricDoc> {
     let client = http.clone();
     let url = format!("https://lrclib.net/api/search?q={}", urlencode(keyword));
     let fut = async move {
@@ -254,12 +254,28 @@ async fn query_lrclib(http: &reqwest::Client, keyword: &str) -> Option<LrclibHit
             .error_for_status()
             .ok()?;
         let list: Vec<LrclibHit> = resp.json().await.ok()?;
-        list.into_iter().find(|h| h.synced_lyrics.is_some())
+        recording_lyrics(list, duration)
     };
     tokio::time::timeout(std::time::Duration::from_millis(2000), fut)
         .await
         .ok()
         .flatten()
+}
+
+fn recording_lyrics(mut hits: Vec<LrclibHit>, duration: Option<Millis>) -> Option<LyricDoc> {
+    if let Some(duration) = duration {
+        let offset = |hit: &LrclibHit| (hit.duration - duration.as_secs()).abs();
+        hits.retain(|hit| offset(hit) <= 2.0);
+        hits.sort_by(|first, second| offset(first).total_cmp(&offset(second)));
+    }
+    let mut plain = None;
+    for doc in hits.into_iter().filter_map(hit_to_doc) {
+        if doc.synced {
+            return Some(doc);
+        }
+        plain.get_or_insert(doc);
+    }
+    plain
 }
 
 /// 命中结果转成歌词文档。
@@ -312,6 +328,19 @@ fn urlencode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lrclib_uses_the_playing_recordings_duration() {
+        let hits = || serde_json::from_value(serde_json::json!([
+            { "duration": 244.0, "syncedLyrics": "[00:01.00]vocal" },
+            { "duration": 270.306667, "syncedLyrics": "[00:02.00]band" }
+        ])).unwrap();
+
+        assert!(recording_lyrics(hits(), Some(Millis(295_000))).is_none());
+        let band = recording_lyrics(hits(), Some(Millis(271_000))).unwrap();
+        assert_eq!(band.lines[0].text, "band");
+        assert!(band.synced);
+    }
 
     #[test]
     fn 解析带毫秒的_lrc() {

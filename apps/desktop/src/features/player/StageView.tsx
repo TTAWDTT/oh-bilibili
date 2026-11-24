@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import { useSmoothIndex } from '../../shared/lib/useSmoothIndex'
+import { readPlayhead } from '../../shared/lib/playhead'
 import { useSwipe } from '../../shared/lib/useSwipe'
 import type { Track } from '../../shared/lib/contract'
 import type { LyricDoc } from '../../shared/lib/contract'
@@ -13,7 +14,7 @@ import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
 import { VideoInfo } from './VideoInfo'
 import { PlaybackProgress } from './PlaybackProgress'
-import { usePlayerStore } from './playerStore'
+import { playbackSubtitle, usePlayerStore } from './playerStore'
 import { thumbWide } from '../../shared/lib/thumb'
 import { StageLyrics } from './StageLyrics'
 import { useStageCoverMorph } from './stageCoverMorph'
@@ -49,6 +50,8 @@ export function StageView() {
   const vinylRef = useRef<HTMLDivElement | null>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const track = snapshot?.track ?? null
+  const cid = snapshot?.page?.cid
+  const trackKey = track?.key
   const local = snapshot?.local ?? false
   const exitStage = useCallback(() => setStage(false), [setStage])
   const { requestClose, closeNow } = useStageCoverMorph({
@@ -60,13 +63,13 @@ export function StageView() {
   })
 
   useEffect(() => {
-    if (!open || !track) return
+    if (!open || !trackKey) return
     let cancelled = false
     setDoc(null)
     setLyricsLoading(true)
     setLyricsFailed(null)
     void ipc
-      .lyricsGet(track.key)
+      .lyricsGet(trackKey)
       .then((d) => {
         if (!cancelled) {
           setDoc(d)
@@ -83,7 +86,7 @@ export function StageView() {
     return () => {
       cancelled = true
     }
-  }, [open, track, lyricsAttempt])
+  }, [open, trackKey, cid, lyricsAttempt])
 
   // 相关推荐只在舞台打开时拉，关掉就不再请求。
   useEffect(() => {
@@ -147,6 +150,7 @@ export function StageView() {
 
   if (!open || !track) return null
 
+  const subtitle = playbackSubtitle(track, snapshot?.page)
   const lines = doc?.lines ?? []
   // 用平滑索引：只在「换行」时重渲染，而不是每秒 5 次
   const active = activeLine
@@ -190,24 +194,25 @@ export function StageView() {
       ) : null}
       {/* 白纱必须渐变：整层纯色会把模糊封面完全盖掉，舞台就退化成一张白纸 */}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.52),rgba(255,255,255,0.78)_58%,rgba(255,255,255,0.94))]" />
-      {local ? null : (
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <DanmakuLayer trackKey={track.key} fade />
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={requestClose}
-        aria-label="退出舞台"
-        /* 舞台铺满整窗，左上角是系统红绿灯：按钮要落在它们右侧，不能压上去 */
-        className="t press absolute left-24 top-3 z-20 flex h-8 items-center gap-1 rounded-full bg-[var(--panel)]/85 pl-2 pr-3.5 text-[13px] text-[var(--text-2)] shadow-[0_2px_10px_rgba(0,0,0,0.08)] backdrop-blur hover:text-[var(--text-1)]"
-      >
-        <Icon name="chevronLeft" size={16} />
-        退出
-      </button>
-
-      {local ? null : <DanmakuPanel />}
+      <div className="absolute left-24 right-4 top-2 z-20 flex h-8 items-center gap-3">
+        <button
+          type="button"
+          onClick={requestClose}
+          aria-label="退出舞台"
+          className="t press flex h-8 shrink-0 items-center gap-1 rounded-full bg-[var(--panel)]/85 pl-2 pr-3.5 text-[13px] text-[var(--text-2)] shadow-[0_2px_10px_rgba(0,0,0,0.08)] backdrop-blur hover:text-[var(--text-1)]"
+        >
+          <Icon name="chevronLeft" size={16} />
+          退出
+        </button>
+        {!local && (
+          <>
+            <div className="relative min-w-0 flex-1 overflow-hidden self-stretch">
+              <DanmakuLayer trackKey={track.key} page={snapshot?.page ?? null} />
+            </div>
+            <DanmakuPanel />
+          </>
+        )}
+      </div>
 
       <div className="stage-content relative z-10 flex min-h-0 w-full max-w-[1180px] flex-1 flex-col px-4 pb-4 pt-16 md:px-8">
         <div className="grid min-h-0 flex-1 content-start items-start gap-5 lg:content-center lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
@@ -234,29 +239,48 @@ export function StageView() {
             >
               {track.title}
             </h2>
-            <p className="mt-1 max-w-full truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
-              {track.artist}
+            <p className="mt-1 max-w-full truncate text-[14px] text-[var(--text-2)]" title={subtitle}>
+              {subtitle}
             </p>
 
             {local ? null : (
-              <div className="stage-extra mt-3 hidden w-full max-w-[360px] justify-center lg:flex">
-                <DanmakuComposer trackKey={track.key} />
-              </div>
-            )}
-            {related.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setRelatedOpen((current) => !current)}
-                aria-expanded={relatedOpen}
-                className="t press mt-3 rounded-full border border-[var(--line)] bg-[var(--panel)]/70 px-3 py-1 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)]"
-              >
-                相关推荐
-              </button>
-            ) : null}
-            {local ? null : (
-              <div className="stage-extra hidden w-full lg:block">
-                <VideoInfo trackKey={track.key} />
-              </div>
+              <>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeNow()
+                      navigate({
+                        kind: 'watch',
+                        track,
+                        page: snapshot?.page?.no ?? 1,
+                        atMs: Math.round(readPlayhead()),
+                        audioPaused: snapshot?.phase === 'paused',
+                      }, undefined, 'player-stage')
+                    }}
+                    className="t press inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--panel)]/85 px-3 text-[13px] text-[var(--text-1)] hover:text-[var(--accent-strong)]"
+                  >
+                    <Icon name="biliTv" size={15} />
+                    看视频
+                  </button>
+                  {related.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setRelatedOpen((current) => !current)}
+                      aria-expanded={relatedOpen}
+                      className="t press h-8 rounded-full border border-[var(--line)] bg-[var(--panel)]/70 px-3 text-[13px] text-[var(--text-2)] hover:text-[var(--accent-strong)]"
+                    >
+                      相关推荐
+                    </button>
+                  )}
+                </div>
+                <div className="stage-extra mt-3 hidden w-full max-w-[360px] justify-center lg:flex">
+                  <DanmakuComposer trackKey={track.key} page={snapshot?.page ?? null} />
+                </div>
+                <div className="stage-extra hidden w-full lg:block">
+                  <VideoInfo trackKey={track.key} />
+                </div>
+              </>
             )}
           </div>
 
@@ -269,7 +293,7 @@ export function StageView() {
                 loading={lyricsLoading}
                 failed={lyricsFailed}
                 source={doc?.source ?? ''}
-                trackKey={track.key}
+                trackKey={`${track.key}:${cid ?? 0}`}
                 onSeek={(at) => void usePlayerStore.getState().seek(at)}
                 onRetry={() => setLyricsAttempt((current) => current + 1)}
               />

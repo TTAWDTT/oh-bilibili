@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use bilimusic_audio::{probe_audio, AudioError, Media, Player};
 use bilimusic_bili::media::RemoteMedia;
-use bilimusic_bili::Source;
+use bilimusic_bili::{PageRef, Source};
 use bilimusic_model::{Millis, Quality, SearchQuery, Track, TrackKey};
 use bilimusic_store::{Library, Reaction, ReactionKind, ReactionState, StoredDownload};
 
@@ -906,6 +906,45 @@ mod queue_restore_tests {
         }
     }
 
+    #[test]
+    fn 重启后续播队列的原分集() {
+        use super::{lock, PageRef};
+
+        let song = track("BV1Tb4y1a7sZ");
+        let saved = SavedQueue::new(std::slice::from_ref(&song));
+        let p2 = PageRef {
+            no: 2,
+            cid: 22,
+            title: "镜音双子版".into(),
+            duration_ms: 192_000,
+        };
+        let restart = || {
+            let engine = Engine::open(&saved.db()).unwrap();
+            engine.restore_queue();
+            engine
+        };
+        let engine = restart();
+        assert_eq!(engine.snapshot().page, None);
+        assert_eq!(engine.snapshot().position_ms, 65_000);
+        *lock(&engine.page) = Some((song.key.clone(), p2.clone()));
+        engine.seek(30_000);
+        drop(engine);
+
+        let restarted = restart();
+        let snapshot = restarted.snapshot();
+        assert_eq!(snapshot.page.as_ref(), Some(&p2));
+        assert_eq!(snapshot.position_ms, 30_000);
+        assert_eq!(snapshot.duration_ms, 192_000);
+        restarted.preserve_queue_bookmark();
+        *lock(&restarted.page) = None;
+        restarted.persist_queue();
+        drop(restarted);
+
+        let after_temporary_watch = restart().snapshot();
+        assert_eq!(after_temporary_watch.page, Some(p2));
+        assert_eq!(after_temporary_watch.position_ms, 30_000);
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "真实网络与声卡"]
     async fn 临时观看后继续听原分集() {
@@ -944,18 +983,34 @@ mod queue_restore_tests {
             .unwrap();
         engine.close_watch(Some(&x));
 
+        let before = engine.snapshot();
+        let audio_load = lock(&engine.state).token();
+        let reopened = engine.open_watch_page_with_options(
+            &x, origin, Some(2), Some(before.position_ms),
+            WatchOptions { continue_audio: true, paused: true, ..Default::default() },
+        ).await.unwrap();
+        let after = engine.snapshot();
+        assert_eq!(reopened.current_page, 2);
+        assert_eq!(after.page.as_ref(), Some(p2));
+        assert_eq!(after.duration_ms, p2.duration_ms);
+        assert_eq!(after.position_ms, before.position_ms);
+        assert_eq!(after.phase, "paused");
+        assert_eq!(lock(&engine.state).token(), audio_load);
+        engine.set_mode(PlayMode::Listen, None, Some(&x)).await.unwrap();
+        engine.close_watch(Some(&x));
+
         let temporary = engine
             .open_watch_page_with_options(
                 &y,
                 origin,
                 None,
                 Some(10_000),
-                WatchOptions { paused: true, preserve_listen_queue: true },
+                WatchOptions { paused: true, preserve_listen_queue: true, ..Default::default() },
             )
             .await
             .unwrap();
         wait_for_phase("paused").await;
-        assert_eq!(lock(&engine.watch_cid).as_ref().unwrap().1, temporary.pages[0].cid);
+        assert_eq!(engine.active_page(&y).unwrap(), temporary.pages[0]);
         let restored = engine.close_watch(Some(&y));
         assert_eq!(restored.track.unwrap().key, x);
         assert_eq!(restored.position_ms, 193_000);
@@ -965,7 +1020,7 @@ mod queue_restore_tests {
         let resumed = engine.pause();
         assert_eq!(resumed.track.unwrap().key, x);
         assert!((193_000..=196_000).contains(&resumed.position_ms));
-        assert_eq!(*lock(&engine.watch_cid), Some((x.as_opaque().into(), p2.cid)));
+        assert_eq!(engine.active_page(&x).as_ref(), Some(p2));
         println!(
             "X P1={} P2={} / Y={} / 恢复位置={}ms",
             view.pages[0].cid, p2.cid, temporary.pages[0].cid, resumed.position_ms
@@ -1213,11 +1268,12 @@ mod queue_restore_tests {
 pub struct WatchOptions {
     pub paused: bool,
     pub preserve_listen_queue: bool,
+    pub continue_audio: bool,
 }
 
 struct QueueBookmark {
     current: Option<(TrackKey, u64)>,
-    watch_cid: Option<(String, u64)>,
+    page: Option<(TrackKey, PageRef)>,
 }
 
 pub struct Engine {
@@ -1230,7 +1286,7 @@ pub struct Engine {
     state: Mutex<PlayerState>,
     local_track: Mutex<Option<TrackKey>>,
     known: Mutex<HashMap<String, Track>>,
-    lyrics_cache: Mutex<HashMap<String, LyricDoc>>,
+    lyrics_cache: Mutex<HashMap<(TrackKey, Option<u64>), LyricDoc>>,
     token: AtomicU64,
     /// 已经取到、但还没等到声卡首批样本的这一次加载。
     /// 音轨就绪前状态保持 loading，看门狗看到 `is_started()` 后才迁到 playing。
@@ -1241,7 +1297,7 @@ pub struct Engine {
     listen_bookmark: Mutex<Option<QueueBookmark>>,
     /// 看模式下当前 P 的 cid。`detail.cid` 永远是第一 P，多 P 视频取音轨
     /// 必须换成用户正在看的那一 P，否则每一集放的都是 P1 的声音。
-    watch_cid: Mutex<Option<(String, u64)>>,
+    page: Mutex<Option<(TrackKey, PageRef)>>,
     repeat: Mutex<String>,
     events: tokio::sync::broadcast::Sender<AppEvent>,
     http: reqwest::Client,
@@ -1298,7 +1354,7 @@ impl Engine {
             speed: Mutex::new(1.0),
             pending_resume: Mutex::new(None),
             listen_bookmark: Mutex::new(None),
-            watch_cid: Mutex::new(None),
+            page: Mutex::new(None),
             repeat: Mutex::new("off".into()),
             events,
             http: reqwest::Client::new(),
@@ -1536,9 +1592,9 @@ impl Engine {
                 let resume = self.pending_resume_for(key).unwrap_or(0);
                 // 夹到曲目时长以内：快照是外部输入，旧版本写坏过的位置（实测存过
                 // 42:02 而歌只有 2:17）不该把播放器 seek 到不存在的地方。
-                let bounded = match (watch_duration, track.duration) {
+                let bounded = match (watch_duration, prepared.duration) {
                     (Some(d), _) if d.0 > 0 => resume.min(d.0),
-                    (_, Some(d)) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
+                    (_, d) if d.0 > 0 => resume.min(d.0.saturating_sub(1000)),
                     _ => resume,
                 };
                 if bounded > 0 {
@@ -1635,7 +1691,7 @@ impl Engine {
         }
         self.watch_gate.cancel();
         *lock(&self.mode) = crate::wire::PlayMode::Listen;
-        *lock(&self.watch_cid) = None;
+        *lock(&self.page) = None;
         let token = self.begin_load(&track, true);
         if let Err(err) = self.load_media(Media::new(file), true) {
             let mut st = lock(&self.state);
@@ -1756,26 +1812,25 @@ impl Engine {
             .or(detail.track.duration)
             .unwrap_or(Millis(0));
         let page_no = current.map(|p| p.no).unwrap_or(1);
-        *lock(&self.watch_cid) = current.map(|p| (key.as_opaque().to_string(), p.cid));
+        let continuing = options.continue_audio
+            && self.active_page(key).map(|p| p.cid) == page_cid
+            && {
+                let state = lock(&self.state);
+                state.track() == Some(key) && matches!(state.phase(), "loading" | "playing" | "paused")
+            };
+        *lock(&self.page) = current.map(|p| (key.clone(), p.clone()));
         // 观看页首次打开时把历史进度交给 play_key，让音频在 load 完成后直接
         // 从上次位置起播。前端再 seek 一次时，视频和声音已经在同一个点上，
         // 不会出现「进度条先跳过去、音频还在 0」的竞态。
-        let at = resume_at_ms.unwrap_or_else(|| {
-            if page.is_none() {
-                self.library
-                    .history_position(key.as_opaque())
-                    .ok()
-                    .flatten()
-                    .unwrap_or(0)
-            } else {
-                0
-            }
-        });
-        *lock(&self.pending_resume) = Some((key.clone(), at));
-        // 打开观看页就要有声音。引擎是唯一的发声者，这里顺手把它挂上：
-        // 前端不需要再补一次「开始播放」，也就不会因为调用失败而静音。
-        // 起播要等拉流，放后台跑，页面先出来。
-        {
+        if !continuing {
+            let at = resume_at_ms.unwrap_or_else(|| {
+                if page.is_none() {
+                    self.library.history_position(key.as_opaque()).ok().flatten().unwrap_or(0)
+                } else {
+                    0
+                }
+            });
+            *lock(&self.pending_resume) = Some((key.clone(), at));
             let engine = Arc::clone(self);
             let track = detail.track.clone();
             tokio::spawn(async move {
@@ -1850,7 +1905,7 @@ impl Engine {
             });
             QueueBookmark {
                 current,
-                watch_cid: lock(&self.watch_cid).clone(),
+                page: lock(&self.page).clone(),
             }
         });
     }
@@ -1858,7 +1913,7 @@ impl Engine {
     fn restore_queue_bookmark(&self) -> bool {
         if let Some(bookmark) = lock(&self.listen_bookmark).take() {
             *lock(&self.pending_resume) = bookmark.current;
-            *lock(&self.watch_cid) = bookmark.watch_cid;
+            *lock(&self.page) = bookmark.page;
             true
         } else {
             false
@@ -2146,11 +2201,8 @@ impl Engine {
         let mut detail = self.source.detail(key).await?;
         // 多 P 视频的 `detail.cid` 是第一 P。观看页切到第 N P 时音轨也得跟着换，
         // 否则听到的仍是 P1 的声音，播到 P1 结尾就当成整集播完。
-        if let Some((_, cid)) = lock(&self.watch_cid)
-            .as_ref()
-            .filter(|(bvid, _)| bvid == key.as_opaque())
-        {
-            detail.cid = *cid;
+        if let Some(page) = self.active_page(key) {
+            detail.cid = page.cid;
         }
         // 详情是字段最全的一份（UP 主头像、分区名都在里面），把它写回 known。
         // 入库与卡片都从 known 取，不写回的话历史里的头像会一直是空的——
@@ -2179,10 +2231,17 @@ impl Engine {
             lock(&self.player).stop();
             return Err(WireError::internal("加载已过期，用户点了别的"));
         }
+        let page = detail.pages.into_iter().find(|p| p.cid == detail.cid);
+        let duration = page.as_ref()
+            .filter(|p| p.duration_ms > 0)
+            .map(|p| Millis(p.duration_ms))
+            .or(detail.track.duration)
+            .unwrap_or(Millis::ZERO);
+        *lock(&self.page) = page.map(|p| (key.clone(), p));
         let quality: Quality = best.quality;
         Ok(Prepared {
             quality,
-            duration: detail.track.duration.unwrap_or(Millis(0)),
+            duration,
         })
     }
 
@@ -2445,6 +2504,7 @@ impl Engine {
             }
         }
         PlayerSnapshot {
+            page: track.as_ref().and_then(|t| self.active_page(&t.key)),
             phase: state.phase().to_string(),
             duration_ms: self.playback_duration(track.as_ref(), local),
             track,
@@ -2466,7 +2526,20 @@ impl Engine {
                 return decoded_duration;
             }
         }
-        track.and_then(|t| t.duration).map_or(0, |d| d.0)
+        track.map_or(0, |track| {
+            self.active_page(&track.key)
+                .map(|p| p.duration_ms)
+                .filter(|d| *d > 0)
+                .or(track.duration.map(|d| d.0))
+                .unwrap_or(0)
+        })
+    }
+
+    fn active_page(&self, key: &TrackKey) -> Option<PageRef> {
+        lock(&self.page)
+            .as_ref()
+            .filter(|(k, _)| k == key)
+            .map(|(_, page)| page.clone())
     }
 
     fn snapshot_track(&self, state: &PlayerState) -> Option<Track> {
@@ -2812,13 +2885,17 @@ impl Engine {
             let current = queue.current().map(|entry| entry.track.key.clone());
             (queue.items(), queue.index(), current)
         };
-        let position_ms = current.as_ref().map_or(0, |key| {
+        let (position_ms, page) = current.as_ref().map_or((0, None), |key| {
             if let Some(bookmark) = lock(&self.listen_bookmark).as_ref() {
-                bookmark.current.as_ref()
+                let at = bookmark.current.as_ref()
                     .filter(|(current, _)| current == key)
-                    .map_or(0, |(_, at)| *at)
+                    .map_or(0, |(_, at)| *at);
+                let page = bookmark.page.as_ref()
+                    .filter(|(current, _)| current == key)
+                    .map(|(_, page)| page.clone());
+                (at, page)
             } else {
-                self.listen_queue_position(key)
+                (self.listen_queue_position(key), self.active_page(key))
             }
         });
         // 存完整曲目而不只是 key：恢复时不必重新拉 29 首详情，打开即用。
@@ -2827,6 +2904,7 @@ impl Engine {
             "tracks": tracks,
             "index": index,
             "position_ms": position_ms,
+            "page": page,
         });
         if let Ok(json) = serde_json::to_string(&snapshot) {
             let _ = self.library.save_queue(&json);
@@ -2855,6 +2933,7 @@ impl Engine {
             Ok(v) => v,
             Err(_) => return,
         };
+        let saved_page = serde_json::from_value::<PageRef>(parsed["page"].clone()).ok();
         let (keys, saved_index, saved_ms, saved_tracks): (
             Vec<String>,
             usize,
@@ -2890,7 +2969,9 @@ impl Engine {
             let start = saved_index.min(saved_tracks.len().saturating_sub(1));
             let mut q = lock(&self.queue);
             q.replace_from_tracks(&saved_tracks, start);
-            *lock(&self.pending_resume) = Some((saved_tracks[start].key.clone(), saved_ms));
+            let key = &saved_tracks[start].key;
+            *lock(&self.pending_resume) = Some((key.clone(), saved_ms));
+            *lock(&self.page) = saved_page.map(|page| (key.clone(), page));
             return;
         }
         let tracks = self.tracks_for(&keys);
@@ -3412,21 +3493,23 @@ impl Engine {
     }
 
     pub async fn lyrics_get(&self, key: &TrackKey) -> Result<LyricDoc, WireError> {
-        if let Some(doc) = lock(&self.lyrics_cache).get(key.as_opaque()).cloned() {
-            return Ok(doc);
-        }
-        let track = self.track_of(key)?;
-        // 同一首歌在 B 站有几十个投稿，标题清洗后往往一样。
-        // 按标题命中缓存，换一条投稿就不用再打一次网络。
-        let title_key = format!("title:{}", crate::lyrics::clean_title(&track.title));
-        if !title_key.ends_with(':') {
-            if let Some(doc) = lock(&self.lyrics_cache).get(&title_key).cloned() {
-                lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
-                return Ok(doc);
-            }
-        }
+        let mut track = self.track_of(key)?;
         if self.is_local_track(key) {
             return Ok(lyrics::from_local(&track).unwrap_or_else(LyricDoc::empty));
+        }
+        let page = self.active_page(key);
+        let cid = page.as_ref().map(|page| page.cid);
+        let recording = (key.clone(), cid);
+        if let Some(doc) = lock(&self.lyrics_cache).get(&recording).cloned() {
+            return Ok(doc);
+        }
+        if let Some(page) = page {
+            if page.duration_ms > 0 {
+                track.duration = Some(Millis(page.duration_ms));
+            }
+            if track.pages.unwrap_or(1) > 1 && !page.title.is_empty() {
+                track.title = page.title;
+            }
         }
         // 本地 lrc 优先（用户自己放的更准）；没有就同时打 lrclib 和 B 站字幕。
         //
@@ -3437,7 +3520,7 @@ impl Engine {
             None => {
                 let (lr, sub) = tokio::join!(
                     lyrics::from_lrclib(&self.http, &track),
-                    self.source.subtitles(key)
+                    self.source.subtitle_cues(key, cid, None)
                 );
                 match lr {
                     Some(doc) => doc,
@@ -3447,7 +3530,7 @@ impl Engine {
                             source: "bilibili-subtitle".into(),
                             lines: lines
                                 .into_iter()
-                                .map(|(at_ms, text)| crate::lyrics::LyricLine { at_ms, text })
+                                .map(|cue| crate::lyrics::LyricLine { at_ms: cue.at_ms, text: cue.text })
                                 .collect(),
                         },
                         _ => LyricDoc::empty(),
@@ -3455,10 +3538,7 @@ impl Engine {
                 }
             }
         };
-        lock(&self.lyrics_cache).insert(key.as_opaque().to_string(), doc.clone());
-        if !title_key.ends_with(':') && !doc.lines.is_empty() {
-            lock(&self.lyrics_cache).insert(title_key, doc.clone());
-        }
+        lock(&self.lyrics_cache).insert(recording, doc.clone());
         Ok(doc)
     }
 
@@ -3500,11 +3580,16 @@ impl Engine {
         Ok(self.source.danmaku_colored(key, cid).await?)
     }
 
-    pub async fn danmaku_heat(&self, key: &TrackKey, buckets: usize) -> Result<Vec<u32>, WireError> {
+    pub async fn danmaku_heat(
+        &self,
+        key: &TrackKey,
+        buckets: usize,
+        cid: Option<u64>,
+    ) -> Result<Vec<u32>, WireError> {
         if self.is_local_track(key) {
             return Ok(Vec::new());
         }
-        Ok(self.source.danmaku_heat(key, buckets).await?)
+        Ok(self.source.danmaku_heat(key, buckets, cid).await?)
     }
 
     pub async fn video_meta(&self, key: &TrackKey) -> Result<bilimusic_bili::TrackDetail, WireError> {

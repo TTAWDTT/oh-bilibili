@@ -7,7 +7,7 @@ import { Icon } from '../../shared/ui/Icon'
 import { ReactionButtons } from '../../shared/ui/ReactionButtons'
 import type { Track } from '../../shared/lib/contract'
 import { PlaybackProgress } from './PlaybackProgress'
-import { useIsListening, useHasSession, usePlayerStore } from './playerStore'
+import { playbackSubtitle, useIsListening, useHasSession, usePlayerStore } from './playerStore'
 import { rememberStageOrigin } from './stageCoverMorph'
 import { Transport } from './Transport'
 import { VolumeControl } from './VolumeControl'
@@ -49,6 +49,7 @@ function RailToggle({
 }
 
 function TrackInfo({ track, quality }: { track: Track | null; quality: number | null }) {
+  const page = usePlayerStore((state) => state.snapshot?.page)
   const setStage = useAppStore((state) => state.setStage)
   const playing = usePlayerStore((state) => state.snapshot?.phase === 'playing')
 
@@ -70,11 +71,13 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
     )
   }
 
+  const subtitle = playbackSubtitle(track, page)
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <button
         type="button"
         data-stage-origin={track.key}
+        data-focus-id="player-stage"
         onClick={(event) => {
           rememberStageOrigin(event.currentTarget, track)
           setStage(true)
@@ -98,8 +101,8 @@ function TrackInfo({ track, quality }: { track: Track | null; quality: number | 
           {track.title}
         </div>
         <div className="mt-1 hidden items-center gap-2 md:flex">
-          <span className="truncate text-[14px] text-[var(--text-2)]" title={track.artist}>
-            {track.artist}
+          <span className="truncate text-[14px] text-[var(--text-2)]" title={subtitle}>
+            {subtitle}
           </span>
           {quality ? (
             <span className="num shrink-0 rounded-[3px] border border-[var(--line)] px-2 py-0 font-mono text-[12px] text-[var(--text-2)]">

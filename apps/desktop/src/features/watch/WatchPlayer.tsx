@@ -567,8 +567,6 @@ export function WatchPlayer({
 
   /** 已经为哪条清单续过播。同一份清单（含降档重载）只续一次。 */
   const resumedFor = useRef<string | null>(null)
-  /** 已经为哪份清单补过续播 seek；切 P 换清单后可以再补一次。 */
-  const resumeSeekedFor = useRef<string | null>(null)
   /** 声音真的开始走之前的进度锚点；画面要等它越过锚点才起播。 */
   const audioAnchor = useRef<number | null>(null)
   const audioLive = useRef(false)
@@ -677,7 +675,7 @@ export function WatchPlayer({
       // 停住，等音频时钟真的走起来，再把画面接到同一个位置起播。
       if (!audioLive.current) {
         const reported = usePlayerStore.getState().progress.position_ms
-        if (audioAnchor.current === null) audioAnchor.current = reported
+        if (audioAnchor.current === null || reported < audioAnchor.current) audioAnchor.current = reported
         if (reported < audioAnchor.current + 150) {
           if (!v.paused) v.pause()
           return
@@ -686,18 +684,6 @@ export function WatchPlayer({
         v.currentTime = reported / 1000
       }
       const head = readPlayhead()
-      // 切 P 时引擎偶尔从 0 起播（续播点没有落到这一条流上）。等声音真的
-      // 走起来再补一次 seek，保证声音和画面都回到记录的位置。
-      if (
-        resumeAt !== null &&
-        resumeSeekedFor.current !== data.manifest_url &&
-        head > 500 &&
-        head + 3000 < resumeAt
-      ) {
-        resumeSeekedFor.current = data.manifest_url
-        void ipc.playerSeek(resumeAt).catch(() => {})
-        return
-      }
       const drift = v.currentTime * 1000 - head
       // 重播时画面还停在片尾、声音已从头走：这个差距等不回来，直接拉回声音位置。
       if (drift > 5000) {
@@ -725,7 +711,7 @@ export function WatchPlayer({
       if (Math.abs(v.playbackRate - wanted) > 0.001) v.playbackRate = wanted
     }, 250)
     return () => window.clearInterval(timer)
-  }, [ready, track.key, speed, resumeAt, data.manifest_url])
+  }, [ready, track.key, speed, data.manifest_url])
 
   // 换一条视频就重置降档状态：上一部的重试次数不该带到这一部。
   useEffect(() => {

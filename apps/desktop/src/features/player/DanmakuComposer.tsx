@@ -4,7 +4,8 @@ import * as ipc from '../../shared/lib/ipc'
 import { toastDone } from '../../app/notice'
 import { readPlayhead } from '../../shared/lib/playhead'
 import { Icon } from '../../shared/ui/Icon'
-import { useSentDanmaku } from './sentDanmaku'
+import type { PageRef } from '../../shared/lib/contract'
+import { danmakuPartKey, useSentDanmaku } from './sentDanmaku'
 
 /**
  * B 站播放器底部那条弹幕输入框。
@@ -14,9 +15,11 @@ import { useSentDanmaku } from './sentDanmaku'
  */
 export function DanmakuComposer({
   trackKey,
+  page,
   onSent,
 }: {
   trackKey: string | null
+  page: PageRef | null
   onSent?: () => void
 }) {
   const [text, setText] = useState('')
@@ -35,8 +38,8 @@ export function DanmakuComposer({
     setBusy(true)
     try {
       const sentAt = Math.max(0, Math.round(readPlayhead()))
-      await ipc.danmakuSend(trackKey, value, sentAt)
-      append(trackKey, { at: sentAt, text: value, color: 'var(--text-1)' })
+      await ipc.danmakuSend(trackKey, value, sentAt, 1, 0xffffff, page?.cid)
+      append(danmakuPartKey(trackKey, page?.no), { at: sentAt, text: value, color: 'var(--text-1)' })
       setText('')
       toastDone('弹幕已发出', `${Math.floor(at / 1000)} 秒处`)
       onSent?.()

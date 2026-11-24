@@ -590,6 +590,7 @@ async fn watch_session_preserves_listen_queue_and_bookmark() {
                 bilimusic_core::engine::WatchOptions {
                     paused: true,
                     preserve_listen_queue: true,
+                    ..Default::default()
                 },
             )
             .await

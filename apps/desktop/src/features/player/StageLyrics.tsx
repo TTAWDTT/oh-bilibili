@@ -68,7 +68,7 @@ export function StageLyrics({
   if (lines.length === 0) {
     return (
       <div className="grid min-h-[220px] place-items-center px-8 text-center">
-        <p className="text-[14px] leading-6 text-[var(--text-2)]">这条视频没挂歌词，先听个响。</p>
+        <p className="text-[14px] leading-6 text-[var(--text-2)]">暂无匹配歌词</p>
       </div>
     )
   }
@@ -81,7 +81,7 @@ export function StageLyrics({
   return (
     <div data-stage-lyrics className="flex h-full min-h-0 flex-col">
       <div className="mb-2 flex h-8 shrink-0 items-center justify-between gap-3 px-2 text-[12px] text-[var(--text-3)]">
-        <span>{source.trim().length > 0 ? source : '歌词'}</span>
+        <span>{source === 'bilibili-subtitle' ? '视频字幕' : synced ? '同步歌词' : '歌词'}</span>
         {!following && synced ? (
           <button
             type="button"
@@ -118,6 +118,10 @@ export function StageLyrics({
         className="no-scrollbar lyrics-mask relative min-h-0 flex-1 overflow-y-auto px-3 pb-16 pt-12 outline-none"
       >
         {lines.map((line, index) => {
+          if (!line.text.trim()) return null
+          if (!synced) {
+            return <p key={index} className="px-3 py-1.5 text-[16px] leading-[1.55] text-[var(--text-2)]">{line.text}</p>
+          }
           const current = index === active
           return (
             <button
@@ -128,10 +132,8 @@ export function StageLyrics({
                 rows.current[index] = node
               }}
               onClick={() => {
-                if (synced) {
-                  onSeek(line.at_ms)
-                  setFollowing(true)
-                }
+                onSeek(line.at_ms)
+                setFollowing(true)
               }}
               className={[
                 't block min-h-9 w-full rounded-[6px] px-3 py-1.5 text-left leading-[1.55]',

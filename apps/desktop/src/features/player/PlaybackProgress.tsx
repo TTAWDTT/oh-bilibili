@@ -18,6 +18,8 @@ export function PlaybackProgress() {
   const [heat, setHeat] = useState<number[]>([])
   const trackKey = snapshot?.local ? null : (snapshot?.track?.key ?? null)
 
+  const cid = snapshot?.page?.cid
+
   // 弹幕密度只在换歌时拉一次，进度推进不重拉。
   useEffect(() => {
     if (!trackKey) {
@@ -25,16 +27,17 @@ export function PlaybackProgress() {
       return
     }
     let cancelled = false
+    setHeat([])
     void ipc
-      .danmakuHeat(trackKey, 80)
+      .danmakuHeat(trackKey, 80, cid)
       .then((h) => {
         if (!cancelled) setHeat(h)
       })
-      .catch(() => setHeat([]))
+      .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [trackKey])
+  }, [trackKey, cid])
   const peak = heat.reduce((m, v) => Math.max(m, v), 0)
 
   useEffect(() => {
@@ -46,7 +49,7 @@ export function PlaybackProgress() {
   useEffect(() => {
     setScrub(null)
     setHover(null)
-  }, [trackKey, duration])
+  }, [trackKey, cid, duration])
 
   const ratio = scrub ?? (duration > 0 ? Math.min(1, now / duration) : 0)
   const preview = scrub ?? hover ?? (focused ? ratio : null)

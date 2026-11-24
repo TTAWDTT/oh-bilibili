@@ -129,9 +129,10 @@ async fn danmaku_heat(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     buckets: usize,
+    cid: Option<u64>,
 ) -> Result<Vec<u32>, WireError> {
     engine
-        .danmaku_heat(&TrackKey::from_provider(key), buckets)
+        .danmaku_heat(&TrackKey::from_provider(key), buckets, cid)
         .await
 }
 
@@ -346,6 +347,7 @@ async fn watch_open(
     resume_at: Option<u64>,
     paused: Option<bool>,
     preserve_listen_queue: Option<bool>,
+    continue_audio: Option<bool>,
 ) -> Result<bilimusic_core::wire::WatchView, WireError> {
     let origin = format!("http://127.0.0.1:{}", port.0);
     engine
@@ -357,6 +359,7 @@ async fn watch_open(
             bilimusic_core::engine::WatchOptions {
                 paused: paused.unwrap_or(false),
                 preserve_listen_queue: preserve_listen_queue.unwrap_or(false),
+                continue_audio: continue_audio.unwrap_or(false),
             },
         )
         .await

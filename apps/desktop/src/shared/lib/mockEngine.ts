@@ -1,10 +1,11 @@
-import type { AppEvent, AuthSnapshot, DownloadView, PlayerPhase, PlayerSnapshot, RepeatMode, Track } from './contract'
+import type { AppEvent, AuthSnapshot, DownloadView, PageRef, PlayerPhase, PlayerSnapshot, RepeatMode, Track } from './contract'
 import { findTrack, PLAYLIST_SEEDS, trackByTitle } from './mockCatalog'
 import { clamp } from './format'
 
 export type MockPlaylist = { id: number; name: string; keys: string[] }
 
 export type MockState = {
+  watchPage: { key: string; page: PageRef } | null
   keys: string[]
   index: number | null
   localKey: string | null
@@ -58,6 +59,7 @@ const loggedIn =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('loggedIn')
 
 export const state: MockState = {
+  watchPage: null,
   keys: [],
   index: null,
   localKey: null,
@@ -142,6 +144,7 @@ export function snapshot(): PlayerSnapshot {
   const track = currentTrack()
   return {
     phase: state.phase,
+    page: !state.localKey && state.watchPage?.key === track?.key ? state.watchPage?.page ?? null : null,
     track: track && state.localKey ? { ...track, cover: null } : track,
     local: state.localKey !== null,
     mode: state.mode,

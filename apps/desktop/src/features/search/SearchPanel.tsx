@@ -327,6 +327,15 @@ export function SearchPanel({ query }: { query: string }) {
       })
   }
 
+  const selectTab = (value: SearchTab): void => {
+    setTab(value)
+    scrollerRef.current?.scrollTo({ top: 0 })
+  }
+
+  const openUser = (user: ipc.UserHit): void => {
+    navigate({ kind: 'author', name: user.name, mid: user.mid }, undefined, `search-user:${user.mid}`)
+  }
+
   return (
     <div
       ref={scrollerRef}
@@ -368,10 +377,7 @@ export function SearchPanel({ query }: { query: string }) {
                   key={value}
                   type="button"
                   aria-current={tab === value ? 'page' : undefined}
-                  onClick={() => {
-                    setTab(value)
-                    scrollerRef.current?.scrollTo({ top: 0 })
-                  }}
+                  onClick={() => selectTab(value)}
                   className={`t border-b-2 pb-2 text-[14px] ${
                     tab === value
                       ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
@@ -382,28 +388,18 @@ export function SearchPanel({ query }: { query: string }) {
                 </button>
               ))}
             </nav>
-            {tab !== 'video' && usersReady && users.length > 0 ? (
-              <div className="mb-4">
-                {tab === 'user' ? null : (
-                  <h2 className="mb-2 text-[14px] font-medium text-[var(--text-1)]">UP 主</h2>
-                )}
-                <div
-                  className={
-                    tab === 'user'
-                      ? 'grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3'
-                      : 'no-scrollbar flex gap-2 overflow-x-auto pb-1'
-                  }
-                >
-                  {(tab === 'user' ? users : users.slice(0, 6)).map((user) => (
-                    <div
-                      key={user.mid}
-                      data-user-mid={user.mid}
-                      className={`bili-card flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)] ${tab === 'user' ? 'w-full' : 'w-[248px] shrink-0'}`}
-                    >
+            {tab === 'user' && usersReady && users.length > 0 ? (
+              <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {users.map((user) => (
+                  <div
+                    key={user.mid}
+                    data-user-mid={user.mid}
+                    className="bili-card flex w-full items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 hover:border-[var(--accent)]"
+                  >
                     <button
                       type="button"
                       data-focus-id={`search-user:${user.mid}`}
-                      onClick={() => navigate({ kind: 'author', name: user.name, mid: user.mid }, undefined, `search-user:${user.mid}`)}
+                      onClick={() => openUser(user)}
                       className="bili-press flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
                       <Avatar src={user.face} alt={user.name} size={40} />
@@ -464,9 +460,8 @@ export function SearchPanel({ query }: { query: string }) {
                         {followedMids.has(user.mid) ? '已关注' : '关注'}
                       </button>
                     ) : null}
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             ) : null}
             {tab === 'user' && !usersReady ? (
@@ -514,22 +509,38 @@ export function SearchPanel({ query }: { query: string }) {
             ) : null}
             {tab === 'user' ? null : (
             <div>
-            <div className="mb-2 flex min-h-5 items-center justify-between gap-1 border-b border-hairline px-4 pb-2 text-[12px] text-[var(--text-3)]">
-              <span>
-                {status === 'error'
-                  ? '搜索失败'
-                  : status === 'loading'
-                    ? '正在搜索…'
-                    : loadingMore
-                      ? '正在加载更多…'
-                      : ''}
-              </span>
-              <span className="flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-[17px] font-medium text-[var(--text-1)]">视频</h3>
                 {tracks.length > 0 ? (
-                  // 「已加载」不说「共」：这个数字随滚动增长，不是 B 站的结果总数。
-                  <span className="num">已加载 {formatCount(tracks.length)} 个</span>
+                  <span className="num text-[12px] text-[var(--text-3)]">已加载 {formatCount(tracks.length)} 个</span>
                 ) : null}
-              </span>
+              </div>
+              {tab === 'all' && usersReady && users.length > 0 ? (
+                <div className="flex min-w-0 max-w-full items-center gap-2">
+                  {users.slice(0, 2).map((user) => (
+                    <button
+                      key={user.mid}
+                      type="button"
+                      data-user-mid={user.mid}
+                      data-focus-id={`search-user:${user.mid}`}
+                      aria-label={`查看 UP 主 ${user.name}`}
+                      onClick={() => openUser(user)}
+                      className="t press flex min-w-0 max-w-32 items-center gap-1.5 rounded-full bg-[var(--panel)] py-1 pl-1 pr-2 text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)]"
+                    >
+                      <Avatar src={user.face} alt="" size={22} />
+                      <span className="truncate">{user.name}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => selectTab('user')}
+                    className="t press flex shrink-0 items-center gap-0.5 rounded px-1 py-1 text-[12px] text-[var(--text-3)] hover:text-[var(--accent-strong)]"
+                  >
+                    相关 UP 主 <Icon name="chevronRight" size={14} />
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {/* 筛选条常驻：加载中、零结果时也能就地改条件，不必先清空关键词。 */}

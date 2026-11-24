@@ -114,6 +114,7 @@ impl From<bilimusic_store::StoreError> for WireError {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerSnapshot {
+    pub page: Option<bilimusic_bili::PageRef>,
     pub phase: String,
     pub track: Option<Track>,
     pub local: bool,

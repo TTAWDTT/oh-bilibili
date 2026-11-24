@@ -576,8 +576,8 @@ export function danmakuColored(key: string, cid?: number): Promise<DanmakuLine[]
 }
 
 /** 弹幕密度曲线，用来画高能进度条。 */
-export function danmakuHeat(key: string, buckets: number): Promise<number[]> {
-  return call<number[]>('danmaku_heat', { key, buckets })
+export function danmakuHeat(key: string, buckets: number, cid?: number): Promise<number[]> {
+  return call<number[]>('danmaku_heat', { key, buckets, cid })
 }
 
 /** 本地 MV 代理端口。浏览器预览没有这个能力，返回 0。 */
@@ -769,7 +769,7 @@ export function watchOpen(
   key: string,
   page?: number,
   resumeAt?: number,
-  { paused = false, preserveListenQueue = false } = {},
+  { paused = false, preserveListenQueue = false, continueAudio = false } = {},
 ): Promise<WatchView> {
   return call<WatchView>('watch_open', {
     key,
@@ -777,6 +777,7 @@ export function watchOpen(
     resume_at: resumeAt ?? null,
     paused,
     preserve_listen_queue: preserveListenQueue,
+    continue_audio: continueAudio,
   })
 }
 
