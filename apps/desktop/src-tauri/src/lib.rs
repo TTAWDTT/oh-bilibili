@@ -11,7 +11,7 @@ use std::sync::Arc;
 use bilimusic_core::engine::Engine;
 use bilimusic_core::engine::DownloadView;
 use bilimusic_core::lyrics::LyricDoc;
-use bilimusic_core::wire::{AuthSnapshot, PlayerSnapshot, QueueView, SeasonView, SyncOutcome, WireError};
+use bilimusic_core::wire::{AuthSnapshot, HistoryEntry, HistoryResume, PlayerSnapshot, QueueView, SeasonView, SyncOutcome, WireError};
 use bilimusic_model::{Track, TrackKey};
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -129,9 +129,10 @@ async fn danmaku_heat(
     engine: tauri::State<'_, Arc<Engine>>,
     key: String,
     buckets: usize,
+    cid: Option<u64>,
 ) -> Result<Vec<u32>, WireError> {
     engine
-        .danmaku_heat(&TrackKey::from_provider(key), buckets)
+        .danmaku_heat(&TrackKey::from_provider(key), buckets, cid)
         .await
 }
 
@@ -346,6 +347,8 @@ async fn watch_open(
     resume_at: Option<u64>,
     paused: Option<bool>,
     preserve_listen_queue: Option<bool>,
+    continue_audio: Option<bool>,
+    local_resume: Option<HistoryResume>,
 ) -> Result<bilimusic_core::wire::WatchView, WireError> {
     let origin = format!("http://127.0.0.1:{}", port.0);
     engine
@@ -357,6 +360,8 @@ async fn watch_open(
             bilimusic_core::engine::WatchOptions {
                 paused: paused.unwrap_or(false),
                 preserve_listen_queue: preserve_listen_queue.unwrap_or(false),
+                continue_audio: continue_audio.unwrap_or(false),
+                local_resume,
             },
         )
         .await
@@ -447,9 +452,10 @@ async fn player_play_context(
     engine: tauri::State<'_, Arc<Engine>>,
     keys: Vec<String>,
     index: usize,
+    resume: Option<HistoryResume>,
 ) -> Result<PlayerSnapshot, WireError> {
     let arc = engine.inner().clone();
-    arc.play_context(&keys, index).await
+    arc.play_context(&keys, index, resume).await
 }
 
 #[tauri::command]
@@ -482,8 +488,14 @@ async fn player_prev(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn player_seek(engine: tauri::State<'_, Arc<Engine>>, position_ms: u64) -> PlayerSnapshot {
-    engine.seek(position_ms)
+async fn player_seek(
+    engine: tauri::State<'_, Arc<Engine>>,
+    position_ms: u64,
+) -> Result<PlayerSnapshot, WireError> {
+    let engine = engine.inner().clone();
+    tokio::task::spawn_blocking(move || engine.seek(position_ms))
+        .await
+        .map_err(|error| WireError::internal(error.to_string()))
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -551,17 +563,6 @@ fn queue_move(
     engine.queue_move(&from, &to)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-struct HistoryEntryView {
-    id: i64,
-    track: Track,
-    /// 播放时刻，Unix 毫秒。
-    played_at: i64,
-    /// 上次看到的位置，毫秒。历史卡片底下的进度条用它。
-    position_ms: u64,
-}
-
 #[tauri::command(rename_all = "snake_case")]
 fn history_delete(
     engine: tauri::State<'_, Arc<Engine>>,
@@ -581,20 +582,11 @@ fn library_history_timed(
     limit: u32,
     before_played_at: Option<i64>,
     before_id: Option<i64>,
-) -> Result<Vec<HistoryEntryView>, WireError> {
+) -> Result<Vec<HistoryEntry>, WireError> {
     let before = before_played_at
         .zip(before_id)
         .map(|(played_at, id)| (played_at, id as u64));
-    Ok(engine
-        .history_with_time(limit, before)?
-        .into_iter()
-        .map(|(track, played_at, position_ms, id)| HistoryEntryView {
-            id,
-            track,
-            played_at,
-            position_ms,
-        })
-        .collect())
+    engine.history_with_time(limit, before)
 }
 
 #[tauri::command(rename_all = "snake_case")]

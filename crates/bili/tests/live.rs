@@ -192,7 +192,7 @@ async fn 弹幕能算成密度曲线() {
     let q = SearchQuery::parse("晴天", 1).expect("查询");
     let tracks = source.search(&q).await.expect("搜索");
     let first = tracks.first().expect("有结果");
-    let heat = source.danmaku_heat(&first.key, 40).await.expect("密度");
+    let heat = source.danmaku_heat(&first.key, 40, None).await.expect("密度");
     let peak = heat.iter().copied().max().unwrap_or(0);
     let non_zero = heat.iter().filter(|v| **v > 0).count();
     println!("40 桶里 {non_zero} 个非空，峰值 {peak}");

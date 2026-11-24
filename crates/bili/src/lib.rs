@@ -1192,8 +1192,9 @@ impl Source {
         &self,
         key: &TrackKey,
         buckets: usize,
+        cid: Option<u64>,
     ) -> Result<Vec<u32>, BiliError> {
-        let items = self.danmaku_items(key).await?;
+        let items = self.danmaku_colored(key, cid).await?;
         let buckets = buckets.clamp(8, 200);
         let mut heat = vec![0u32; buckets];
         if items.is_empty() {
@@ -1201,11 +1202,11 @@ impl Source {
         }
         let max_t = items
             .iter()
-            .map(|(t, _)| *t)
+            .map(|line| line.secs)
             .fold(0.0_f64, f64::max)
             .max(1.0);
-        for (t, _) in &items {
-            let idx = ((t / max_t) * (buckets as f64 - 1.0)).round() as usize;
+        for line in &items {
+            let idx = ((line.secs / max_t) * (buckets as f64 - 1.0)).round() as usize;
             if let Some(slot) = heat.get_mut(idx.min(buckets - 1)) {
                 *slot += 1;
             }
@@ -1475,7 +1476,7 @@ mod wire {
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.to_string()),
             typeid: data["tid"].as_u64().map(|v| v as u32),
-            pages: None,
+            pages: u32::try_from(pages.len()).ok().filter(|count| *count > 0),
         };
         Ok(TrackDetail {
             track,

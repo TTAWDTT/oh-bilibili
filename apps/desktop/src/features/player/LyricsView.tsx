@@ -63,6 +63,7 @@ export function LyricsView({ track }: { track: Track | null }) {
   const lineRefs = useRef<Array<HTMLDivElement | null>>([])
   const [offset, setOffset] = useState(0)
   const key = track?.key ?? null
+  const cid = usePlayerStore((state) => state.snapshot?.page?.cid)
 
   useEffect(() => {
     if (!key) {
@@ -103,7 +104,7 @@ export function LyricsView({ track }: { track: Track | null }) {
     return () => {
       cancelled = true
     }
-  }, [key, nonce])
+  }, [key, cid, nonce])
 
   const lineTimes = doc && doc.synced ? doc.lines.map((l) => l.at_ms) : EMPTY_TIMES
   const active = useSmoothIndex(lineTimes, Boolean(doc && doc.synced))
@@ -139,14 +140,7 @@ export function LyricsView({ track }: { track: Track | null }) {
     return (
       <EmptyState
         icon="biliTv"
-        title={failed ?? (track ? '这条视频没挂歌词，先听个响' : '还没有在播放')}
-        detail={
-          failed
-            ? '歌词是可选的一条支路，播放本身不受影响。'
-            : track
-              ? '三级回退都没查到时不去编造，播放本身不受影响。'
-              : '挑一首歌，歌词会跟着进度滚动。'
-        }
+        title={failed ?? (track ? '暂无匹配歌词' : '还没有在播放')}
         action={
           track
             ? { label: failed ? '重新取一次' : '看看队列', onClick: failed ? () => setNonce((n) => n + 1) : () => toggleRail('queue') }

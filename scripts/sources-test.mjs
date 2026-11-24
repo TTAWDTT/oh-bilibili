@@ -1,4 +1,5 @@
 // 简介出处解析的回归断言：直接用 Node 的类型剥离跑真实模块（Node >= 22.6）。
+import { parseWatchUrl, watchUrl } from '../apps/desktop/src/features/watch/watchUrl.ts'
 import { parseSources } from '../apps/desktop/src/features/watch/sources.ts'
 
 let failed = 0
@@ -47,6 +48,12 @@ const parts = parseSources('原舞：https://www.bilibili.com/video/BV1Mk4y11666
 check('同稿不同分 P 的出处分别保留时间和页号', parts.length === 2 && parts[0].page === 2 && parts[0].atMs === 18500 && parts[1].page === 3)
 check('外部素材链接中的 BV 不改变其目的地', parseSources('素材：https://example.org/data/BV1Mk4y11666', 'other')[0]?.kind === 'external')
 check('同名而无明确目标不生成关系', parseSources('原舞：《大喜》', 'other').length === 0)
+
+const shared = parseWatchUrl(watchUrl('BV1Tb4y1a7sZ', 2) + '&t=77')
+check('分享面板生成的时间链接保留 BV、分 P 和 1:17 断点',
+  shared?.bvid === 'BV1Tb4y1a7sZ' && shared.page === 2 && shared.atMs === 77_000)
+check('普通搜索词和其他站点不触发打开视频',
+  parseWatchUrl('千本樱') === null && parseWatchUrl('https://example.org/video/BV1Tb4y1a7sZ') === null)
 
 if (failed > 0) {
   console.error(`sources: ${failed} failed`)

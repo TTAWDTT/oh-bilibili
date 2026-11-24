@@ -279,11 +279,10 @@ impl Player {
     pub fn seek(&self, position_ms: u64) {
         let _ = self.tx.send(Cmd::Seek(position_ms, None));
     }
-    pub fn seek_local(&self, position_ms: u64) {
+    pub fn seek_with_receipt(&self, position_ms: u64) -> Receiver<()> {
         let (done, finished) = channel();
-        if self.tx.send(Cmd::Seek(position_ms, Some(done))).is_ok() {
-            let _ = finished.recv();
-        }
+        let _ = self.tx.send(Cmd::Seek(position_ms, Some(done)));
+        finished
     }
     /// 设置播放倍速。0.5 到 2.0，超范围会被夹住。
     pub fn set_speed(&self, speed: f64) {

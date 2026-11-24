@@ -1,41 +1,44 @@
 import { useState } from 'react'
-import { Icon } from '../../shared/ui/Icon'
+import { AnchoredPanel, type Anchor } from '../../shared/ui/AnchoredPanel'
+import { BiliDanmakuSetting, BiliDanmakuSwitch } from '../../shared/ui/BiliDanmakuIcons'
 import { useDanmakuSettings } from './danmakuSettings'
 
-/** 弹幕设置面板。四项，和 B 站播放器的面板一致。 */
 export function DanmakuPanel() {
-  const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState<Anchor | null>(null)
   const { enabled, opacity, size, speed, mergeSame, setEnabled, patch, setMergeSame } =
     useDanmakuSettings()
 
   return (
-    <div className="absolute right-5 top-16 z-20">
+    <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--panel)]/75 px-1 text-[var(--text-2)]">
+      <button
+        type="button"
+        aria-label={enabled ? '关闭弹幕' : '打开弹幕'}
+        aria-pressed={enabled}
+        title={enabled ? '关闭弹幕' : '打开弹幕'}
+        onClick={() => setEnabled(!enabled)}
+        className="t press flex h-8 items-center gap-1 rounded-full px-2 text-[13px] hover:bg-[var(--hover)] aria-pressed:text-[var(--accent-strong)]"
+      >
+        <BiliDanmakuSwitch on={enabled} size={18} />
+        弹幕
+      </button>
       <button
         type="button"
         aria-label="弹幕设置"
+        aria-haspopup="dialog"
         title="弹幕设置"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={[
-          't press flex h-8 w-8 items-center justify-center rounded-[4px]',
-          open ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-3)] hover:bg-[var(--hover)] hover:text-[var(--text-1)]',
-        ].join(' ')}
+        onClick={(event) => {
+          if (anchor) { setAnchor(null); return }
+          const trigger = event.currentTarget
+          const rect = trigger.getBoundingClientRect()
+          setAnchor({ trigger, left: Math.max(8, rect.right - 224), top: rect.bottom + 6, anchorTop: rect.top })
+        }}
+        aria-expanded={anchor !== null}
+        className="t press flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--hover)] aria-expanded:text-[var(--accent-strong)]"
       >
-        <Icon name="settings" size={15} />
+        <BiliDanmakuSetting size={18} />
       </button>
-
-      {open ? (
-        <div className="mt-2 w-56 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] p-3 text-[var(--text-1)] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.3)]">
-          <label className="flex items-center justify-between text-[14px]">
-            显示弹幕
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="h-3.5 w-3.5 accent-[var(--accent)]"
-            />
-          </label>
-
+      <AnchoredPanel anchor={anchor} onClose={() => setAnchor(null)} label="弹幕设置" width={224}>
+        <div className="px-3 pb-3">
           <Slider label="透明度" min={0.2} max={1} step={0.1} value={opacity} onChange={(v) => patch({ opacity: v })} />
           <Slider label="字号" min={11} max={22} step={1} value={size} onChange={(v) => patch({ size: v })} />
           <Slider label="速度" min={0.5} max={2.5} step={0.1} value={speed} onChange={(v) => patch({ speed: v })} />
@@ -50,7 +53,7 @@ export function DanmakuPanel() {
             />
           </label>
         </div>
-      ) : null}
+      </AnchoredPanel>
     </div>
   )
 }

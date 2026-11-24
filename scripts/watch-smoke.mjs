@@ -504,6 +504,42 @@ async function checkLibraryShelf(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkStageMoments(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
+  const waitFor = async (expression) => {
+    for (let i = 0; i < 100; i += 1) {
+      if (await page.evaluate(expression)) return true
+      await sleep(80)
+    }
+    return false
+  }
+  await waitFor(`location.search.includes('multiP') && !!document.querySelector('main h2')`)
+  await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
+    .then(([app, catalog]) => app.useAppStore.getState().navigate({
+      kind: 'watch', track: catalog.trackByTitle('漠河舞厅'), page: 2,
+    }))`)
+  const canListen = await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === '听视频')`)
+  if (canListen) await page.clickExactText('听视频')
+  await waitFor(`!!document.querySelector('[aria-label="打开播放舞台"]')`)
+  await page.evaluate(`document.querySelector('[aria-label="打开播放舞台"]')?.click()`)
+  const moment = `document.querySelector('.stage button[aria-label="跳到 0:19，尾奏适合循环"]')`
+  const correctPart = await waitFor(`!!${moment}`)
+  check('无歌词时只用当前 P 的弹幕选听点', correctPart &&
+    await page.evaluate(`document.querySelector('.stage [aria-label="弹幕听点"]').innerText.includes('这段变奏好喜欢')`))
+  if (!correctPart) return
+  check('中点是倒数或标点时改选附近原话，计数仍包含六条弹幕',
+    await page.evaluate(`document.querySelector('.stage button[aria-label="跳到 0:05，这段变奏好喜欢"]')?.innerText.includes('6 条')`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="暂停"]')?.click()`)
+  await page.evaluate(`${moment}.click()`)
+  check('点弹幕听点定位到原话时间，同时标出当前片段', await waitFor(`
+    ${moment}.getAttribute('aria-current') === 'time' &&
+    document.querySelector('.stage [aria-label="播放进度"]').getAttribute('aria-valuetext') === '0:19'`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="关闭弹幕"]')?.click()`)
+  check('舞台关闭弹幕后不再列出观众原话', await waitFor(`
+    !document.querySelector('.stage [aria-label="弹幕听点"]') && document.querySelector('.stage')?.innerText.includes('暂无匹配歌词')`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="打开弹幕"]')?.click()`)
+}
+
 async function checkStageLyrics(page) {
   await page.viewport(1320, 900)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
@@ -532,6 +568,10 @@ async function checkStageLyrics(page) {
       `!!document.querySelector('[data-stage-lyrics] button[data-current]')`,
     )
   }
+  check(
+    '在线曲目的听歌舞台可以直接看当前视频',
+    await page.evaluate(`[...document.querySelectorAll('.stage button')].some(button => button.textContent.trim() === '看视频')`),
+  )
   const openedFocus = await page.evaluate(`(() => ({
     label: document.activeElement?.getAttribute('aria-label'),
     inside: !!document.querySelector('.stage')?.contains(document.activeElement),
@@ -1615,6 +1655,59 @@ async function checkHeroAllocation(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkHistoryParts(page) {
+  const url = new URL(WEB)
+  url.searchParams.set('historyLong', '1')
+  url.searchParams.set('manyPages', '1')
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(url)}`)
+  const waitFor = watchUiWait(page)
+  const watch = "document.querySelector('[data-home-hero-grid] button[data-focus-id^=herocard]')"
+  await waitFor(`location.search.includes('historyLong') && ${watch}`)
+  await page.evaluate(`(() => {
+    for (const [key, page] of [['history-0', 2], ['history-1', 3]]) {
+      localStorage.setItem('oh-bilibili:watch-page:' + key, String(page))
+      localStorage.setItem('oh-bilibili:watch-pos:' + key + ':' + page, '8000')
+      localStorage.setItem('oh-bilibili:watch-len:' + key + ':' + page, '31000')
+    }
+    ${watch}.click()
+  })()`)
+  const watched = await waitFor(`!!document.querySelector('video')`)
+  await page.evaluate(`document.querySelector('button[title="历史"]')?.click()`)
+  await waitFor(`!!document.querySelector('[data-history-row]')`)
+  for (const [key, position, action, label] of [
+    ['history-0', 8000, '继续播放', '旧记录按本地 P2 和时间续听'],
+    ['history-1', 12000, '继续播放', '新历史用已存 P2 断点并保留当天队列'],
+    ['history-2', 0, '从头播放', '已播完的 P2 从本集开头重播'],
+  ]) {
+    const source = `document.querySelector('[data-history-row][data-key="${key}"]')`
+    const row = await page.evaluate(`(() => {
+      const row = ${source}
+      const button = row?.querySelector('[data-history-play]')
+      const keys = [...row?.closest('section').querySelectorAll('[data-history-row]') ?? []].map((r) => r.dataset.key)
+      const page = [...row?.querySelectorAll('span') ?? []].some((s) => s.textContent === 'P2')
+      const action = button?.getAttribute('aria-label')
+      button?.click()
+      return { keys, page, action }
+    })()`)
+    const selected = await waitFor(`${source}?.getAttribute('aria-current') === 'true' && !!document.querySelector('[aria-label="打开播放舞台"]')`)
+    const [state, queue] = await page.evaluate(`(async () => {
+      const module = performance.getEntriesByType('resource').find(entry => new URL(entry.name).pathname === '/src/shared/lib/ipc.ts')
+      const ipc = await import(module.name)
+      return Promise.all([ipc.playerState(), ipc.queueState()])
+    })()`)
+    check(label, watched && selected && row.page && row.action?.startsWith(action) && state.mode === 'listen' &&
+      state.track?.key === key && state.page?.no === 2 && state.duration_ms === 31000 &&
+      state.position_ms >= position && state.position_ms < position + 2000 &&
+      JSON.stringify(queue.items.map((item) => item.key)) === JSON.stringify(row.keys) && row.keys[queue.index] === key)
+  }
+  await page.evaluate(`(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (/watch-(page|pos|len):history-[01](:|$)/.test(key)) localStorage.removeItem(key)
+    }
+  })()`)
+}
+
 /** 发现页续播卡：宽窗占左半屏，换一换不动它，窄窗收成一条。 */
 async function checkHomeResume(page) {
   await page.viewport(1320, 900)
@@ -1630,6 +1723,7 @@ async function checkHomeResume(page) {
   await page.evaluate(`(() => {
     const key = ${JSON.stringify(resumeKey)}
     if (!key) return
+    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
     localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
     localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
   })()`)
@@ -3669,69 +3763,16 @@ async function checkTriple(page) {
     return false
   }
   await page.viewport(1440, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
-  await sleep(2200)
-  const opened = await page.evaluate(`(() => {
-    const cards = [...document.querySelectorAll('[data-track-card]')]
-    const card = cards[1]
-    const hit = card?.querySelector('button')
-    hit?.click()
-    return !!hit
-  })()`)
-  const ready = opened && await waitFor(`!!document.querySelector('[data-triple]')`)
-  const clicked = ready && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.click()
-    return !!hit
-  })()`)
-  const confirmed = await waitFor(
-    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
-  )
-  const state = await page.evaluate(`(() => ({
-    like: document.querySelector('button[aria-label="取消点赞"]') !== null,
-    coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
-    fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
-    tripleFocusable: document.querySelector('[data-triple]')?.tabIndex === 0,
-  }))()`)
-  check(
-    '三连三项都确认后才显示完成',
-    clicked && confirmed && state.like && state.coin && state.fav && state.tripleFocusable,
-  )
-  if (!confirmed || !state.like || !state.coin || !state.fav) console.log(state)
-
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&failCoin=1`)}`)
-  await sleep(2200)
-  const openedFail = await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
-    hit?.click()
-    return !!hit
-  })()`)
-  const failReady = openedFail && await waitFor(`!!document.querySelector('[data-triple]')`)
-  const failClicked = failReady && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.click()
-    return !!hit
-  })()`)
-  const partial = await waitFor(
-    `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
-  )
-  check('三连部分失败列出未确认项，不播完成提示', failClicked && partial)
-
-  const resetWatch = async () => {
-    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
-    await sleep(2200)
-    const openedCard = await page.evaluate(`(() => {
-      const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
-      hit?.click()
-      return !!hit
-    })()`)
-    const ready = openedCard && await waitFor(`!!document.querySelector('[data-triple]')`)
-    await sleep(500)
-    return ready
+  const resetWatch = async (query = '') => {
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1${query}`)}`)
+    const card = "document.querySelectorAll('[data-track-card]')[1]?.querySelector('button')"
+    if (!await waitFor(`!!${card}`)) return false
+    await page.evaluate(`${card}.click()`)
+    return waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="点赞"]')`)
   }
   const likePoint = () =>
     page.evaluate(`(() => {
-      const box = document.querySelector('button[aria-label="点赞"]')?.getBoundingClientRect()
+      const box = document.querySelector('.bili-tri-like')?.closest('button')?.getBoundingClientRect()
       return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null
     })()`)
   const press = (point) =>
@@ -3740,13 +3781,16 @@ async function checkTriple(page) {
     page.mouseEvent({ type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 })
   const tripleState = () =>
     page.evaluate(`(() => ({
-      like: document.querySelector('button[aria-label="取消点赞"]') !== null,
-      coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
-      fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
+      like: document.querySelector('.bili-tri-btn[aria-label="取消点赞"]') !== null,
+      coin: document.querySelector('.bili-tri-btn[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
+      fav: document.querySelector('.bili-tri-btn[aria-label="取消收藏"]') !== null,
       toast: document.body.innerText.includes('点赞、投币、收藏都已确认'),
+      burst: document.querySelectorAll('.bili-tri-celebrate').length,
     }))()`)
 
   const shortReady = await resetWatch()
+  const standalone = await page.evaluate(`!!document.querySelector('button[aria-label="一键三连"], [data-triple]')`)
+  check('三连手势只占用点赞入口', shortReady && !standalone)
   const shortPoint = await likePoint()
   if (shortPoint) {
     await press(shortPoint)
@@ -3764,7 +3808,12 @@ async function checkTriple(page) {
   const longPoint = await likePoint()
   if (longPoint) {
     await press(longPoint)
-    await sleep(650)
+    await sleep(100)
+    const charging = await page.evaluate(`document.querySelectorAll('.bili-tri-charge').length === 3 &&
+      document.querySelectorAll('.bili-tri-celebrate').length === 0 &&
+      !document.querySelector('.bili-tri-btn[aria-pressed="true"]')`)
+    check('长按时三枚图标蓄力，未提交前不点亮', charging)
+    await sleep(550)
     await release(longPoint)
   }
   const longConfirmed = await waitFor(
@@ -3773,7 +3822,7 @@ async function checkTriple(page) {
   const longState = await tripleState()
   check(
     '按住越过 550ms 触发三连，松手不会取消点赞',
-    longReady && longPoint && longConfirmed && longState.like && longState.coin && longState.fav,
+    longReady && longPoint && longConfirmed && longState.like && longState.coin && longState.fav && longState.burst === 3,
   )
 
   const cancelReady = await resetWatch()
@@ -3794,7 +3843,7 @@ async function checkTriple(page) {
 
   const changedReady = await resetWatch()
   const changed = await page.evaluate(`(() => {
-    const like = document.querySelector('button[aria-label="点赞"]')
+    const like = document.querySelector('.bili-tri-btn[aria-label="点赞"]')
     const next = document.querySelector('[data-related-item]')
     like?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
     next?.click()
@@ -3806,17 +3855,77 @@ async function checkTriple(page) {
   )
   check('按住时换稿取消本次三连', changedReady && changed && !changedToast)
 
-  const keyboardReady = await resetWatch()
-  const keyboardClicked = keyboardReady && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.focus()
-    return document.activeElement === hit
-  })()`)
-  await page.pressSpace()
-  const keyboardConfirmed = await waitFor(
-    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  const failReady = await resetWatch('&failCoin=1')
+  const counts = () => page.evaluate(`[...document.querySelectorAll('.bili-tri-btn')].map(el => Number(el.textContent.trim()))`)
+  const beforeFail = await counts()
+  const failPoint = await likePoint()
+  if (failPoint) {
+    await press(failPoint)
+    await sleep(650)
+    await release(failPoint)
+  }
+  const partial = await waitFor(
+    `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
   )
-  check('键盘可在三连按钮上直接触发', keyboardClicked && keyboardConfirmed)
+  const failed = await tripleState()
+  check('投币失败只保留点赞、收藏；不播放三连动效', failReady && partial &&
+    failed.like && !failed.coin && failed.fav && !failed.toast && failed.burst === 0)
+
+  const afterFail = await counts()
+  check('部分成功的点赞和收藏数字随回执增加', afterFail[0] === beforeFail[0] + 1 &&
+    afterFail[1] === beforeFail[1] && afterFail[2] === beforeFail[2] + 1)
+
+  await page.evaluate(`history.replaceState(null, '', ${JSON.stringify(`${WEB}?loggedIn=1`)})`)
+  const retryPoint = await likePoint()
+  if (retryPoint) {
+    await press(retryPoint)
+    await sleep(650)
+    await release(retryPoint)
+  }
+  const recovered = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  const afterRetry = await counts()
+  check('重试只补缺少的两枚币', recovered && afterRetry[0] === afterFail[0] &&
+    afterRetry[1] === afterFail[1] + 2 && afterRetry[2] === afterFail[2])
+
+  const oneCoinReady = await resetWatch()
+  const beforeCoin = await counts()
+  await page.evaluate(`document.querySelector('.bili-tri-btn[aria-label="投币"]').click()`)
+  await page.clickExactText('投 1 枚')
+  await waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="取消点赞"]')`)
+  const afterCoin = await counts()
+  check('投一枚并同时点赞后，两项数字同步增加', oneCoinReady &&
+    afterCoin[0] === beforeCoin[0] + 1 && afterCoin[1] === beforeCoin[1] + 1)
+  const topUpPoint = await likePoint()
+  if (topUpPoint) {
+    await press(topUpPoint)
+    await sleep(650)
+    await release(topUpPoint)
+  }
+  const toppedUp = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  const afterTopUp = await counts()
+  check('已投一枚时三连只补一枚', toppedUp && afterTopUp[0] === afterCoin[0] &&
+    afterTopUp[1] === afterCoin[1] + 1 && afterTopUp[2] === afterCoin[2] + 1)
+
+  const keyboardReady = await resetWatch()
+  await page.evaluate(`document.querySelector('.bili-tri-btn[aria-label="点赞"]').focus()`)
+  await page.pressSpace()
+  const keyboardShort = await waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="取消点赞"]')`)
+  const onlyLiked = await tripleState()
+  check('聚焦点赞后轻按空格只点赞', keyboardReady && keyboardShort && !onlyLiked.coin && !onlyLiked.fav)
+  await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
+  const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }
+  await page.keyEvent({ ...enter, type: 'keyDown' })
+  await sleep(120)
+  const still = await page.evaluate(`getComputedStyle(document.querySelector('.bili-tri-charge circle')).animationName === 'none'`)
+  await page.keyEvent({ ...enter, type: 'keyDown', autoRepeat: true })
+  const keyConfirmed = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  await page.keyEvent({ ...enter, type: 'keyUp' })
+  const afterKey = await tripleState()
+  check('按住回车触发三连，按键重复和松开不反转', keyConfirmed && afterKey.like && afterKey.coin && afterKey.fav)
+  const reducedBurst = await page.evaluate(`[...document.querySelectorAll('.bili-tri-celebrate')]
+    .every(el => getComputedStyle(el).animationName === 'none' && getComputedStyle(el, '::after').animationName === 'none')`)
+  check('减少动态效果时保留按住提示和完成状态', still && afterKey.burst === 3 && reducedBurst)
+  await page.emulateMedia([])
 }
 
 /** 榜单首屏骨架必须和真实首行同起点，页首和分区在数据到达前后不跳。 */
@@ -4128,16 +4237,111 @@ async function checkProfileSettings(page) {
   await page.viewport(1320, 900)
 }
 
-async function checkCommentPauseIntent(page) {
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
-  const waitFor = async (expression) => {
+function watchUiWait(page) {
+  return async (expression) => {
     const deadline = Date.now() + 8000
     while (Date.now() < deadline) {
-      if (await page.evaluate(expression)) return
+      if (await page.evaluate(`Boolean(${expression})`)) return true
       await sleep(50)
     }
-    throw new Error(`评论切 P 验收超时：${expression}`)
+    throw new Error(`观看页验收超时：${expression}`)
   }
+}
+
+async function checkWatchPartHistory(page) {
+  const waitFor = watchUiWait(page)
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?watchHistory=1`)}`)
+  const input = `document.querySelector('[aria-label="顶栏搜索"]')`
+  await waitFor(`location.search.includes('watchHistory') && ${input} && window.shaka?.Player`)
+  await page.evaluate(`(() => {
+    // 预览的 MPD 没有媒体流。只代替网络加载，保留实际的播放器与视频定位。
+    window.shaka.Player.prototype.load = async () => {}
+    const input = ${input}
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '晴天')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.form.requestSubmit()
+  })()`)
+  const card = "document.querySelector('[data-search-results] [data-track-title=\"晴天\"]')"
+  const watch = `${card}.querySelector('[aria-label=\"观看 晴天\"]')`
+  await waitFor(card)
+  const key = await page.evaluate(`${card}.dataset.key`)
+  const keys = [
+    `oh-bilibili:watch-page:${key}`, `oh-bilibili:page-count:${key}`,
+    ...[1, 2, 3].flatMap(no => [`oh-bilibili:watch-pos:${key}:${no}`, `oh-bilibili:watch-len:${key}:${no}`]),
+  ]
+  const local = await page.evaluate(`${JSON.stringify(keys)}.map(key => localStorage.getItem(key))`)
+  const active = `document.querySelector('[data-watch-pages] button[aria-pressed=true]')?.innerText`
+  const restored = `${active}?.includes('P2') && document.body.innerText.includes('上次观看位置 1:17') && document.querySelector('video')?.currentTime === 77`
+  try {
+    await page.evaluate(`${JSON.stringify(keys)}.forEach(key => localStorage.removeItem(key))`)
+    await page.evaluate(`${watch}.click()`)
+    check('搜索卡无本地断点时打开数据库记录的 P2，画面回到 1:17', await waitFor(restored))
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+    await waitFor(card)
+    await page.evaluate(`(() => {
+      const input = ${input}
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify('https://www.bilibili.com/video/' + key + '?p=1')})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.form.requestSubmit()
+    })()`)
+    check('显式 P1 链接从 0:00 开始，不沿用 P2 的续播时间', await waitFor(
+      `window.__ohBilibiliWatch?.state().ready && ${active}?.includes('P1') && document.querySelector('video')?.currentTime === 0 && !document.body.innerText.includes('上次观看位置 1:17')`))
+    await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+    await waitFor(card)
+    await page.evaluate(`(() => {
+      localStorage.setItem(${JSON.stringify(keys[0])}, '3')
+      localStorage.setItem(${JSON.stringify(`oh-bilibili:watch-pos:${key}:3`)}, '8000')
+      ${watch}.click()
+    })()`)
+    check('本地留有 P3 的 0:08 时，搜索卡仍恢复数据库 P2 的 1:17', await waitFor(restored))
+  } finally {
+    await page.evaluate(`${JSON.stringify(keys)}.forEach((key, i) => {
+      const value = ${JSON.stringify(local)}[i]
+      if (value === null) localStorage.removeItem(key)
+      else localStorage.setItem(key, value)
+    })`)
+  }
+}
+
+async function checkWatchLink(page) {
+  const waitFor = watchUiWait(page)
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const input = `document.querySelector('[aria-label="顶栏搜索"]')`
+  await waitFor(`location.search.includes('commentJumps') && ${input}`)
+  const submit = async (text, action) => {
+    await page.evaluate(`(() => {
+      const input = ${input}
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(text)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    const button = `${input}.form.querySelector('button[type="submit"]')`
+    await waitFor(`${button}.textContent === ${JSON.stringify(action)} && !${button}.disabled`)
+    await page.evaluate(`${button}.click()`)
+  }
+  await submit('晴天', '搜索')
+  const result = "document.querySelector('[data-search-results] [data-track-card]')"
+  check('普通搜索词仍展示视频结果', await waitFor(`${result}?.dataset.trackTitle?.includes('晴天')`))
+
+  const key = await page.evaluate(`${result}.dataset.key`)
+  const link = `https://www.bilibili.com/video/${key}?p=2&t=77`
+  const last = "performance.getEntriesByName('comment-page-ready').at(-1)?.detail"
+  const activePart = "document.querySelector('[data-watch-pages] button[aria-pressed=true]')?.innerText"
+  const target = `${activePart}?.includes('P2') && ${last}?.page === 2 && ${last}?.at === 77000`
+  await submit(link, '打开视频')
+  check('顶栏分享链接打开 P2 并向播放引擎传入 1:17', await waitFor(target))
+
+  await page.evaluate(`document.querySelector('[data-watch-pages] ol button').click()`)
+  await waitFor(`${activePart}?.includes('P1') && ${last}?.page === 1`)
+  await submit(link, '打开视频')
+  check('手动切到 P1 后重贴同一链接，回到 P2 的 1:17', await waitFor(target))
+}
+
+async function checkCommentPauseIntent(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const waitFor = watchUiWait(page)
   await waitFor('location.search.includes("commentJumps") && !!document.querySelector("main h2")')
   await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
     .then(([app, catalog]) => app.useAppStore.getState().navigate({ kind: 'watch', track: catalog.CATALOG[0], page: 1 }))`)
@@ -4181,8 +4385,24 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--watch-link-only')) {
+      await checkWatchLink(page)
+      return
+    }
     if (process.argv.includes('--comment-pause-only')) {
       await checkCommentPauseIntent(page)
+      return
+    }
+    if (process.argv.includes('--watch-history-only')) {
+      await checkWatchPartHistory(page)
+      return
+    }
+    if (process.argv.includes('--history-parts-only')) {
+      await checkHistoryParts(page)
+      return
+    }
+    if (process.argv.includes('--stage-moments-only')) {
+      await checkStageMoments(page)
       return
     }
     if (channelOnly) {
@@ -4223,9 +4443,11 @@ async function main() {
     }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkWatchLink(page)
     await checkCommentPauseIntent(page)
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
+    await checkStageMoments(page)
     await checkStageMorph(page)
     await checkHeroAllocation(page)
     await checkAuthorHero(page)
@@ -4234,6 +4456,8 @@ async function main() {
     await checkTriple(page)
     await checkFollowingDirectory(page)
     await checkHomeResume(page)
+    await checkHistoryParts(page)
+    await checkWatchPartHistory(page)
     await checkNavConventions(page)
     await checkRanking(page)
     await checkRankingSkeleton(page)
@@ -5185,10 +5409,14 @@ async function main() {
     const byTitle = await page.evaluate(pageRows)
     check('输入标题片段只留下匹配集', byTitle.count === 1 && byTitle.text.includes('晴天 · 现场版'))
     await typeIntoFilter('P62')
-    await sleep(200)
-    await page.evaluate(`${visiblePanel}?.querySelector('ol li button')?.click()`)
-    await sleep(1500)
-    const picked = await page.evaluate(pageRows)
+    const matchingPart = `${visiblePanel}?.querySelector('ol button[title="晴天 · 现场版"]')`
+    await watchUiWait(page)(matchingPart)
+    await page.evaluate(`${matchingPart}.click()`)
+    let picked = await page.evaluate(pageRows)
+    for (let i = 0; i < 80 && !picked.header.includes('P62/80'); i += 1) {
+      await sleep(100)
+      picked = await page.evaluate(pageRows)
+    }
     check('选中筛选结果才切到 P62', picked.header.includes('P62/80'))
     await page.evaluate(`${visiblePanel}?.querySelector('button[aria-label="清除筛选"]')?.click()`)
     await sleep(300)

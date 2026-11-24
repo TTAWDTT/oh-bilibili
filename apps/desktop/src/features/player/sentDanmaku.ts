@@ -8,6 +8,10 @@ import { create } from 'zustand'
  */
 export type SentLine = { at: number; text: string; color: string }
 
+export function danmakuPartKey(trackKey: string, page?: number): string {
+  return page && page > 1 ? `${trackKey}_p${page}` : trackKey
+}
+
 type Store = {
   byTrack: Record<string, SentLine[]>
   append: (trackKey: string, line: SentLine) => void

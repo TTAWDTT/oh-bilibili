@@ -507,6 +507,89 @@ fn 评论能取到真实数据与嵌套回复() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "真实网络与声卡"]
+async fn 观看后从列表继续听会显示音频控制() {
+    use bilimusic_core::wire::{HistoryResume, PlayMode};
+    use bilimusic_model::TrackKey;
+
+    let dir = TestDir::new("watch-to-listen-entry");
+    let engine = Engine::new(&dir.join("library.sqlite")).unwrap();
+    engine.set_volume(0.0);
+    let first = TrackKey::from_provider("BV1Tb4y1a7sZ");
+    let second = TrackKey::from_provider("BV1Sx411T7QQ");
+    let origin = "http://127.0.0.1:9";
+    engine.open_watch(&second, origin).await.unwrap();
+    let video = engine.open_watch_page(&first, origin, Some(2), Some(58_000)).await.unwrap();
+    assert_eq!(video.current_page, 2);
+    let p2 = video.pages.iter().find(|part| part.no == 2).unwrap();
+    assert_eq!(engine.snapshot().mode, PlayMode::Watch);
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while engine.snapshot().phase != "playing" {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }).await.unwrap();
+    engine.pause();
+    assert_eq!(engine.seek(77_000).position_ms, 77_000);
+    engine.close_watch(Some(&first));
+
+    let keys = [first.as_opaque().to_string(), second.as_opaque().to_string()];
+    let from_list = engine.play_context(&keys, 1, None).await.unwrap();
+    assert_eq!(from_list.mode, PlayMode::Listen, "列表点继续播放或只听要进入听模式");
+    assert_eq!(from_list.track.unwrap().key, second);
+
+    let rows = engine.history_with_time(5, None).unwrap();
+    let saved = rows.iter().find(|row| row.track.key == first).unwrap();
+    assert_eq!(saved.page_no, Some(2));
+    assert_eq!(saved.page_duration_ms, Some(p2.duration_ms));
+    assert_eq!(saved.position_ms, 77_000);
+    let resume = HistoryResume { page: saved.page_no.unwrap(), position_ms: saved.position_ms };
+    let resumed = engine.play_context(&keys, 0, Some(resume)).await.unwrap();
+    assert!((77_000..78_000).contains(&resumed.position_ms));
+    assert_eq!(resumed.page.as_ref(), Some(p2), "另一稿播完再从历史续听应恢复原分 P");
+    assert_eq!(resumed.duration_ms, p2.duration_ms);
+    let queue = engine.queue_view();
+    assert_eq!(queue.index, Some(0));
+    assert_eq!(queue.items.iter().map(|t| &t.key).collect::<Vec<_>>(), [&first, &second]);
+    let playing = tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let snapshot = engine.snapshot();
+            if snapshot.phase == "playing" && snapshot.position_ms > 77_000 {
+                break snapshot;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }).await.expect("续听后真实音频时钟应从 P2 的断点继续走");
+    assert_eq!(playing.mode, PlayMode::Listen);
+    assert_eq!(playing.page.as_ref(), Some(p2));
+    assert!(playing.position_ms < 81_000);
+    println!("恢复 P{}（CID {}），进度 {}/{} ms，保留两稿队列", p2.no, p2.cid, playing.position_ms, playing.duration_ms);
+
+    engine.play_key(&second).await.unwrap();
+    let automatic = engine.open_watch(&first, origin).await.unwrap();
+    assert_eq!(automatic.current_page, 2, "普通搜索卡观看应打开数据库记录的 P2");
+    assert!((77_000..81_000).contains(&automatic.resume_ms));
+    assert_eq!(automatic.duration_ms, p2.duration_ms);
+    assert_eq!(engine.snapshot().mode, PlayMode::Watch);
+    let explicit = engine.open_watch_page_with_pause(&first, origin, Some(1), None, true).await.unwrap();
+    assert_eq!(explicit.current_page, 1);
+    assert_eq!(explicit.resume_ms, 0, "显式 P1 不得消费 P2 的断点");
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while engine.snapshot().phase != "paused" {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }).await.unwrap();
+    let p1 = engine.snapshot();
+    assert_eq!(p1.page.unwrap().no, 1);
+    assert_eq!(p1.position_ms, 0);
+    println!("普通观看恢复 P2 到 {} ms；显式 P1 的实际音频时钟为 {} ms", automatic.resume_ms, p1.position_ms);
+    let single = engine.play_key(&second).await.unwrap();
+    assert_eq!(single.mode, PlayMode::Listen);
+    let after_close = engine.close_watch(Some(&first));
+    assert_eq!(after_close.track.unwrap().key, second);
+    assert!(matches!(after_close.phase.as_str(), "loading" | "playing"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络与声卡"]
 async fn paused_comment_jump_preserves_page_and_position() {
     let dir = TestDir::new("comment-jump");
     let engine = Engine::new(&dir.join("library.sqlite")).unwrap();
@@ -590,6 +673,7 @@ async fn watch_session_preserves_listen_queue_and_bookmark() {
                 bilimusic_core::engine::WatchOptions {
                     paused: true,
                     preserve_listen_queue: true,
+                    ..Default::default()
                 },
             )
             .await
@@ -723,7 +807,7 @@ fn 切到听视频能接管并接上位置() {
         let key = tracks.first().map(|t| t.key.clone()).expect("至少一条");
         // 先进队列，set_mode 要能从队列里取当前项
         let keys: Vec<String> = vec![key.as_opaque().to_string()];
-        let prepared = engine.play_context(&keys, 0).await;
+        let prepared = engine.play_context(&keys, 0, None).await;
         println!("准备阶段: {:?} 相位={}", prepared.as_ref().map(|_| "ok").map_err(|e| e.message()), engine.snapshot().phase);
         std::thread::sleep(std::time::Duration::from_millis(900));
         println!("播放 0.9 秒后位置 {}ms（音量 {}）", engine.snapshot().position_ms, engine.snapshot().volume);
@@ -785,7 +869,7 @@ fn 听视频接的是正在看的那一条() {
 
         // 先听第一条，让队列里有东西
         let keys: Vec<String> = vec![second.as_opaque().to_string()];
-        engine.play_context(&keys, 0).await.ok();
+        engine.play_context(&keys, 0, None).await.ok();
         println!("队列当前: {:?}", engine.snapshot().track.map(|t| t.key.as_opaque().to_string()));
 
         // 再看第一条，然后切听

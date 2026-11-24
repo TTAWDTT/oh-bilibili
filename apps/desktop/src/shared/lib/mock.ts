@@ -1,8 +1,9 @@
-import type { DownloadView, PageRef, QrStatus, Track, WireError } from './contract'
+import type { DownloadView, QrStatus, Track, WireError } from './contract'
+import type { HistoryEntry, PlaybackResume } from './ipc'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
-import { emit, ensureClock, fail, playlistOf, setDuration, snapshot, state, trackOf } from './mockEngine'
+import { emit, ensureClock, fail, playlistOf, previewPages, setDuration, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
 
 export { mockSubscribe } from './mockEngine'
@@ -190,18 +191,6 @@ const popularFailOnce =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('popularFailOnce')
 let popularFailedOnce = false
 
-function previewPages(track: Track): PageRef[] {
-  const params = new URLSearchParams(window.location.search)
-  const many = params.has('manyPages')
-  const commentJumps = params.has('commentJumps')
-  const count = many ? 80 : params.has('multiP') || commentJumps ? 2 : track.pages ?? 1
-  return Array.from({ length: count }, (_, index) => ({
-    no: index + 1,
-    cid: (many ? 100 : 1) + index,
-    title: index === 0 ? track.title : index === 61 ? '晴天 · 现场版' : index === 1 ? '第二 P · 预览' : `第 ${index + 1} 集 · 预览`,
-    duration_ms: many ? 30_000 + index * 1000 : commentJumps ? 300_000 : track.duration_ms ?? 30_000,
-  }))
-}
 
 function eightPartTrack(track: Track): Track {
   const result = { ...track, pages: 8 }
@@ -603,14 +592,23 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const seed = CATALOG[0]
       if (!seed) return []
       const long = import.meta.env.DEV && new URLSearchParams(window.location.search).has('historyLong')
+      const manyPages = new URLSearchParams(window.location.search).has('manyPages')
+      const watchHistory = new URLSearchParams(window.location.search).has('watchHistory')
       const all = long
         ? [
-            ...Array.from({ length: 98 }, (_, i) => ({
-              id: i + 1,
-              track: { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` },
-              played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
-              position_ms: i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000,
-            })),
+            ...Array.from({ length: 98 }, (_, i) => {
+              const track = { ...seed, key: `history-${i}`, title: `历史记录 ${i + 1} · ${seed.title}` }
+              const page = manyPages && (i === 1 || i === 2) ? previewPages(track)[1] : undefined
+              const position = i % 5 === 0 ? seed.duration_ms ?? 0 : i % 5 === 4 ? 0 : 12_000
+              return {
+                id: i + 1,
+                track,
+                played_at: now - Math.floor(i / 3) * 86_400_000 - (i % 3) * 3_600_000,
+                page_no: page?.no,
+                page_duration_ms: page?.duration_ms,
+                position_ms: page && i === 2 ? page.duration_ms - 500 : position,
+              }
+            }),
             {
               id: 99,
               track: {
@@ -633,7 +631,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
             id: i + 1,
             track,
             played_at: now - i * 9.5 * 3600_000,
-            position_ms: [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
+            page_no: watchHistory && i === 0 ? 2 : null,
+            page_duration_ms: watchHistory && i === 0 ? previewPages(track)[1]?.duration_ms : null,
+            position_ms: watchHistory && i === 0 ? 77_000 : [12_000, 0, 20_000, 0, 0, 26_000, 0][i] ?? 0,
           }))
       for (const entry of all) registerTrack(entry.track)
       return all
@@ -651,6 +651,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       // 预览模式给几条近期记录，让「继续听」区块有内容可看。
       return CATALOG.slice(0, 5)
     case 'set_mode': {
+      const previous = snapshot()
       state.mode = str(args, 'mode') === 'watch' ? 'watch' : 'listen'
       // 「听视频」切到听模式时会带上当前曲目与位置：真实引擎从这里接着放，
       // 预览也要接上，否则回到列表就变成「还没有在播放」。
@@ -659,11 +660,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (key && state.mode === 'listen') {
         const track = findTrack(key)
         if (track) {
-          state.keys = [key]
-          state.index = 0
-          state.duration = track.duration_ms ?? 30_000
+          if (!state.keys.includes(key)) state.keys.push(key)
+          state.index = state.keys.indexOf(key)
+          state.localKey = null
+          state.duration = state.watchPage?.key === key ? state.watchPage.page.duration_ms : track.duration_ms ?? 30_000
           state.position = Number.isFinite(at) ? at : 0
-          state.phase = 'playing'
+          state.phase = previous.track?.key === key && previous.phase === 'paused' ? 'paused' : 'playing'
         }
       }
       // 真实引擎切模式后会推一条 state 事件；界面靠它更新底部播放条与右栏。
@@ -1002,14 +1004,28 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const track = findTrack(str(args, 'key'))
       if (!track) throw fail('input', '预览模式没有这条视频')
       const commentJumps = import.meta.env.DEV && new URLSearchParams(window.location.search).has('commentJumps')
-      const pageDuration = commentJumps ? 300_000 : track.duration_ms ?? 30_000
-      // 预览没有真实音频：把时长交给 mock 播放器，进度条、seek 与热度柱才有得可算。
-      setDuration(pageDuration)
       const pages = previewPages(track)
-      const requestedPage = Number(args.page ?? 1) || 1
-      if (commentJumps && requestedPage === 2) await sleep(600)
-      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused } })
-      const currentPage = pages.some((entry) => entry.no === requestedPage) ? requestedPage : 1
+      const rows = await mockInvoke('library_history_timed', { limit: 500 }) as HistoryEntry[]
+      const saved = rows.find((entry) => entry.track.key === track.key)
+      const local = args.local_resume as PlaybackResume | null
+      const savedPage = pages.find((entry) => entry.no === saved?.page_no)
+      const localPage = pages.find((entry) => entry.no === local?.page)
+      const chosen = args.page == null ? savedPage ?? localPage : pages.find((entry) => entry.no === args.page)
+      const part = chosen ?? pages[0]!
+      const savedAt = saved?.page_no === part.no ? saved.position_ms : null
+      const legacyAt = args.page == null && part.no === 1 && saved?.page_no == null ? saved?.position_ms : null
+      const localAt = local?.page === part.no ? local.position_ms : null
+      const explicitAt = args.page == null || args.page === part.no ? args.resume_at as number | null : null
+      const resume = Math.min(explicitAt ?? savedAt ?? localAt ?? legacyAt ?? 0, part.duration_ms)
+      if (commentJumps && part.no === 2) await sleep(600)
+      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: part.no, paused: args.paused, at: args.resume_at } })
+      const currentPage = part.no
+      state.watchPage = { key: track.key, page: part }
+      setDuration(part.duration_ms)
+      if (args.continue_audio) {
+        state.mode = 'watch'
+        emit({ type: 'state', snapshot: snapshot() })
+      }
       return {
         key: track.key,
         desc: '预览模式的简介：00:12 开场，01:03 副歌，这里放 UP 主写的正文，链接会做成可点的 https://www.bilibili.com/video/BV1xx411c7mD 下面的文字用来验证简介超过两行时的展开与收起，以及窄屏下的排版是否会把按钮挤掉。展开之后应该能看到这一段完整的介绍，收起时恢复到两行，按钮本身不遮挡下面的标签。\n原舞参考：BV1Mk4y11666\n伴奏下载：https://example.com/inst',
@@ -1029,6 +1045,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         tname: track.tname ?? null,
         pages,
         current_page: currentPage,
+        resume_ms: resume,
         // 预览给一个三集合集：换成别的视频时把当前这条换进第一集，右栏合集能验到。
         season: {
           id: 1,
@@ -1055,7 +1072,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
                 { mid: 9004, name: '一个很长的合作成员昵称用来验证换行', face: null, title: '动画' },
               ],
         // 预览模式不真的取流，播放器会落到错误层；这里给一个不存在的本机地址。
-        manifest_url: 'http://127.0.0.1:1/m/preview.mpd',
+        manifest_url: `http://127.0.0.1:1/m/${track.key}-${currentPage}.mpd`,
         // 观看页拿到的 duration 是当前这一 P 的时长，不是整条投稿的总长。
         duration_ms: pages.find((entry) => entry.no === currentPage)?.duration_ms ?? track.duration_ms ?? 30_000,
         qualities: [{ id: 80, label: '1080P', height: 1080, bandwidth: 2_400_000 }],
@@ -1434,6 +1451,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         '前奏一响 青春就回来了', '谁 2026 年还在听', '音量调大', '泪目',
         '这个转场绝了', '单曲循环中', '干杯',
       ]
+      if (num(args, 'cid') === 2) {
+        texts[2] = '这段变奏好喜欢'
+        texts[3] = '5'
+        texts[4] = '？！'
+        texts[9] = '尾奏适合循环'
+      }
       // 第 3 条做成顶部弹幕、第 6 条做成底部，用来验证钉住的两种位置。
       const base = texts.map((text, i) => ({
         secs: 1 + i * 2,
@@ -1498,17 +1521,18 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         ]
       })
     }
-    case 'coin_set':
+    case 'coin_set': {
       if (new URL(window.location.href).searchParams.has('failCoin')) {
         throw fail('internal', '投币回执超时')
       }
+      const key = str(args, 'key')
+      state.coins.set(key, Math.min(2, (state.coins.get(key) ?? 0) + num(args, 'count')))
+      if (bool(args, 'also_like')) state.likes.add(key)
       return null
+    }
     case 'relation_states': {
-      // 预览：目录第一条固定是已赞/已藏，用来验证进页面时状态会被点亮。
-      // 按「这一批的第一条」算会把鼠标底下那张卡随机点亮，验出来的状态是假的。
       const keys = Array.isArray(args.keys) ? (args.keys as string[]) : []
-      const first = CATALOG[0]?.key
-      return keys.map((key) => [key, key === first, key === first, key === first ? 1 : 0])
+      return keys.map((key) => [key, state.likes.has(key), state.favs.has(key), state.coins.get(key) ?? 0])
     }
     case 'like_set': {
       const key = str(args, 'key')

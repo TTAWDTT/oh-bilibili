@@ -14,6 +14,18 @@ assert.deepEqual(counts(timeline, 12000), [3, 1])
 assert.deepEqual(counts(timeline, 10800), [2])
 assert.deepEqual(counts(timeline, 10800), [2])
 assert.deepEqual(counts(scheduleDanmaku([line(0), line(0)], true, 1, life), 0), [2])
+const strip = scheduleDanmaku(
+  [line(1000), line(1500), line(1600, '顶部', 5), line(10000, '底部', 4), line(10100), line(14000)],
+  true, 1, life, true,
+)
+assert.deepEqual(counts(strip, 1600), [2])
+assert.deepEqual(visibleDanmaku(strip, 10000, life).map(({ flight }) => flight.mode), [4])
+assert.deepEqual(counts(strip, 13999), [1])
+assert.deepEqual(counts(strip, 14000), [1])
+const own = { ...line(3500, '我刚发的弹幕'), own: true }
+const withOwn = scheduleDanmaku([line(1000), own, line(4000)], false, 1, life, true)
+assert.deepEqual(visibleDanmaku(withOwn, 3499, life).map(({ flight }) => flight.text), ['前方高能'])
+assert.deepEqual(visibleDanmaku(withOwn, 3500, life).map(({ flight }) => flight.text), [own.text])
 const crowded = scheduleDanmaku([line(0), line(15, '独特'), line(500), line(580, '独特'), line(1490, '独特')], true, 1, life)
 assert.deepEqual(counts(crowded, 1490), [2])
 const variants = [line(100), line(200, '前方高能！'), line(210, '前方高能', 4), line(220, '前方高能', 1, '#ddd'), line(230)]

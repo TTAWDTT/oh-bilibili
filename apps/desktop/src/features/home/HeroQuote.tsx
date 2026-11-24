@@ -2,33 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 import type { Track } from '../../shared/lib/contract'
 import { formatTime } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
+import { Icon } from '../../shared/ui/Icon'
+import { filterDanmaku } from '../player/danmakuFilter'
 import { useDanmakuSettings } from '../player/danmakuSettings'
 
 /** 引文取同一段 24 秒里最密的一小簇，读起来像同一刻的观众反应。 */
 const QUOTE_WINDOW_S = 24
 
-export type Quote = { page: number; pages: number; cid: number; at: number; lines: string[] }
+type Quote = { page: number; pages: number; atMs: number; text: string }
 
-/** 按用户的屏蔽词与屏蔽类型过滤，再去重、取最密的一段，最多三条。 */
+/** 同一句刷屏只计一次，取观众发言最集中的一段。 */
 function pickQuote(
   lines: ipc.DanmakuLine[],
   page: number,
   pages: number,
-  cid: number,
-  blockWords: string[],
-  blockTypes: string[],
 ): Quote | null {
-  const words = blockWords.map((word) => word.toLowerCase())
   const seen = new Set<string>()
   const kept = lines
-    .filter((line) => line.text.trim().length > 0)
     .filter((line) => {
-      if (line.mode === 1 && blockTypes.includes('roll')) return false
-      if (line.mode === 5 && blockTypes.includes('top')) return false
-      if (line.mode === 4 && blockTypes.includes('bottom')) return false
       const text = line.text.trim()
-      if (words.some((word) => text.toLowerCase().includes(word))) return false
-      if (seen.has(text)) return false
+      if (!text || seen.has(text)) return false
       seen.add(text)
       return true
     })
@@ -42,20 +35,18 @@ function pickQuote(
   let bestStart = 0
   let bestCount = 0
   for (let start = 0, end = 0; start < pool.length; start += 1) {
-    if (end < start) end = start
     while (end < pool.length && pool[end]!.secs < pool[start]!.secs + QUOTE_WINDOW_S) end += 1
     if (end - start > bestCount) {
       bestCount = end - start
       bestStart = start
     }
   }
-  const picked = pool.slice(bestStart, bestStart + Math.min(3, bestCount))
+  const picked = pool[bestStart]!
   return {
     page,
     pages,
-    cid,
-    at: Math.floor(picked[0]!.secs),
-    lines: picked.map((line) => line.text.trim()),
+    atMs: Math.round(picked.secs * 1000),
+    text: picked.text.trim(),
   }
 }
 
@@ -69,39 +60,30 @@ export function useHeroQuote(key: string | undefined): Quote | null {
   const enabled = useDanmakuSettings((state) => state.enabled)
   const blockWords = useDanmakuSettings((state) => state.blockWords)
   const blockTypes = useDanmakuSettings((state) => state.blockTypes)
+  const quoteKey = JSON.stringify([key, blockWords, blockTypes])
   const cache = useRef(new Map<string, Quote>())
-  const [quote, setQuote] = useState<Quote | null>(null)
+  const [loaded, setLoaded] = useState<{ key: string; quote: Quote } | null>(null)
 
   useEffect(() => {
-    if (!key || !enabled) {
-      setQuote(null)
-      return
-    }
-    const cached = cache.current.get(key)
+    if (!key || !enabled) return
+    const cached = cache.current.get(quoteKey)
     if (cached) {
-      setQuote(cached)
+      setLoaded({ key: quoteKey, quote: cached })
       return
     }
     let alive = true
-    setQuote(null)
     void (async () => {
       try {
         const meta = await ipc.videoMeta(key)
         const page = meta.current_page || meta.pages[0]?.no || 1
         const cid = meta.pages.find((entry) => entry.no === page)?.cid
         if (!cid) return
-        const picked = pickQuote(
-          await ipc.danmakuColored(key, cid),
-          page,
-          meta.pages.length,
-          cid,
-          blockWords,
-          blockTypes,
-        )
+        const lines = await ipc.danmakuColored(key, cid)
+        const picked = pickQuote(filterDanmaku(lines, blockWords, blockTypes), page, meta.pages.length)
         if (!picked) return
-        cache.current.set(key, picked)
+        cache.current.set(quoteKey, picked)
         // 轮播可能已经翻走：旧稿的响应只进缓存，不进画面。
-        if (alive) setQuote(picked)
+        if (alive) setLoaded({ key: quoteKey, quote: picked })
       } catch {
         // 取不到就维持普通首推，不做占位
       }
@@ -109,35 +91,31 @@ export function useHeroQuote(key: string | undefined): Quote | null {
     return () => {
       alive = false
     }
-  }, [key, enabled, blockWords, blockTypes])
+  }, [key, enabled, blockWords, blockTypes, quoteKey])
 
-  return quote
+  return enabled && loaded?.key === quoteKey ? loaded.quote : null
 }
 
-export function quoteLabel(quote: Quote): string {
-  return `从 ${quote.pages > 1 ? `P${quote.page} · ` : ''}${formatTime(quote.at * 1000)} 看`
-}
-
-/** 窄窗与右侧小卡共用的一行引文：一句原话 + 明确的时间入口。 */
-export function HeroQuoteLine({
-  track,
-  quote,
-  onOpen,
-}: {
+export function HeroQuoteLine({ track, quote, featured = false, onOpen }: {
   track: Track
   quote: Quote
+  featured?: boolean
   onOpen: (track: Track, start: { page: number; atMs: number }) => void
 }) {
+  const time = `${quote.pages > 1 ? `P${quote.page} · ` : ''}${formatTime(quote.atMs)}`
   return (
-    <div className="mt-2 flex items-center gap-3">
-      <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--text-2)]">{quote.lines[0]}</span>
-      <button
-        type="button"
-        onClick={() => onOpen(track, { page: quote.page, atMs: quote.at * 1000 })}
-        className="t press shrink-0 text-[12px] text-[var(--accent)] hover:underline"
-      >
-        {quoteLabel(quote)}
-      </button>
-    </div>
+    <button
+      type="button"
+      data-focus-id={`hero-quote:${track.key}`}
+      aria-label={`从 ${time} 看弹幕：${quote.text}`}
+      onClick={() => onOpen(track, { page: quote.page, atMs: quote.atMs })}
+      className={`group relative mt-2 grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-1.5 rounded-[5px] text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)] ${featured ? 'border-l-2 border-[var(--accent)] bg-[var(--ga0)] px-2.5 py-2' : 'px-0.5 py-1'}`}
+    >
+      <Icon name="danmaku" size={14} className="self-center text-[var(--accent-strong)]" />
+      <span className={featured ? 'line-clamp-2' : 'truncate'}>{quote.text}</span>
+      <span className="num inline-flex shrink-0 items-center gap-0.5 text-[var(--accent-strong)]">
+        {time}<Icon name="chevronRight" size={11} />
+      </span>
+    </button>
   )
 }

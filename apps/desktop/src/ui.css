@@ -551,212 +551,111 @@
   background: #fff;
 }
 
-/* 长按点赞：一条从左往右填满的细条，填满就是「一键三连」触发。
-   只动 transform，不触发布局。 */
-@keyframes bili-hold-fill {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-.bili-hold-bar {
-  transform-origin: left center;
-  animation: bili-hold-fill 550ms linear forwards;
-}
-
-/* 三连按钮点中那一下：点赞先放大再回弹，硬币翻面，收藏转一圈。
-   只在状态翻转时通过 key 重挂载播放一次，平时不占渲染。 */
-@keyframes bili-tri-pop {
-  0% { transform: scale(1); }
-  38% { transform: scale(1.34); }
-  70% { transform: scale(0.92); }
-  100% { transform: scale(1); }
-}
-
-@keyframes bili-tri-flip {
-  from { transform: rotateY(0deg); }
-  to { transform: rotateY(360deg); }
-}
-
-@keyframes bili-tri-spin {
-  0% { transform: rotate(0deg) scale(1); }
-  55% { transform: rotate(150deg) scale(1.24); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
-.bili-tri-pop,
-.bili-tri-flip,
-.bili-tri-spin {
-  display: inline-flex;
-}
-
-.bili-tri-pop { animation: bili-tri-pop 320ms var(--spring); }
-.bili-tri-flip { animation: bili-tri-flip 420ms var(--ease); }
-.bili-tri-spin { animation: bili-tri-spin 420ms var(--spring); }
-
-/* 悬停时只让图标自己活一下：小幅摆头，播一遍就停，不做无限循环。 */
-@keyframes bili-tri-wobble {
-  0% { transform: rotate(0deg); }
-  25% { transform: rotate(-6deg); }
-  52% { transform: rotate(5deg); }
-  78% { transform: rotate(-3deg); }
-  100% { transform: rotate(0deg); }
-}
-
-.bili-tri-btn:hover {
-  transform: translateY(-1px);
-}
-
-.bili-tri-btn:active {
-  transform: translateY(-1px) scale(0.94);
-}
-
-.bili-tri-btn:hover .bili-tri-glyph {
-  animation: bili-tri-wobble 520ms var(--ease);
+.bili-tri-btn {
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .bili-tri-glyph {
   display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
 }
 
-/* 状态翻过时贴着按钮内沿闪一圈；key 换掉重播，平时透明。
-   按钮本身 overflow-hidden（长按进度条要裁住），所以这里只做内缩到满框的脉冲。 */
-@keyframes bili-tri-ring {
-  from {
-    opacity: 0.55;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1);
-  }
+.bili-tri-charge {
+  position: absolute;
+  inset: -5px;
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+  transform: rotate(-90deg);
 }
 
-.bili-tri-ring {
-  animation: bili-tri-ring 360ms var(--ease);
+.bili-tri-charge circle {
+  stroke-dasharray: 1;
+  animation: bili-tri-charge var(--hold-duration) linear both;
+}
+
+@keyframes bili-tri-charge {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.bili-tri-celebrate {
+  display: inline-flex;
+  animation: var(--tri-motion) 460ms var(--ease) var(--tri-delay) both;
+}
+
+.bili-tri-like {
+  --tri-motion: bili-thumb-up;
+  --tri-delay: 0ms;
+}
+
+.bili-tri-coin {
+  --tri-motion: bili-coin-flip;
+  --tri-delay: 80ms;
+}
+
+.bili-tri-favorite {
+  --tri-motion: bili-star-flash;
+  --tri-delay: 160ms;
+}
+
+@keyframes bili-thumb-up {
+  35% { transform: translateY(-3px) scale(1.18) rotate(-10deg); }
+  70% { transform: scale(.96) rotate(3deg); }
+}
+
+@keyframes bili-coin-flip {
+  55% { transform: perspective(80px) translateY(-2px) rotateY(190deg); }
+  to { transform: perspective(80px) rotateY(360deg); }
+}
+
+@keyframes bili-star-flash {
+  40% { transform: scale(1.24) rotate(-15deg); }
+  72% { transform: scale(.96) rotate(8deg); }
+}
+
+.bili-tri-celebrate::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  color: var(--accent);
+  box-shadow: -9px -9px, 8px -11px, 12px 5px, -8px 9px;
+  opacity: 0;
+  pointer-events: none;
+  animation: bili-tri-spark 420ms ease-out var(--tri-delay) both;
+}
+
+@keyframes bili-tri-spark {
+  0% { opacity: 0; transform: scale(.65); }
+  30% { opacity: .9; }
+  100% { opacity: 0; transform: scale(1.5); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bili-tri-pop,
-  .bili-tri-flip,
-  .bili-tri-spin,
-  .bili-tri-ring,
-  .bili-tri-btn:hover .bili-tri-glyph {
-    animation: none;
-  }
-
-  .bili-tri-btn:hover,
   .bili-tri-btn:active {
     transform: none;
   }
-}
 
-/* ── 一键三连的整屏庆祝 ─────────────────────────────
- * 四拍：中心光环 → 图标带旋转弹出 → 文字跟上 → 三枚一起收拢淡出。
- * 收拢在 1180ms 走完，TripleBurst.tsx 的 1200ms 计时器随即卸载。
- */
-@keyframes triple-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.2) rotate(-120deg);
+  .bili-tri-charge circle {
+    animation: none;
+    stroke-dasharray: .18 .07;
   }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
 
-@keyframes triple-label {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 收拢：左右两枚朝中间并、一起缩小淡出，中间那枚只缩不移。 */
-@keyframes triple-gather {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(var(--dx, 0px)) scale(0.86);
-  }
-}
-
-/* 前两拍用 --spring；收拢这一拍用 linear：--spring 的透明度会越界，
-   图标在总时长过半时就淡没了，剩下半程是空等。 */
-.triple-cell {
-  animation: triple-gather 500ms linear 680ms both;
-}
-
-.triple-cell:first-child {
-  --dx: 26px;
-}
-
-.triple-cell:last-child {
-  --dx: -26px;
-}
-
-/* 中心先闪一圈光环：比三枚图标先到，交代「成了」，然后让位给图标。 */
-@keyframes bili-triple-ring {
-  from {
-    opacity: 1;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.8);
-  }
-}
-
-.triple-ring {
-  animation: bili-triple-ring 320ms var(--ease);
-}
-
-/* 「一键三连」自己一拍：淡入的同时上移，不挤进图标的 90ms 错峰。 */
-@keyframes triple-title {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.triple-title {
-  animation: triple-title 240ms var(--ease) 80ms both;
-}
-
-.triple-pop {
-  animation: triple-pop 420ms var(--spring) both;
-  animation-delay: calc(var(--i, 0) * 90ms);
-}
-
-.triple-label {
-  animation: triple-label 240ms var(--spring) both;
-  animation-delay: calc(var(--i, 0) * 90ms + 100ms);
-}
-
-/* 减少动态：三枚静止地露一下再收走，不做旋转、位移与淡出。
-   白色蒙版保留：它是这三行字在视频画面上的底，不算运动。 */
-@media (prefers-reduced-motion: reduce) {
-  .triple-cell,
-  .triple-pop,
-  .triple-label,
-  .triple-ring,
-  .triple-title,
-  .bili-hold-bar {
+  .bili-tri-celebrate,
+  .bili-tri-celebrate::after {
     animation: none;
   }
 }
@@ -940,7 +839,7 @@
   transition: transform 160ms var(--spring);
 }
 
-.bili-icon-btn:hover svg {
+.bili-icon-btn:not(.bili-tri-btn):hover svg {
   transform: scale(1.12);
 }
 

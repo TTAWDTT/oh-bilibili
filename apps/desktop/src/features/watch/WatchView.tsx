@@ -27,10 +27,9 @@ import { NoteReader } from './NoteReader'
 import type { CommentNote } from './NoteReader'
 import { rememberPageCount } from '../tracks/pageSpineLabel'
 import { rememberSeason } from '../tracks/seasonMark'
-import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer, type NextUp } from './WatchPlayer'
-import { setWatchFavHandler } from './watchActions'
+import { setWatchFavHandler, setWatchSeekHandler } from './watchActions'
 import { FavPicker } from '../library/FavPicker'
 import { usePlayerStore } from '../player/playerStore'
 import { Modal } from '../../shared/ui/Modal'
@@ -114,8 +113,10 @@ export function WatchView({
   track,
   page: startPage,
   atMs,
+  audioPaused,
 }: {
   track: Track
+  audioPaused?: boolean
   /** 从弹幕引文进来时直接落在这一分 P。 */
   page?: number
   /** 同一次跳转还要落到这条弹幕的时刻。 */
@@ -145,9 +146,7 @@ export function WatchView({
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
-  const storedPage = useRef(startPage ?? loadWatchPage(track.key)).current
-  const storedPagePos = useRef(storedPage ? loadPagePos(track.key, storedPage) : null).current
-  const [page, setPage] = useState<number | undefined>(storedPage ?? undefined)
+  const [page, setPage] = useState(startPage)
   /** 中窄窗的选集面板。宽窗用右栏目录，影院用播放器自带的选集。 */
   const [pickingPage, setPickingPage] = useState(false)
   const pageTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -164,9 +163,12 @@ export function WatchView({
     pageTriggerRef.current?.focus()
   }, [pickingPage])
   /** 下一次取清单时要告诉引擎从这个 P 的哪个位置起播。 */
-  const [pendingResume, setPendingResume] = useState({ at: atMs ?? storedPagePos, paused: false, comment: false })
+  const [pendingResume, setPendingResume] = useState({
+    at: atMs,
+    paused: audioPaused ?? false,
+    source: audioPaused === undefined ? 'history' : 'audio',
+  })
   const pageLoading = useRef(false)
-  const initialStoredPage = useRef(page !== undefined)
   // 换 P 后播放器在页面顶部，显式回顶，别依赖数据重载把滚动容器撑矮这种副作用。
   useEffect(() => {
     if (page === undefined) return
@@ -187,22 +189,20 @@ export function WatchView({
   }, [data, track.key])
   /** 换 P 是另一条播放位置：先存走这一 P 的进度，再取下一 P 自己的。 */
   const changePage = (no: number, resumeAtMs?: number, commentPaused?: boolean): void => {
-    const from = page ?? data?.current_page
+    const from = data?.current_page
     const snap = usePlayerStore.getState().snapshot
     // 快照只在命令时更新，真实播放位置在 progress 切片里（10Hz）。
     const now = usePlayerStore.getState().progress.position_ms
-    if (!pageLoading.current && from === data?.current_page && from !== undefined && snap?.track?.key === track.key && now >= 5000) {
+    if (!pageLoading.current && from !== undefined && snap?.track?.key === track.key && now >= 5000) {
       savePagePos(track.key, from, now)
       // 历史里的 duration 是整条投稿总长，分 P 要看观看数据里这一页的时长。
       if ((data?.duration_ms ?? 0) > 0) savePageLen(track.key, from, data!.duration_ms)
     }
-    const at = resumeAtMs ?? loadPagePos(track.key, no)
-    setResume(at !== null ? { key: track.key, at } : null)
+    setResume(null)
     setSeekSignal(null)
     pageLoading.current = true
-    setPendingResume({ at, paused: commentPaused ?? false, comment: commentPaused !== undefined })
+    setPendingResume({ at: resumeAtMs, paused: commentPaused ?? false, source: commentPaused === undefined ? 'history' : 'comment' })
     setPage(no)
-    saveWatchPage(track.key, no)
   }
   const [watchNote, setWatchNote] = useState<CommentNote | null>(null)
   const openNote = (note: CommentNote): void => {
@@ -224,7 +224,7 @@ export function WatchView({
       row?.focus({ preventScroll: true })
     })
   }
-  const seekFromComment = (ms: number, pageNo?: number): void => {
+  const seekToPart = (ms: number, pageNo?: number): void => {
     const current = data?.current_page ?? 1
     const target = pageNo ?? current
     if (target !== current || pageLoading.current) {
@@ -252,13 +252,7 @@ export function WatchView({
     setSeekSignal((previous) => ({ at: ms, nonce: (previous?.nonce ?? 0) + 1 }))
   }
   /** 上次看到的位置，带 key：换片瞬间旧值不能落进新视频。 */
-  const [resume, setResume] = useState<{ key: string; at: number } | null>(
-    atMs !== undefined
-      ? { key: track.key, at: atMs }
-      : storedPagePos
-        ? { key: track.key, at: storedPagePos }
-        : null,
-  )
+  const [resume, setResume] = useState<{ key: string; at: number } | null>(null)
   /** UP 主名片与关注状态。右栏和窄屏的行都用同一份，两处不会各说各话。 */
   const [card, setCard] = useState<ipc.AuthorCard | null>(null)
   const [followed, setFollowed] = useState<boolean | null>(null)
@@ -289,34 +283,11 @@ export function WatchView({
     }
   }, [track.key, data])
 
-  // 离开观看页就收声音。引擎感知不到页面切换，之前退出后声音会一直放，
-  // 而那时连播放条都不显示，用户没有任何地方能把它停掉。
-  useEffect(() => {
-    return () => {
-      void ipc.playerPause().catch(() => {})
-    }
-  }, [])
-
   useEffect(() => {
     setLikeDelta(0)
     setFavDelta(0)
     setCoinDelta(0)
-  }, [track.key])
-
-  useEffect(() => {
-    let cancelled = false
-    // 从记住的 P 打开时不沿用 bvid 级历史：它可能属于上一 P。
-    if (initialStoredPage.current) return
-    setResume(null)
-    void ipc
-      .historyPosition(track.key)
-      .then((at) => {
-        if (!cancelled && at) setResume({ key: track.key, at })
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
+    setBurst(0)
   }, [track.key])
 
   /** 选集每一行下面那条「看到哪了」。读的是本地存的分 P 进度。 */
@@ -339,8 +310,8 @@ export function WatchView({
     const save = (): void => {
       const snap = usePlayerStore.getState().snapshot
       if (!snap || snap.track?.key !== track.key) return
-      const no = page ?? data?.current_page
-      if (no === undefined || !data || data.current_page !== no) return
+      if (pageLoading.current || !data) return
+      const no = data.current_page
       if (snap.phase === 'ended') {
         clearPagePos(track.key, no)
         return
@@ -398,14 +369,12 @@ export function WatchView({
       .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
   }
 
-  const like = (): void => {
+  const like = async (): Promise<boolean | null> => {
     const before = useReactionStore.getState().liked[track.key] ?? false
-    void useReactionStore
-      .getState()
-      .toggleLike(track)
-      .then((next) => {
-        if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
-      })
+    const next = await useReactionStore.getState().toggleLike(track)
+    if (trackKeyRef.current !== track.key) return null
+    if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
+    return next
   }
 
   const coin = (count: number, alsoLike: boolean, quiet = false): void => {
@@ -415,6 +384,7 @@ export function WatchView({
       .then((ok) => {
         if (!ok) return
         setCoinDelta((n) => n + count)
+        if (alsoLike && !liked) setLikeDelta((n) => n + 1)
         if (!quiet) toastDone('投币成功', alsoLike ? '同时点了个赞' : null)
       })
   }
@@ -433,41 +403,34 @@ export function WatchView({
       return
     }
     tripleBusy.current = true
-    const results: { label: string; ok: boolean }[] = []
     try {
-      if (needLike) {
-        const next = await st.toggleLike(track)
-        results.push({ label: '点赞', ok: next === true })
-      } else {
-        results.push({ label: '点赞', ok: true })
-      }
-      if (needCoin) {
-        // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
-        const ok = await st.addCoin(track, 2 - haveCoins, true)
-        results.push({ label: '投币', ok })
-      } else {
-        results.push({ label: '投币', ok: true })
-      }
-      if (needFav) {
-        const next = await st.toggleFav(track)
-        results.push({ label: '收藏', ok: next === true })
-      } else {
-        results.push({ label: '收藏', ok: true })
+      const likeOk = !needLike || (await st.toggleLike(track)) === true
+      // 点赞是单独的一项写入，投币只补足差额。
+      const coinOk = !needCoin || await st.addCoin(track, 2 - haveCoins, false)
+      const favOk = !needFav || (await st.toggleFav(track)) === true
+      if (!likeOk || !coinOk || !favOk) {
+        await st.refresh([key]).catch(() => {})
       }
       if (trackKeyRef.current !== key) return
-      const failed = results.filter((item) => !item.ok).map((item) => item.label)
-      if (failed.length === 0) {
-        if (needLike) setLikeDelta((n) => n + 1)
-        if (needCoin) setCoinDelta((n) => n + (2 - haveCoins))
-        if (needFav) setFavDelta((n) => n + 1)
+      const state = useReactionStore.getState()
+      const nowLiked = state.liked[key] ?? false
+      const nowCoins = state.coins[key] ?? 0
+      const nowFaved = state.faved[key] ?? false
+      if (needLike && nowLiked) setLikeDelta((n) => n + 1)
+      if (needCoin && nowCoins !== haveCoins) setCoinDelta((n) => n + nowCoins - haveCoins)
+      if (needFav && nowFaved) setFavDelta((n) => n + 1)
+
+      if (nowLiked && nowCoins >= 2 && nowFaved) {
         setBurst((n) => n + 1)
         toastDone('一键三连', '点赞、投币、收藏都已确认')
         return
       }
-      // 失败可能是服务端拒绝，也可能是回执未知。先以账号关系为准，
-      // 避免界面亮着实际没生效，也避免用户重试时重复投币。
-      await useReactionStore.getState().refresh([key]).catch(() => {})
-      if (trackKeyRef.current !== key) return
+      const results = [
+        { label: '点赞', ok: nowLiked },
+        { label: '投币', ok: nowCoins >= 2 },
+        { label: '收藏', ok: nowFaved },
+      ]
+      const failed = results.filter((item) => !item.ok).map((item) => item.label)
       const done = results.filter((item) => item.ok).map((item) => item.label)
       toastWarn(
         `未确认：${failed.join('、')}`,
@@ -496,6 +459,10 @@ export function WatchView({
     }
     setPickingFav(true)
   }
+  useEffect(() => {
+    setWatchSeekHandler(seekToPart)
+    return () => setWatchSeekHandler(null)
+  })
   // 按 E 等于点收藏：走同一条路，需要选收藏夹时照样弹窗。
   const openFavRef = useRef(openFav)
   openFavRef.current = openFav
@@ -518,7 +485,7 @@ export function WatchView({
     }
   }
 
-  const currentPageNo = page ?? data?.current_page ?? 1
+  const currentPageNo = data?.current_page ?? page ?? 1
   const danmakuCid = data?.pages.find((entry) => entry.no === currentPageNo)?.cid
   const chapters = metaChapters.map((chapter) => ({ at: chapter.at_ms, title: chapter.title }))
   const pageIndex = data?.pages.findIndex((entry) => entry.no === currentPageNo) ?? -1
@@ -609,22 +576,17 @@ export function WatchView({
     setError(null)
     void (async () => {
       try {
-        const next = await ipc.watchOpen(track.key, page, pendingResume.at ?? undefined, {
+        const localPage = page ?? loadWatchPage(track.key)
+        const next = await ipc.watchOpen(track.key, page, pendingResume.at, {
+          localResume: localPage ? { page: localPage, position_ms: loadPagePos(track.key, localPage) ?? 0 } : undefined,
           paused: pendingResume.paused,
+          continueAudio: pendingResume.source === 'audio',
           preserveListenQueue: currentWatchSession(track.key) !== null
             || useAppStore.getState().history.at(-1)?.view.kind === 'watchLater',
         })
         if (!cancelled) {
-          initialStoredPage.current = false
-          if (page !== undefined) saveWatchPage(track.key, page)
-          if (page !== undefined && !next.pages.some((entry) => entry.no === page)) {
-            const fallback = next.current_page
-            const at = loadPagePos(track.key, fallback)
-            setPage(fallback)
-            setPendingResume({ at, paused: pendingResume.paused, comment: false })
-            setResume(at ? { key: track.key, at } : null)
-            saveWatchPage(track.key, fallback)
-          }
+          if (next.pages.length > 1) saveWatchPage(track.key, next.current_page)
+          setResume({ key: track.key, at: next.resume_ms })
           // 详情里带完整合集目录时记到本地：列表页的书脊靠它，
           // 不必为每个卡片额外请求一次详情。
           rememberPageCount(track.key, next.pages.length)
@@ -730,7 +692,6 @@ export function WatchView({
           退出网页全屏
         </button>
       ) : null}
-      <TripleBurst run={burst} />
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       <Modal
         open={pickingPage && data !== null}
@@ -829,7 +790,7 @@ export function WatchView({
                 currentPage={currentPageNo}
                 onPage={changePage}
                 resumeAt={pageLoading.current || resume?.key !== track.key ? null : resume.at}
-                commentSeek={pendingResume.comment}
+                commentSeek={pendingResume.source !== 'history'}
                 chapters={chapters}
               />
             </div>
@@ -847,7 +808,7 @@ export function WatchView({
                 className="t press flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] text-[var(--text-2)] hover:text-[var(--text-1)]"
               >
                 <Icon name="queue" size={14} className="shrink-0 text-[var(--text-3)]" />
-                <span className="min-w-0 flex-1 truncate">{directoryTitle(data, page ?? data.current_page)}</span>
+                <span className="min-w-0 flex-1 truncate">{directoryTitle(data, currentPageNo)}</span>
                 <Icon name="chevronRight" size={13} className="shrink-0 rotate-90 text-[var(--text-3)]" />
               </button>
             </div>
@@ -881,6 +842,7 @@ export function WatchView({
               onLike={like}
               onFav={openFav}
               onTriple={triple}
+              burst={burst}
               onSeek={seekTo}
               ownerRow={
                 <div className="xl:hidden">
@@ -923,7 +885,7 @@ export function WatchView({
                 trackKey={track.key}
                 ownerMid={data?.owner_mid ?? null}
                 pages={data?.pages ?? []}
-                onSeek={seekFromComment}
+                onSeek={seekToPart}
                 note={watchNote}
                 onNote={openNote}
                 onBackToComment={backToComment}
@@ -945,7 +907,7 @@ export function WatchView({
                 key={watchNote.id}
                 note={watchNote}
                 pages={data?.pages ?? []}
-                onSeek={seekFromComment}
+                onSeek={seekToPart}
                 onBack={backToComment}
               />
             ) : null}

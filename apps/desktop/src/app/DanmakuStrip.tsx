@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useIsPlaying, usePlayerStore } from '../features/player/playerStore'
 import { useDanmakuSettings } from '../features/player/danmakuSettings'
-import { useSentDanmaku } from '../features/player/sentDanmaku'
+import { danmakuPartKey, useSentDanmaku } from '../features/player/sentDanmaku'
 import { readPlayhead } from '../shared/lib/playhead'
 import * as ipc from '../shared/lib/ipc'
 
@@ -33,7 +33,9 @@ export function DanmakuStrip() {
   const [items, setItems] = useState<Item[]>([])
   const [flights, setFlights] = useState<Flight[]>([])
   const seq = useRef(0)
-  const sent = useSentDanmaku((s) => (trackKey ? (s.byTrack[trackKey] ?? EMPTY) : EMPTY))
+  const page = usePlayerStore((s) => s.snapshot?.page)
+  const cid = page?.cid
+  const sent = useSentDanmaku((s) => trackKey ? s.byTrack[danmakuPartKey(trackKey, page?.no)] ?? EMPTY : EMPTY)
 
   useEffect(() => {
     if (!trackKey) {
@@ -45,7 +47,7 @@ export function DanmakuStrip() {
     setItems([])
     setFlights([])
     void ipc
-      .danmakuColored(trackKey)
+      .danmakuColored(trackKey, cid)
       .then((list) => {
         if (cancelled) return
         setItems(
@@ -66,7 +68,7 @@ export function DanmakuStrip() {
     return () => {
       cancelled = true
     }
-  }, [trackKey])
+  }, [trackKey, cid])
 
   // 必须 memo：不 memo 的话每次渲染都是新数组，下面那个 effect 会被
   // 反复销毁重建，定时器永远等不到第一次触发，弹幕就一条都不出。

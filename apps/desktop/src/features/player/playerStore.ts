@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PlayerSnapshot, QueueView, RepeatMode, Track } from '../../shared/lib/contract'
+import type { PageRef, PlayerSnapshot, QueueView, RepeatMode, Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { syncPlayhead } from '../../shared/lib/playhead'
 import { setLevel } from '../../shared/lib/level'
@@ -18,7 +18,7 @@ type PlayerStore = {
   init: () => Promise<void>
   refreshQueue: () => Promise<void>
   play: (key: string) => Promise<void>
-  playContext: (keys: string[], index: number) => Promise<void>
+  playContext: (keys: string[], index: number, resume?: ipc.PlaybackResume) => Promise<void>
   toggle: () => Promise<void>
   next: () => Promise<void>
   prev: () => Promise<void>
@@ -131,8 +131,8 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       await run('播放', () => ipc.playerPlay(key))
       await refreshQueue()
     },
-    playContext: async (keys, index) => {
-      await run('开始播放', () => ipc.playerPlayContext(keys, index))
+    playContext: async (keys, index, resume) => {
+      await run('开始播放', () => ipc.playerPlayContext(keys, index, resume))
       await refreshQueue()
     },
     toggle: async () => {
@@ -253,13 +253,14 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
         void get().init()
         return
       }
-      apply({ ...current, track, local: false, duration_ms: track.duration_ms ?? current.duration_ms })
+      const page = current.track?.key === track.key ? current.page ?? null : null
+      apply({ ...current, track, page, local: false, duration_ms: page?.duration_ms || track.duration_ms || 0 })
       void refreshQueue()
     },
     applyBuffering: (track) => {
       const current = get().snapshot
       if (!current) return
-      apply({ ...current, track, local: false, phase: 'loading' })
+      apply({ ...current, track, page: null, local: false, phase: 'loading', position_ms: 0, duration_ms: track.duration_ms ?? 0 })
     },
     applyStopped: () => {
       const current = get().snapshot
@@ -278,6 +279,12 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
  */
 export function useIsPlaying(): boolean {
   return usePlayerStore((state) => state.snapshot?.phase === 'playing')
+}
+
+export function playbackSubtitle(track: Track, page?: PageRef | null): string {
+  if (!page || (track.pages ?? page.no) < 2) return track.artist
+  const part = page.title && page.title !== track.title ? `P${page.no} ${page.title}` : `P${page.no}`
+  return [part, track.artist].filter(Boolean).join(' · ')
 }
 
 /** 会话是否活着：有加载、在放、暂停、播完都算，没有会话（idle）就不算。 */

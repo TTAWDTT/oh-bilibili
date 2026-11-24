@@ -21,16 +21,28 @@ import { SharePanel } from './SharePanel'
 import { SummaryCard } from './SummaryCard'
 import { watchUrl } from './watchUrl'
 
-/** 状态翻过一次才换 key，让扩散环重播；初次挂载返回 0，进页面时不会三颗一起闪。 */
-function useFlipKey(value: boolean | number): number {
-  const [key, setKey] = useState(0)
-  const previous = useRef(value)
-  useEffect(() => {
-    if (previous.current === value) return
-    previous.current = value
-    setKey((n) => n + 1)
-  }, [value])
-  return key
+const TRIPLE_HOLD_MS = 550
+
+function ReactionGlyph({
+  kind, holding, burst, children,
+}: {
+  kind: 'like' | 'coin' | 'favorite'
+  holding: boolean
+  burst: number
+  children: React.ReactNode
+}) {
+  return (
+    <span className={`bili-tri-glyph bili-tri-${kind}`}>
+      {holding ? (
+        <svg aria-hidden className="bili-tri-charge" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="16" pathLength="1" />
+        </svg>
+      ) : null}
+      <span key={burst} className={burst ? 'bili-tri-celebrate' : 'inline-flex'}>
+        {children}
+      </span>
+    </span>
+  )
 }
 
 /** 简介里的链接单独成段；长 URL 可以断行，点开走系统浏览器。 */
@@ -181,6 +193,7 @@ export function WatchInfo({
   onFav,
   onCoin,
   onTriple,
+  burst,
   onSeek,
   ownerRow,
 }: {
@@ -191,11 +204,12 @@ export function WatchInfo({
   likeDelta: number
   favDelta: number
   coinDelta: number
-  onLike: () => void
+  onLike: () => Promise<boolean | null>
   onFav: () => void
   onCoin: (count: number, alsoLike: boolean) => void
   /** 长按点赞：B 站的一键三连。 */
   onTriple: () => void
+  burst: number
   /** 简介里的时间戳跳转。 */
   onSeek: (ms: number) => void
   /** 窄屏主栏的 UP 主行；宽屏只在右栏放名片。 */
@@ -204,9 +218,6 @@ export function WatchInfo({
   const liked = useReactionStore((st) => st.liked[track.key] ?? false)
   const faved = useReactionStore((st) => st.faved[track.key] ?? false)
   const coins = useReactionStore((st) => st.coins[track.key] ?? 0)
-  const likeRing = useFlipKey(liked)
-  const coinRing = useFlipKey(coins)
-  const favRing = useFlipKey(faved)
   const cid = data.pages.find((page) => page.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
 
   const [saved, setSaved] = useState(false)
@@ -267,7 +278,7 @@ export function WatchInfo({
   /** 长按点赞：按住 550ms 触发一键三连。松手就算普通点赞。 */
   const [holding, setHolding] = useState(false)
   const holdTimer = useRef<number | null>(null)
-  const longFired = useRef(false)
+  const skipPointerClick = useRef(false)
   /** 详情里的投币数是打开那一刻的快照，自己投出去的要自己加上。 */
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
 
@@ -302,29 +313,22 @@ export function WatchInfo({
   }, [track.key])
 
   useEffect(() => {
-    return () => {
-      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
-    }
-  }, [])
-
-  // 换稿时这次按住不再属于任何一条视频，计时和“已触发”标记都要清掉。
-  useEffect(() => {
-    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
-    holdTimer.current = null
-    longFired.current = false
     setHolding(false)
-  }, [track.key])
-
-  // 按住时切到别的窗口、触屏开始滚动，都不能在后台继续累计到三连。
-  useEffect(() => {
     const cancel = (): void => {
-      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+      if (holdTimer.current === null) return
+      window.clearTimeout(holdTimer.current)
       holdTimer.current = null
+      skipPointerClick.current = true
       setHolding(false)
     }
     window.addEventListener('blur', cancel)
-    return () => window.removeEventListener('blur', cancel)
-  }, [])
+    return () => {
+      window.removeEventListener('blur', cancel)
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+      holdTimer.current = null
+      skipPointerClick.current = true
+    }
+  }, [track.key])
 
   useEffect(() => {
     if (!noteOpen) return
@@ -347,20 +351,35 @@ export function WatchInfo({
     setAlsoLike(!liked)
   }
 
+  const tapLike = async (button: HTMLButtonElement): Promise<void> => {
+    const next = await onLike()
+    if (!next || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    button.querySelector('.bili-tri-like')?.animate(
+      [
+        { transform: 'none' },
+        { transform: 'translateY(-2px) scale(1.13) rotate(-5deg)', offset: 0.4 },
+        { transform: 'none' },
+      ],
+      { id: 'watch-like-tap', duration: 260, easing: 'ease-out' },
+    )
+  }
+
   const startHold = (): void => {
-    longFired.current = false
+    skipPointerClick.current = false
     setHolding(true)
     holdTimer.current = window.setTimeout(() => {
       holdTimer.current = null
-      longFired.current = true
+      skipPointerClick.current = true
       setHolding(false)
       onTriple()
-    }, 550)
+    }, TRIPLE_HOLD_MS)
   }
 
-  const endHold = (): void => {
-    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+  const endHold = (cancelled = false): void => {
+    if (holdTimer.current === null) return
+    window.clearTimeout(holdTimer.current)
     holdTimer.current = null
+    skipPointerClick.current = cancelled
     setHolding(false)
   }
 
@@ -414,64 +433,54 @@ export function WatchInfo({
 
   return (
     <div className="pb-4 pt-3">
-      <div className="no-scrollbar mt-2 flex items-center gap-3 overflow-x-auto border-y border-hairline py-1.5">
+      <div
+        className="no-scrollbar mt-2 flex items-center gap-3 overflow-x-auto border-y border-hairline py-1.5"
+        style={{ '--hold-duration': `${TRIPLE_HOLD_MS}ms` } as React.CSSProperties}
+      >
         <button
           type="button"
           aria-pressed={liked}
           aria-label={liked ? '取消点赞' : '点赞'}
-          onPointerDown={startHold}
-          onPointerUp={endHold}
-          onPointerLeave={endHold}
-          onPointerCancel={endHold}
-          onBlur={endHold}
-          onClick={() => {
-            // 长按已经触发过三连，这一次松开不再当成普通点赞
-            if (longFired.current) {
-              longFired.current = false
-              return
-            }
-            onLike()
+          aria-description="长按点赞或按住空格键、回车键可一键三连"
+          onPointerDown={(event) => { if (event.button === 0) startHold() }}
+          onPointerUp={() => endHold()}
+          onPointerLeave={() => endHold(true)}
+          onPointerCancel={() => endHold(true)}
+          onBlur={() => endHold(true)}
+          onKeyDown={(event) => {
+            if (event.key !== ' ' && event.key !== 'Enter') return
+            event.preventDefault()
+            if (!event.repeat) startHold()
           }}
-          className={`${action(liked)} bili-tri-btn relative overflow-hidden`}
+          onKeyUp={(event) => {
+            if (event.key !== ' ' && event.key !== 'Enter') return
+            event.preventDefault()
+            if (holdTimer.current === null) return
+            endHold()
+            void tapLike(event.currentTarget)
+          }}
+          onClick={(event) => {
+            if (!skipPointerClick.current || event.detail === 0) void tapLike(event.currentTarget)
+          }}
+          className={`${action(liked)} bili-tri-btn`}
           title={liked ? '取消点赞（长按一键三连）' : '点赞（长按一键三连）'}
         >
-          {likeRing > 0 ? (
-            <span
-              key={likeRing}
-              aria-hidden
-              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
-            />
-          ) : null}
-          <span className="bili-tri-glyph">
-            <span key={liked ? 'on' : 'off'} className={liked ? 'bili-tri-pop' : undefined}>
-              <BiliThumb size={26} filled={liked} />
-            </span>
-          </span>
+          <ReactionGlyph kind="like" holding={holding} burst={burst}>
+            <BiliThumb size={26} filled={liked} />
+          </ReactionGlyph>
           {formatCount(Math.max(0, data.stats.likes + likeDelta))}
-          {holding ? (
-            <span className="bili-hold-bar absolute inset-x-0 bottom-0 h-[2px] bg-[var(--accent)]" />
-          ) : null}
         </button>
         <button
           type="button"
           aria-pressed={coins > 0}
           aria-label="投币"
           onClick={openCoin}
-          className={`${action(coins > 0)} bili-tri-btn relative overflow-hidden`}
+          className={`${action(coins > 0)} bili-tri-btn`}
           title="投币"
         >
-          {coinRing > 0 ? (
-            <span
-              key={coinRing}
-              aria-hidden
-              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
-            />
-          ) : null}
-          <span className="bili-tri-glyph">
-            <span key={coins} className={coins > 0 ? 'bili-tri-flip' : undefined}>
-              <BiliCoin size={24} />
-            </span>
-          </span>
+          <ReactionGlyph kind="coin" holding={holding} burst={burst}>
+            <BiliCoin size={24} />
+          </ReactionGlyph>
           {formatCount(data.stats.coins + coinDelta)}
         </button>
         <button
@@ -479,33 +488,13 @@ export function WatchInfo({
           aria-pressed={faved}
           aria-label={faved ? '取消收藏' : '收藏'}
           onClick={onFav}
-          className={`${action(faved)} bili-tri-btn relative overflow-hidden`}
+          className={`${action(faved)} bili-tri-btn`}
           title={faved ? '取消收藏（E）' : '收藏（E）'}
         >
-          {favRing > 0 ? (
-            <span
-              key={favRing}
-              aria-hidden
-              className="bili-tri-ring pointer-events-none absolute inset-0 rounded-[4px] border border-current opacity-0"
-            />
-          ) : null}
-          <span className="bili-tri-glyph">
-            <span key={faved ? 'on' : 'off'} className={faved ? 'bili-tri-spin' : undefined}>
-              <BiliStar size={24} filled={faved} />
-            </span>
-          </span>
+          <ReactionGlyph kind="favorite" holding={holding} burst={burst}>
+            <BiliStar size={24} filled={faved} />
+          </ReactionGlyph>
           {formatCount(Math.max(0, data.stats.favorites + favDelta))}
-        </button>
-        <button
-          type="button"
-          data-triple
-          aria-label="一键三连"
-          title="一键三连"
-          onClick={onTriple}
-          className={action(false)}
-        >
-          <Icon name="gift" size={20} />
-          三连
         </button>
         <button
           type="button"

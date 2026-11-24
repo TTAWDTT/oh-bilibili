@@ -69,8 +69,10 @@ export function playerPlayLocal(key: string): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_play_local', { key })
 }
 
-export function playerPlayContext(keys: string[], index: number): Promise<PlayerSnapshot> {
-  return call<PlayerSnapshot>('player_play_context', { keys, index })
+export type PlaybackResume = { page: number; position_ms: number }
+
+export function playerPlayContext(keys: string[], index: number, resume?: PlaybackResume): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('player_play_context', { keys, index, resume })
 }
 
 /** 只暂停；已经在暂停时什么也不做。离开观看页用它收声音。 */
@@ -160,7 +162,14 @@ export function libraryAdd(playlistId: number, key: string): Promise<null> {
   return call<null>('library_add', { playlist_id: playlistId, key })
 }
 
-export type HistoryEntry = { id: number; track: Track; played_at: number; position_ms: number }
+export type HistoryEntry = {
+  id: number
+  track: Track
+  played_at: number
+  position_ms: number
+  page_no?: number | null
+  page_duration_ms?: number | null
+}
 
 /** 带播放时间的历史。翻页传上一页最旧一条的 (played_at, id) 作为边界。 */
 export function libraryHistoryTimed(
@@ -576,8 +585,8 @@ export function danmakuColored(key: string, cid?: number): Promise<DanmakuLine[]
 }
 
 /** 弹幕密度曲线，用来画高能进度条。 */
-export function danmakuHeat(key: string, buckets: number): Promise<number[]> {
-  return call<number[]>('danmaku_heat', { key, buckets })
+export function danmakuHeat(key: string, buckets: number, cid?: number): Promise<number[]> {
+  return call<number[]>('danmaku_heat', { key, buckets, cid })
 }
 
 /** 本地 MV 代理端口。浏览器预览没有这个能力，返回 0。 */
@@ -769,7 +778,12 @@ export function watchOpen(
   key: string,
   page?: number,
   resumeAt?: number,
-  { paused = false, preserveListenQueue = false } = {},
+  { paused = false, preserveListenQueue = false, continueAudio = false, localResume }: {
+    paused?: boolean
+    preserveListenQueue?: boolean
+    continueAudio?: boolean
+    localResume?: PlaybackResume | undefined
+  } = {},
 ): Promise<WatchView> {
   return call<WatchView>('watch_open', {
     key,
@@ -777,6 +791,8 @@ export function watchOpen(
     resume_at: resumeAt ?? null,
     paused,
     preserve_listen_queue: preserveListenQueue,
+    continue_audio: continueAudio,
+    local_resume: localResume ?? null,
   })
 }
 

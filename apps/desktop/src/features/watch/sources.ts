@@ -1,3 +1,5 @@
+import { parseWatchUrl } from './watchUrl.ts'
+
 /** 简介里能确认出处的素材/原作关系词。顺序从长到短，避免「动作数据」被拆成「动作」。 */
 const RELATIONS = [
   '动作数据',
@@ -54,22 +56,6 @@ function relationsIn(line: string): string[] {
   return [...new Set([...line.matchAll(pattern)].map((match) => match[0]))]
 }
 
-function videoTarget(link: string): { bvid: string; page?: number; atMs?: number } | null {
-  if (BV_RE.test(link)) return { bvid: link }
-  if (!URL.canParse(link)) return null
-  const url = new URL(link)
-  if (!['www.bilibili.com', 'm.bilibili.com', 'bilibili.com'].includes(url.hostname)) return null
-  const bvid = url.pathname.match(/^\/video\/(BV[0-9A-Za-z]{10})\/?$/)?.[1]
-  if (!bvid) return null
-  const page = Number(url.searchParams.get('p'))
-  const seconds = Number(url.searchParams.get('t'))
-  return {
-    bvid,
-    ...(Number.isSafeInteger(page) && page > 0 ? { page } : {}),
-    ...(url.searchParams.has('t') && Number.isFinite(seconds) && seconds >= 0 ? { atMs: Math.round(seconds * 1000) } : {}),
-  }
-}
-
 /**
  * 只认投稿人自己在简介里写明的出处：
  * - 关系词与链接在同一行，或关系词下一行只放一个链接；
@@ -82,7 +68,7 @@ export function parseSources(desc: string, currentKey: string): SourceEntry[] {
   const seen = new Set<string>()
 
   const push = (sentence: string, relations: string[], link: string): void => {
-    const video = videoTarget(link)
+    const video = BV_RE.test(link) ? { bvid: link } : parseWatchUrl(link)
     if (video?.bvid === currentKey) return
     const target = video ? `${video.bvid}:${video.page ?? ''}:${video.atMs ?? ''}` : link
     const id = `${relations.join('|')}@${target}`

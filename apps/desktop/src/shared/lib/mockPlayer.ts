@@ -1,4 +1,5 @@
 import type { PlayerSnapshot, QueueView } from './contract'
+import type { PlaybackResume } from './ipc'
 import { clamp } from './format'
 import { bool, num, str, strArray } from './mockArgs'
 import {
@@ -26,7 +27,7 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
         state.keys = [key]
         index = 0
       }
-      state.index = index
+      state.mode = 'listen'
       playIndex(index)
       return snapshot()
     }
@@ -54,7 +55,8 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       const index = clamp(Math.trunc(num(args, 'index')), 0, keys.length - 1)
       trackOf(keys[index] ?? '')
       state.keys = [...keys]
-      playIndex(index)
+      state.mode = 'listen'
+      playIndex(index, args.resume as PlaybackResume | undefined)
       return snapshot()
     }
     case 'player_pause':
