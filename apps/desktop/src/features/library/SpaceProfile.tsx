@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
+import { MedalWall } from './MedalWall'
+import { useAuthStore } from '../auth/authStore'
 import { Icon } from '../../shared/ui/Icon'
 
 function useSpaceField<T>(mid: number | null | undefined, load: (mid: number) => Promise<T>, enabled = true) {
@@ -41,6 +43,7 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
   const [expanded, setExpanded] = useState(false)
   const room = useSpaceField(mid, ipc.spaceRoom)
   const notice = useSpaceField(mid, ipc.spaceNotice)
+  const account = useAuthStore((state) => state.auth?.user?.mid)
   const details = profile.value
   const medal = details?.fans_medal
   const charge = details?.charging
@@ -70,6 +73,7 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
           <span>UID {mid}</span>
           {details?.sex && <span>性别 {details.sex}</span>}
           {details?.birthday && <span>生日 {details.birthday}</span>}
+          {details?.profession && <span>{details.profession}</span>}
           {details?.school && <span>学校 {details.school}</span>}
         </div>
         {plate && <div className="flex items-center gap-2">
@@ -79,6 +83,7 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
         </div>}
         {medal && <span title="佩戴的粉丝勋章" className="inline-flex items-center gap-1 rounded border border-current px-1.5 font-medium"
           style={{ color: medal.color ?? undefined, backgroundColor: medal.background ?? undefined }}>{medal.name} {medal.level}</span>}
+        <MedalWall key={`${mid}:${account ?? 0}`} mid={mid} />
         {charge && !isSelf && <div className="flex items-center gap-2"><button type="button" className={link} onClick={() => open(charge.url)}>
           {charge.icon ? <img src={charge.icon} alt="" width={17} height={17} referrerPolicy="no-referrer" /> : <Icon name="battery" size={16} />}
           充电

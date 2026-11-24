@@ -2,7 +2,7 @@
 
 use bilimusic_model::Track;
 pub use bilimusic_bili::space::{CollectionKind, SpaceCollection, SpacePick};
-pub use bilimusic_bili::space_identity::{SpaceProfile, SpaceRoom};
+pub use bilimusic_bili::space_identity::{SpaceProfile, SpaceRoom, WallMedal};
 pub use bilimusic_bili::sync::AuthorCard;
 use serde::{Deserialize, Serialize};
 
