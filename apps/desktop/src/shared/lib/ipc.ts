@@ -226,6 +226,14 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
 
 export type AuthorCard = {
   banner?: string | null
+  banner_small?: string | null
+  following_count?: number | null
+  dress?: {
+    pendant: string | null
+    pendant_name: string | null
+    nameplate: { name: string; image: string; small: string | null; condition: string | null } | null
+    membership: { label: string | null; image: string | null; animated: string | null; nickname_color: string | null } | null
+  }
   name: string
   face: string
   fans: number | null
@@ -243,6 +251,25 @@ export type AuthorCard = {
 /** UP 主名片：粉丝数、签名、认证。 */
 export function authorCard(mid: number): Promise<AuthorCard> {
   return call<AuthorCard>('author_card', { mid })
+}
+
+export type SpaceRoom = { id: number; title: string | null; cover: string | null; live: boolean; looping: boolean }
+export type SpaceProfile = {
+  official_icon: string | null
+  fans_medal: { name: string; level: number; background: string | null; color: string | null } | null
+  charging: { url: string; icon: string | null; count: number | null } | null
+  sex: string | null
+  birthday: string | null
+  school: string | null
+}
+export function spaceNotice(mid: number): Promise<string | null> {
+  return call<string | null>('space_notice', { mid })
+}
+export function spaceRoom(mid: number): Promise<SpaceRoom | null> {
+  return call<SpaceRoom | null>('space_room', { mid })
+}
+export function spaceProfile(mid: number): Promise<SpaceProfile> {
+  return call<SpaceProfile>('space_profile', { mid })
 }
 
 export type FavFolder = { id: number; title: string; count: number; cover: string | null }
@@ -634,8 +661,26 @@ export function spaceVideos(
   mid: number,
   page: number,
   order: 'pubdate' | 'click' | 'stow' = 'pubdate',
+  keyword = '',
 ): Promise<[Track[], number]> {
-  return call<[Track[], number]>('space_videos', { mid, page, order })
+  return call<[Track[], number]>('space_videos', { mid, page, order, keyword })
+}
+
+export type CatalogKind = 'opus' | 'articles' | 'reading_lists' | 'audio' | 'courses' | 'reservations'
+  | 'created' | 'collected' | 'anime' | 'cinema' | 'tags' | 'games' | 'coins' | 'likes'
+export type CatalogChild = { kind: 'reading_list' | 'folder'; id: number } | { kind: 'subscribed_season'; id: number; owner: number }
+export type CatalogItem = {
+  title: string; cover: string | null; detail: string | null
+  destination: CatalogChild | { kind: 'web'; url: string } | { kind: 'video'; track: Track }
+    | { kind: 'search'; keyword: string } | { kind: 'reservation'; mid: number; starts_at: number | null } | { kind: 'unavailable' }
+}
+export type CatalogPage = { status: 'private' }
+  | { status: 'public'; items: CatalogItem[]; more: boolean; offset: string | null }
+export function spaceCatalogOrder(mid: number): Promise<number[]> {
+  return call<number[]>('space_catalog_order', { mid })
+}
+export function spaceCatalog(mid: number, catalog: { kind: CatalogKind } | CatalogChild, page: number, offset?: string | null): Promise<CatalogPage> {
+  return call<CatalogPage>('space_catalog', { mid, catalog, page, offset: offset ?? null })
 }
 
 export type SpaceCollection = { id: number; kind: 'season' | 'series'; name: string; cover: string | null; total: number }

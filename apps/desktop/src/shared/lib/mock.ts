@@ -178,6 +178,7 @@ const followSlow = import.meta.env.DEV && new URLSearchParams(window.location.se
 const followFailPage = import.meta.env.DEV
   ? Number(new URLSearchParams(window.location.search).get('followFailPage') ?? 0)
   : 0
+let profileFailurePending = import.meta.env.DEV && new URLSearchParams(window.location.search).has('failSpaceProfileOnce')
 const spaceShowcase = import.meta.env.DEV && new URLSearchParams(window.location.search).has('spaceShowcase')
 const spaceEmpty = import.meta.env.DEV && new URLSearchParams(window.location.search).has('spaceEmpty')
 function previewSpaceWorks(mid: number): Track[] {
@@ -315,15 +316,46 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         }
       })
     }
+    case 'space_notice': return spaceShowcase && !spaceEmpty ? '周五晚上更新下一期。' : null
+    case 'space_room': return spaceShowcase && !spaceEmpty
+      ? { id: 173551, title: '剪辑室', cover: '/assets/cover-fallback.jpg', live: false, looping: true } : null
+    case 'space_profile': {
+      if (profileFailurePending) {
+        profileFailurePending = false
+        throw fail('internal', '空间资料暂时不可用')
+      }
+      return {
+        official_icon: null, sex: null, birthday: spaceShowcase && !spaceEmpty ? '05-16' : null, school: null,
+        fans_medal: spaceShowcase && !spaceEmpty ? { name: '剪辑', level: 18, background: '#F8EBF0', color: '#AB6890' } : null,
+        charging: spaceShowcase && !spaceEmpty ? { url: `https://member.bilibili.com/mall/upower-pay?mid=${num(args, 'mid')}`, icon: null, count: 250 } : null,
+      }
+    }
     case 'author_card': {
       const mid = num(args, 'mid')
       const owner = CATALOG.find((t) => t.up_mid === mid)
       const follow = followByMid(mid)
-      if (!owner && !follow) throw fail('input', '这个 UP 主不在目录里')
+      const self = state.auth.user?.mid === mid ? state.auth.user : null
+      if (!owner && !follow && !self) throw fail('input', '这个 UP 主不在目录里')
       return {
-        name: follow?.seed.name ?? owner!.artist,
+        name: self?.uname ?? follow?.seed.name ?? owner!.artist,
         banner: spaceShowcase && !spaceEmpty ? '/assets/illustrations/precious-editing-desk.webp' : null,
-        face: follow ? avatarArt() : (owner!.up_avatar ?? ''),
+        banner_small: spaceShowcase && !spaceEmpty ? '/assets/cover-fallback.jpg' : null,
+        following_count: 430,
+        dress: spaceShowcase && !spaceEmpty ? {
+          pendant: 'https://i2.hdslb.com/bfs/garb/open/efe5e579cbb95a404c2ba289f37c5965dee7a3a2.png',
+          pendant_name: '箱庭少女之梦头像',
+          nameplate: {
+            name: '见习偶像', condition: '所有自制视频总播放数>=10万，数据次日更新',
+            image: 'https://i2.hdslb.com/bfs/face/e93dd9edfa7b9e18bf46fd8d71862327a2350923.png',
+            small: 'https://i1.hdslb.com/bfs/face/275b468b043ec246737ab8580a2075bee0b1263b.png',
+          },
+          membership: {
+            label: '十年大会员', nickname_color: '#FB7299',
+            image: 'https://i0.hdslb.com/bfs/vip/802418ff03911645648b63aa193ba67997b5a0bc.png',
+            animated: 'https://i0.hdslb.com/bfs/activity-plat/static/20220608/e369244d0b14644f5e1a06431e22a4d5/wltavwHAkL.gif',
+          },
+        } : null,
+        face: self?.avatar ?? (follow ? avatarArt() : owner?.up_avatar ?? ''),
         // 按 mid 造一个稳定的粉丝数，同一个 UP 每次一样
         fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
         sign: follow?.seed.sign ?? '这里是 B 站的占位签名，真机走真实接口。',
@@ -1476,6 +1508,22 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const tracks = previewSpaceWorks(num(args, 'mid'))
       return str(args, 'kind') === 'pinned' ? tracks.slice(-1) : tracks.slice(0, 3)
     }
+    case 'space_catalog_order': return [2, 1, 8, 7, 3, 4, 5, 10, 9, 23, 26, 21, 22, 25]
+    case 'space_catalog': {
+      const { kind } = args.catalog as { kind: string }
+      const empty = { status: 'public', items: [], more: false, offset: null }
+      if (!spaceShowcase || spaceEmpty) return empty
+      const page = num(args, 'page')
+      if (kind === 'anime') return { status: 'private' }
+      const track = previewSpaceWorks(num(args, 'mid'))[0]
+      const item = kind === 'created' ? { title: '影像收藏', destination: { kind: 'folder', id: 100 } }
+        : kind === 'folder' && track ? { title: track.title, destination: { kind: 'video', track } }
+        : kind === 'reading_lists' ? { title: '拍摄笔记', destination: { kind: 'reading_list', id: 10 } }
+        : kind === 'reading_list' || kind === 'opus' ? { title: page > 1 ? '拍摄续记' : '开拍啦', destination: { kind: 'web', url: 'https://www.bilibili.com/' } }
+        : null
+      const more = kind === 'opus' && page === 1
+      return { ...empty, items: item ? [{ cover: track?.cover ?? null, detail: null, ...item }] : [], more, offset: more ? '1271245104890249267' : null }
+    }
     case 'space_collections': {
       const tracks = previewSpaceWorks(num(args, 'mid'))
       if (!spaceShowcase || spaceEmpty || !tracks.length) return [[], 0]
@@ -1519,7 +1567,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
           }
         })
       }
-      const sorted = [...owned]
+      const keyword = str(args, 'keyword').trim().toLocaleLowerCase()
+      const sorted = keyword ? owned.filter(track => track.title.toLocaleLowerCase().includes(keyword)) : [...owned]
       if (typographyMode !== null && mid === sampleTrack.up_mid) sorted[0] = sampleTrack
       if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
       if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))
