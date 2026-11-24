@@ -798,6 +798,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         next_cursor: start + 8 < 24 ? `${start + 8}:0` : null,
       }
     }
+    case 'space_dynamics':
     case 'dynamic_feed': {
       const now = Math.floor(Date.now() / 1000)
       const params = import.meta.env.DEV ? new URLSearchParams(window.location.search) : undefined
@@ -969,6 +970,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         ],
         offset: '',
         has_more: false,
+      }
+      if (command === 'space_dynamics') {
+        if (params?.has('spaceDynamicsBlocked')) throw fail('input', '作者动态暂时没取到')
+        const mid = num(args, 'mid')
+        const named = CATALOG.find(track => track.up_mid === mid)
+        const author = named?.artist ?? FOLLOW_SEEDS[mid - 5000]?.name ?? 'UP 主'
+        const item = { ...firstVideo, mid, author, face: named?.up_avatar ?? '' }
+        if (spaceEmpty) return { items: [], offset: '', has_more: false }
+        if (args.offset) return { items: [{ ...item, id: '1129036400123456390', pinned: false }], offset: '', has_more: false }
+        return { items: [{ ...item, kind: 'opus', pinned: true, title: '', text: '投票 [doge]', nodes: [
+          { kind: 'text', text: '投票 ' }, { kind: 'emoji', text: '[doge]', image: '/assets/2233-coin.png' },
+        ], attachment: { label: '投票', title: '下一期想看什么？', detail: '345人参与', cover: null,
+          ends_at: null, url: 'https://www.bilibili.com/h5/vote?vote_id=14989681' } }], offset: '1129036400123456391', has_more: true }
       }
       if (typographyMode !== null) {
         for (const item of page.items) if (item.mid === sampleTrack.up_mid) item.author = sampleName

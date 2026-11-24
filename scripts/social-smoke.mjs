@@ -99,6 +99,8 @@ export async function checkSocialPages(page, web, wait, check) {
 
   await page.viewport(1320, 900)
   await click(other)
+  await wait(`${messages}.length > 0 && Array.from(${log}.querySelectorAll('img')).every(img => img.complete)`)
+  await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
   await byName('body', '账号菜单')
   await byName('body', '退出登录')
   await wait(`!${field} && !${first} && !${log}`)
@@ -122,6 +124,32 @@ export async function checkSocialPages(page, web, wait, check) {
   await click(element('button[aria-label="返回"]'))
   await wait(`${work}?.getAttribute('aria-label') === ${JSON.stringify(title)}`)
   check('点开合集作品后返回同一目录', true)
+
+  const dynamics = 'section[aria-label="作者动态"]'
+  await byName('nav[aria-label="空间内容"]', '动态')
+  await wait(element(dynamics + ' [data-dynamic-id] img[alt="[doge]"]'))
+  check('作者空间的置顶动态、正文表情和投票卡一起出现', await page.evaluate(`(() => {
+    const entry = document.querySelector(${JSON.stringify(dynamics + ' [data-dynamic-id]')})
+    return entry.textContent.includes('置顶') && entry.querySelector('a[href*="vote_id"]')?.textContent.includes('下一期想看什么')
+  })()`))
+  const filter = element(dynamics + ' input[type="search"]')
+  await page.evaluate(`(() => {
+    const input = ${filter}
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '晴天')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await wait(`!${element(dynamics + ' [data-dynamic-id]')}`)
+  await byName(dynamics, '更多动态')
+  await wait(`${element(dynamics + ' [data-dynamic-id]')}?.textContent.includes('晴天')`)
+  check('空间动态搜索也能找到随后翻页加载的内容', true)
+  await newPage('spaceDynamicsBlocked=1')
+  await openSpace()
+  await byName('nav[aria-label="空间内容"]', '动态')
+  await wait(buttons(dynamics, '重试'))
+  check('受限时保留当前作者官网动态入口', await page.evaluate(`(() => {
+    const author = document.querySelector('[data-up-mid]').dataset.upMid
+    return document.querySelector(${JSON.stringify(dynamics + ' a')})?.href === 'https://space.bilibili.com/' + author + '/dynamic'
+  })()`))
 
   await newPage('loggedIn=1&spaceEmpty=1')
   await openSpace()

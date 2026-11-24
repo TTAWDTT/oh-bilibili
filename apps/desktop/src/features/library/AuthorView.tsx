@@ -2,6 +2,7 @@ import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore, type AuthorRoute, type SpaceSection } from '../../app/appStore'
+import { AuthorDynamics } from './AuthorDynamics'
 import { AuthorCollections } from './AuthorCollections'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
@@ -367,7 +368,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
 
       {mid && (
         <nav aria-label="空间内容" className="mb-4 flex items-center gap-5 border-b border-[var(--line)]">
-          {([['videos', '投稿'], ['masterpieces', '代表作'], ['collections', '合集和系列']] as const)
+          {([['videos', '投稿'], ['dynamics', '动态'], ['masterpieces', '代表作'], ['collections', '合集和系列']] as const)
             .filter(([id]) => id !== 'masterpieces' || !!masterpieces?.length || section === id)
             .map(([id, label]) => (
               <button type="button" key={id} aria-pressed={section === id} onClick={() => show(id)}
@@ -377,7 +378,9 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
             ))}
         </nav>
       )}
-      {mid && section === 'collections' ? (
+      {mid && section === 'dynamics' ? (
+        <AuthorDynamics key={mid} mid={mid} />
+      ) : mid && section === 'collections' ? (
         <AuthorCollections key={`${view.shelf?.kind}-${view.shelf?.id}-${view.shelfPage ?? 1}`} view={view} mid={mid} />
       ) : section === 'masterpieces' ? (
         masterpieceFailed ? (

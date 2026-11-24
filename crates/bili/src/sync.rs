@@ -3,6 +3,9 @@
 //! 喜欢映射成 B 站点赞；收藏映射到固定名字的收藏夹，没有就自动建。
 //! 两个接口都要 csrf（bili_jct），也必须登录。
 
+mod dynamic_content;
+pub use dynamic_content::{DynamicAttachment, DynamicNode};
+use dynamic_content::{dynamic_attachment, dynamic_nodes};
 use crate::client::{Client, API, LIVE_API};
 use crate::error::BiliError;
 use serde::{Deserialize, Serialize};
@@ -261,7 +264,7 @@ pub enum DynamicKind {
     Live,
 }
 
-/// 关注动态里的一条视频或图文投稿。
+/// 一条动态和它引用的原作。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicItem {
     pub id: String,
@@ -275,6 +278,12 @@ pub struct DynamicItem {
     pub vip: bool,
     pub pub_time: String,
     pub pub_ts: u64,
+    #[serde(default)]
+    pub nodes: Vec<DynamicNode>,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default)]
+    pub attachment: Option<DynamicAttachment>,
     pub text: String,
     pub bvid: String,
     pub title: String,
@@ -726,26 +735,32 @@ impl Client {
 
     /// 关注动态。`offset` 是接口上一页返回的游标，第一页为空。
     pub async fn dynamic_feed(&self, offset: Option<String>) -> Result<DynamicPage, BiliError> {
-        let suffix = offset
-            .map(|o| format!("&offset={}", crate::wbi::encode_uri_component(&o)))
-            .unwrap_or_default();
-        let v = self
-            .get_json(
-                &format!(
-                    "{API}/x/polymer/web-dynamic/v1/feed/all?type=all&page=1&features=itemOpusStyle{suffix}"
-                ),
-                std::time::Duration::from_millis(400),
-            )
-            .await?;
-        let data = &v["data"];
-        let items = data["items"]
-            .as_array()
-            .map(|list| list.iter().filter_map(dynamic_item).collect())
-            .unwrap_or_default();
+        self.dynamic_page("all?type=all&page=1", offset).await
+    }
+
+    pub async fn space_dynamics(&self, mid: u64, offset: Option<String>) -> Result<DynamicPage, BiliError> {
+        self.dynamic_page(&format!("space?host_mid={mid}&platform=web"), offset).await
+    }
+
+    async fn dynamic_page(&self, feed: &str, offset: Option<String>) -> Result<DynamicPage, BiliError> {
+        let cursor = offset.as_deref().unwrap_or_default();
+        let mut url = format!("{API}/x/polymer/web-dynamic/v1/feed/{feed}&features=itemOpusStyle");
+        if !cursor.is_empty() {
+            url.push_str("&offset=");
+            url.push_str(&crate::wbi::encode_uri_component(cursor));
+        }
+        let response = self.get_json(&url, std::time::Duration::from_millis(400)).await?;
+        let data = &response["data"];
+        let items = match data.get("items") {
+            Some(serde_json::Value::Array(items)) => items.iter().filter_map(dynamic_item).collect(),
+            Some(serde_json::Value::Null) if data["has_more"] == false => Vec::new(),
+            _ => return Err(BiliError::Parse("没有收到动态列表".into())),
+        };
+        let next = data["offset"].as_str().unwrap_or_default();
         Ok(DynamicPage {
             items,
-            offset: data["offset"].as_str().unwrap_or_default().to_string(),
-            has_more: data["has_more"].as_bool().unwrap_or(false),
+            offset: next.to_string(),
+            has_more: data["has_more"] == true && !next.is_empty() && next != cursor,
         })
     }
 
@@ -1728,7 +1743,11 @@ fn duration_text_ms(text: &str) -> Option<u64> {
 }
 
 fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
-    let major = &item["modules"]["module_dynamic"]["major"];
+    if item["visible"] == false {
+        return None;
+    }
+    let module = &item["modules"]["module_dynamic"];
+    let major = &module["major"];
     let kind = match (item["type"].as_str(), major["type"].as_str()) {
         (Some("DYNAMIC_TYPE_AV"), Some("MAJOR_TYPE_ARCHIVE")) => DynamicKind::Video,
         // 图文动态有两种形状：带 opus 摘要的，和只有 draw.items 的老格式。
@@ -1736,6 +1755,7 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
         (Some("DYNAMIC_TYPE_DRAW"), Some("MAJOR_TYPE_OPUS" | "MAJOR_TYPE_DRAW")) => {
             DynamicKind::Opus
         }
+        (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_OPUS")) => DynamicKind::Opus,
         (Some("DYNAMIC_TYPE_ARTICLE"), Some("MAJOR_TYPE_ARTICLE")) => DynamicKind::Article,
         // 关注流里夹的直播推荐。B 站网页把这几条画成普通直播卡。
         (Some("DYNAMIC_TYPE_LIVE_RCMD"), Some("MAJOR_TYPE_LIVE_RCMD")) => DynamicKind::Live,
@@ -1743,14 +1763,24 @@ fn dynamic_item(item: &serde_json::Value) -> Option<DynamicItem> {
         (Some("DYNAMIC_TYPE_LIVE"), Some("MAJOR_TYPE_LIVE")) => DynamicKind::Live,
         (Some("DYNAMIC_TYPE_FORWARD"), _) => DynamicKind::Forward,
         (Some("DYNAMIC_TYPE_WORD"), _) => DynamicKind::Opus,
+        // 主卡未识别时仍可查看附卡。
+        _ if module["additional"]["type"].as_str().is_some_and(|kind| kind.starts_with("ADDITIONAL_TYPE_") && kind != "ADDITIONAL_TYPE_NONE") => DynamicKind::Opus,
         _ => return None,
     };
     let author = &item["modules"]["module_author"];
+    let id = item["id_str"].as_str().map(str::to_string)
+        .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?;
+    let discussion = format!("https://t.bilibili.com/{id}");
+    let body = if major["opus"]["summary"].is_object() {
+        &major["opus"]["summary"]
+    } else {
+        &module["desc"]
+    };
     let mut dynamic = DynamicItem {
-        id: item["id_str"]
-            .as_str()
-            .map(str::to_string)
-            .or_else(|| item["id"].as_u64().map(|id| id.to_string()))?,
+        id,
+        nodes: dynamic_nodes(&body["rich_text_nodes"], &discussion),
+        pinned: item["modules"]["module_tag"]["text"] == "置顶",
+        attachment: dynamic_attachment(&module["additional"], &discussion),
         kind,
         mid: dynamic_mid(&author["mid"]).unwrap_or(0),
         author: author["name"].as_str().unwrap_or_default().to_string(),

@@ -2153,6 +2153,10 @@ impl Engine {
         Ok(self.source.dynamic_feed(offset).await?)
     }
 
+    pub async fn space_dynamics(&self, mid: u64, offset: Option<String>) -> Result<crate::wire::DynamicPage, WireError> {
+        Ok(self.source.space_dynamics(mid, offset).await?)
+    }
+
     pub async fn message_unread(&self) -> Result<crate::wire::MessageUnread, WireError> {
         Ok(self.source.message_unread().await?)
     }

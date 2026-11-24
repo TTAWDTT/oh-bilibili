@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../auth/authStore'
 import { cachedFollowing } from '../library/followingIndex'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
@@ -33,6 +33,8 @@ type OpenDynamic = (event: DynamicOpenEvent) => void
 type OpenDynamicItem = (item: ipc.DynamicItem, event: DynamicOpenEvent) => void
 type DynamicBody = { id: string; initiallyExpanded: boolean }
 
+const CardPosition = createContext<((event: DynamicOpenEvent) => DynamicReturn | undefined) | undefined>(undefined)
+
 function discussionUrl(id: string): string {
   return `https://t.bilibili.com/${id}`
 }
@@ -55,12 +57,35 @@ function DiscussionLink({ item }: { item: ipc.DynamicItem }) {
 }
 
 /** 动态正文：超过六行折起来，B 站卡片也是先露出前几行再给「展开」。 */
-function RichText({ text, body, discuss }: { text: string; body: DynamicBody; discuss?: string }) {
+function RichText({ text, nodes, body, discuss }: {
+  text: string; nodes: ipc.DynamicNode[] | undefined; body: DynamicBody; discuss?: string
+}) {
+  const position = useContext(CardPosition)
+  const navigate = useAppStore((state) => state.navigate)
   const setHeroQuery = useAppStore((state) => state.setHeroQuery)
   const [expanded, setExpanded] = useState(body.initiallyExpanded)
   const [overflow, setOverflow] = useState(false)
   const textRef = useRef<HTMLParagraphElement | null>(null)
-  const bodyNodes = text.split(/(https?:\/\/[^\s<>，。]+|#[^#\s]{1,40}#)/g).map((part, index) => {
+  const linkClass = 't break-words text-left text-[var(--accent)] hover:underline'
+  const bodyNodes = nodes?.length ? nodes.map((node, index) => {
+    switch (node.kind) {
+      case 'text': return node.text
+      case 'emoji': return <img key={index} src={node.image} alt={node.text} title={node.text}
+        referrerPolicy="no-referrer" className="inline-block h-[1.35em] w-[1.35em] align-text-bottom object-contain" />
+      case 'mention': return <button key={index} type="button" className={linkClass} data-dynamic-open={`mention-${body.id}-${index}`}
+        onClick={event => navigate({ kind: 'author', mid: node.mid, name: node.text.trim().replace(/^@/, '') }, position?.(event))}>{node.text}</button>
+      case 'video': return <button key={index} type="button" className={linkClass} data-dynamic-open={`video-${body.id}-${index}`}
+        onClick={event => navigate({ kind: 'watch', track: { key: node.bvid, title: node.text, artist: '', cover: null, duration_ms: null } }, position?.(event))}>
+        {node.text}
+      </button>
+      case 'topic': return <button key={index} type="button" className={linkClass}
+        onClick={() => setHeroQuery(node.text.replace(/^#|#$/g, ''))}>{node.text}</button>
+      case 'link': return <a key={index} className={linkClass} href={node.url}
+        onClick={(event) => { event.preventDefault(); void ipc.openExternal(node.url).catch(cause => toastFailure('打开链接', cause)) }}>
+        {node.text}<Icon name="external" size={10} className="inline" />
+      </a>
+    }
+  }) : text.split(/(https?:\/\/[^\s<>，。]+|#[^#\s]{1,40}#)/g).map((part, index) => {
     if (/^https?:\/\//.test(part)) {
       return (
         <a
@@ -271,6 +296,23 @@ function DynamicLive({ item, onOpen }: { item: ipc.DynamicItem; onOpen: OpenDyna
   )
 }
 
+function Attachment({ card }: { card: ipc.DynamicAttachment }) {
+  return <a href={card.url}
+    onClick={(event) => { event.preventDefault(); void ipc.openExternal(card.url).catch(cause => toastFailure('打开附卡', cause)) }}
+    className="t mt-3 flex items-center gap-3 rounded-[6px] border border-[var(--line)] p-3 hover:bg-[var(--ga1)]">
+    {card.cover && <img src={card.cover} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 rounded object-cover" />}
+    <span className="min-w-0 flex-1">
+      <span className="block text-[12px] text-[var(--text-2)]">{card.label}</span>
+      <strong className="block break-words text-[14px]">{card.title}</strong>
+      {card.detail && <span className="block text-[12px] text-[var(--text-2)]">{card.detail}</span>}
+      {card.ends_at && <span className="block text-[12px] text-[var(--text-2)]">
+        截止 {new Date(card.ends_at * 1000).toLocaleDateString('zh-CN')}
+      </span>}
+    </span>
+    <Icon name="external" size={13} className="shrink-0 text-[var(--text-3)]" />
+  </a>
+}
+
 function DynamicContent({
   item,
   body,
@@ -294,7 +336,7 @@ function DynamicContent({
           {item.title} <Icon name="external" size={11} className="inline" />
         </button>
       ) : null}
-      {text ? <RichText text={text} body={body} /> : null}
+      {text ? <RichText text={text} nodes={item.nodes} body={body} /> : null}
       {item.kind === 'video' ? (
         <DynamicVideo item={item} onOpen={onOpen} attribution={attribution} />
       ) : null}
@@ -374,7 +416,7 @@ function ForwardContent({ item, expandedBodies, onOpen, onAuthor }: {
 
   return (
     <>
-      {item.text && item.text !== '转发动态' ? <RichText text={item.text} body={body(item.id)} discuss={item.id} /> : null}
+      {item.text && item.text !== '转发动态' ? <RichText text={item.text} nodes={item.nodes} body={body(item.id)} discuss={item.id} /> : null}
       <DiscussionLink item={item} />
       {path.length ? (
         <div className="mt-2">
@@ -396,7 +438,8 @@ function ForwardContent({ item, expandedBodies, onOpen, onAuthor }: {
                     <ForwardByline item={step} onAuthor={onAuthor} />
                     <span className="num text-page-meta text-[var(--text-3)]">{step.pub_time}</span>
                   </div>
-                  {step.text ? <RichText text={step.text} body={body(`${item.id}/${step.id}`)} discuss={step.id} /> : null}
+                  {step.text ? <RichText text={step.text} nodes={step.nodes} body={body(`${item.id}/${step.id}`)} discuss={step.id} /> : null}
+                  {step.attachment && <Attachment card={step.attachment} />}
                   <DiscussionLink item={step} />
                 </li>
               ))}
@@ -421,6 +464,7 @@ function ForwardContent({ item, expandedBodies, onOpen, onAuthor }: {
               </span>
             }
           />
+          {original.attachment && <Attachment card={original.attachment} />}
           {original.kind === 'opus' ? <DiscussionLink item={original} /> : null}
         </div>
       ) : null}
@@ -481,6 +525,7 @@ function DynamicCard({
             >
               {item.author}
             </button>
+            {item.pinned && <span className="shrink-0 rounded-[2px] bg-[var(--accent-soft)] px-1 text-[11px] text-[var(--accent)]">置顶</span>}
             {item.official != null ? (
               <span
                 title={item.official === 1 ? '机构认证' : '个人认证'}
@@ -522,6 +567,7 @@ function DynamicCard({
         ) : (
           <DynamicContent item={item} body={body} onOpen={(event) => onOpen(item, event)} />
         )}
+        {item.attachment && <Attachment card={item.attachment} />}
       </div>
       <footer className="mt-3 sm:ml-[60px] flex items-center gap-6 text-[12px] leading-[16px] text-[var(--text-3)]">
         <span className="flex items-center gap-1.5" title={`转发 ${formatCount(item.forwards)}`}>
@@ -539,6 +585,32 @@ function DynamicCard({
       </footer>
     </article>
   )
+}
+
+function dynamicUrl(item: ipc.DynamicItem) {
+  if (item.kind === 'video' && item.bvid) return `https://www.bilibili.com/video/${item.bvid}`
+  if (item.kind === 'article' && item.article_id) return `https://www.bilibili.com/read/cv${item.article_id}`
+  if (item.kind === 'live' && item.room_id) return `https://live.bilibili.com/${item.room_id}`
+  return `https://www.bilibili.com/opus/${item.id}`
+}
+
+export function FeedCard({ item, expandedBodies = [], position }: {
+  item: ipc.DynamicItem; expandedBodies?: readonly string[]; position?: (event: DynamicOpenEvent) => DynamicReturn | undefined
+}) {
+  const navigate = useAppStore((state) => state.navigate)
+  const openSite = (opened: ipc.DynamicItem) =>
+    void ipc.openExternal(dynamicUrl(opened)).catch(cause => toastFailure('打开链接', cause))
+  return <CardPosition.Provider value={position}><DynamicCard item={item} expandedBodies={expandedBodies}
+    onOpen={(opened, event) => {
+      if (opened.kind !== 'video' || !opened.bvid) return openSite(opened)
+      navigate({ kind: 'watch', track: {
+        key: opened.bvid, title: opened.title, artist: opened.author, cover: opened.cover,
+        duration_ms: opened.duration_ms, views: opened.views, danmaku: opened.danmaku,
+        up_avatar: opened.face, up_mid: opened.mid,
+      } }, position?.(event))
+    }}
+    onAuthor={(opened, event) => navigate({ kind: 'author', name: opened.author, mid: opened.mid }, position?.(event))}
+    onExternal={() => openSite(item)} /></CardPosition.Provider>
 }
 
 function restoreDynamicPosition(scroller: HTMLElement, position: DynamicReturn): void {
@@ -760,23 +832,6 @@ export function DynamicView() {
       : undefined
   }
 
-  const openVideo = (item: ipc.DynamicItem, event: DynamicOpenEvent, index: number): void => {
-    navigate({
-      kind: 'watch',
-      track: {
-        key: item.bvid,
-        title: item.title,
-        artist: item.author,
-        cover: item.cover,
-        duration_ms: item.duration_ms,
-        views: item.views,
-        danmaku: item.danmaku,
-        up_avatar: item.face,
-        up_mid: item.mid,
-      },
-    }, capturePosition(event, index))
-  }
-
   if (!loaded && loading) return <BiliLoader label="正在取动态…" />
   if (error && items.length === 0) {
     return (
@@ -927,45 +982,8 @@ export function DynamicView() {
           <EmptyState icon="biliTv" title="关注的人还没有新动态" action={{ label: '去发现', onClick: () => navigate({ kind: 'home' }) }} />
         ) : null}
         {visible.map((item, index) => (
-          <DynamicCard
-            key={item.id}
-            item={item}
-            expandedBodies={expandedBodies}
-            onOpen={(opened, event) => {
-              if (opened.kind === 'video' && opened.bvid) {
-                openVideo(opened, event, index)
-              } else if (opened.kind === 'article' && opened.article_id) {
-                void ipc
-                  .openExternal(`https://www.bilibili.com/read/cv${opened.article_id}`)
-                  .catch((cause) => toastFailure('打开专栏', cause))
-              } else if (opened.kind === 'live' && opened.room_id) {
-                void ipc
-                  .openExternal(`https://live.bilibili.com/${opened.room_id}`)
-                  .catch((cause) => toastFailure('打开直播间', cause))
-              } else if (opened.kind !== 'video') {
-                void ipc
-                  .openExternal(`https://www.bilibili.com/opus/${opened.id}`)
-                  .catch((cause) => toastFailure('打开动态', cause))
-              }
-            }}
-            onAuthor={(opened, event) => navigate(
-              { kind: 'author', name: opened.author, mid: opened.mid },
-              capturePosition(event, index),
-            )}
-            onExternal={() => {
-              void ipc
-                .openExternal(
-                  item.kind === 'video'
-                    ? `https://www.bilibili.com/video/${item.bvid}`
-                    : item.kind === 'article' && item.article_id
-                      ? `https://www.bilibili.com/read/cv${item.article_id}`
-                      : item.kind === 'live' && item.room_id
-                        ? `https://live.bilibili.com/${item.room_id}`
-                        : `https://www.bilibili.com/opus/${item.id}`,
-                )
-                .catch((cause) => toastFailure('打开链接', cause))
-            }}
-          />
+          <FeedCard key={item.id} item={item} expandedBodies={expandedBodies}
+            position={(event) => capturePosition(event, index)} />
         ))}
         {visible.length === 0 && items.length > 0 && !loading && !hasMore && !error && pickedName === null ? (
           <p className="rounded-[6px] bg-[var(--panel)] py-10 text-center text-[13px] text-[var(--text-3)]">
