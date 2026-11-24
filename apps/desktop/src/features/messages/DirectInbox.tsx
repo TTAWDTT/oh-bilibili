@@ -8,16 +8,20 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { useAuthStore } from '../auth/authStore'
 import { useDirectPages } from './useDirectPages'
+import { DirectCards } from './DirectCards'
+import { quoteNodes } from './quoteNodes'
+import { DirectComposer } from './DirectComposer'
 import './direct.css'
 
 const sessionKey = (item: ipc.DirectSession) => item.mid
 const messageKey = (item: ipc.DirectMessage) => item.id
 const clockTime = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-type Composer = { text: string; sending: boolean; error: string | null }
-const emptyComposer: Composer = { text: '', sending: false, error: null }
+export type Composer = { image: File | null; text: string; sending: boolean; error: string | null }
+const emptyComposer: Composer = { image: null, text: '', sending: false, error: null }
 
-export function DirectInbox({ me, selected, onSelect }: {
+export function DirectInbox({ me, emotes, selected, onSelect }: {
   me: number
+  emotes: Map<string, string>
   selected: ipc.DirectPeer | undefined
   onSelect: (peer?: ipc.DirectPeer) => void
 }) {
@@ -38,16 +42,16 @@ export function DirectInbox({ me, selected, onSelect }: {
   }
 
   async function send(peer: ipc.DirectPeer, received: (message: ipc.DirectMessage) => void) {
-    const text = composers[peer.mid]?.text.trim()
-    if (!text || sending.current.has(peer.mid)) return
+    const { text, image } = composers[peer.mid] ?? emptyComposer
+    if ((!text.trim() && !image) || sending.current.has(peer.mid)) return
     sending.current.add(peer.mid)
     update(peer.mid, { sending: true, error: null })
     try {
-      const message = await ipc.sendDirectText(peer.mid, text)
+      const message = image ? await ipc.sendDirectImage(peer.mid, image) : await ipc.sendDirectText(peer.mid, text.trim())
       received(message)
       const unread = sessions.items.find((item) => item.mid === peer.mid)?.unread ?? 0
       sessions.addLatest({ ...peer, preview: message.text, at: message.at, unread })
-      update(peer.mid, { text: '', sending: false, error: null })
+      update(peer.mid, { ...(image ? { image: null } : { text: '' }), sending: false, error: null })
     } catch (cause) {
       const failure = toWireError(cause)
       if (failure.class === 'needs_login') useAppStore.getState().setAuthOpen(true)
@@ -91,18 +95,19 @@ export function DirectInbox({ me, selected, onSelect }: {
           </button>}
         </div>
       </aside>
-      {selected ? <DirectThread key={selected.mid} peer={selected} me={me} composer={composers[selected.mid] ?? emptyComposer}
-        onChange={(text) => update(selected.mid, { text, error: null })} onSend={(received) => send(selected, received)}
+      {selected ? <DirectThread key={selected.mid} peer={selected} me={me} emotes={emotes} composer={composers[selected.mid] ?? emptyComposer}
+        onChange={(values) => update(selected.mid, values)} onSend={(received) => send(selected, received)}
         onBack={() => onSelect()} onRead={afterRead} /> : <div className="dm-placeholder"><Icon name="msgEnvelope" size={44} /><span>选择联系人</span></div>}
     </div>
   )
 }
 
-function DirectThread({ peer, me, composer, onChange, onSend, onBack, onRead }: {
+function DirectThread({ peer, me, emotes, composer, onChange, onSend, onBack, onRead }: {
   peer: ipc.DirectPeer
   me: number
+  emotes: Map<string, string>
   composer: Composer
-  onChange: (text: string) => void
+  onChange: (values: Partial<Composer>) => void
   onSend: (received: (message: ipc.DirectMessage) => void) => Promise<void>
   onBack: () => void
   onRead: (mid: number, at: number) => void
@@ -182,19 +187,11 @@ function DirectThread({ peer, me, composer, onChange, onSend, onBack, onRead }: 
         <time dateTime={new Date(message.at * 1000).toISOString()}>{clockTime.format(message.at * 1000)}</time>
         {message.image ? <img src={message.image} alt="图片消息" className="dm-image" referrerPolicy="no-referrer"
           onLoad={() => { if (atEnd && list.current) list.current.scrollTop = list.current.scrollHeight }} />
-          : <p className="dm-bubble">{message.text}</p>}
+          : message.text && <p className="dm-bubble">{quoteNodes(message.text, [], message.emotes?.length ? new Map([...emotes, ...message.emotes]) : emotes)}</p>}
+        {message.cards?.length ? <DirectCards cards={message.cards} messageId={message.id} /> : null}
       </div>)}
     </div>
-    <form className="dm-compose" onSubmit={(event) => {
-      event.preventDefault()
-      void onSend((message) => { setAtEnd(true); history.addLatest(message) })
-    }}>
-      <textarea aria-label={`给${peer.name}发私信`} placeholder="写私信…" rows={2} readOnly={composer.sending}
-        value={composer.text} onChange={(event) => onChange(event.target.value)} />
-      <div className="dm-compose-actions">
-        {composer.error && <p role="alert" className="dm-error">{composer.error}</p>}
-        <button type="submit" className="dm-send" disabled={composer.sending || !composer.text.trim()}>{composer.sending ? '发送中…' : '发送'}</button>
-      </div>
-    </form>
+    <DirectComposer peer={peer} value={composer} emotes={emotes} onChange={onChange}
+      onSend={() => void onSend((message) => { setAtEnd(true); history.addLatest(message) })} />
   </section>
 }
