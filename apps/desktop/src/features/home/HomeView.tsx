@@ -9,7 +9,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { useAppStore } from '../../app/appStore'
 import { toastFailure } from '../../app/notice'
 import { DISCOVERY_REGIONS } from '../../shared/lib/discoveryRegions'
-import { DiscoveryChannelEditor } from './DiscoveryChannelEditor'
+import { DiscoveryNavigation } from './DiscoveryNavigation'
 import { discoveryTabKey, useDiscoveryTabs } from './discoveryTabs'
 import { FeedMoreButton } from './FeedMoreButton'
 import './discovery.css'
@@ -52,7 +52,7 @@ export function HomeView() {
   const channel = useAppStore((state) => state.view.kind === 'home' ? state.view.channel : undefined)
   const [catalog, setCatalog] = useState(DISCOVERY_REGIONS)
   const { tabs, saveTabs } = useDiscoveryTabs(catalog)
-  const selected = tabs.find((tab) => discoveryTabKey(tab) === channel)
+  const selected = catalog.find((tab) => discoveryTabKey(tab) === channel)
   const scope = selected && discoveryTabKey(selected)
   const replace = useAppStore((state) => state.replace)
   const [items, setItems] = useState<Track[]>(feedMemory.items)
@@ -78,9 +78,6 @@ export function HomeView() {
   const attempt = useRef({ next: 1, append: false })
   /** 上一批一条新的都没带回来，就说明推荐流到头了，别再自动补。 */
   const exhausted = useRef(false)
-  const channelRef = useRef<HTMLDivElement | null>(null)
-  const [channelScroll, setChannelScroll] = useState({ left: false, right: false })
-
   useEffect(() => {
     void ipc.discoveryRegions().then(setCatalog).catch(() => {})
   }, [])
@@ -91,36 +88,6 @@ export function HomeView() {
     media.addEventListener('change', sync)
     return () => media.removeEventListener('change', sync)
   }, [])
-
-  useEffect(() => {
-    const el = channelRef.current
-    if (!el) return
-    const update = (): void => {
-      const left = el.scrollLeft > 1
-      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
-      setChannelScroll((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
-    }
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    el.addEventListener('scroll', update, { passive: true })
-    return () => {
-      observer.disconnect()
-      el.removeEventListener('scroll', update)
-    }
-  }, [tabs])
-
-  useLayoutEffect(() => {
-    const list = channelRef.current
-    const active = list?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')
-    if (!list || !active || list.scrollWidth <= list.clientWidth) return
-    // 只横移分区栏，从视频返回时保留整页的阅读位置。
-    const left = active.offsetLeft - list.offsetLeft
-    const right = left + active.offsetWidth
-    if (left < list.scrollLeft + 32 || right > list.scrollLeft + list.clientWidth - 32) {
-      list.scrollLeft = (left + right - list.clientWidth) / 2
-    }
-  }, [scope, tabs])
 
   const topCount = 5 + (wideHero ? 6 : 2)
   const heroCards = hero.slice(5, topCount)
@@ -303,35 +270,8 @@ export function HomeView() {
     >
       <header className="discovery-bar">
         <h1 className="sr-only">发现</h1>
-        <nav aria-label="发现分区" className="discovery-channels">
-          <div ref={channelRef} className="discovery-channel-list no-scrollbar">
-            <button type="button" aria-pressed={!selected} onClick={() => chooseScope()}>全部</button>
-            {tabs.map((tab) => {
-              const key = discoveryTabKey(tab)
-              return (
-                <button key={key} type="button" title={tab.label} aria-pressed={scope === key} onClick={() => chooseScope(key)}>
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-          {channelScroll.left && (
-            <button type="button" className="discovery-channel-scroll left-0" aria-label="向左浏览分区"
-              onClick={() => channelRef.current?.scrollBy({ left: -channelRef.current.clientWidth * 0.7 })}>
-              <Icon name="chevronLeft" size={16} />
-            </button>
-          )}
-          {channelScroll.right && (
-            <button type="button" className="discovery-channel-scroll right-0" aria-label="向右浏览分区"
-              onClick={() => channelRef.current?.scrollBy({ left: channelRef.current.clientWidth * 0.7 })}>
-              <Icon name="chevronRight" size={16} />
-            </button>
-          )}
-        </nav>
-        <DiscoveryChannelEditor catalog={catalog} tabs={tabs} onSave={(next) => {
-          saveTabs(next)
-          if (scope && !next.some((tab) => discoveryTabKey(tab) === scope)) chooseScope()
-        }} />
+        <DiscoveryNavigation catalog={catalog} tabs={tabs} selected={selected} onSave={saveTabs}
+          onSelect={(region) => chooseScope(region && discoveryTabKey(region))} />
         <div className="discovery-shortcuts md:hidden">
           <button type="button" title="热门" aria-label="热门" onClick={() => navigate({ kind: 'popular' })}>
             <Icon name="popularFlame" size={20} /><span>热门</span>
@@ -433,7 +373,6 @@ export function HomeView() {
 
       {selected && scope && (
         <RegionFeed key={scope} tab={selected}
-          regionName={selected.kind === 'region' ? catalog.find((region) => region.rid === selected.rid)?.name : undefined}
           activeKey={activeKey} playing={playing} />
       )}
 

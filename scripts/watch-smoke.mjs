@@ -1726,57 +1726,108 @@ async function checkDiscoveryFeed(page) {
   })()`))
 }
 
+const discoveryNav = 'nav[aria-label="发现分区"]'
+const discoveryDirectory = '[role="dialog"][aria-label="全部分区"]'
+const discoveryEditor = '[role="dialog"][aria-label="编辑常用"]'
+
+async function clickDiscoveryButton(page, container, name) {
+  const button = `[...document.querySelectorAll(${JSON.stringify(container + ' button')})]
+    .find((item) => (item.getAttribute('aria-label') || item.textContent.trim()) === ${JSON.stringify(name)}
+      && item.getClientRects().length)`
+  await watchUiWait(page)(button)
+  await page.evaluate(`${button}.click()`)
+}
+
+async function openDiscoveryEditor(page) {
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '编辑常用')
+}
+
 async function checkDiscoveryEditor(page) {
   const waitFor = watchUiWait(page)
-  const tabNames = () => page.evaluate(`[...document.querySelectorAll('[aria-label="发现分区"] [aria-pressed]')]
-    .map((button) => button.textContent.trim())`)
-  const openEditor = () => page.evaluate(`document.querySelector('button[aria-label="编辑分区"]').click()`)
-  const chooseChip = (name) => page.evaluate(`[...document.querySelectorAll('[role="dialog"] [aria-pressed]')]
-    .find((button) => button.textContent.trim() === ${JSON.stringify(name)}).click()`)
-  const setField = (selector, value) => page.evaluate(`(() => {
-    const input = document.querySelector(${JSON.stringify(selector)})
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)})
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })()`)
-  await openEditor()
-  await page.clickExactText('恢复默认')
-  await page.clickExactText('保存')
-  const defaults = await tabNames()
-  await openEditor()
-  await chooseChip('音乐')
-  await page.clickExactText('移除')
-  await setField('#discovery-keyword', '周杰伦')
-  await page.clickExactText('添加')
-  await setField('[role="dialog"] .discovery-name-row input', '我的歌单')
-  await page.evaluate(`document.querySelector('[aria-label="向前移动"]').click()`)
-  await page.clickExactText('保存')
-  const edited = await tabNames()
-  await page.evaluate('location.reload()')
-  await waitFor("document.querySelector('[aria-label=\"发现分区\"] [aria-pressed]')")
-  check('窄窗新增、移除、改名、排序在重新打开后保留',
-    defaults.includes('音乐') && !edited.includes('音乐') && edited.at(-2) === '我的歌单' &&
-    edited[0] === '全部' && JSON.stringify(edited) === JSON.stringify(await tabNames()))
-  await page.clickExactText('我的歌单')
-  await waitFor("document.querySelector('[data-home-region] [data-track-card]')")
-  check('改了兴趣的显示名称后仍按原关键词找视频', await page.evaluate(`(() => {
-    const region = document.querySelector('[data-home-region]')
-    return region.querySelector('h2').textContent.includes('我的歌单') &&
-      region.querySelector('[data-track-card]').innerText.includes('周杰伦') && !document.querySelector('[data-home-recommend]')
-  })()`))
-  await openEditor()
-  await chooseChip('我的歌单')
-  await page.clickExactText('移除')
-  await page.evaluate(`document.querySelector('[aria-label="添加音乐"]').click()`)
-  await page.clickExactText('保存')
+  const edit = (name) => clickDiscoveryButton(page, discoveryEditor, name)
+  const pinned = () => page.evaluate(`[...document.querySelectorAll(${JSON.stringify(discoveryEditor + ' button[aria-label^="移除"]')})]
+    .map((button) => button.getAttribute('aria-label').slice(2))`)
+  await page.viewport(1320, 900)
+  await openDiscoveryEditor(page)
+  await edit('恢复默认')
+  const defaults = await pinned()
+  await edit('保存')
+
+  const legacy = [
+    { kind: 'region', rid: 1004, label: '跳舞' },
+    { kind: 'keyword', keyword: '动画短片', label: '短片收藏' },
+    { kind: 'region', rid: 999999, label: '过期分区' },
+    { kind: 'region', rid: 1003, label: '音乐' },
+  ]
+  await page.evaluate(`localStorage.setItem('bili.discovery.tabs', ${JSON.stringify(JSON.stringify(legacy))}); location.reload()`)
   await waitFor("document.querySelector('[data-home-recommend]')")
-  const afterRemove = await tabNames()
-  check('移除正在看的兴趣后回到全部，也能重新添加官方分区',
-    afterRemove.includes('音乐') && !afterRemove.includes('我的歌单') && await page.evaluate(
-      `document.querySelector('[aria-label="发现分区"] [aria-pressed="true"]').textContent.trim() === '全部'`))
-  await openEditor()
-  await page.clickExactText('恢复默认')
-  await page.clickExactText('保存')
-  check('恢复默认还原官方目录及顺序', JSON.stringify(await tabNames()) === JSON.stringify(defaults))
+  await openDiscoveryEditor(page)
+  check('升级时保留常用顺序，恢复官方名称，清理关键词和失效分区',
+    JSON.stringify(await pinned()) === JSON.stringify(['舞蹈', '音乐']) &&
+    await page.evaluate(`!document.querySelector(${JSON.stringify(discoveryEditor)}).querySelector('input')`))
+  await edit('前移音乐')
+  const moved = await pinned()
+  await edit('移除舞蹈')
+  await edit('添加鬼畜')
+  await edit('保存')
+  await page.evaluate('location.reload()')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await openDiscoveryEditor(page)
+  check('添加、移除、移动常用分区均可保存，重开顺序正确',
+    JSON.stringify(moved) === JSON.stringify(['音乐', '舞蹈']) &&
+    JSON.stringify(await pinned()) === JSON.stringify(['音乐', '鬼畜']))
+  await edit('取消')
+
+  for (const width of [1320, 390]) {
+    await clickDiscoveryButton(page, discoveryNav, '全部')
+    await waitFor("document.querySelector('[data-home-recommend]')")
+    await page.viewport(width, 820)
+    await page.evaluate('new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))')
+    await clickDiscoveryButton(page, discoveryNav, '全部分区')
+    const layout = await page.evaluate(`(() => {
+      const panel = document.querySelector(${JSON.stringify(discoveryDirectory)})
+      const box = panel.getBoundingClientRect()
+      const buttons = [...panel.querySelectorAll('button[aria-pressed]')].filter((button) => button.getClientRects().length)
+      const names = buttons.map((button) => button.textContent.trim())
+      return names.length === 31 && new Set(names).size === names.length && names.slice(0, 2).join() === '音乐,鬼畜' &&
+        box.left >= 0 && box.right <= innerWidth + 1 && buttons.every((button) => {
+          const rect = button.getBoundingClientRect()
+          return rect.left >= box.left - 1 && rect.right <= box.right + 1
+        }) && document.documentElement.scrollWidth <= innerWidth
+    })()`)
+    await clickDiscoveryButton(page, discoveryDirectory, '人工智能')
+    await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 人工智能')")
+    const active = await page.evaluate(`(() => {
+      const nav = document.querySelector(${JSON.stringify(discoveryNav)})
+      const current = [...nav.querySelectorAll('[aria-pressed="true"]')].filter((button) => button.getClientRects().length)
+      const rect = current[0]?.getBoundingClientRect()
+      return current.length === 1 && current[0].textContent.trim() === '人工智能' &&
+        [rect.left + 2, rect.right - 2].every((x) => current[0].contains(document.elementFromPoint(x, rect.top + rect.height / 2))) &&
+        !document.querySelector('[data-home-recommend], [role="dialog"]')
+    })()`)
+    check(`${width}px 目录可直接选未固定的官方分区，当前项看得见，无需横拖`, layout && active)
+  }
+
+  await openDiscoveryEditor(page)
+  await edit('全部移除')
+  await edit('保存')
+  await clickDiscoveryButton(page, discoveryNav, '全部')
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '舞蹈')
+  await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 舞蹈')")
+  await openDiscoveryEditor(page)
+  check('常用分区留空后仍能浏览官方分区，浏览不会自动固定', (await pinned()).length === 0)
+  await edit('恢复默认')
+  await edit('保存')
+  await page.evaluate('location.reload()')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await openDiscoveryEditor(page)
+  check('恢复默认并重开后，常用分区与原顺序一致',
+    defaults.length === 6 && JSON.stringify(await pinned()) === JSON.stringify(defaults))
+  await edit('取消')
+  check('关闭编辑器后键盘焦点回到全部分区',
+    await page.evaluate(`document.activeElement === document.querySelector(${JSON.stringify(discoveryNav + ' [aria-haspopup="dialog"]')})`))
 }
 
 /** 导航约定：歌单详情仍在曲库下，观看页返回把焦点还给进来的那张卡。 */
@@ -1859,11 +1910,8 @@ async function checkNavConventions(page) {
     watching && opened !== null && back.key === opened && back.label.startsWith('观看'),
   )
 
-  await page.evaluate(`(() => {
-    const tabs = document.querySelector('[aria-label="发现分区"]')
-    const music = [...tabs.querySelectorAll('button')].find((button) => button.textContent.trim() === '音乐')
-    music?.click()
-  })()`)
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '音乐')
   const waitFor = watchUiWait(page)
   const cardButton = '[data-home-region] [data-track-card] button[aria-label^="观看"]'
   await waitFor(`document.querySelector(${JSON.stringify(cardButton)})`)

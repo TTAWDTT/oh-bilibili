@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
+import type { DiscoveryRegion } from '../../shared/lib/discoveryRegions'
 import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { FeedMoreButton } from './FeedMoreButton'
-import { discoveryTabKey, type DiscoveryTab } from './discoveryTabs'
+import { discoveryTabKey } from './discoveryTabs'
 
 type RegionPage = { tracks: Track[]; page: number; hasMore: boolean; top: number; index: number }
 export const regionMemory = new Map<string, RegionPage>()
@@ -16,9 +17,8 @@ const illustrations: Record<string, string> = {
   游戏: 'handheld',
 }
 
-export function RegionFeed({ tab, regionName, activeKey, playing }: {
-  tab: DiscoveryTab
-  regionName: string | undefined
+export function RegionFeed({ tab, activeKey, playing }: {
+  tab: DiscoveryRegion
   activeKey: string | null
   playing: boolean
 }) {
@@ -27,24 +27,20 @@ export function RegionFeed({ tab, regionName, activeKey, playing }: {
   const [requested, setRequested] = useState(result ? 0 : 1)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const rid = tab.kind === 'region' ? tab.rid : undefined
-  const keyword = tab.kind === 'keyword' ? tab.keyword : undefined
-  const illustration = regionName ? illustrations[regionName] : undefined
+  const { rid, name } = tab
+  const illustration = illustrations[name]
 
   useEffect(() => {
     if (!requested) return
     let active = true
-    const response = rid !== undefined
-      ? ipc.discoveryRegionFeed(rid, requested).then((tracks) => ({ tracks, has_more: tracks.length > 0 }))
-      : ipc.searchPage(keyword!, requested)
-    void response.then(({ tracks, has_more }) => {
+    void ipc.discoveryRegionFeed(rid, requested).then((tracks) => {
       if (!active) return
       const previous = regionMemory.get(key)
       const merged = new Map(previous?.tracks.map((track) => [track.key, track]))
       const before = merged.size
       for (const track of tracks) merged.set(track.key, track)
       const next = {
-        tracks: [...merged.values()], page: requested, hasMore: has_more && merged.size > before,
+        tracks: [...merged.values()], page: requested, hasMore: merged.size > before,
         top: previous?.top ?? 0, index: previous?.index ?? 0,
       }
       regionMemory.set(key, next)
@@ -54,19 +50,14 @@ export function RegionFeed({ tab, regionName, activeKey, playing }: {
       if (active) setError(toWireError(cause).message)
     })
     return () => { active = false }
-  }, [key, rid, keyword, requested, attempt])
+  }, [key, rid, requested, attempt])
 
   return (
     <section data-home-region className="px-4 pt-4 md:px-8">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="flex min-w-0 max-w-full items-center gap-2 text-[16px] font-semibold">
           {illustration && <img src={`/assets/illustrations/${illustration}.png`} alt="" width={28} height={28} className="h-7 w-7 shrink-0 object-contain" />}
-          <span className="min-w-0 truncate" title={tab.label}>{tab.label}</span>
-          {(keyword || (regionName && regionName !== tab.label)) && (
-            <span className="self-end pb-0.5 text-[13px] font-normal text-[var(--text-2)]">
-              {keyword ? (keyword === tab.label ? '相关视频' : `搜索「${keyword}」`) : `${regionName}分区`}
-            </span>
-          )}
+          <span className="min-w-0 truncate">{name}</span>
         </h2>
       </div>
       {result && result.tracks.length > 0 && (
@@ -92,7 +83,7 @@ export function RegionFeed({ tab, regionName, activeKey, playing }: {
         <FeedMoreButton onMore={() => setRequested(result.page + 1)} />
       ) : result?.tracks.length === 0 ? (
         <p className="py-8 text-center text-[12.5px] text-[var(--text-3)]">
-          {keyword ? '没有找到相关视频。' : '这个分区暂时没有投稿。'}
+          这个分区暂时没有投稿。
         </p>
       ) : null}
     </section>

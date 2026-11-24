@@ -16,22 +16,44 @@
   background: var(--panel);
 }
 
-.discovery-channels { position: relative; flex: 1; min-width: 0; }
-.discovery-channel-list { display: flex; align-items: center; gap: 18px; overflow-x: auto; }
-.discovery-channel-list button {
+.discovery-channels {
+  container-type: inline-size;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 20px;
+}
+.discovery-directory-trigger {
+  display: inline-flex;
+  flex: none;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-alt);
+  color: var(--text-1);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.discovery-directory-trigger[aria-expanded="true"],
+.discovery-directory-trigger:hover { color: var(--accent-strong); border-color: var(--accent); }
+.discovery-directory-trigger svg { transform: rotate(90deg); }
+.discovery-directory-trigger[aria-expanded="true"] svg { transform: rotate(-90deg); }
+.discovery-shortcut-list { display: flex; align-items: center; gap: 16px; }
+.discovery-shortcut-list button {
   position: relative;
   flex: none;
   height: 54px;
-  max-width: 11em;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   padding-inline: 2px;
   color: var(--text-2);
   font-size: 14px;
+  white-space: nowrap;
 }
-.discovery-channel-list button[aria-pressed="true"] { color: var(--accent-strong); font-weight: 600; }
-.discovery-channel-list button[aria-pressed="true"]::after {
+.discovery-shortcut-list button[aria-pressed="true"] { color: var(--accent-strong); font-weight: 600; }
+.discovery-shortcut-list button[aria-pressed="true"]::after {
   content: '';
   position: absolute;
   inset: auto 2px 0;
@@ -39,24 +61,57 @@
   border-radius: 2px;
   background: var(--accent);
 }
-.discovery-channel-list button:focus-visible { outline-offset: -3px; }
-.discovery-channel-list button:hover,
+.discovery-shortcut-list button:focus-visible { outline-offset: -3px; }
+.discovery-shortcut-list button:hover,
 .discovery-shortcuts button:hover,
 .discovery-refresh:hover { color: var(--accent-strong); }
 
-.discovery-channel-scroll {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  display: grid;
-  width: 26px;
-  height: 28px;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--panel);
-  color: var(--text-2);
+@container (max-width: 690px) {
+  .discovery-shortcut-list button:nth-child(n+6):not([aria-pressed="true"]) { display: none; }
 }
+@container (max-width: 540px) {
+  .discovery-shortcut-list button:nth-child(n+4):not([aria-pressed="true"]) { display: none; }
+}
+@container (max-width: 365px) {
+  .discovery-shortcut-list { gap: 10px; }
+  .discovery-shortcut-list button:nth-child(n+3):not([aria-pressed="true"]) { display: none; }
+}
+@container (max-width: 270px) {
+  .discovery-shortcut-list:has([aria-pressed="true"]:not(:first-child)) button:not(:first-child):not([aria-pressed="true"]) { display: none; }
+}
+
+.discovery-directory { padding: 14px; }
+.discovery-directory-head, .discovery-directory-head button {
+  display: flex;
+  align-items: center;
+}
+.discovery-directory-head { justify-content: space-between; }
+.discovery-directory h2 { color: var(--text-1); font-size: 14px; font-weight: 600; }
+.discovery-directory-head button {
+  gap: 5px;
+  min-height: 28px;
+  padding-inline: 6px;
+  border-radius: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.discovery-directory-head button:hover { color: var(--accent-strong); background: var(--ga0); }
+.discovery-directory > h2 { margin-top: 16px; }
+.discovery-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.discovery-directory-grid button {
+  min-height: 34px;
+  border-radius: 5px;
+  background: var(--ga0);
+  color: var(--text-1);
+  font-size: 14px;
+}
+.discovery-directory-grid button:hover,
+.discovery-directory-grid button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-strong); }
 
 .discovery-shortcuts { align-items: center; gap: 14px; }
 .discovery-refresh,
@@ -102,8 +157,8 @@
   .discovery-page { --discovery-gutter: 12px; scroll-padding-block-start: 54px; }
   .discovery-bar { gap: 12px; padding-inline: 16px; }
   .discovery-shortcuts { display: flex; flex: none; gap: 10px; }
-  .discovery-channel-list { gap: 16px; }
-  .discovery-channel-list button { height: 44px; }
+  .discovery-channels { gap: 12px; }
+  .discovery-shortcut-list button { height: 44px; }
   .discovery-recommend { padding-top: 14px; }
   .discovery-heading { font-size: 18px; line-height: 26px; }
 }
