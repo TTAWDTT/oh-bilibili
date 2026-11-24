@@ -2,6 +2,7 @@ import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore, type AuthorRoute, type SpaceSection } from '../../app/appStore'
+import { SpaceProfile, useSpaceProfile } from './SpaceProfile'
 import { AuthorCollections } from './AuthorCollections'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
@@ -29,7 +30,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const [masterpieces, setMasterpieces] = useState<Track[] | null>(null)
   const [masterpieceFailed, setMasterpieceFailed] = useState(false)
   const [masterpieceAttempt, setMasterpieceAttempt] = useState(0)
-  const [bannerBroken, setBannerBroken] = useState(false)
+  const [brokenBanners, setBrokenBanners] = useState<string[]>([])
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const focusSearch = useAppStore((state) => state.focusSearch)
@@ -44,6 +45,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const [followBusy, setFollowBusy] = useState(false)
   const [followFailed, setFollowFailed] = useState(false)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
+  const profile = useSpaceProfile(mid)
   const [total, setTotal] = useState(0)
   /** 是否退回了搜索聚合。界面要如实标注这一点。 */
   const [isFallback, setIsFallback] = useState(false)
@@ -201,6 +203,11 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   }
 
   const avatar = card?.face || tracks?.find((t) => t.up_avatar)?.up_avatar || null
+  const dress = card?.dress
+  const member = dress?.membership
+  const plate = dress?.nameplate
+  const smallBanner = card?.banner_small && !brokenBanners.includes(card.banner_small) ? card.banner_small : null
+  const banner = card?.banner && !brokenBanners.includes(card.banner) ? card.banner : smallBanner
   const isSelf = mid != null && me?.mid === mid
   const submissionCount = tracks && !isFallback ? total : card?.videos
   const show = (next: SpaceSection) => {
@@ -227,10 +234,16 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
         data-up-mid={mid == null ? undefined : String(mid)}
         className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
       >
-        {card?.banner && !bannerBroken && (
-          <img data-space-banner src={card.banner} alt="" referrerPolicy="no-referrer"
-            onError={() => setBannerBroken(true)}
-            className="block h-[72px] w-full rounded-t-[7px] object-cover object-center md:h-[100px]" />
+        {banner && (
+          <picture>
+            {smallBanner && smallBanner !== banner && <source media="(max-width: 640px)" srcSet={smallBanner} />}
+            <img data-space-banner src={banner} alt="" referrerPolicy="no-referrer"
+              onError={(event) => {
+                const failed = event.currentTarget.currentSrc === event.currentTarget.src ? banner : smallBanner
+                if (failed) setBrokenBanners((previous) => [...previous, failed])
+              }}
+              className="block h-[72px] w-full rounded-t-[7px] object-cover object-center md:h-[100px]" />
+          </picture>
         )}
         <div
           className={[
@@ -242,17 +255,33 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
           <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 items-start gap-4">
               <div
-                className="shrink-0 rounded-full p-[3px]"
+                className="relative shrink-0 rounded-full p-[3px]"
                 style={{ background: 'color-mix(in srgb, var(--accent) 22%, white)' }}
               >
                 <Avatar src={avatar} alt={name} size={72} bordered={false} />
+                {dress?.pendant && <img src={dress.pendant} alt={dress.pendant_name ?? '头像挂件'} referrerPolicy="no-referrer"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[125%] w-[125%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+                  onError={(event) => { event.currentTarget.hidden = true }} />}
+                {profile.value?.official_icon ? <img src={profile.value.official_icon} alt={card?.official || 'B 站认证'}
+                  referrerPolicy="no-referrer" className="absolute bottom-0 right-0 h-5 w-5" /> : card?.official_type != null && <span title={card.official_type === 1 ? '机构认证' : '个人认证'}
+                  className="absolute bottom-0 right-0 grid h-5 w-5 place-items-center rounded-full border-2 border-[var(--panel)] text-white"
+                  style={{ backgroundColor: card.official_type === 1 ? 'var(--accent)' : '#e99718' }}>
+                  <Icon name="check" size={12} />
+                </span>}
               </div>
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="truncate text-[24px] font-semibold text-[var(--text-1)]" title={card?.name || name}>
+                  <h2 className="truncate text-[24px] font-semibold text-[var(--text-1)]" style={{ color: member?.nickname_color ?? undefined }} title={card?.name || name}>
                     {card?.name || name}
                   </h2>
                   {card ? <LevelBadge level={card.level} /> : null}
+                  {member && (member.image || member.animated ? <picture>
+                    {member.animated && member.image && <source media="(prefers-reduced-motion: no-preference)" srcSet={member.animated} />}
+                    <img src={member.image ?? member.animated ?? undefined} alt={member.label ?? '大会员'} referrerPolicy="no-referrer"
+                      className="h-4 w-auto max-w-[76px] object-contain" />
+                  </picture> : member.label && <span className="text-[12px]">{member.label}</span>)}
+                  {plate && <img src={plate.small ?? plate.image} alt={plate.name} title={plate.name} referrerPolicy="no-referrer"
+                    className="h-5 w-auto max-w-12 object-contain" />}
                   {card?.official ? (
                     <span className="inline-flex max-w-full items-center rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_12%,white)] px-1.5 text-[11.5px] leading-[17px] text-[var(--accent)]">
                       {card.official}
@@ -265,6 +294,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
                   </p>
                 ) : null}
                 <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--text-3)]">
+                  {card?.following_count != null && <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.following_count)}</span> 关注</span>}
                   {card?.fans != null && <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>}
                   {submissionCount != null && <span>共 <span className="font-medium text-[var(--text-1)]">{formatCount(submissionCount)}</span> 个投稿</span>}
                   {card?.likes != null && <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>}
@@ -273,57 +303,39 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
             </div>
             {!isSelf && mid ? (
               <div className="flex flex-wrap items-center gap-2">
-                {mid ? (
-                  <>
-                    <button
-                      type="button"
-                      title="去 B 站给 UP 主充电"
-                      onClick={() =>
-                        void ipc
-                          .openExternal(`https://space.bilibili.com/${mid}`)
-                          .catch((cause) => toastFailure('打开充电页', cause))
-                      }
-                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                    >
-                      <Icon name="battery" size={14} />
-                      充电
-                    </button>
-                    <button
-                      type="button"
-                      data-focus-id={`author-dm:${mid}`}
-                      onClick={() => navigate({
-                        kind: 'messages', tab: 'direct', peer: { mid, name: card?.name || name, avatar: card?.face ?? '' },
-                        ...(me ? { accountMid: me.mid } : {}),
-                      }, undefined, `author-dm:${mid}`)}
-                      className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                    >
-                      <Icon name="message" size={14} />
-                      发消息
-                    </button>
-                  </>
-                ) : null}
-                {mid ? (
-                  <button
-                    type="button"
-                    disabled={followed === null || followBusy}
-                    onClick={() => void follow()}
-                    aria-live="polite"
-                    className={[
-                      't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
-                      followFailed
-                        ? 'border border-[var(--danger)] text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_8%,white)]'
-                        : followed === true
-                          ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
-                          : 'bg-[var(--accent)] text-white hover:opacity-90',
-                      followBusy ? 'opacity-70' : '',
-                    ].join(' ')}
-                  >
-                    <Icon name={followFailed ? 'refresh' : followed ? 'check' : 'plus'} size={14} />
-                    {followBusy ? '处理中…' : followFailed ? '重试关注' : followed ? '已关注' : '关注'}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  data-focus-id={`author-dm:${mid}`}
+                  onClick={() => navigate({
+                    kind: 'messages', tab: 'direct', peer: { mid, name: card?.name || name, avatar: card?.face ?? '' },
+                    ...(me ? { accountMid: me.mid } : {}),
+                  }, undefined, `author-dm:${mid}`)}
+                  className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                >
+                  <Icon name="message" size={14} />
+                  发消息
+                </button>
+                <button
+                  type="button"
+                  disabled={followed === null || followBusy}
+                  onClick={() => void follow()}
+                  aria-live="polite"
+                  className={[
+                    't press flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] px-4 text-[14px]',
+                    followFailed
+                      ? 'border border-[var(--danger)] text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_8%,white)]'
+                      : followed === true
+                        ? 'border border-[var(--line)] text-[var(--text-2)] hover:text-[var(--text-1)]'
+                        : 'bg-[var(--accent)] text-white hover:opacity-90',
+                    followBusy ? 'opacity-70' : '',
+                  ].join(' ')}
+                >
+                  <Icon name={followFailed ? 'refresh' : followed ? 'check' : 'plus'} size={14} />
+                  {followBusy ? '处理中…' : followFailed ? '重试关注' : followed ? '已关注' : '关注'}
+                </button>
               </div>
             ) : null}
+            {mid && <SpaceProfile mid={mid} card={card} isSelf={isSelf} profile={profile} />}
             {tracks && isFallback && (
               <span className="text-[12px] text-[var(--text-3)]">来自搜索结果，共 {tracks.length} 个</span>
             )}

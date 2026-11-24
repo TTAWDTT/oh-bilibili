@@ -13,6 +13,7 @@ pub mod messages;
 pub mod direct;
 pub mod sync;
 pub mod space;
+pub mod space_identity;
 pub mod error;
 pub mod search;
 pub mod wbi;

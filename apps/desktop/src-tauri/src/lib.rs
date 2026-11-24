@@ -741,41 +741,36 @@ async fn coin_set(
         .await
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-struct AuthorCardView {
-    banner: Option<String>,
-    name: String,
-    face: String,
-    fans: Option<u64>,
-    sign: String,
-    official: Option<String>,
-    official_type: Option<i8>,
-    level: u8,
-    vip: bool,
-    videos: Option<u64>,
-    likes: Option<u64>,
-}
-
 #[tauri::command(rename_all = "snake_case")]
 async fn author_card(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
-) -> Result<AuthorCardView, WireError> {
-    let c = engine.author_card(mid).await?;
-    Ok(AuthorCardView {
-        banner: c.banner,
-        name: c.name,
-        face: c.face,
-        fans: c.fans,
-        sign: c.sign,
-        official: c.official,
-        official_type: c.official_type,
-        level: c.level,
-        vip: c.vip,
-        videos: c.videos,
-        likes: c.likes,
-    })
+) -> Result<bilimusic_core::wire::AuthorCard, WireError> {
+    engine.author_card(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_notice(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<Option<String>, WireError> {
+    engine.space_notice(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_room(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<Option<bilimusic_core::wire::SpaceRoom>, WireError> {
+    engine.space_room(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_profile(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+) -> Result<bilimusic_core::wire::SpaceProfile, WireError> {
+    engine.space_profile(mid).await
 }
 
 #[derive(Serialize)]
@@ -1423,6 +1418,9 @@ pub fn run() {
             watch_subtitles,
             video_shots,
             author_card,
+            space_notice,
+            space_room,
+            space_profile,
             fav_tracks,
             unfav_from,
             fav_set,
