@@ -1,3 +1,4 @@
+import { useCardGrid } from '../../shared/ui/useCardGrid'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { toastDone, toastWarn } from '../../app/notice'
@@ -39,6 +40,7 @@ const visits = new WeakMap<View, { pickedId: number | null; folders: Map<number,
  * 未登录时明确提示需要登录——收藏夹在 B 站那边，本机没有副本。
  */
 export function FavFoldersView() {
+  const gridRef = useCardGrid(200)
   const visit = useRef(useAppStore.getState().view).current
   const savedVisit = visits.get(visit)
   const [folders, setFolders] = useState<FavFolder[] | null>(null)
@@ -554,7 +556,7 @@ export function FavFoldersView() {
   return (
     <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
       <PageTitle extra={`${folders.length} 个`}>收藏夹</PageTitle>
-      <section className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+      <section ref={gridRef} className="mt-6 grid grid-cols-(--card-tracks) gap-4">
         {folders.map((folder) => {
           const shots = covers[folder.id]
           const single = shots?.[0] ?? folder.cover

@@ -40,7 +40,7 @@ function RankRow({ track, rank, active, onOpen }: {
     <div
       data-rank-row
       data-rank={rank}
-      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card:gap-x-4"
+      className="group grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card/hot-feed:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card/hot-feed:gap-x-4"
     >
       <span className="pt-1 text-right">
         <span className="sr-only">第 {rank} 名</span>
@@ -59,7 +59,7 @@ function RankRow({ track, rank, active, onOpen }: {
         onClick={onOpen}
         data-focus-id={`rank:${track.key}`}
         aria-label={track.title}
-        className={`relative w-[7rem] shrink-0 ${first ? '@card:w-[13.5rem]' : '@card:w-[10.5rem]'}`}
+        className={`relative w-[7rem] shrink-0 ${first ? '@card/hot-feed:w-[13.5rem]' : '@card/hot-feed:w-[10.5rem]'}`}
         title={track.title}
       >
         <span className="relative block aspect-video overflow-hidden rounded-[6px]">
@@ -79,7 +79,7 @@ function RankRow({ track, rank, active, onOpen }: {
           onClick={onOpen}
           title={track.title}
           className={`w-full text-left font-medium hover:text-[var(--accent)] ${
-            first ? 'text-[17px] leading-[24px] @card:text-[18px] @card:leading-[26px]' : 'text-[15px] leading-[22px]'
+            first ? 'text-[17px] leading-[24px] @card/hot-feed:text-[18px] @card/hot-feed:leading-[26px]' : 'text-[15px] leading-[22px]'
           } ${
             active ? 'text-[var(--accent)]' : 'text-[var(--text-1)]'
           }`}
@@ -87,7 +87,7 @@ function RankRow({ track, rank, active, onOpen }: {
           {/* 最多两行：按行高钉死高度，不依赖 -webkit-box（按钮/span 的 display 会被浏览器重算） */}
           <span
             data-rank-title
-            className={`block overflow-hidden ${first ? 'max-h-12 @card:max-h-[52px]' : 'max-h-11'}`}
+            className={`block overflow-hidden ${first ? 'max-h-12 @card/hot-feed:max-h-[52px]' : 'max-h-11'}`}
           >
             {track.title}
           </span>
@@ -96,7 +96,7 @@ function RankRow({ track, rank, active, onOpen }: {
           <TrackByline track={track} focusId={`rank-author:${track.key}`} />
         </div>
         {/* 窄窗把统计挪到标题下面，先保住名次、标题和封面的宽度。 */}
-        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] @card:hidden">
+        <span className="num mt-1 flex items-center gap-3 text-[12px] text-[var(--text-3)] @card/hot-feed:hidden">
           {track.views ? (
             <span className="flex items-center gap-0.5">
               <Icon name="play" size={11} />
@@ -111,7 +111,7 @@ function RankRow({ track, rank, active, onOpen }: {
           ) : null}
         </span>
       </div>
-      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] @card:flex">
+      <span className="num hidden shrink-0 items-center gap-4 pt-1 text-[12px] text-[var(--text-3)] @card/hot-feed:flex">
         {track.views ? (
           <span className="flex w-16 items-center justify-end gap-1">
             <Icon name="play" size={11} />
@@ -140,7 +140,7 @@ function RankSkeletonRow({ rank }: { rank: number }) {
     <div
       data-rank-skeleton-row
       aria-hidden
-      className="grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card:gap-x-4"
+      className="grid grid-cols-[2rem_auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 @card/hot-feed:grid-cols-[2.75rem_auto_minmax(0,1fr)_auto] @card/hot-feed:gap-x-4"
     >
       <span className="pt-1">
         <span
@@ -151,7 +151,7 @@ function RankSkeletonRow({ rank }: { rank: number }) {
       </span>
       <span
         className={`block w-[7rem] shrink-0 aspect-video rounded-[6px] bg-[var(--ga1)] ${
-          first ? '@card:w-[13.5rem]' : '@card:w-[10.5rem]'
+          first ? '@card/hot-feed:w-[13.5rem]' : '@card/hot-feed:w-[10.5rem]'
         }`}
       />
       <div className="min-w-0 py-0.5">
@@ -161,9 +161,9 @@ function RankSkeletonRow({ rank }: { rank: number }) {
           }`}
         />
         <span className="mt-1.5 block h-[14px] w-24 rounded-[3px] bg-[var(--ga0)]" />
-        <span className="mt-1 block h-[12px] w-32 rounded-[3px] bg-[var(--ga1)] @card:hidden" />
+        <span className="mt-1 block h-[12px] w-32 rounded-[3px] bg-[var(--ga1)] @card/hot-feed:hidden" />
       </div>
-      <span className="hidden shrink-0 items-center gap-4 pt-1 @card:flex">
+      <span className="hidden shrink-0 items-center gap-4 pt-1 @card/hot-feed:flex">
         <span className="block h-3 w-16 rounded-[3px] bg-[var(--ga1)]" />
         <span className="block h-3 w-14 rounded-[3px] bg-[var(--ga1)]" />
       </span>
@@ -257,7 +257,7 @@ export function RankingView({ initialRid = 0 }: { initialRid?: number }) {
           </div>
         }
       />
-      <div className="@container px-4 md:px-8">
+      <div className="px-4 md:px-8">
       {error ? (
         <EmptyState
           icon="alert"

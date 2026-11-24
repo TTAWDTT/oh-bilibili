@@ -259,15 +259,15 @@ export function WeeklyView() {
       ) : issues === null || (number !== null && page === null) ? (
         <BiliLoader label="正在取本期…" />
       ) : page && page.tracks.length > 0 ? (
-        <div data-weekly-issue={number ?? ''} className="@container">
+        <div data-weekly-issue={number ?? ''}>
           {page.subject && page.subject !== page.label ? (
-            <h3 className="mb-4 text-[26px] font-semibold leading-tight text-[var(--text-1)] @card:text-[36px]">
+            <h3 className="mb-4 text-[26px] font-semibold leading-tight text-[var(--text-1)] @card/hot-feed:text-[36px]">
               {page.subject}
             </h3>
           ) : null}
-          <div className="grid items-start gap-5 @card:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-5 @card/hot-feed:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             {page.tracks.slice(0, 3).map((track, index) => (
-              <div key={track.key} className={index === 0 && page.tracks.length > 1 ? '@card:row-span-2' : ''}>
+              <div key={track.key} className={index === 0 && page.tracks.length > 1 ? '@card/hot-feed:row-span-2' : ''}>
                 <WideCard variant="weekly"
                   track={track}
                   lead={index === 0}
@@ -278,7 +278,7 @@ export function WeeklyView() {
             ))}
           </div>
           {page.tracks.length > 3 ? (
-            <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 border-t border-[var(--line)] pt-6 @card:grid-cols-2">
+            <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 border-t border-[var(--line)] pt-6 @card/hot-feed:grid-cols-2">
               {page.tracks.slice(3).map((track) => (
                 <WideCard variant="weekly"
                   key={track.key}

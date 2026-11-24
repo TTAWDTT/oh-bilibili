@@ -60,10 +60,11 @@ export function Sidebar() {
   const restoreCard = useRef<(() => void) | undefined>(undefined)
   const collapsed = (onWatch ? watchNav : preference) === 'rail'
 
-  // 连点时浏览器会缩短折返动画，正文应在侧栏真正停下的那一帧换宽度。
+  // ResizeObserver 在绘制前回调，每次封面改宽都能把正在看的投稿留在原位。
   useLayoutEffect(() => {
-    restoreCard.current?.()
+    const restore = restoreCard.current
     restoreCard.current = undefined
+    restore?.()
     if (toggledIn === null) return
     const slide = toggledIn === mode && navRef.current?.getAnimations()
       .find((animation) => animation instanceof CSSTransition && animation.transitionProperty === 'width')
@@ -71,14 +72,19 @@ export function Sidebar() {
       setToggledIn(null)
       return
     }
+    const observer = restore && new ResizeObserver(restore)
+    if (observer) observer.observe(navRef.current!)
     let current = true
     const finish = () => {
       if (!current) return
-      restoreCard.current = rememberVisibleCard(anchorRows.current)
+      restore?.()
       setToggledIn(null)
     }
     void slide.finished.then(finish, finish)
-    return () => { current = false }
+    return () => {
+      current = false
+      observer?.disconnect()
+    }
   }, [collapsed, mode, toggledIn])
 
   const item = (entry: Item): ReactNode => {

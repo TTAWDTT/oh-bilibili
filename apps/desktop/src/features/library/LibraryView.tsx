@@ -1,3 +1,4 @@
+import { useCardGrid } from '../../shared/ui/useCardGrid'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Playlist, Track } from '../../shared/lib/contract'
@@ -12,6 +13,7 @@ import { usePlayerStore } from '../player/playerStore'
 import { PlaylistSleeve } from './PlaylistSleeve'
 
 export function LibraryView() {
+  const gridRef = useCardGrid(152)
   const playlists = useLibraryStore((state) => state.playlists)
   const revision = useLibraryStore((state) => state.revision)
   const [creating, setCreating] = useState(false)
@@ -52,7 +54,7 @@ export function LibraryView() {
             />
           </div>
         ) : (
-          <section className="mt-6 grid max-w-[1120px] grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-x-4 gap-y-7">
+          <section ref={gridRef} className="mt-6 grid max-w-[1120px] grid-cols-(--card-tracks) gap-x-4 gap-y-7">
             {playlists.map((playlist) => (
               <PlaylistCard key={playlist.id} playlist={playlist} revision={revision} />
             ))}
