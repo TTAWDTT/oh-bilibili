@@ -179,6 +179,7 @@ pub struct FavFolder {
 /// UP 主名片。
 #[derive(Debug, Clone)]
 pub struct AuthorCard {
+    pub banner: Option<String>,
     pub name: String,
     pub face: String,
     pub fans: Option<u64>,
@@ -423,12 +424,14 @@ impl Client {
     pub async fn author_card(&self, mid: u64) -> Result<AuthorCard, BiliError> {
         let v = self
             .get_json_allowing_guest(
-                &format!("{API}/x/web-interface/card?mid={mid}"),
+                &format!("{API}/x/web-interface/card?mid={mid}&photo=1"),
                 std::time::Duration::from_millis(600),
             )
             .await?;
         let card = &v["data"]["card"];
         Ok(AuthorCard {
+            banner: v["data"]["space"]["l_img"].as_str().filter(|url| !url.is_empty())
+                .map(|url| url.replacen("http://", "https://", 1)),
             name: card["name"].as_str().unwrap_or_default().to_string(),
             face: card["face"]
                 .as_str()
@@ -1581,7 +1584,7 @@ fn discovery_regions_from(data: &serde_json::Value) -> Result<Vec<DiscoveryRegio
 }
 
 /// `data.list` 里的一条视频卡片。排行榜、综合热门与入站必刷是同一个形状，共用这一份解析。
-fn track_from_item(m: &serde_json::Value) -> Option<bilimusic_model::Track> {
+pub(crate) fn track_from_item(m: &serde_json::Value) -> Option<bilimusic_model::Track> {
     use bilimusic_model::{Millis, Track, TrackKey};
 
     let bvid = m["bvid"].as_str().filter(|s| !s.is_empty())?;

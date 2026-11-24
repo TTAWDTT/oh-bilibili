@@ -1,7 +1,8 @@
 import { toastFailure } from '../../app/notice'
 import { formatCount } from '../../shared/lib/format'
 import { useEffect, useRef, useState } from 'react'
-import { useAppStore } from '../../app/appStore'
+import { useAppStore, type AuthorRoute, type SpaceSection } from '../../app/appStore'
+import { AuthorCollections } from './AuthorCollections'
 import type { Track } from '../../shared/lib/contract'
 import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -21,7 +22,14 @@ import { useAuthStore } from '../auth/authStore'
  * 主的全部投稿和总数。没有 mid 时退回「按作者名搜索」的结果聚合，那种情况下
  * 界面会标注数据来源，不假装是完整投稿列表。
  */
-export function AuthorView({ name, mid }: { name: string; mid?: number | null }) {
+export function AuthorView({ view }: { view: AuthorRoute }) {
+  const { name, mid, section = 'videos' } = view
+  const replace = useAppStore((state) => state.replace)
+  const [pinned, setPinned] = useState<Track | null>(null)
+  const [masterpieces, setMasterpieces] = useState<Track[] | null>(null)
+  const [masterpieceFailed, setMasterpieceFailed] = useState(false)
+  const [masterpieceAttempt, setMasterpieceAttempt] = useState(0)
+  const [bannerBroken, setBannerBroken] = useState(false)
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const focusSearch = useAppStore((state) => state.focusSearch)
@@ -35,7 +43,6 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   /** 关注请求在飞时不重复发；失败留在按钮上重试，不弹全局提示。 */
   const [followBusy, setFollowBusy] = useState(false)
   const [followFailed, setFollowFailed] = useState(false)
-  const followOwner = useRef<number | null>(null)
   const [card, setCard] = useState<import('../../shared/lib/ipc').AuthorCard | null>(null)
   const [total, setTotal] = useState(0)
   /** 是否退回了搜索聚合。界面要如实标注这一点。 */
@@ -48,12 +55,10 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
    * 页首展示的那一件作品。只在第一次拿到投稿时定下来：
    * 切排序、翻页都不许换图，否则整页会跟着跳。
    */
-  const [hero, setHero] = useState<Track | null>(null)
-  /** 页首作品属于哪个作者：换作者才重置，换排序不动。 */
-  const heroOwner = useRef<string | null>(null)
+  const [recent, setRecent] = useState<Track | null>(null)
+  const hero = pinned ?? recent
   /** 第几次取数：换排序/换作者后，旧的翻页响应直接丢掉。 */
   const loadEpoch = useRef(0)
-  const scroller = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
 
   // 粉丝数与签名走 card 接口，公开可见。
@@ -65,11 +70,29 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
       .then((c) => {
         if (!cancelled) setCard(c)
       })
-      .catch(() => setCard(null))
+      .catch(() => { if (!cancelled) setCard(null) })
     return () => {
       cancelled = true
     }
   }, [mid])
+
+  useEffect(() => {
+    if (!mid) return
+    let active = true
+    void ipc.spacePicks(mid, 'pinned').then(([track]) => {
+      if (active) setPinned(track ?? null)
+    }).catch(() => {})
+    return () => { active = false }
+  }, [mid])
+
+  useEffect(() => {
+    if (!mid) return
+    let active = true
+    void ipc.spacePicks(mid, 'masterpieces').then((list) => {
+      if (active) setMasterpieces(list)
+    }).catch(() => { if (active) setMasterpieceFailed(true) })
+    return () => { active = false }
+  }, [mid, masterpieceAttempt])
 
   // 空间页也要知道自己有没有关注这个人。之前默认 false，已关注的 UP 也显示「+ 关注」。
   useEffect(() => {
@@ -89,56 +112,33 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
   /** 关注是真接口：写进你的 B 站关注列表，取关同理。没有 mid 就没有关注按钮。 */
   const follow = async (): Promise<void> => {
     if (!mid || followed === null || followBusy) return
-    const owner = mid
     const next = !followed
     setFollowBusy(true)
     setFollowFailed(false)
-    followOwner.current = owner
     try {
-      await ipc.followSet(owner, next)
-      // 请求回来时用户可能已经切到别的作者，结果只落在原来的作者上。
-      if (followOwner.current === owner) setFollowed(next)
+      await ipc.followSet(mid, next)
+      setFollowed(next)
     } catch {
-      if (followOwner.current === owner) setFollowFailed(true)
+      setFollowFailed(true)
     } finally {
-      if (followOwner.current === owner) setFollowBusy(false)
+      setFollowBusy(false)
     }
   }
 
   useEffect(() => {
     let cancelled = false
-    // 有 mid 时名字变化不算换人；只有按名字搜索时名字才是身份。
-    const owner = mid ? `mid:${mid}` : `name:${name}`
-    if (heroOwner.current !== owner) {
-      // 换人：旧作者的头像、粉丝数、关注态一概不能留；换排序则保留列表等新数据。
-      heroOwner.current = owner
-      setTracks(null)
-      setIsFallback(false)
-      setCard(null)
-      setFollowed(null)
-      setFollowBusy(false)
-      setFollowFailed(false)
-      followOwner.current = null
-      setHero(null)
-      scroller.current?.scrollTo({ top: 0 })
-    }
     // 换排序也要从第 1 页重新开始，否则下一页会从旧的页码继续。
     setPage(1)
     const epoch = ++loadEpoch.current
-    /** 第一次拿到这一页投稿时定下页首作品；之后换排序、翻页都不再动它。 */
-    const pickHero = (list: Track[]): void => {
-      // 只有名字时无法核对 up_mid，不拿它当页首，免得同名作者串图。
-      if (!mid || heroOwner.current !== owner) return
-      setHero((current) => current ?? list[0] ?? null)
-    }
     if (mid) {
       void ipc
         .spaceVideos(mid, 1, order)
         .then(([list, total]) => {
           if (cancelled || loadEpoch.current !== epoch) return
+          setIsFallback(false)
           setTracks(list)
           setTotal(total)
-          pickHero(list)
+          setRecent(current => current ?? list[0] ?? null)
         })
         .catch(() => {
           // 空间接口不通时退回搜索聚合，并在界面上标注
@@ -150,7 +150,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               if (cancelled || loadEpoch.current !== epoch) return
               const matched = list.filter((t) => t.up_mid === mid)
               setTracks(matched)
-              pickHero(matched)
+              setRecent(current => current ?? matched[0] ?? null)
             })
             .catch(() => {
               if (!cancelled && loadEpoch.current === epoch) setTracks([])
@@ -167,7 +167,6 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         setIsFallback(true)
         const matched = list.filter((t) => t.artist === name)
         setTracks(matched)
-        pickHero(matched)
       })
       .catch(() => {
         if (!cancelled && loadEpoch.current === epoch) setTracks([])
@@ -201,48 +200,16 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
     }
   }
 
-  if (tracks === null) return <BiliLoader label="正在取投稿…" />
-  if (tracks.length === 0) {
-    return (
-      <EmptyState
-        icon="biliTv"
-        title={
-          !mid
-            ? '没找到这个 UP 主'
-            : isFallback
-              ? '空间内容没取到'
-              : '这个 UP 主还没有公开投稿'
-        }
-        detail={
-          !mid
-            ? '这个 UP 主没有可显示的视频，或空间接口取不到。'
-            : isFallback
-              ? '空间接口没有取到，可能被限流；可以稍后再试或直接去 B 站看。'
-              : '空间接口没有返回可显示的视频。'
-        }
-        action={
-          mid
-            ? {
-                label: '在 B 站打开空间',
-                onClick: () => {
-                  void ipc
-                    .openExternal(`https://space.bilibili.com/${mid}`)
-                    .catch((cause) => toastFailure('打开空间', cause))
-                },
-              }
-            : { label: '回到搜索', onClick: () => focusSearch() }
-        }
-      />
-    )
-  }
-
-  const avatar = card?.face || tracks.find((t) => t.up_avatar)?.up_avatar || null
-  const views = tracks.reduce((sum, t) => sum + (t.views ?? 0), 0)
+  const avatar = card?.face || tracks?.find((t) => t.up_avatar)?.up_avatar || null
   const isSelf = mid != null && me?.mid === mid
+  const submissionCount = tracks && !isFallback ? total : card?.videos
+  const show = (next: SpaceSection) => {
+    if (view.shelf) goBack()
+    if (!view.shelf || next !== 'collections') replace({ kind: 'author', name, mid: mid ?? null, section: next })
+  }
 
   return (
     <div
-      ref={scroller}
       id="scroll-main"
       className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
     >
@@ -260,6 +227,11 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         data-up-mid={mid == null ? undefined : String(mid)}
         className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
       >
+        {card?.banner && !bannerBroken && (
+          <img data-space-banner src={card.banner} alt="" referrerPolicy="no-referrer"
+            onError={() => setBannerBroken(true)}
+            className="block h-[72px] w-full rounded-t-[7px] object-cover object-center md:h-[100px]" />
+        )}
         <div
           className={[
             'grid min-w-0 gap-4 p-4 sm:p-5 lg:items-start',
@@ -277,8 +249,8 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               </div>
               <div className="min-w-0 flex-1 pt-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="truncate text-[24px] font-semibold text-[var(--text-1)]" title={name}>
-                    {name}
+                  <h2 className="truncate text-[24px] font-semibold text-[var(--text-1)]" title={card?.name || name}>
+                    {card?.name || name}
                   </h2>
                   {card ? <LevelBadge level={card.level} /> : null}
                   {card?.official ? (
@@ -293,22 +265,13 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                   </p>
                 ) : null}
                 <div className="num mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--text-3)]">
-                  {card ? (
-                    <>
-                      {card.fans !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span> : null}
-                      {card.videos !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.videos)}</span> 投稿</span> : null}
-                      {card.likes !== null ? <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span> : null}
-                    </>
-                  ) : (
-                    <>
-                      <span>{tracks.length} 个投稿</span>
-                      <span>{formatCount(views)} 累计播放</span>
-                    </>
-                  )}
+                  {card?.fans != null && <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.fans)}</span> 粉丝</span>}
+                  {submissionCount != null && <span>共 <span className="font-medium text-[var(--text-1)]">{formatCount(submissionCount)}</span> 个投稿</span>}
+                  {card?.likes != null && <span><span className="font-medium text-[var(--text-1)]">{formatCount(card.likes)}</span> 获赞</span>}
                 </div>
               </div>
             </div>
-            {isSelf ? null : (
+            {!isSelf && mid ? (
               <div className="flex flex-wrap items-center gap-2">
                 {mid ? (
                   <>
@@ -327,11 +290,11 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        void ipc
-                          .openExternal(`https://message.bilibili.com/#/whisper/mid${mid}`)
-                          .catch((cause) => toastFailure('打开私信', cause))
-                      }
+                      data-focus-id={`author-dm:${mid}`}
+                      onClick={() => navigate({
+                        kind: 'messages', tab: 'direct', peer: { mid, name: card?.name || name, avatar: card?.face ?? '' },
+                        ...(me ? { accountMid: me.mid } : {}),
+                      }, undefined, `author-dm:${mid}`)}
                       className="t press flex h-8 items-center gap-1 rounded-[6px] border border-[var(--line)] px-3 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                     >
                       <Icon name="message" size={14} />
@@ -360,25 +323,22 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                   </button>
                 ) : null}
               </div>
+            ) : null}
+            {tracks && isFallback && (
+              <span className="text-[12px] text-[var(--text-3)]">来自搜索结果，共 {tracks.length} 个</span>
             )}
-            <span className="w-fit rounded-[3px] bg-[var(--panel-raised)] px-1.5 text-[12px] leading-[20px] text-[var(--text-3)]">
-              {!mid
-                ? `来自搜索结果，共 ${tracks.length} 个`
-                : isFallback
-                  ? `空间接口不可用，下方是搜索结果里的 ${tracks.length} 个`
-                  : `共 ${formatCount(total)} 个投稿`}
-            </span>
           </div>
 
           {hero ? (
             <button
               type="button"
               data-author-hero
+              data-focus-id={`author-hero:${hero.key}`}
               data-focus-key={hero.key}
               data-up-mid={mid == null ? undefined : String(mid)}
               aria-label={`观看 ${hero.title}`}
-              onClick={() => navigate({ kind: 'watch', track: hero })}
-              className="group flex min-w-0 items-stretch gap-3 text-left lg:flex-col lg:gap-0"
+              onClick={() => navigate({ kind: 'watch', track: hero }, undefined, `author-hero:${hero.key}`)}
+              className="group flex min-w-0 items-stretch gap-3 text-left lg:w-full lg:max-w-[360px] lg:flex-col lg:justify-self-end lg:gap-0"
             >
               <span
                 className="relative w-[132px] shrink-0 overflow-hidden rounded-[6px] border border-[var(--line)] sm:w-[176px] lg:w-full"
@@ -386,7 +346,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
               >
                 <Cover cover={hero.cover} title={hero.title} width={520} className="h-full w-full" />
                 <span className="absolute left-2 top-2 rounded-[3px] bg-black/60 px-1.5 py-0.5 text-[11px] text-white">
-                  {isFallback ? '搜索结果' : '近期投稿'}
+                  {pinned ? '置顶投稿' : isFallback ? '搜索结果' : '近期投稿'}
                 </span>
               </span>
               <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 rounded-b-[6px] bg-[var(--panel-raised)] px-3 py-2 lg:rounded-b-[6px] lg:rounded-t-none">
@@ -397,7 +357,7 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
                   {hero.title}
                 </span>
                 <span className="num text-[12px] text-[var(--text-3)]">
-                  {formatCount(hero.views ?? 0)} 播放
+                  {hero.views != null ? `${formatCount(hero.views)} 播放` : null}
                 </span>
               </span>
             </button>
@@ -405,58 +365,92 @@ export function AuthorView({ name, mid }: { name: string; mid?: number | null })
         </div>
       </header>
 
-      {/* 排序只在拿到了完整投稿列表时才有意义；搜索聚合下按比例排序是假的。 */}
-      {mid && !isFallback ? (
-        <div className="mb-3 flex items-center gap-1">
-          {(
-            [
-              ['pubdate', '最新发布'],
-              ['click', '最多播放'],
-              ['stow', '最多收藏'],
-            ] as const
-          ).map(([value, label]) => (
+      {mid && (
+        <nav aria-label="空间内容" className="mb-4 flex items-center gap-5 border-b border-[var(--line)]">
+          {([['videos', '投稿'], ['masterpieces', '代表作'], ['collections', '合集和系列']] as const)
+            .filter(([id]) => id !== 'masterpieces' || !!masterpieces?.length || section === id)
+            .map(([id, label]) => (
+              <button type="button" key={id} aria-pressed={section === id} onClick={() => show(id)}
+                className={`border-b-2 py-2 text-[14px] ${section === id ? 'border-[var(--accent)] font-semibold text-[var(--accent-strong)]' : 'border-transparent text-[var(--text-2)]'}`}>
+                {label}
+              </button>
+            ))}
+        </nav>
+      )}
+      {mid && section === 'collections' ? (
+        <AuthorCollections key={`${view.shelf?.kind}-${view.shelf?.id}-${view.shelfPage ?? 1}`} view={view} mid={mid} />
+      ) : section === 'masterpieces' ? (
+        masterpieceFailed ? (
+          <EmptyState icon="biliTv" compact title="代表作暂时没取到" action={{
+            label: '重试', onClick: () => { setMasterpieceFailed(false); setMasterpieceAttempt(n => n + 1) },
+          }} />
+        ) : masterpieces === null ? <BiliLoader label="正在取代表作…" /> : masterpieces.length ? (
+          <ContentGrid tracks={masterpieces} activeKey={snapshot?.track?.key ?? null} playing={snapshot?.phase === 'playing'} />
+        ) : <p className="text-[14px] text-[var(--text-3)]">还没有设置代表作</p>
+      ) : tracks === null ? (
+        <BiliLoader label="正在取投稿…" />
+      ) : tracks.length === 0 ? (
+        <EmptyState icon="biliTv" compact
+          title={!mid ? '没找到这个 UP 主' : isFallback ? '空间投稿暂时没取到' : '这个 UP 主还没有公开投稿'}
+          action={mid ? {
+            label: '在 B 站打开空间',
+            onClick: () => void ipc.openExternal(`https://space.bilibili.com/${mid}`).catch((cause) => toastFailure('打开空间', cause)),
+          } : { label: '回到搜索', onClick: () => focusSearch() }}
+        />
+      ) : <>
+        {/* 排序只在拿到了完整投稿列表时才有意义；搜索聚合下按比例排序是假的。 */}
+        {mid && !isFallback ? (
+          <div className="mb-3 flex items-center gap-1">
+            {(
+              [
+                ['pubdate', '最新发布'],
+                ['click', '最多播放'],
+                ['stow', '最多收藏'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={order === value}
+                onClick={() => setOrder(value)}
+                className={`t press rounded-[4px] px-3 py-1 text-[13px] ${
+                  order === value
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-3)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="num ml-auto text-[12px] text-[var(--text-3)]">
+              已加载 {tracks.length} / {total}
+            </span>
+          </div>
+        ) : null}
+
+        <ContentGrid
+          tracks={tracks}
+          activeKey={snapshot?.track?.key ?? null}
+          playing={snapshot?.phase === 'playing'}
+          onNeedMore={() => void loadMore()}
+        />
+
+        {loadingMore ? (
+          <BiliLoader compact label="正在取更多投稿…" />
+        ) : null}
+
+        {isFallback ? (
+          <div className="mt-6 flex justify-center">
             <button
-              key={value}
               type="button"
-              aria-pressed={order === value}
-              onClick={() => setOrder(value)}
-              className={`t press rounded-[4px] px-3 py-1 text-[13px] ${
-                order === value
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-3)] hover:bg-[var(--panel-alt)] hover:text-[var(--text-1)]'
-              }`}
+              onClick={() => searchFor(name)}
+              className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
-              {label}
+              在搜索里找他更多的投稿 →
             </button>
-          ))}
-          <span className="num ml-auto text-[12px] text-[var(--text-3)]">
-            已加载 {tracks.length} / {total}
-          </span>
-        </div>
-      ) : null}
-
-      <ContentGrid
-        tracks={tracks}
-        activeKey={snapshot?.track?.key ?? null}
-        playing={snapshot?.phase === 'playing'}
-        onNeedMore={() => void loadMore()}
-      />
-
-      {loadingMore ? (
-        <BiliLoader compact label="正在取更多投稿…" />
-      ) : null}
-
-      {isFallback ? (
-        <div className="mt-6 flex justify-center">
-          <button
-            type="button"
-            onClick={() => searchFor(name)}
-            className="bili-press rounded-[6px] border border-[var(--line)] px-4 py-2 text-[14px] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-          >
-            在搜索里找他更多的投稿 →
-          </button>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </>}
     </div>
   )
 }

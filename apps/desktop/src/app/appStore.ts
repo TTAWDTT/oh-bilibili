@@ -1,12 +1,18 @@
 import type { DurationKey } from '../features/search/DurationFilter'
 import type { Track } from '../shared/lib/contract'
-import type { MessageUnread } from '../shared/lib/ipc'
+import type { DirectPeer, MessageKind, MessageUnread } from '../shared/lib/ipc'
 import { create } from 'zustand'
+
+export type SpaceSection = 'videos' | 'masterpieces' | 'collections'
+export type SpaceShelf = { id: number; kind: 'season' | 'series'; name: string }
+export type AuthorRoute = {
+  kind: 'author'; name: string; mid?: number | null; section?: SpaceSection; shelf?: SpaceShelf; shelfPage?: number
+}
 
 export type View =
   | { kind: 'home'; channel?: string }
   | { kind: 'dynamic' }
-  | { kind: 'messages' }
+  | { kind: 'messages'; tab?: MessageKind | 'direct'; peer?: DirectPeer; accountMid?: number }
   | { kind: 'ranking'; rid?: number }
   | { kind: 'popular' }
   | { kind: 'precious' }
@@ -17,7 +23,7 @@ export type View =
   | { kind: 'playlist'; id: number; name: string }
   | { kind: 'liked' }
   | { kind: 'downloads' | 'history' | 'favs' }
-  | { kind: 'author'; name: string; mid?: number | null }
+  | AuthorRoute
   /** `page`/`atMs` 用于从弹幕引文直接落到那一分 P 的那一刻。 */
   | { kind: 'watch'; track: Track; page?: number; atMs?: number; audioPaused?: boolean }
   | { kind: 'watchLater' }

@@ -1357,6 +1357,13 @@ pub struct Engine {
     watch_gate: WatchGate,
 }
 
+fn direct_seqno(raw: &str) -> Result<u64, WireError> {
+    raw.parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0)
+        .ok_or_else(|| WireError::input("cursor", "私信位置无效"))
+}
+
 impl Engine {
     pub fn new(db_path: &Path) -> Result<Arc<Engine>, WireError> {
         let engine = Self::open(db_path)?;
@@ -2092,6 +2099,39 @@ impl Engine {
         Ok((tracks, total))
     }
 
+    pub async fn space_picks(
+        &self,
+        mid: u64,
+        kind: crate::wire::SpacePick,
+    ) -> Result<Vec<Track>, WireError> {
+        let tracks = self.source.space_picks(mid, kind).await?;
+        for track in &tracks {
+            self.remember(track);
+        }
+        Ok(tracks)
+    }
+
+    pub async fn space_collections(
+        &self,
+        mid: u64,
+        page: u32,
+    ) -> Result<(Vec<crate::wire::SpaceCollection>, u64), WireError> {
+        Ok(self.source.space_collections(mid, page).await?)
+    }
+
+    pub async fn space_collection_works(
+        &self,
+        mid: u64,
+        kind: crate::wire::CollectionKind,
+        id: u64,
+        page: u32,
+    ) -> Result<(Vec<Track>, u64), WireError> {
+        Ok(self
+            .source
+            .space_collection_works(mid, kind, id, page)
+            .await?)
+    }
+
     /// UP 主粉丝与关注数。
     pub async fn space_stat(&self, mid: u64) -> Result<(u64, u64), WireError> {
         Ok(self.source.space_stat(mid).await?)
@@ -2124,6 +2164,70 @@ impl Engine {
         page: u32,
     ) -> Result<crate::wire::MessagePage, WireError> {
         Ok(self.source.messages(kind, cursor, page).await?)
+    }
+
+    pub async fn direct_sessions(
+        &self,
+        cursor: Option<String>,
+    ) -> Result<crate::wire::DirectSessions, WireError> {
+        let cursor = cursor.as_deref().map(direct_seqno).transpose()?;
+        Ok(self.source.direct_sessions(cursor).await?)
+    }
+
+    pub async fn direct_history(
+        &self,
+        mid: u64,
+        cursor: Option<String>,
+    ) -> Result<crate::wire::DirectHistory, WireError> {
+        let owner = self.direct_participant(mid)?;
+        let cursor = cursor.as_deref().map(direct_seqno).transpose()?;
+        Ok(self.source.direct_history(owner, mid, cursor).await?)
+    }
+
+    pub async fn send_direct_text(
+        &self,
+        mid: u64,
+        text: String,
+    ) -> Result<crate::wire::DirectMessage, WireError> {
+        let owner = self.direct_participant(mid)?;
+        if text.trim().is_empty() {
+            return Err(WireError::input("text", "请输入消息内容"));
+        }
+        let device = self.direct_device(owner)?;
+        Ok(self
+            .source
+            .send_direct_text(owner, mid, text, &device)
+            .await?)
+    }
+
+    pub async fn direct_ack(&self, mid: u64, seqno: String) -> Result<(), WireError> {
+        self.direct_participant(mid)?;
+        Ok(self.source.direct_ack(mid, direct_seqno(&seqno)?).await?)
+    }
+
+    fn direct_participant(&self, mid: u64) -> Result<u64, WireError> {
+        let owner = self
+            .source
+            .nav()
+            .mid
+            .ok_or_else(|| WireError::needs_login("请先登录 B 站账号"))?;
+        if mid == 0 || mid == owner {
+            return Err(WireError::input("mid", "请选择另一位用户"));
+        }
+        Ok(owner)
+    }
+
+    fn direct_device(&self, owner: u64) -> Result<String, WireError> {
+        let key = format!("im.device.{owner}");
+        if let Some(device) = self.library.get_setting(&key)? {
+            return Ok(device);
+        }
+        let device = uuid::Uuid::new_v4()
+            .hyphenated()
+            .to_string()
+            .to_ascii_uppercase();
+        self.library.set_setting(&key, &device)?;
+        Ok(device)
     }
 
     /// 稍后再看列表。

@@ -54,18 +54,26 @@ pub struct MessageUnread {
     pub reply: u64,
     pub at: u64,
     pub like: u64,
+    pub direct: u64,
     pub total: u64,
 }
 
 impl Client {
     pub async fn message_unread(&self) -> Result<MessageUnread, BiliError> {
-        let value = self
-            .get_json(
-                &format!("{API}/x/msgfeed/unread"),
-                std::time::Duration::from_millis(400),
-            )
-            .await?;
-        Ok(unread_from(&value))
+        let notifications_url = format!("{API}/x/msgfeed/unread");
+        let direct_url = "https://api.vc.bilibili.com/session_svr/v1/session_svr/single_unread?unread_type=0&show_dustbin=1&build=0&mobi_app=web";
+        let interval = std::time::Duration::from_millis(400);
+        let (notifications, direct) = tokio::join!(
+            self.get_json(&notifications_url, interval),
+            self.get_json(direct_url, interval)
+        );
+        match (notifications, direct) {
+            (Err(error), Err(_)) => Err(error),
+            (notifications, direct) => Ok(unread_from(
+                &notifications.unwrap_or_default()["data"],
+                &direct.unwrap_or_default()["data"],
+            )),
+        }
     }
 
     pub async fn messages(
@@ -208,16 +216,18 @@ fn message_user_from(value: &serde_json::Value) -> MessageUser {
     }
 }
 
-fn unread_from(value: &serde_json::Value) -> MessageUnread {
-    let data = &value["data"];
+fn unread_from(data: &serde_json::Value, sessions: &serde_json::Value) -> MessageUnread {
     let reply = data["reply"].as_u64().unwrap_or_default();
     let at = data["at"].as_u64().unwrap_or_default();
     let like = data["like"].as_u64().unwrap_or_default();
+    let direct = sessions["follow_unread"].as_u64().unwrap_or_default()
+        + sessions["unfollow_unread"].as_u64().unwrap_or_default();
     MessageUnread {
         reply,
         at,
         like,
-        total: reply + at + like,
+        direct,
+        total: reply + at + like + direct,
     }
 }
 
@@ -465,14 +475,23 @@ mod tests {
     }
 
     #[test]
-    fn 未读统计三类相加为总数() {
+    fn 未读总数包含互动通知和普通私信() {
         let value = json!({
             "data": { "reply": 3, "at": 2, "like": 5, "sys_msg": 7 }
         });
-        let unread = unread_from(&value);
+        let sessions = json!({
+            "follow_unread": 2, "unfollow_unread": 4, "biz_msg_follow_unread": 8
+        });
+        let unread = unread_from(&value["data"], &sessions);
         assert_eq!(unread.reply, 3);
         assert_eq!(unread.at, 2);
         assert_eq!(unread.like, 5);
-        assert_eq!(unread.total, 10);
+        assert_eq!(unread.direct, 6);
+        assert_eq!(unread.total, 16);
+        assert_eq!(
+            unread_from(&value["data"], &serde_json::Value::Null).total,
+            10
+        );
+        assert_eq!(unread_from(&serde_json::Value::Null, &sessions).total, 6);
     }
 }

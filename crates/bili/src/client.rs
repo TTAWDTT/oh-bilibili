@@ -508,13 +508,21 @@ impl Client {
         params: Vec<(&str, String)>,
         min_interval: Duration,
     ) -> Result<Value, BiliError> {
+        let url = self.signed_url(base, &params).await?;
+        self.get_json(&url, min_interval).await
+    }
+
+    pub(crate) async fn signed_url(
+        &self,
+        base: &str,
+        params: &[(&str, String)],
+    ) -> Result<String, BiliError> {
         let keys = self.wbi_keys().await?;
         let wts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let query = keys.sign(&params, wts);
-        self.get_json(&format!("{base}?{query}"), min_interval).await
+        Ok(format!("{base}?{}", keys.sign(params, wts)))
     }
 
     /// 同上，但走播放专用闸门：换歌不该排在弹幕和相关推荐后面。
@@ -524,16 +532,11 @@ impl Client {
         params: Vec<(&str, String)>,
         min_interval: Duration,
     ) -> Result<Value, BiliError> {
-        let keys = self.wbi_keys().await?;
-        let wts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        let query = keys.sign(&params, wts);
+        let url = self.signed_url(base, &params).await?;
         self.gate_play(min_interval).await;
         // 闸门已经过完了，这里用零间隔再走一遍完整流程（含 cookie 吸收），
         // 但不吃别的接口留下的冷却。
-        self.get_json_inner(&format!("{base}?{query}"), Duration::ZERO, false, false, true)
+        self.get_json_inner(&url, Duration::ZERO, false, false, true)
             .await
     }
 

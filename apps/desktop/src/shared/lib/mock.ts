@@ -6,6 +6,7 @@ import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
 import { emit, ensureClock, fail, playlistOf, previewPages, setDuration, snapshot, state, trackOf } from './mockEngine'
 import { playerCommand } from './mockPlayer'
+import { mockDirectAck, mockDirectHistory, mockDirectSessions, mockDirectUnread, mockSendDirect } from './mockDirect'
 
 export { mockSubscribe } from './mockEngine'
 
@@ -177,6 +178,11 @@ const followSlow = import.meta.env.DEV && new URLSearchParams(window.location.se
 const followFailPage = import.meta.env.DEV
   ? Number(new URLSearchParams(window.location.search).get('followFailPage') ?? 0)
   : 0
+const spaceShowcase = import.meta.env.DEV && new URLSearchParams(window.location.search).has('spaceShowcase')
+const spaceEmpty = import.meta.env.DEV && new URLSearchParams(window.location.search).has('spaceEmpty')
+function previewSpaceWorks(mid: number): Track[] {
+  return followTracks(mid) ?? CATALOG.filter(track => track.up_mid === mid)
+}
 const spaceSlowMid = import.meta.env.DEV
   ? Number(new URLSearchParams(window.location.search).get('spaceSlowMid') ?? 0)
   : 0
@@ -316,6 +322,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       if (!owner && !follow) throw fail('input', '这个 UP 主不在目录里')
       return {
         name: follow?.seed.name ?? owner!.artist,
+        banner: spaceShowcase && !spaceEmpty ? '/assets/illustrations/precious-editing-desk.webp' : null,
         face: follow ? avatarArt() : (owner!.up_avatar ?? ''),
         // 按 mid 造一个稳定的粉丝数，同一个 UP 每次一样
         fans: 1_200_000 + ((mid ?? 0) % 800_000) * 7,
@@ -324,7 +331,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         vip: follow?.seed.vip ?? true,
         official: null,
         level: 6,
-        videos: 952,
+        videos: spaceEmpty ? 0 : 952,
         likes: 131_000_000,
       }
     }
@@ -752,8 +759,18 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       }
       return list
     }
-    case 'message_unread':
-      return { reply: 3, at: 2, like: 5, total: 10 }
+    case 'direct_sessions':
+      return mockDirectSessions(args.cursor)
+    case 'direct_history':
+      return mockDirectHistory(num(args, 'mid'), args.cursor)
+    case 'direct_ack':
+      return mockDirectAck(num(args, 'mid'), str(args, 'seqno'))
+    case 'send_direct_text':
+      return mockSendDirect(num(args, 'mid'), str(args, 'text'))
+    case 'message_unread': {
+      const direct = mockDirectUnread()
+      return { reply: 3, at: 2, like: 5, direct, total: 10 + direct }
+    }
     case 'messages': {
       const kind = str(args, 'kind')
       const page = num(args, 'page')
@@ -1438,7 +1455,27 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const start = (page - 1) * 50
       return [users.slice(start, start + 50), users.length]
     }
+    case 'space_picks': {
+      if (!spaceShowcase || spaceEmpty) return []
+      const tracks = previewSpaceWorks(num(args, 'mid'))
+      return str(args, 'kind') === 'pinned' ? tracks.slice(-1) : tracks.slice(0, 3)
+    }
+    case 'space_collections': {
+      const tracks = previewSpaceWorks(num(args, 'mid'))
+      if (!spaceShowcase || spaceEmpty || !tracks.length) return [[], 0]
+      return [[
+        { kind: 'season', id: 1, name: '镜头背后', total: tracks.length, cover: tracks[0]?.cover ?? null },
+        { kind: 'series', id: 2, name: '拍摄手记', total: 1, cover: tracks.at(-1)?.cover ?? null },
+      ], 2]
+    }
+    case 'space_collection_works': {
+      if (!spaceShowcase || spaceEmpty) return [[], 0]
+      const tracks = previewSpaceWorks(num(args, 'mid'))
+      const works = str(args, 'kind') === 'series' ? tracks.slice(-1) : tracks
+      return [works, works.length]
+    }
     case 'space_videos': {
+      if (spaceEmpty) return [[], 0]
       const page = Math.max(1, Math.trunc(num(args, 'page')))
       const size = 50
       const start = (page - 1) * size

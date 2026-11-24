@@ -225,6 +225,7 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
 }
 
 export type AuthorCard = {
+  banner?: string | null
   name: string
   face: string
   fans: number | null
@@ -637,6 +638,17 @@ export function spaceVideos(
   return call<[Track[], number]>('space_videos', { mid, page, order })
 }
 
+export type SpaceCollection = { id: number; kind: 'season' | 'series'; name: string; cover: string | null; total: number }
+export function spacePicks(mid: number, kind: 'pinned' | 'masterpieces'): Promise<Track[]> {
+  return call<Track[]>('space_picks', { mid, kind })
+}
+export function spaceCollections(mid: number, page: number): Promise<[SpaceCollection[], number]> {
+  return call<[SpaceCollection[], number]>('space_collections', { mid, page })
+}
+export function spaceCollectionWorks(mid: number, kind: SpaceCollection['kind'], id: number, page: number): Promise<[Track[], number]> {
+  return call<[Track[], number]>('space_collection_works', { mid, kind, id, page })
+}
+
 /** UP 主粉丝与关注数。 */
 export function spaceStat(mid: number): Promise<[number, number]> {
   return call<[number, number]>('space_stat', { mid })
@@ -703,6 +715,34 @@ export function dynamicFeed(offset?: string | null): Promise<DynamicPage> {
 
 export type MessageKind = 'reply' | 'at' | 'like'
 
+export type DirectPeer = { mid: number; name: string; avatar: string }
+export type DirectSession = DirectPeer & { preview: string; at: number; unread: number }
+export type DirectMessage = { id: string; sender_mid: number; text: string; image: string | null; at: number }
+export type DirectPage<T> = { items: T[]; next_cursor: string | null }
+
+export type DirectSessionPage = DirectPage<DirectSession>
+
+export function directSessions(cursor: string | null): Promise<DirectSessionPage> {
+  return call<DirectSessionPage>('direct_sessions', { cursor })
+}
+
+export type DirectHistoryPage = DirectPage<DirectMessage> & {
+  latest_seqno: string | null; latest_at: number | null
+  withdrawals: { target_id: string; remove: boolean }[]
+}
+
+export function directHistory(mid: number, cursor: string | null): Promise<DirectHistoryPage> {
+  return call<DirectHistoryPage>('direct_history', { mid, cursor })
+}
+
+export function directAck(mid: number, seqno: string): Promise<void> {
+  return call<void>('direct_ack', { mid, seqno })
+}
+
+export function sendDirectText(mid: number, text: string): Promise<DirectMessage> {
+  return call<DirectMessage>('send_direct_text', { mid, text })
+}
+
 export type MessageUser = {
   mid: number
   name: string
@@ -736,6 +776,7 @@ export type MessagePage = {
 }
 
 export type MessageUnread = {
+  direct: number
   reply: number
   at: number
   like: number

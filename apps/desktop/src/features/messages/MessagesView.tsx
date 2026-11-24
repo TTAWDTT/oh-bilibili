@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAppStore } from '../../app/appStore'
+import { useAppStore, type View } from '../../app/appStore'
+import { DirectInbox } from './DirectInbox'
 import { toastFailure } from '../../app/notice'
 import { useAuthStore } from '../auth/authStore'
 import * as ipc from '../../shared/lib/ipc'
@@ -12,7 +13,8 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { Icon } from '../../shared/ui/Icon'
 
 const CONTENT = 'mx-auto w-full max-w-[760px] px-4 md:px-6'
-const TABS: { kind: ipc.MessageKind; label: string }[] = [
+const TABS: { kind: ipc.MessageKind | 'direct'; label: string }[] = [
+  { kind: 'direct', label: '私信' },
   { kind: 'reply', label: '回复我的' },
   { kind: 'at', label: '@我的' },
   { kind: 'like', label: '收到的赞' },
@@ -249,11 +251,16 @@ function MessageList({ kind, emotes }: { kind: ipc.MessageKind; emotes: Map<stri
   )
 }
 
-export function MessagesView() {
-  const [kind, setKind] = useState<ipc.MessageKind>('reply')
+export function MessagesView({ view }: { view: Extract<View, { kind: 'messages' }> }) {
+  const kind = view.tab ?? 'reply'
+  const replace = useAppStore((state) => state.replace)
+  const goBack = useAppStore((state) => state.goBack)
+  const fromAuthor = useAppStore((state) => state.history.at(-1)?.view.kind === 'author')
   const [emotePairs, setEmotePairs] = useState<[string, string][]>([])
   const emotes = useMemo(() => new Map(emotePairs), [emotePairs])
   const auth = useAuthStore((state) => state.auth)
+  const accountMid = auth?.user?.mid
+  const sameOwner = view.accountMid === undefined || view.accountMid === accountMid
   const unread = useAppStore((state) => state.messageUnread)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
 
@@ -265,18 +272,29 @@ export function MessagesView() {
     if (auth && !auth.logged_in) setAuthOpen(true)
   }, [auth?.logged_in, setAuthOpen])
 
+  useEffect(() => {
+    if (!view.peer || !auth) return
+    if (!sameOwner) replace({ kind: 'messages', tab: 'direct' })
+    else if (view.accountMid === undefined && accountMid) replace({ ...view, accountMid })
+  }, [view, auth, accountMid, sameOwner, replace])
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--ga0)]">
       <header className="shrink-0 border-b border-[var(--line)] bg-[var(--panel)] pt-5">
-        <div className={`messages-header-content ${CONTENT}`}>
-          <h2 className="text-[20px] font-semibold text-[var(--text-1)]">消息中心</h2>
-          <nav aria-label="消息分类" className="mt-3 flex gap-6">
+        <div className={`messages-header-content ${kind === 'direct' ? 'mx-auto w-full max-w-[1120px] px-4 md:px-6' : CONTENT}`}>
+          <div className="flex items-center gap-2">
+            {fromAuthor && <button type="button" onClick={goBack} aria-label="返回个人空间" title="返回个人空间"
+              className="press rounded p-1 hover:bg-[var(--ga0)]"><Icon name="chevronLeft" size={18} /></button>}
+            <h2 className="text-[20px] font-semibold text-[var(--text-1)]">消息中心</h2>
+          </div>
+          <nav aria-label="消息分类" className="mt-3 flex flex-wrap gap-x-4 sm:gap-x-6">
             {TABS.map((tab) => (
               <button
                 key={tab.kind}
                 type="button"
+                aria-label={tab.label}
                 aria-current={kind === tab.kind ? 'page' : undefined}
-                onClick={() => setKind(tab.kind)}
+                onClick={() => replace({ kind: 'messages', tab: tab.kind })}
                 className={`t relative flex items-center gap-1.5 border-b-2 pb-3 text-[14px] ${kind === tab.kind ? 'border-[var(--accent)] font-medium text-[var(--accent)]' : 'border-transparent text-[var(--text-2)] hover:text-[var(--accent)]'}`}
               >
                 {tab.label}
@@ -291,7 +309,10 @@ export function MessagesView() {
         </div>
       </header>
       {!auth ? <BiliLoader label="正在确认登录…" /> : auth.logged_in ? (
-        <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} emotes={emotes} />
+        kind === 'direct' && accountMid
+          ? <DirectInbox key={accountMid} me={accountMid} selected={sameOwner ? view.peer : undefined}
+              onSelect={(peer) => replace(peer ? { kind: 'messages', tab: 'direct', peer, accountMid } : { kind: 'messages', tab: 'direct' })} />
+          : kind !== 'direct' && <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} emotes={emotes} />
       ) : (
         <EmptyState icon="message" mascot="peek" title="登录后查看消息" action={{ label: '登录', onClick: () => setAuthOpen(true) }} />
       )}

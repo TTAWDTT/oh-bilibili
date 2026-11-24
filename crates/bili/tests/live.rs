@@ -962,3 +962,66 @@ async fn 弹幕按传入的cid取而不是总拿第一P() {
     assert_eq!(fallback.len(), by_first.len(), "不给 cid 时必须退回第一 P");
     assert_ne!(named.len(), by_first.len(), "不同 P 的弹幕池不该一样多");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "真实网络"]
+async fn 空间头图置顶代表作与合集可读取() {
+    use bilimusic_bili::space::{CollectionKind, SpacePick};
+
+    let source = Source::new().expect("Source 应该能打开");
+    let mid = 946974;
+    let card = source.author_card(mid).await.expect("作者资料");
+    assert!(card
+        .banner
+        .as_ref()
+        .is_some_and(|url| url.starts_with("https://")));
+    for kind in [SpacePick::Pinned, SpacePick::Masterpieces] {
+        let picks = source.space_picks(mid, kind).await.expect("空间精选投稿");
+        assert!(picks
+            .iter()
+            .any(|track| !track.title.is_empty() && track.cover.is_some()));
+    }
+    for (mid, want) in [
+        (mid, CollectionKind::Season),
+        (546195, CollectionKind::Series),
+    ] {
+        let (collections, total) = source.space_collections(mid, 1).await.expect("公开目录");
+        if total > collections.len() as u64 {
+            let (more, _) = source.space_collections(mid, 2).await.expect("第二页目录");
+            assert!(more.iter().any(|next| collections
+                .iter()
+                .all(|seen| (seen.kind, seen.id) != (next.kind, next.id))));
+            println!("空间 {mid} 合集和系列第二页返回 {} 项", more.len());
+        }
+        let collection = collections
+            .iter()
+            .find(|item| item.kind == want && item.total > 0)
+            .expect("该空间应有一个有内容的目录");
+        let (works, _) = source
+            .space_collection_works(mid, want, collection.id, 1)
+            .await
+            .expect("作品列表");
+        let work = works.first().expect("目录应有公开作品");
+        let detail = source
+            .detail(&work.key)
+            .await
+            .expect("目录内的作品可打开播放页");
+        assert_eq!(detail.track.key, work.key);
+        assert!(!detail.track.title.is_empty() && detail.cid > 0);
+        println!("{} → {}", collection.name, detail.track.title);
+        if let Some(long) = collections.iter().find(|item| item.total > 30) {
+            let (first, _) = source
+                .space_collection_works(mid, long.kind, long.id, 1)
+                .await
+                .expect("作品第一页");
+            let (second, _) = source
+                .space_collection_works(mid, long.kind, long.id, 2)
+                .await
+                .expect("作品第二页");
+            assert!(second
+                .iter()
+                .any(|next| first.iter().all(|seen| seen.key != next.key)));
+            println!("{} 第二页返回 {} 个视频", long.name, second.len());
+        }
+    }
+}
