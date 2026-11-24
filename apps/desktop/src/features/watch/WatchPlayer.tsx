@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -283,7 +282,6 @@ export function WatchPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
-  const fullscreenSynced = useRef(false)
   /** 冒烟脚本读的最后一次落位；播放时钟在无头预览里没有真值。 */
   const lastSeek = useRef<number | null>(null)
   /** 当前生效的变体高度，降档时用它找下一档。 */
@@ -390,6 +388,11 @@ export function WatchPlayer({
     }
   }, [menu])
 
+  const finishMenuSelection = (): void => {
+    setMenu(null)
+    menuButton.current?.focus({ preventScroll: true })
+  }
+
   const toggleMenu = (next: PlayerMenu, button: HTMLButtonElement): void => {
     menuButton.current = button
     setMenu((current) => current === next ? null : next)
@@ -485,9 +488,7 @@ export function WatchPlayer({
   const lastClickAt = useRef(0)
 
   const togglePlay = (): void => {
-    void ipc.playerToggle().catch(() => {
-      // 没加载起来时点播放不该静默失败，但也不该假装成功
-    })
+    void usePlayerStore.getState().toggle()
     poke()
   }
 
@@ -571,31 +572,6 @@ export function WatchPlayer({
     setCinema(web)
     setOsFullscreen(os)
   }
-
-  useEffect(() => {
-    // 首次挂载不要把用户自己开的窗口全屏关掉。
-    if (!fullscreenSynced.current) {
-      fullscreenSynced.current = true
-      return
-    }
-    try {
-      void getCurrentWindow().setFullscreen(osFullscreen).catch(() => {})
-    } catch {
-      // 浏览器预览里没有 Tauri 窗口。
-    }
-  }, [osFullscreen])
-
-  useEffect(() => {
-    return () => {
-      useAppStore.getState().setCinema(false)
-      useAppStore.getState().setOsFullscreen(false)
-      try {
-        void getCurrentWindow().setFullscreen(false).catch(() => {})
-      } catch {
-        // 浏览器预览里没有 Tauri 窗口。
-      }
-    }
-  }, [])
 
   /** 当前这一 P 的 cid：弹幕、字幕、预览图都按它取。 */
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
@@ -1802,7 +1778,7 @@ export function WatchPlayer({
                     type="button"
                     onClick={() => {
                       setSubTrack(null)
-                      setMenu(null)
+                      finishMenuSelection()
                     }}
                     className={`t press px-3 py-1 text-left text-[12px] ${
                       subTrack === null ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -1816,7 +1792,7 @@ export function WatchPlayer({
                       type="button"
                       onClick={() => {
                         setSubTrack(t.lan)
-                        setMenu(null)
+                        finishMenuSelection()
                       }}
                       className={`t press px-3 py-1 text-left text-[12px] ${
                         subTrack === t.lan ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -1850,7 +1826,7 @@ export function WatchPlayer({
                     <span className="text-[12px] text-white/60">选集</span>
                     <button
                       type="button"
-                      onClick={() => setMenu(null)}
+                      onClick={finishMenuSelection}
                       className="text-[12px] text-white/80 hover:text-white"
                     >
                       关闭
@@ -1865,7 +1841,7 @@ export function WatchPlayer({
                         aria-pressed={on}
                         onClick={() => {
                           onPage(page.no)
-                          setMenu(null)
+                          finishMenuSelection()
                         }}
                         className={`t flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-[12px] ${
                           on
@@ -1907,7 +1883,7 @@ export function WatchPlayer({
                     type="button"
                     onClick={() => {
                       pickAutoQuality()
-                      setMenu(null)
+                      finishMenuSelection()
                     }}
                     className={`t press px-2 py-1 text-left text-[12px] ${
                       qualityAuto ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -1921,7 +1897,7 @@ export function WatchPlayer({
                       type="button"
                       onClick={() => {
                         pickQuality(q)
-                        setMenu(null)
+                        finishMenuSelection()
                       }}
                       className={`t press px-2 py-1 text-left text-[12px] ${
                         !qualityAuto && activeId === q.id
@@ -1971,7 +1947,7 @@ export function WatchPlayer({
                     type="button"
                     onClick={() => {
                       void setSpeed(rate)
-                      setMenu(null)
+                      finishMenuSelection()
                     }}
                     className={`t press px-3 py-1 text-left text-[12px] ${
                       rate === speed

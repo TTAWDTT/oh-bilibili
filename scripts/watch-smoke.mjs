@@ -4448,6 +4448,16 @@ async function checkWatchComfort(page) {
   const toolbar = 'document.querySelector("[data-watch-danmaku-toolbar]")'
   const player = 'document.querySelector("[data-watch-player]")'
   const seek = (ms) => page.evaluate(`import('/src/shared/lib/ipc.ts').then(ipc => ipc.playerSeek(${ms}))`)
+  const clickCenter = async (element) => {
+    const point = await page.evaluate(`(() => {
+      const rect = (${element}).getBoundingClientRect()
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })()`)
+    await page.mouseEvent({ type: 'mouseMoved', ...point })
+    await page.mouseEvent({ type: 'mousePressed', ...point, button: 'left', buttons: 1, clickCount: 1 })
+    await page.mouseEvent({ type: 'mouseReleased', ...point, button: 'left', buttons: 0, clickCount: 1 })
+    return point
+  }
   try {
     await page.evaluate(`localStorage.removeItem('bilimusic.danmaku'); location.href = ${JSON.stringify(`${WEB}?mergeDanmaku=1&loggedIn=1`)}`)
     await waitFor('location.search.includes("mergeDanmaku") && window.shaka?.Player && document.querySelector("[data-track-card]")')
@@ -4501,25 +4511,18 @@ async function checkWatchComfort(page) {
     await page.keyEvent({ type: 'keyUp', key: 'd', code: 'KeyD', windowsVirtualKeyCode: 68 })
     check('按 D 重新开启弹幕，同步更新画面外的开关', await waitFor(`${toolbar}.querySelector('[aria-label="关闭弹幕"]')?.getAttribute('aria-pressed') === 'true'`))
     await page.clickText('字幕')
-    await page.clickExactText('中文（中国）')
+    await clickCenter(`[...${player}.querySelectorAll('button')].find(b => b.textContent === '中文（中国）')`)
     await seek(200)
     await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
     await waitFor(`${player}.innerText.includes('预览字幕第一句')`)
     check('控制条隐藏后，字幕仍随播放从第一句换成第二句', await waitFor(`${player}.dataset.controlsVisible === 'false' && ${player}.innerText.includes('预览字幕第二句')`))
-    const center = await page.evaluate(`(() => {
-      const r = ${player}.getBoundingClientRect()
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-    })()`)
-    await page.mouseEvent({ type: 'mouseMoved', ...center })
-    await page.mouseEvent({ type: 'mousePressed', ...center, button: 'left', buttons: 1, clickCount: 1 })
-    await page.mouseEvent({ type: 'mouseReleased', ...center, button: 'left', buttons: 0, clickCount: 1 })
+    const center = await clickCenter(`${player}.querySelector('video')`)
     await waitFor('!window.__ohBilibiliWatch.state().playing')
     check('暂停时画面中央仍是视频', await page.evaluate(`
       document.elementFromPoint(${center.x}, ${center.y}) === ${player}.querySelector('video')
     `))
     await page.evaluate(`document.querySelector('[data-watch-controls] button[aria-label="播放"]').click()`)
     check('暂停后可从底栏继续播放', await waitFor('window.__ohBilibiliWatch.state().playing'))
-
   } finally {
     await page.evaluate(saved === null ? "localStorage.removeItem('bilimusic.danmaku')"
       : `localStorage.setItem('bilimusic.danmaku', ${JSON.stringify(saved)})`)

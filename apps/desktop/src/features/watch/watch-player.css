@@ -1,4 +1,4 @@
-[data-watch-player], .watch-dm-toolbar {
+[data-watch-player], .watch-dm-toolbar, .watch-dm-portal {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -123,8 +123,15 @@
 }
 .watch-dm-toggle[aria-pressed="true"] .watch-dm-indicator { background: var(--accent-strong); }
 .watch-dm-toggle[aria-pressed="true"] .watch-dm-indicator::after { transform: translateX(10px); }
-/* 共享弹层计算相对按钮的方向，短窗口在弹层内滚动。 */
-.watch-dm-tools [role="dialog"] {
+.watch-dm-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+/* 脱离正文滚动区域，靠近窗口顶边时也能盖住应用顶栏。 */
+.watch-dm-portal [role="dialog"] {
+  pointer-events: auto;
   max-height: min(390px, calc(100dvh - 24px));
   color: var(--dm-text);
   background: var(--dm-surface);
