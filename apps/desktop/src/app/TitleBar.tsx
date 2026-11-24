@@ -13,6 +13,8 @@ import { useSearchHistory } from '../shared/lib/searchHistory'
 import { AnchoredPanel } from '../shared/ui/AnchoredPanel'
 import type { Anchor } from '../shared/ui/AnchoredPanel'
 import { LevelBadge } from '../shared/ui/LevelBadge'
+import { seekCurrentWatch } from '../features/watch/watchActions'
+import { parseWatchUrl } from '../features/watch/watchUrl'
 
 const overlayTitleBar = isTauri && isMacOS
 
@@ -196,6 +198,8 @@ export function TitleBar() {
   const setUnread = useAppStore((state) => state.setMessageUnread)
   const currentQuery = useAppStore((state) => state.currentQuery)
   const [text, setText] = useState(currentQuery)
+  const target = parseWatchUrl(text.trim())
+  const [opening, setOpening] = useState('')
   const [focused, setFocused] = useState(false)
   const [account, setAccount] = useState<Anchor | null>(null)
   const [submitMenu, setSubmitMenu] = useState<Anchor | null>(null)
@@ -232,12 +236,33 @@ export function TitleBar() {
     }
   }, [auth?.logged_in, auth?.user?.mid, messaging, setUnread])
 
-  const submit = (): void => {
-    const word = text.trim()
+  const submit = (word = text.trim()): void => {
     if (!word) return
     setFocused(false)
     inputRef.current?.blur()
-    setQuery(word)
+    const link = word === text.trim() ? target : parseWatchUrl(word)
+    setText(word)
+    if (!link) {
+      setQuery(word)
+      return
+    }
+    const previousView = useAppStore.getState().view
+    const page = link.page ?? 1
+    const atMs = link.atMs ?? 0
+    if (previousView.kind === 'watch' && previousView.track.key === link.bvid) {
+      seekCurrentWatch(atMs, page)
+      setText(currentQuery)
+      return
+    }
+    setOpening(word)
+    void ipc.videoBrief(link.bvid)
+      .then((track) => {
+        if (inputRef.current?.value.trim() !== word || useAppStore.getState().view !== previousView) return
+        navigate({ kind: 'watch', track, page, atMs })
+        setText(currentQuery)
+      })
+      .catch((cause) => toastFailure('打开视频链接', cause))
+      .finally(() => setOpening(''))
   }
 
   const openAccount = (button: HTMLButtonElement): void => {
@@ -406,6 +431,7 @@ export function TitleBar() {
           )}
           <button
             type="submit"
+            disabled={opening !== '' && opening === text.trim()}
             className={[
               'bili-press flex h-7 shrink-0 items-center rounded-[6px] px-3 text-[13px]',
               focused || text.trim()
@@ -413,19 +439,11 @@ export function TitleBar() {
                 : 'text-[var(--text-2)] hover:bg-[var(--ga2)] hover:text-[var(--text-1)]',
             ].join(' ')}
           >
-            搜索
+            {target ? (opening === text.trim() ? '正在打开…' : '打开视频') : '搜索'}
           </button>
         </form>
-        {focused ? (
-          <SearchSuggest
-            query={text}
-            onPick={(word) => {
-              setFocused(false)
-              inputRef.current?.blur()
-              setText(word)
-              setQuery(word)
-            }}
-          />
+        {focused && !target ? (
+          <SearchSuggest query={text} onPick={submit} />
         ) : null}
       </div>
 

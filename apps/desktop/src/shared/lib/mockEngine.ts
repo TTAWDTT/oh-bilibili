@@ -1,5 +1,5 @@
 import type { AppEvent, AuthSnapshot, DownloadView, PageRef, PlayerPhase, PlayerSnapshot, RepeatMode, Track } from './contract'
-import { findTrack, PLAYLIST_SEEDS, trackByTitle } from './mockCatalog'
+import { CATALOG, findTrack, PLAYLIST_SEEDS, trackByTitle } from './mockCatalog'
 import { clamp } from './format'
 
 export type MockPlaylist = { id: number; name: string; keys: string[] }
@@ -22,6 +22,7 @@ export type MockState = {
   shuffle: boolean
   likes: Set<string>
   favs: Set<string>
+  coins: Map<string, number>
   playlists: MockPlaylist[]
   downloads: DownloadView[]
   /** 被删掉的历史条目 key。 */
@@ -58,6 +59,8 @@ const downloadSeeds: Omit<DownloadView, 'key'>[] = [
 const loggedIn =
   import.meta.env.DEV && new URLSearchParams(window.location.search).has('loggedIn')
 
+const reactedKeys = CATALOG.slice(0, 1).map((track) => track.key)
+
 export const state: MockState = {
   watchPage: null,
   keys: [],
@@ -72,8 +75,9 @@ export const state: MockState = {
   speed: 1,
   repeat: 'off',
   shuffle: false,
-  likes: new Set(),
-  favs: new Set(),
+  likes: new Set(reactedKeys),
+  favs: new Set(reactedKeys),
+  coins: new Map(reactedKeys.map((key) => [key, 1])),
   playlists: PLAYLIST_SEEDS.map((seed) => ({
     id: seed.id,
     name: seed.name,

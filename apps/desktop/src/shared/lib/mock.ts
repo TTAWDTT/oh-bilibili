@@ -1007,7 +1007,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const pages = previewPages(track)
       const requestedPage = Number(args.page ?? 1) || 1
       if (commentJumps && requestedPage === 2) await sleep(600)
-      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused } })
+      if (commentJumps) performance.mark('comment-page-ready', { detail: { page: requestedPage, paused: args.paused, at: args.resume_at } })
       const part = pages.find((entry) => entry.no === requestedPage) ?? pages[0]!
       const currentPage = part.no
       state.watchPage = { key: track.key, page: part }
@@ -1440,6 +1440,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         '前奏一响 青春就回来了', '谁 2026 年还在听', '音量调大', '泪目',
         '这个转场绝了', '单曲循环中', '干杯',
       ]
+      if (num(args, 'cid') === 2) {
+        texts[2] = '这段变奏好喜欢'
+        texts[3] = '5'
+        texts[4] = '？！'
+        texts[9] = '尾奏适合循环'
+      }
       // 第 3 条做成顶部弹幕、第 6 条做成底部，用来验证钉住的两种位置。
       const base = texts.map((text, i) => ({
         secs: 1 + i * 2,
@@ -1504,17 +1510,18 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         ]
       })
     }
-    case 'coin_set':
+    case 'coin_set': {
       if (new URL(window.location.href).searchParams.has('failCoin')) {
         throw fail('internal', '投币回执超时')
       }
+      const key = str(args, 'key')
+      state.coins.set(key, Math.min(2, (state.coins.get(key) ?? 0) + num(args, 'count')))
+      if (bool(args, 'also_like')) state.likes.add(key)
       return null
+    }
     case 'relation_states': {
-      // 预览：目录第一条固定是已赞/已藏，用来验证进页面时状态会被点亮。
-      // 按「这一批的第一条」算会把鼠标底下那张卡随机点亮，验出来的状态是假的。
       const keys = Array.isArray(args.keys) ? (args.keys as string[]) : []
-      const first = CATALOG[0]?.key
-      return keys.map((key) => [key, key === first, key === first, key === first ? 1 : 0])
+      return keys.map((key) => [key, state.likes.has(key), state.favs.has(key), state.coins.get(key) ?? 0])
     }
     case 'like_set': {
       const key = str(args, 'key')

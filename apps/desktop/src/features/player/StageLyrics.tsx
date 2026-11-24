@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { StageDanmakuMoments } from './StageDanmakuMoments'
+import type { DanmakuItem } from './danmakuMerge'
 import type { LyricLine } from '../../shared/lib/contract'
 
 type StageLyricsProps = {
   lines: readonly LyricLine[]
+  danmaku: DanmakuItem[]
   synced: boolean
   active: number
   loading: boolean
@@ -15,6 +18,7 @@ type StageLyricsProps = {
 
 export function StageLyrics({
   lines,
+  danmaku,
   synced,
   active,
   loading,
@@ -66,11 +70,7 @@ export function StageLyrics({
   }
 
   if (lines.length === 0) {
-    return (
-      <div className="grid min-h-[220px] place-items-center px-8 text-center">
-        <p className="text-[14px] leading-6 text-[var(--text-2)]">暂无匹配歌词</p>
-      </div>
-    )
+    return <StageDanmakuMoments items={danmaku} onSeek={onSeek} />
   }
 
   const resumeFollowing = (): void => {

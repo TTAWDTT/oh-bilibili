@@ -27,10 +27,9 @@ import { NoteReader } from './NoteReader'
 import type { CommentNote } from './NoteReader'
 import { rememberPageCount } from '../tracks/pageSpineLabel'
 import { rememberSeason } from '../tracks/seasonMark'
-import { TripleBurst } from './TripleBurst'
 import { WatchHead, WatchInfo } from './WatchInfo'
 import { WatchPlayer, type NextUp } from './WatchPlayer'
-import { setWatchFavHandler } from './watchActions'
+import { setWatchFavHandler, setWatchSeekHandler } from './watchActions'
 import { FavPicker } from '../library/FavPicker'
 import { usePlayerStore } from '../player/playerStore'
 import { Modal } from '../../shared/ui/Modal'
@@ -230,7 +229,7 @@ export function WatchView({
       row?.focus({ preventScroll: true })
     })
   }
-  const seekFromComment = (ms: number, pageNo?: number): void => {
+  const seekToPart = (ms: number, pageNo?: number): void => {
     const current = data?.current_page ?? 1
     const target = pageNo ?? current
     if (target !== current || pageLoading.current) {
@@ -299,6 +298,7 @@ export function WatchView({
     setLikeDelta(0)
     setFavDelta(0)
     setCoinDelta(0)
+    setBurst(0)
   }, [track.key])
 
   useEffect(() => {
@@ -396,14 +396,12 @@ export function WatchView({
       .catch(() => toastDone(next ? '关注失败' : '取消关注失败', '登录后再试'))
   }
 
-  const like = (): void => {
+  const like = async (): Promise<boolean | null> => {
     const before = useReactionStore.getState().liked[track.key] ?? false
-    void useReactionStore
-      .getState()
-      .toggleLike(track)
-      .then((next) => {
-        if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
-      })
+    const next = await useReactionStore.getState().toggleLike(track)
+    if (trackKeyRef.current !== track.key) return null
+    if (next !== null && next !== before) setLikeDelta((n) => n + (next ? 1 : -1))
+    return next
   }
 
   const coin = (count: number, alsoLike: boolean, quiet = false): void => {
@@ -413,6 +411,7 @@ export function WatchView({
       .then((ok) => {
         if (!ok) return
         setCoinDelta((n) => n + count)
+        if (alsoLike && !liked) setLikeDelta((n) => n + 1)
         if (!quiet) toastDone('投币成功', alsoLike ? '同时点了个赞' : null)
       })
   }
@@ -431,41 +430,34 @@ export function WatchView({
       return
     }
     tripleBusy.current = true
-    const results: { label: string; ok: boolean }[] = []
     try {
-      if (needLike) {
-        const next = await st.toggleLike(track)
-        results.push({ label: '点赞', ok: next === true })
-      } else {
-        results.push({ label: '点赞', ok: true })
-      }
-      if (needCoin) {
-        // 一键三连按 B 站语义把硬币补满 2 枚；已经投过 1 枚的只补差额。
-        const ok = await st.addCoin(track, 2 - haveCoins, true)
-        results.push({ label: '投币', ok })
-      } else {
-        results.push({ label: '投币', ok: true })
-      }
-      if (needFav) {
-        const next = await st.toggleFav(track)
-        results.push({ label: '收藏', ok: next === true })
-      } else {
-        results.push({ label: '收藏', ok: true })
+      const likeOk = !needLike || (await st.toggleLike(track)) === true
+      // 点赞是单独的一项写入，投币只补足差额。
+      const coinOk = !needCoin || await st.addCoin(track, 2 - haveCoins, false)
+      const favOk = !needFav || (await st.toggleFav(track)) === true
+      if (!likeOk || !coinOk || !favOk) {
+        await st.refresh([key]).catch(() => {})
       }
       if (trackKeyRef.current !== key) return
-      const failed = results.filter((item) => !item.ok).map((item) => item.label)
-      if (failed.length === 0) {
-        if (needLike) setLikeDelta((n) => n + 1)
-        if (needCoin) setCoinDelta((n) => n + (2 - haveCoins))
-        if (needFav) setFavDelta((n) => n + 1)
+      const state = useReactionStore.getState()
+      const nowLiked = state.liked[key] ?? false
+      const nowCoins = state.coins[key] ?? 0
+      const nowFaved = state.faved[key] ?? false
+      if (needLike && nowLiked) setLikeDelta((n) => n + 1)
+      if (needCoin && nowCoins !== haveCoins) setCoinDelta((n) => n + nowCoins - haveCoins)
+      if (needFav && nowFaved) setFavDelta((n) => n + 1)
+
+      if (nowLiked && nowCoins >= 2 && nowFaved) {
         setBurst((n) => n + 1)
         toastDone('一键三连', '点赞、投币、收藏都已确认')
         return
       }
-      // 失败可能是服务端拒绝，也可能是回执未知。先以账号关系为准，
-      // 避免界面亮着实际没生效，也避免用户重试时重复投币。
-      await useReactionStore.getState().refresh([key]).catch(() => {})
-      if (trackKeyRef.current !== key) return
+      const results = [
+        { label: '点赞', ok: nowLiked },
+        { label: '投币', ok: nowCoins >= 2 },
+        { label: '收藏', ok: nowFaved },
+      ]
+      const failed = results.filter((item) => !item.ok).map((item) => item.label)
       const done = results.filter((item) => item.ok).map((item) => item.label)
       toastWarn(
         `未确认：${failed.join('、')}`,
@@ -494,6 +486,10 @@ export function WatchView({
     }
     setPickingFav(true)
   }
+  useEffect(() => {
+    setWatchSeekHandler(seekToPart)
+    return () => setWatchSeekHandler(null)
+  })
   // 按 E 等于点收藏：走同一条路，需要选收藏夹时照样弹窗。
   const openFavRef = useRef(openFav)
   openFavRef.current = openFav
@@ -729,7 +725,6 @@ export function WatchView({
           退出网页全屏
         </button>
       ) : null}
-      <TripleBurst run={burst} />
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       <Modal
         open={pickingPage && data !== null}
@@ -880,6 +875,7 @@ export function WatchView({
               onLike={like}
               onFav={openFav}
               onTriple={triple}
+              burst={burst}
               onSeek={seekTo}
               ownerRow={
                 <div className="xl:hidden">
@@ -922,7 +918,7 @@ export function WatchView({
                 trackKey={track.key}
                 ownerMid={data?.owner_mid ?? null}
                 pages={data?.pages ?? []}
-                onSeek={seekFromComment}
+                onSeek={seekToPart}
                 note={watchNote}
                 onNote={openNote}
                 onBackToComment={backToComment}
@@ -944,7 +940,7 @@ export function WatchView({
                 key={watchNote.id}
                 note={watchNote}
                 pages={data?.pages ?? []}
-                onSeek={seekFromComment}
+                onSeek={seekToPart}
                 onBack={backToComment}
               />
             ) : null}

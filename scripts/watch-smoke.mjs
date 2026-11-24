@@ -504,6 +504,42 @@ async function checkLibraryShelf(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkStageMoments(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?multiP=1`)}`)
+  const waitFor = async (expression) => {
+    for (let i = 0; i < 100; i += 1) {
+      if (await page.evaluate(expression)) return true
+      await sleep(80)
+    }
+    return false
+  }
+  await waitFor(`location.search.includes('multiP') && !!document.querySelector('main h2')`)
+  await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
+    .then(([app, catalog]) => app.useAppStore.getState().navigate({
+      kind: 'watch', track: catalog.trackByTitle('漠河舞厅'), page: 2,
+    }))`)
+  const canListen = await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === '听视频')`)
+  if (canListen) await page.clickExactText('听视频')
+  await waitFor(`!!document.querySelector('[aria-label="打开播放舞台"]')`)
+  await page.evaluate(`document.querySelector('[aria-label="打开播放舞台"]')?.click()`)
+  const moment = `document.querySelector('.stage button[aria-label="跳到 0:19，尾奏适合循环"]')`
+  const correctPart = await waitFor(`!!${moment}`)
+  check('无歌词时只用当前 P 的弹幕选听点', correctPart &&
+    await page.evaluate(`document.querySelector('.stage [aria-label="弹幕听点"]').innerText.includes('这段变奏好喜欢')`))
+  if (!correctPart) return
+  check('中点是倒数或标点时改选附近原话，计数仍包含六条弹幕',
+    await page.evaluate(`document.querySelector('.stage button[aria-label="跳到 0:05，这段变奏好喜欢"]')?.innerText.includes('6 条')`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="暂停"]')?.click()`)
+  await page.evaluate(`${moment}.click()`)
+  check('点弹幕听点定位到原话时间，同时标出当前片段', await waitFor(`
+    ${moment}.getAttribute('aria-current') === 'time' &&
+    document.querySelector('.stage [aria-label="播放进度"]').getAttribute('aria-valuetext') === '0:19'`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="关闭弹幕"]')?.click()`)
+  check('舞台关闭弹幕后不再列出观众原话', await waitFor(`
+    !document.querySelector('.stage [aria-label="弹幕听点"]') && document.querySelector('.stage')?.innerText.includes('暂无匹配歌词')`))
+  await page.evaluate(`document.querySelector('.stage button[aria-label="打开弹幕"]')?.click()`)
+}
+
 async function checkStageLyrics(page) {
   await page.viewport(1320, 900)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
@@ -3673,69 +3709,16 @@ async function checkTriple(page) {
     return false
   }
   await page.viewport(1440, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
-  await sleep(2200)
-  const opened = await page.evaluate(`(() => {
-    const cards = [...document.querySelectorAll('[data-track-card]')]
-    const card = cards[1]
-    const hit = card?.querySelector('button')
-    hit?.click()
-    return !!hit
-  })()`)
-  const ready = opened && await waitFor(`!!document.querySelector('[data-triple]')`)
-  const clicked = ready && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.click()
-    return !!hit
-  })()`)
-  const confirmed = await waitFor(
-    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
-  )
-  const state = await page.evaluate(`(() => ({
-    like: document.querySelector('button[aria-label="取消点赞"]') !== null,
-    coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
-    fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
-    tripleFocusable: document.querySelector('[data-triple]')?.tabIndex === 0,
-  }))()`)
-  check(
-    '三连三项都确认后才显示完成',
-    clicked && confirmed && state.like && state.coin && state.fav && state.tripleFocusable,
-  )
-  if (!confirmed || !state.like || !state.coin || !state.fav) console.log(state)
-
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&failCoin=1`)}`)
-  await sleep(2200)
-  const openedFail = await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
-    hit?.click()
-    return !!hit
-  })()`)
-  const failReady = openedFail && await waitFor(`!!document.querySelector('[data-triple]')`)
-  const failClicked = failReady && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.click()
-    return !!hit
-  })()`)
-  const partial = await waitFor(
-    `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
-  )
-  check('三连部分失败列出未确认项，不播完成提示', failClicked && partial)
-
-  const resetWatch = async () => {
-    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1`)}`)
-    await sleep(2200)
-    const openedCard = await page.evaluate(`(() => {
-      const hit = [...document.querySelectorAll('[data-track-card]')][1]?.querySelector('button')
-      hit?.click()
-      return !!hit
-    })()`)
-    const ready = openedCard && await waitFor(`!!document.querySelector('[data-triple]')`)
-    await sleep(500)
-    return ready
+  const resetWatch = async (query = '') => {
+    await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1${query}`)}`)
+    const card = "document.querySelectorAll('[data-track-card]')[1]?.querySelector('button')"
+    if (!await waitFor(`!!${card}`)) return false
+    await page.evaluate(`${card}.click()`)
+    return waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="点赞"]')`)
   }
   const likePoint = () =>
     page.evaluate(`(() => {
-      const box = document.querySelector('button[aria-label="点赞"]')?.getBoundingClientRect()
+      const box = document.querySelector('.bili-tri-like')?.closest('button')?.getBoundingClientRect()
       return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null
     })()`)
   const press = (point) =>
@@ -3744,13 +3727,16 @@ async function checkTriple(page) {
     page.mouseEvent({ type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 })
   const tripleState = () =>
     page.evaluate(`(() => ({
-      like: document.querySelector('button[aria-label="取消点赞"]') !== null,
-      coin: document.querySelector('button[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
-      fav: document.querySelector('button[aria-label="取消收藏"]') !== null,
+      like: document.querySelector('.bili-tri-btn[aria-label="取消点赞"]') !== null,
+      coin: document.querySelector('.bili-tri-btn[aria-label="投币"]')?.getAttribute('aria-pressed') === 'true',
+      fav: document.querySelector('.bili-tri-btn[aria-label="取消收藏"]') !== null,
       toast: document.body.innerText.includes('点赞、投币、收藏都已确认'),
+      burst: document.querySelectorAll('.bili-tri-celebrate').length,
     }))()`)
 
   const shortReady = await resetWatch()
+  const standalone = await page.evaluate(`!!document.querySelector('button[aria-label="一键三连"], [data-triple]')`)
+  check('三连手势只占用点赞入口', shortReady && !standalone)
   const shortPoint = await likePoint()
   if (shortPoint) {
     await press(shortPoint)
@@ -3768,7 +3754,12 @@ async function checkTriple(page) {
   const longPoint = await likePoint()
   if (longPoint) {
     await press(longPoint)
-    await sleep(650)
+    await sleep(100)
+    const charging = await page.evaluate(`document.querySelectorAll('.bili-tri-charge').length === 3 &&
+      document.querySelectorAll('.bili-tri-celebrate').length === 0 &&
+      !document.querySelector('.bili-tri-btn[aria-pressed="true"]')`)
+    check('长按时三枚图标蓄力，未提交前不点亮', charging)
+    await sleep(550)
     await release(longPoint)
   }
   const longConfirmed = await waitFor(
@@ -3777,7 +3768,7 @@ async function checkTriple(page) {
   const longState = await tripleState()
   check(
     '按住越过 550ms 触发三连，松手不会取消点赞',
-    longReady && longPoint && longConfirmed && longState.like && longState.coin && longState.fav,
+    longReady && longPoint && longConfirmed && longState.like && longState.coin && longState.fav && longState.burst === 3,
   )
 
   const cancelReady = await resetWatch()
@@ -3798,7 +3789,7 @@ async function checkTriple(page) {
 
   const changedReady = await resetWatch()
   const changed = await page.evaluate(`(() => {
-    const like = document.querySelector('button[aria-label="点赞"]')
+    const like = document.querySelector('.bili-tri-btn[aria-label="点赞"]')
     const next = document.querySelector('[data-related-item]')
     like?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
     next?.click()
@@ -3810,17 +3801,77 @@ async function checkTriple(page) {
   )
   check('按住时换稿取消本次三连', changedReady && changed && !changedToast)
 
-  const keyboardReady = await resetWatch()
-  const keyboardClicked = keyboardReady && await page.evaluate(`(() => {
-    const hit = document.querySelector('[data-triple]')
-    hit?.focus()
-    return document.activeElement === hit
-  })()`)
-  await page.pressSpace()
-  const keyboardConfirmed = await waitFor(
-    `document.body.innerText.includes('点赞、投币、收藏都已确认')`,
+  const failReady = await resetWatch('&failCoin=1')
+  const counts = () => page.evaluate(`[...document.querySelectorAll('.bili-tri-btn')].map(el => Number(el.textContent.trim()))`)
+  const beforeFail = await counts()
+  const failPoint = await likePoint()
+  if (failPoint) {
+    await press(failPoint)
+    await sleep(650)
+    await release(failPoint)
+  }
+  const partial = await waitFor(
+    `document.body.innerText.includes('未确认：投币') && document.body.innerText.includes('已确认：点赞、收藏')`,
   )
-  check('键盘可在三连按钮上直接触发', keyboardClicked && keyboardConfirmed)
+  const failed = await tripleState()
+  check('投币失败只保留点赞、收藏；不播放三连动效', failReady && partial &&
+    failed.like && !failed.coin && failed.fav && !failed.toast && failed.burst === 0)
+
+  const afterFail = await counts()
+  check('部分成功的点赞和收藏数字随回执增加', afterFail[0] === beforeFail[0] + 1 &&
+    afterFail[1] === beforeFail[1] && afterFail[2] === beforeFail[2] + 1)
+
+  await page.evaluate(`history.replaceState(null, '', ${JSON.stringify(`${WEB}?loggedIn=1`)})`)
+  const retryPoint = await likePoint()
+  if (retryPoint) {
+    await press(retryPoint)
+    await sleep(650)
+    await release(retryPoint)
+  }
+  const recovered = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  const afterRetry = await counts()
+  check('重试只补缺少的两枚币', recovered && afterRetry[0] === afterFail[0] &&
+    afterRetry[1] === afterFail[1] + 2 && afterRetry[2] === afterFail[2])
+
+  const oneCoinReady = await resetWatch()
+  const beforeCoin = await counts()
+  await page.evaluate(`document.querySelector('.bili-tri-btn[aria-label="投币"]').click()`)
+  await page.clickExactText('投 1 枚')
+  await waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="取消点赞"]')`)
+  const afterCoin = await counts()
+  check('投一枚并同时点赞后，两项数字同步增加', oneCoinReady &&
+    afterCoin[0] === beforeCoin[0] + 1 && afterCoin[1] === beforeCoin[1] + 1)
+  const topUpPoint = await likePoint()
+  if (topUpPoint) {
+    await press(topUpPoint)
+    await sleep(650)
+    await release(topUpPoint)
+  }
+  const toppedUp = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  const afterTopUp = await counts()
+  check('已投一枚时三连只补一枚', toppedUp && afterTopUp[0] === afterCoin[0] &&
+    afterTopUp[1] === afterCoin[1] + 1 && afterTopUp[2] === afterCoin[2] + 1)
+
+  const keyboardReady = await resetWatch()
+  await page.evaluate(`document.querySelector('.bili-tri-btn[aria-label="点赞"]').focus()`)
+  await page.pressSpace()
+  const keyboardShort = await waitFor(`!!document.querySelector('.bili-tri-btn[aria-label="取消点赞"]')`)
+  const onlyLiked = await tripleState()
+  check('聚焦点赞后轻按空格只点赞', keyboardReady && keyboardShort && !onlyLiked.coin && !onlyLiked.fav)
+  await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
+  const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }
+  await page.keyEvent({ ...enter, type: 'keyDown' })
+  await sleep(120)
+  const still = await page.evaluate(`getComputedStyle(document.querySelector('.bili-tri-charge circle')).animationName === 'none'`)
+  await page.keyEvent({ ...enter, type: 'keyDown', autoRepeat: true })
+  const keyConfirmed = await waitFor(`document.body.innerText.includes('点赞、投币、收藏都已确认')`)
+  await page.keyEvent({ ...enter, type: 'keyUp' })
+  const afterKey = await tripleState()
+  check('按住回车触发三连，按键重复和松开不反转', keyConfirmed && afterKey.like && afterKey.coin && afterKey.fav)
+  const reducedBurst = await page.evaluate(`[...document.querySelectorAll('.bili-tri-celebrate')]
+    .every(el => getComputedStyle(el).animationName === 'none' && getComputedStyle(el, '::after').animationName === 'none')`)
+  check('减少动态效果时保留按住提示和完成状态', still && afterKey.burst === 3 && reducedBurst)
+  await page.emulateMedia([])
 }
 
 /** 榜单首屏骨架必须和真实首行同起点，页首和分区在数据到达前后不跳。 */
@@ -4132,16 +4183,55 @@ async function checkProfileSettings(page) {
   await page.viewport(1320, 900)
 }
 
-async function checkCommentPauseIntent(page) {
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
-  const waitFor = async (expression) => {
+function watchUiWait(page) {
+  return async (expression) => {
     const deadline = Date.now() + 8000
     while (Date.now() < deadline) {
-      if (await page.evaluate(expression)) return
+      if (await page.evaluate(`Boolean(${expression})`)) return true
       await sleep(50)
     }
-    throw new Error(`评论切 P 验收超时：${expression}`)
+    throw new Error(`观看页验收超时：${expression}`)
   }
+}
+
+async function checkWatchLink(page) {
+  const waitFor = watchUiWait(page)
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const input = `document.querySelector('[aria-label="顶栏搜索"]')`
+  await waitFor(`location.search.includes('commentJumps') && ${input}`)
+  const submit = async (text, action) => {
+    await page.evaluate(`(() => {
+      const input = ${input}
+      input.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(text)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    const button = `${input}.form.querySelector('button[type="submit"]')`
+    await waitFor(`${button}.textContent === ${JSON.stringify(action)} && !${button}.disabled`)
+    await page.evaluate(`${button}.click()`)
+  }
+  await submit('晴天', '搜索')
+  const result = "document.querySelector('[data-search-results] [data-track-card]')"
+  check('普通搜索词仍展示视频结果', await waitFor(`${result}?.dataset.trackTitle?.includes('晴天')`))
+
+  const key = await page.evaluate(`${result}.dataset.key`)
+  const link = `https://www.bilibili.com/video/${key}?p=2&t=77`
+  const last = "performance.getEntriesByName('comment-page-ready').at(-1)?.detail"
+  const activePart = "document.querySelector('[data-watch-pages] button[aria-pressed=true]')?.innerText"
+  const target = `${activePart}?.includes('P2') && ${last}?.page === 2 && ${last}?.at === 77000`
+  await submit(link, '打开视频')
+  check('顶栏分享链接打开 P2 并向播放引擎传入 1:17', await waitFor(target))
+
+  await page.evaluate(`document.querySelector('[data-watch-pages] ol button').click()`)
+  await waitFor(`${activePart}?.includes('P1') && ${last}?.page === 1`)
+  await submit(link, '打开视频')
+  check('手动切到 P1 后重贴同一链接，回到 P2 的 1:17', await waitFor(target))
+}
+
+async function checkCommentPauseIntent(page) {
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?commentJumps=1`)}`)
+  const waitFor = watchUiWait(page)
   await waitFor('location.search.includes("commentJumps") && !!document.querySelector("main h2")')
   await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
     .then(([app, catalog]) => app.useAppStore.getState().navigate({ kind: 'watch', track: catalog.CATALOG[0], page: 1 }))`)
@@ -4185,8 +4275,16 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--watch-link-only')) {
+      await checkWatchLink(page)
+      return
+    }
     if (process.argv.includes('--comment-pause-only')) {
       await checkCommentPauseIntent(page)
+      return
+    }
+    if (process.argv.includes('--stage-moments-only')) {
+      await checkStageMoments(page)
       return
     }
     if (channelOnly) {
@@ -4227,9 +4325,11 @@ async function main() {
     }
     await checkLibraryPartial(page)
     if (libraryPartialOnly) return
+    await checkWatchLink(page)
     await checkCommentPauseIntent(page)
     await checkLibraryShelf(page)
     await checkStageLyrics(page)
+    await checkStageMoments(page)
     await checkStageMorph(page)
     await checkHeroAllocation(page)
     await checkAuthorHero(page)

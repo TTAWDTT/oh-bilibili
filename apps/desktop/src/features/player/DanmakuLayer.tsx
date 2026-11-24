@@ -12,47 +12,52 @@ import { withLocalEchoes } from './danmakuMerge'
 
 const EMPTY: never[] = []
 
-export function DanmakuLayer({ trackKey, page }: { trackKey: string; page: PageRef | null }) {
-  const [items, setItems] = useState<DanmakuItem[]>([])
+export function useStageDanmaku(trackKey: string | undefined, page: PageRef | null) {
+  const [loaded, setLoaded] = useState<{
+    trackKey: string
+    cid: number | undefined
+    items: DanmakuItem[]
+  } | null>(null)
   const enabled = useDanmakuSettings((s) => s.enabled)
-  const opacity = useDanmakuSettings((s) => s.opacity)
-  const size = useDanmakuSettings((s) => s.size)
-  const speed = useDanmakuSettings((s) => s.speed)
-  const mergeSame = useDanmakuSettings((s) => s.mergeSame)
   const blockWords = useDanmakuSettings((s) => s.blockWords)
   const blockTypes = useDanmakuSettings((s) => s.blockTypes)
-  const playbackRate = usePlayerStore((s) => s.snapshot?.speed ?? 1)
-  const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
   const cid = page?.cid
-  const key = danmakuPartKey(trackKey, page?.no)
+  const key = trackKey ? danmakuPartKey(trackKey, page?.no) : ''
   const sent = useSentDanmaku((s) => s.byTrack[key] ?? EMPTY)
 
   useEffect(() => {
+    if (!enabled || !trackKey) return
     let cancelled = false
-    setItems([])
-    void ipc
-      .danmakuColored(trackKey, cid)
+    void ipc.danmakuColored(trackKey, cid)
       .then((list) => {
-        if (!cancelled) setItems(toDanmakuItems(list))
+        if (!cancelled) setLoaded({ trackKey, cid, items: toDanmakuItems(list) })
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [trackKey, cid])
+  }, [trackKey, cid, enabled])
 
-  // 必须 memo：不 memo 的话每次渲染都是新数组，DanmakuField 里的定时器
-  // 会被反复销毁重建，永远等不到第一次触发。
-  const all = useMemo(
-    () => withLocalEchoes(items, sent.map((s) => ({ ...s, mode: 1, own: true }))),
-    [items, sent],
-  )
-  /** 听歌舞台和观看页共用同一份屏蔽规则；热度与列表不受影响。 */
-  const visible = useMemo(() => filterDanmaku(all, blockWords, blockTypes), [all, blockWords, blockTypes])
+  const items = loaded && loaded.trackKey === trackKey && loaded.cid === cid ? loaded.items : EMPTY
+  return useMemo(() => {
+    if (!enabled || !trackKey) return EMPTY
+    const all = withLocalEchoes(items, sent.map((s) => ({ ...s, mode: 1, own: true })))
+    return filterDanmaku(all, blockWords, blockTypes)
+  }, [enabled, trackKey, items, sent, blockWords, blockTypes])
+}
+
+export function DanmakuLayer({ items }: { items: DanmakuItem[] }) {
+  const enabled = useDanmakuSettings((s) => s.enabled)
+  const opacity = useDanmakuSettings((s) => s.opacity)
+  const size = useDanmakuSettings((s) => s.size)
+  const speed = useDanmakuSettings((s) => s.speed)
+  const mergeSame = useDanmakuSettings((s) => s.mergeSame)
+  const playbackRate = usePlayerStore((s) => s.snapshot?.speed ?? 1)
+  const playing = usePlayerStore((s) => s.snapshot?.phase === 'playing')
 
   return (
     <DanmakuField
-      items={visible}
+      items={items}
       position={readPlayhead}
       playing={playing}
       enabled={enabled}

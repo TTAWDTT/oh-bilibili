@@ -9,7 +9,7 @@ import type { LyricDoc } from '../../shared/lib/contract'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
 import { DanmakuComposer } from './DanmakuComposer'
-import { DanmakuLayer } from './DanmakuLayer'
+import { DanmakuLayer, useStageDanmaku } from './DanmakuLayer'
 import { DanmakuPanel } from './DanmakuPanel'
 import { LevelBars } from './LevelBars'
 import { VideoInfo } from './VideoInfo'
@@ -53,6 +53,7 @@ export function StageView() {
   const cid = snapshot?.page?.cid
   const trackKey = track?.key
   const local = snapshot?.local ?? false
+  const danmaku = useStageDanmaku(open && !local ? trackKey : undefined, snapshot?.page ?? null)
   const exitStage = useCallback(() => setStage(false), [setStage])
   const { requestClose, closeNow } = useStageCoverMorph({
     open,
@@ -207,7 +208,7 @@ export function StageView() {
         {!local && (
           <>
             <div className="relative min-w-0 flex-1 overflow-hidden self-stretch">
-              <DanmakuLayer trackKey={track.key} page={snapshot?.page ?? null} />
+              <DanmakuLayer items={danmaku} />
             </div>
             <DanmakuPanel />
           </>
@@ -288,6 +289,7 @@ export function StageView() {
             <div className={relatedOpen ? 'hidden h-full' : 'h-full'}>
               <StageLyrics
                 lines={lines}
+                danmaku={danmaku}
                 synced={Boolean(doc?.synced)}
                 active={active}
                 loading={lyricsLoading}

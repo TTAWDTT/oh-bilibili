@@ -13,3 +13,14 @@ export function setWatchFavHandler(next: (() => void) | null): void {
 export function watchFav(): void {
   favHandler?.()
 }
+
+type WatchSeek = (atMs: number, page: number) => void
+let seekHandler: WatchSeek | null = null
+
+export function setWatchSeekHandler(next: WatchSeek | null): void {
+  seekHandler = next
+}
+
+export function seekCurrentWatch(atMs: number, page: number): void {
+  seekHandler?.(atMs, page)
+}

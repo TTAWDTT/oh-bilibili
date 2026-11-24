@@ -67,28 +67,36 @@ export function HomeView() {
   const [hero, setHero] = useState<Track[]>(feedMemory.hero)
   const [wideHero, setWideHero] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const [heroLoading, setHeroLoading] = useState(false)
-  const directoryReturn = useRef(useAppStore.getState().returnFocus?.id.startsWith('directory:')).current
-  const [resume, setResume] = useState<Resume | null>(directoryReturn ? feedMemory.resume : null)
+  // 从分 P 目录或首推返回时保留原卡位，新产生的观看历史不应把焦点目标顶走。
+  const keepLayout = useRef(/^(directory|hero|hero-quote|hero-author|herocard):/.test(useAppStore.getState().returnFocus?.id ?? '')).current
+  const [resume, setResume] = useState<Resume | null>(keepLayout ? feedMemory.resume : null)
   // 续播位独立于推荐：换推荐不能动它，推荐失败也不影响它。
   useEffect(() => {
-    if (directoryReturn) return
+    if (keepLayout) return
     feedMemory.resume = null
     let alive = true
     void ipc
       .libraryHistoryTimed(12)
-      .then((list) => {
-        if (alive) {
-          feedMemory.resume = resumeFrom(list)
+      .then(async (list) => {
+        if (!alive) return
+        const next = resumeFrom(list)
+        feedMemory.resume = next
+        setResume(next)
+        if (!next?.page) return
+        const meta = await ipc.videoMeta(next.entry.track.key)
+        const partTitle = meta.pages.find((part) => part.no === next.page)?.title.trim()
+        if (alive && partTitle && partTitle !== next.entry.track.title) {
+          feedMemory.resume = { ...next, partTitle }
           setResume(feedMemory.resume)
         }
       })
       .catch(() => {
-        // 历史读不到就让推荐占满首屏
+        // 历史和分 P 名称分别到达；详情失败时仍可用现有断点续播。
       })
     return () => {
       alive = false
     }
-  }, [directoryReturn])
+  }, [keepLayout])
 
   const openResume = (item: Resume): void => {
     if (item.watching) {
@@ -454,14 +462,14 @@ export function HomeView() {
       ) : null}
       {scope === 0 && slow && !attempt.current.append ? slowNotice : null}
 
-      {scope === 0 && resume ? (
+      {scope === 0 && resume && !wideHero ? (
         <div className="px-4 pt-4 md:px-8 lg:hidden">
           <ResumeCard compact resume={resume} onOpen={openResume} />
         </div>
       ) : null}
 
       {/* 推荐单独失败时，续播卡不跟着消失。 */}
-      {scope === 0 && resume && hero.length === 0 ? (
+      {scope === 0 && resume && wideHero && hero.length === 0 ? (
         <div className="px-4 pt-4 md:px-8">
           <div className="hidden max-w-[560px] lg:block">
             <ResumeCard resume={resume} onOpen={openResume} />
@@ -508,7 +516,7 @@ export function HomeView() {
                     ? { kind: 'watch', track, page: start.page, atMs: start.atMs }
                     : { kind: 'watch', track },
                   undefined,
-                  `hero:${track.key}`,
+                  `${start ? 'hero-quote' : 'hero'}:${track.key}`,
                 )
               }
             />
@@ -564,7 +572,7 @@ export function HomeView() {
                       navigate(
                         { kind: 'watch', track: target, page: start.page, atMs: start.atMs },
                         undefined,
-                        `hero:${target.key}`,
+                        `hero-quote:${target.key}`,
                       )
                     }
                   />

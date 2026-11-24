@@ -111,14 +111,13 @@ export const useReactionStore = create<ReactionStore>()((set, get) => ({
   toggleFav: async (track) => {
     const previous = get().faved[track.key] ?? false
     const next = !previous
-    set((state) => ({ faved: { ...state.faved, [track.key]: next } }))
     try {
       await ipc.favSet(track.key, next)
     } catch (cause) {
-      set((state) => ({ faved: { ...state.faved, [track.key]: previous } }))
       toastFailure(next ? '收藏' : '取消收藏', cause)
       return null
     }
+    set((state) => ({ faved: { ...state.faved, [track.key]: next } }))
     return next
   },
 }))
