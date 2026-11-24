@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { join } from 'node:path'
 
 export async function checkSocialPages(page, web, wait, check) {
@@ -146,12 +147,45 @@ export async function checkSocialPages(page, web, wait, check) {
   await byName('body', '退出登录')
   await wait(`!${field} && !${first} && !${log}`)
   check('退出账号后联系人、聊天记录和输入框一起收起', true)
-  await newPage('loggedIn=1&spaceShowcase=1')
+  await newPage('loggedIn=1&spaceShowcase=1&failSpaceProfileOnce=1')
   await openSpace()
   await wait(element('[data-space-banner]'))
   const hero = element('[data-author-hero]')
   await wait(`${hero}?.textContent.includes('置顶投稿')`)
   check('作者设置的头图与置顶投稿出现在个人空间', true)
+  const banner = element('[data-space-banner]')
+  await wait(`${banner}.currentSrc.endsWith('precious-editing-desk.webp') && ${banner}.naturalWidth > 0`)
+  await wait(element('[data-space-notice]'))
+  check('页首展示公开公告、轮播间、挂件和有效会员标识', await page.evaluate(`!!document.querySelector('[aria-label="打开直播间：剪辑室"]') &&
+    !!document.querySelector('[alt="箱庭少女之梦头像"]') && !!document.querySelector('[alt="十年大会员"]') && !!document.querySelector('[title="见习偶像"]')`))
+  await byName('#scroll-main', '空间资料')
+  await wait(buttons('#scroll-main', '重新加载空间资料'))
+  check('扩展资料取不到时仍可看公告、置顶投稿及 B 站空间', await page.evaluate(`!!${hero} && !!${element('[data-space-notice]')} && !!(${buttons('#scroll-main', '去 B 站空间查看勋章')})`))
+  await byName('#scroll-main', '重新加载空间资料')
+  await wait(buttons('#scroll-main', '充电'))
+  check('资料重试成功后显示公开生日、充电和已佩戴粉丝牌', await page.evaluate(`document.querySelector('section[aria-label="空间资料"]').textContent.includes('05-16') &&
+    document.querySelector('[title="佩戴的粉丝勋章"]').textContent.includes('剪辑 18')`))
+  await page.viewport(390, 844)
+  await wait(`${banner}.currentSrc.endsWith('cover-fallback.jpg') && ${banner}.naturalWidth > 0`)
+  check('窄窗使用独立小头图，资料没有撑宽窗口', await page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+  await page.viewport(1320, 900)
+  await byName('#scroll-main', '空间资料')
+  const missing = createServer((_, res) => { res.writeHead(404); res.end() })
+  await new Promise(resolve => missing.listen(0, '127.0.0.1', resolve))
+  try {
+    const absent = JSON.stringify(`http://127.0.0.1:${missing.address().port}/missing-banner.webp`)
+    await page.evaluate(`${banner}.src = ${absent}`)
+    await wait(`${banner}?.currentSrc.endsWith('cover-fallback.jpg') && ${banner}.naturalWidth > 0`)
+    check('宽窗大图返回 404 后继续显示有效的小头图', true)
+    await newPage('loggedIn=1&spaceShowcase=1')
+    await page.viewport(390, 844)
+    await openSpace()
+    await wait(`${banner}?.currentSrc.endsWith('cover-fallback.jpg') && ${banner}.naturalWidth > 0`)
+    await page.evaluate(`${banner}.previousElementSibling.srcset = ${absent}`)
+    await wait(`${banner}?.currentSrc.endsWith('precious-editing-desk.webp') && ${banner}.naturalWidth > 0`)
+    check('窄窗小图返回 404 后继续显示有效的大头图', true)
+    await page.viewport(1320, 900)
+  } finally { missing.close() }
   await byName('#scroll-main', '代表作')
   await wait(element('[data-track-card]'))
   check('代表作可从空间内容栏单独查看', await page.evaluate(`(${buttons('#scroll-main', '代表作')}).getAttribute('aria-pressed') === 'true'`))
@@ -166,6 +200,13 @@ export async function checkSocialPages(page, web, wait, check) {
   await wait(`${work}?.getAttribute('aria-label') === ${JSON.stringify(title)}`)
   check('点开合集作品后返回同一目录', true)
 
+  await byName('body', '账号菜单')
+  await byName('body', '个人空间')
+  await byName('#scroll-main', '空间资料')
+  await wait(`document.querySelector('section[aria-label="空间资料"]').textContent.includes('生日')`)
+  check('自己的空间显示公开资料，收起给自己发消息、充电和关注的动作', await page.evaluate(`
+    document.querySelector('section[aria-label="空间资料"]').textContent.includes('1960976249') &&
+    !(${buttons('#scroll-main', '充电')}) && !(${buttons('#scroll-main', '发消息')}) && !(${buttons('#scroll-main', '关注')})`))
   await newPage('loggedIn=1&spaceEmpty=1')
   await openSpace()
   await wait(buttons('#scroll-main', '发消息'))
