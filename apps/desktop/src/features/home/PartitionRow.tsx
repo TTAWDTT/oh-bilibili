@@ -3,25 +3,18 @@ import { TrackDirectory } from '../tracks/TrackDirectory'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
-import { partColor } from '../../shared/lib/biliParts'
 import { formatCount, formatDuration } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import { Cover } from '../../shared/ui/Cover'
 import { Icon } from '../../shared/ui/Icon'
-import type { IconName } from '../../shared/ui/Icon'
-
-const FLOOR_ICONS: Record<string, IconName> = {
-  动画: 'biliTv',
-  音乐: 'music',
-  游戏: 'game',
-}
 
 type PartitionRowProps = {
   rid: number
   title: string
+  illustration: string
 }
 
-export function PartitionRow({ rid, title }: PartitionRowProps) {
+export function PartitionRow({ rid, title, illustration }: PartitionRowProps) {
   const navigate = useAppStore((state) => state.navigate)
   const [tracks, setTracks] = useState<Track[] | null>(null)
 
@@ -45,13 +38,7 @@ export function PartitionRow({ rid, title }: PartitionRowProps) {
     <section className="mt-8 px-4 md:px-8">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-[17px] font-medium text-[var(--text-1)]">
-          <span
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-white"
-            style={{ background: partColor(title) }}
-          >
-            <Icon name={FLOOR_ICONS[title] ?? 'biliTv'} size={16} />
-          </span>
+          <img src={`/assets/illustrations/${illustration}.png`} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
           {title}
         </h2>
         <button

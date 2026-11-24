@@ -382,15 +382,13 @@
   animation: bili-live-pulse 1.6s ease-in-out infinite;
 }
 
-/* 顶栏的小电视：每 7 秒眨一次，和图标的眼睛节奏对齐 */
-.bili-tv-mark {
-  display: inline-flex;
-  animation: bili-tv-mark-blink 7s ease-in-out infinite;
-}
-
-@keyframes bili-tv-mark-blink {
-  0%, 90%, 100% { opacity: 1; }
-  94% { opacity: 0.45; }
+@media (min-width: 1024px) {
+  [data-hot-page="weekly"] {
+    background-image: url('/assets/illustrations/weekly-projector.png');
+    background-position: right 2rem center;
+    background-repeat: no-repeat;
+    background-size: auto 38px;
+  }
 }
 
 /* 弹幕：从右向左匀速穿过，带一点描边保证在封面背景上可读 */

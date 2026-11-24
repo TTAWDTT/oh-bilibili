@@ -324,7 +324,7 @@ export function TitleBar() {
       onPointerDown={overlayTitleBar ? drag.onPointerDown : undefined}
       className={`safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pr-3 md:gap-4 ${overlayTitleBar ? 'pl-[74px] md:pl-[80px]' : 'pl-3'}`}
     >
-      <div className="flex w-16 shrink-0 items-center gap-2 sm:w-32 md:gap-4 lg:w-52">
+      <div className="flex min-w-16 shrink-0 items-center gap-2 sm:min-w-32 md:gap-4 lg:min-w-52">
         {viewing ? (
           <button
             type="button"
@@ -336,11 +336,9 @@ export function TitleBar() {
             返回
           </button>
         ) : (
-          <div className="pointer-events-none flex shrink-0 items-center gap-2">
-            <span className="bili-tv-mark text-[var(--accent)]">
-              <Icon name="biliTv" size={19} />
-            </span>
-            <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
+          <div className="pointer-events-none flex shrink-0 items-center gap-1">
+            <img src="/assets/illustrations/wink-tv.png" alt="oh-bilibili" width={24} height={24} />
+            <span aria-hidden="true" className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">oh-bilibili</span>
           </div>
         )}
 

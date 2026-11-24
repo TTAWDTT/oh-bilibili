@@ -21,9 +21,9 @@ import { formatCount, formatDuration } from '../../shared/lib/format'
 import { ResumeCard, resumeFrom, type Resume } from './ResumeCard'
 
 const PARTITION_FLOORS = [
-  { rid: 1, title: '动画' },
-  { rid: 3, title: '音乐' },
-  { rid: 4, title: '游戏' },
+  { rid: 1, title: '动画', illustration: 'animation-cels' },
+  { rid: 3, title: '音乐', illustration: 'cassette' },
+  { rid: 4, title: '游戏', illustration: 'handheld' },
 ]
 
 /** 首页推荐等这么久还没回来就提示「加载较慢」，但请求继续等，不提前判死。 */
@@ -590,7 +590,7 @@ export function HomeView() {
           <LiveRow />
           <BangumiRow />
           {PARTITION_FLOORS.map((part) => (
-            <PartitionRow key={part.rid} rid={part.rid} title={part.title} />
+            <PartitionRow key={part.rid} {...part} />
           ))}
         </>
       )}
