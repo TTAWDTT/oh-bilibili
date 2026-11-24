@@ -13,6 +13,7 @@ pub mod messages;
 pub mod direct;
 pub mod sync;
 pub mod space;
+pub mod space_catalog;
 pub mod error;
 pub mod search;
 pub mod wbi;
@@ -361,7 +362,13 @@ impl Source {
         page: u32,
         order: &str,
     ) -> Result<(Vec<Track>, u32), BiliError> {
-        self.client.space_videos(mid, page, order).await
+        self.search_space_videos(mid, page, order, "").await
+    }
+
+    pub async fn search_space_videos(
+        &self, mid: u64, page: u32, order: &str, keyword: &str,
+    ) -> Result<(Vec<Track>, u32), BiliError> {
+        self.client.space_videos(mid, page, order, keyword).await
     }
 
     /// UP 主粉丝与关注数。

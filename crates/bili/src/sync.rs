@@ -604,6 +604,7 @@ impl Client {
         mid: u64,
         page: u32,
         order: &str,
+        keyword: &str,
     ) -> Result<(Vec<bilimusic_model::Track>, u32), BiliError> {
         use bilimusic_model::{Millis, Track, TrackKey};
 
@@ -619,6 +620,7 @@ impl Client {
                     ("pn", page.max(1).to_string()),
                     ("ps", "50".to_string()),
                     ("order", order.to_string()),
+                    ("keyword", keyword.to_owned()),
                 ],
                 std::time::Duration::from_millis(400),
             )
