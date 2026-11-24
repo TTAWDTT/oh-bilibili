@@ -7,6 +7,9 @@ const threads = new Map<number, Thread>()
 let owner: number | null = null
 let nextId = 1000
 let failSend = import.meta.env.DEV && new URLSearchParams(window.location.search).has('failDirectSendOnce')
+const recallSample = import.meta.env.DEV && new URLSearchParams(window.location.search).has('directRecall')
+let firstAck = true
+let deliveredRecall = false
 
 function conversations() {
   const me = state.auth.user?.mid
@@ -46,12 +49,24 @@ export function mockDirectHistory(mid: number, cursor: unknown) {
   const messages = conversations().get(mid)?.messages ?? []
   const end = cursor ? messages.findIndex((item) => item.id === cursor) : messages.length
   const items = messages.slice(Math.max(0, end - 2), end)
-  return { items, next_cursor: end > items.length ? items[0]?.id : null, latest_seqno: items.at(-1)?.id ?? null }
+  if (recallSample && !cursor && deliveredRecall && messages.length >= 4) {
+    return { items: [], next_cursor: messages[2]!.id, latest_seqno: '9900', latest_at: messages[3]!.at + 1,
+      withdrawals: [{ target_id: messages[0]!.id, remove: false }, { target_id: messages[2]!.id, remove: true }] }
+  }
+  return { items, next_cursor: end > items.length ? items[0]?.id : null, latest_seqno: items.at(-1)?.id ?? null,
+    latest_at: items.at(-1)?.at ?? null, withdrawals: [] }
 }
 
 export function mockDirectAck(mid: number, seqno: string) {
   const chat = conversations().get(mid)
-  if (chat && chat.messages.at(-1)?.id === seqno) chat.unread = 0
+  if (recallSample && firstAck) {
+    firstAck = false
+    throw fail('internal', '暂时无法标记已读')
+  }
+  if (chat && chat.messages.at(-1)?.id === seqno) {
+    chat.unread = 0
+    if (recallSample) deliveredRecall = true
+  }
 }
 
 export function mockSendDirect(mid: number, text: string) {

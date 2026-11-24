@@ -3,16 +3,17 @@ import type { DirectPage } from '../../shared/lib/ipc'
 import { toWireError } from '../../shared/lib/errors'
 import { useAppStore } from '../../app/appStore'
 
-type Page<T> = DirectPage<T> & { latest_seqno?: string | null }
-type PageState<T> = { items: T[]; next: string | null; loaded: boolean; latestSeq: string | null }
+type Page<T> = DirectPage<T> & { latest_seqno?: string | null; latest_at?: number | null }
+type PageState<T> = { items: T[]; next: string | null; loaded: boolean; latestSeq: string | null; latestAt: number | null }
 
 /** 会话按最近联系排在前面，聊天记录按时间从旧到新。 */
 export function useDirectPages<T extends { at: number }>(
   fetchPage: (cursor: string | null) => Promise<Page<T>>,
   keyOf: (item: T) => number | string,
   newestFirst: boolean,
+  applyUpdates?: (items: T[]) => T[],
 ) {
-  const [page, setPage] = useState<PageState<T>>({ items: [], next: null, loaded: false, latestSeq: null })
+  const [page, setPage] = useState<PageState<T>>({ items: [], next: null, loaded: false, latestSeq: null, latestAt: null })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ message: string; cursor: string | null } | null>(null)
   const pending = useRef(false)
@@ -22,8 +23,9 @@ export function useDirectPages<T extends { at: number }>(
     const keys = new Set(incoming.map(keyOf))
     const rest = old.filter((item) => !keys.has(keyOf(item)))
     const items = first ? [...incoming, ...rest] : [...rest, ...incoming]
-    return items.sort((a, b) => newestFirst ? b.at - a.at : a.at - b.at)
-  }, [keyOf, newestFirst])
+    items.sort((a, b) => newestFirst ? b.at - a.at : a.at - b.at)
+    return applyUpdates ? applyUpdates(items) : items
+  }, [keyOf, newestFirst, applyUpdates])
 
   const load = useCallback(async (cursor: string | null) => {
     if (pending.current) return
@@ -41,6 +43,7 @@ export function useDirectPages<T extends { at: number }>(
           items: merge(old.items, result.items, newestFirst === (cursor === null)),
           next: overlap ? old.next : result.next_cursor,
           latestSeq: cursor === null ? result.latest_seqno ?? null : old.latestSeq,
+          latestAt: cursor === null ? result.latest_at ?? null : old.latestAt,
           loaded: true,
         }
       })
