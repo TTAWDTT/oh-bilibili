@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { DanmakuItem } from './DanmakuField'
 import { formatTime } from '../../shared/lib/format'
+import './danmaku-beats.css'
 
 const BUCKETS = 120
 const MIN_BAR_PX = 2
@@ -38,6 +39,7 @@ export function DanmakuBeats({
   const stripRef = useRef<HTMLDivElement | null>(null)
   const [active, setActive] = useState<number | null>(null)
   const [pinned, setPinned] = useState(false)
+  const [hoverTarget, setHoverTarget] = useState<number | null>(null)
 
   const bars = useMemo(() => {
     if (durationMs <= 0 || items.length === 0) return null
@@ -77,15 +79,23 @@ export function DanmakuBeats({
       return {
         ...bucket,
         height: MIN_BAR_PX + (MAX_BAR_PX - MIN_BAR_PX) * ratio,
-        opacity: 0.3 + 0.65 * ratio,
+        opacity: 0.2 + 0.28 * ratio,
       }
     })
   }, [items, durationMs])
+
+  // 斜向移入卡片时会经过相邻的柱子；仅在新时段停留后切换预览。
+  useEffect(() => {
+    if (hoverTarget === null || pinned || !enabled) return
+    const timer = window.setTimeout(() => setActive(bars?.[hoverTarget]?.count ? hoverTarget : null), 150)
+    return () => window.clearTimeout(timer)
+  }, [bars, enabled, hoverTarget, pinned])
 
   // 换 P、关弹幕、或过滤后这一段没有样本时，旧预览不能留在画面上。
   useEffect(() => {
     setActive(null)
     setPinned(false)
+    setHoverTarget(null)
   }, [resetKey])
 
   useEffect(() => {
@@ -119,14 +129,8 @@ export function DanmakuBeats({
   }
   const firstFilled = bars.findIndex((bar) => bar.count > 0)
   const shown = active !== null ? bars[active] : undefined
-  const pick = (index: number): void => {
-    if (!bars[index]?.count) {
-      setActive(null)
-      setPinned(false)
-      return
-    }
-    setActive(index)
-  }
+  const startLabel = shown && formatTime(shown.start)
+  const endLabel = shown && formatTime(shown.end)
   const close = (): void => {
     setActive(null)
     setPinned(false)
@@ -149,11 +153,16 @@ export function DanmakuBeats({
         // 都不能漏给它，否则读一条弹幕就把播放位置带走了。
         event.stopPropagation()
         if (!interactive || pinned) return
-        if ((event.target as HTMLElement).closest('[data-danmaku-preview]')) return
-        const index = bucketAt(event.clientX)
-        if (index !== null) pick(index)
+        const target = event.target as HTMLElement
+        if (target.closest('[data-danmaku-preview]')) return
+        // 窄窗的一根柱可能不到两个像素，取整的指针坐标会落进隔壁时段。
+        const index = target.dataset.bucket === undefined ? bucketAt(event.clientX) : Number(target.dataset.bucket)
+        if (index === null) return
+        if (active === null && bars[index]?.count) setActive(index)
+        setHoverTarget(active !== null && index !== active ? index : null)
       }}
       onPointerLeave={() => {
+        setHoverTarget(null)
         if (!pinned) setActive(null)
       }}
       onFocus={() => {
@@ -167,6 +176,7 @@ export function DanmakuBeats({
       }}
       onKeyDown={(event) => {
         if (!interactive) return
+        setHoverTarget(null)
         if (event.key === 'Escape') {
           event.preventDefault()
           close()
@@ -197,40 +207,44 @@ export function DanmakuBeats({
         {bars.map((bar, i) => (
           <span
             key={i}
+            data-bucket={i}
             onClick={
-              interactive
+              interactive && bar.count > 0
                 ? (event) => {
                     event.stopPropagation()
                     // 固定预览后焦点留在热度条上，Esc 才有落点。
                     stripRef.current?.focus()
-                    pick(i)
+                    setHoverTarget(null)
+                    setActive(i)
                     setPinned(true)
                   }
                 : undefined
             }
-            className={`flex-1 rounded-[1px] bg-[var(--accent)] ${
-              interactive && bar.count > 0 && i === active ? 'brightness-140' : ''
-            }`}
-            style={{ height: bar.height, opacity: bar.opacity }}
+            className="flex-1 rounded-[1px]"
+            style={{
+              height: bar.height,
+              background: interactive && i === active ? 'var(--accent)' : `rgb(255 255 255 / ${bar.opacity})`,
+            }}
           />
         ))}
       </div>
       {shown && shown.samples.length > 0 ? (
         <div
           data-danmaku-preview
+          onPointerEnter={() => setHoverTarget(null)}
           onPointerDown={(event) => event.stopPropagation()}
           onPointerUp={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           /* ui-audit-ok: 预览气泡固定深底，描边和时间都叠在这块底色上。 */
-          className="absolute bottom-full z-40 mb-2 w-[272px] -translate-x-1/2 rounded-[6px] border border-white/15 bg-black/90 p-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-          style={{
-            left: `${Math.min(88, Math.max(12, ((active ?? 0) + 0.5) * (100 / BUCKETS)))}%`,
-          }}
+          className="watch-beat-preview absolute bottom-full z-40 rounded-lg border border-white/15 bg-[#202226] px-3 py-2 text-white shadow-lg"
+          style={{ '--beat-at': `${((active ?? 0) + 0.5) * (100 / BUCKETS)}%` } as CSSProperties}
         >
-          <div className="num text-[11px] text-slate-300">
-            {formatTime(shown.start)} – {formatTime(shown.end)}
-          </div>
-          <div className="mt-1.5 flex flex-col gap-1">
+          {startLabel !== endLabel && (
+            <div className="num mb-1.5 text-[11px] text-slate-300">
+              {startLabel} – {endLabel}
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
             {shown.samples.map((line, i) => (
               <span
                 key={`${line.text}-${i}`}
@@ -250,7 +264,7 @@ export function DanmakuBeats({
               setPinned(false)
               stripRef.current?.focus()
             }}
-            className="t press mt-2.5 flex h-7 w-full items-center justify-center gap-1.5 rounded-[4px] bg-[var(--accent)] text-[12px] font-medium text-white hover:opacity-90"
+            className="t press mt-2 flex h-7 w-full items-center justify-center rounded-[4px] bg-white/10 text-[12px] font-medium text-white hover:bg-white/20"
           >
             从 {formatTime(shown.samples[0]!.at)} 播放
           </button>

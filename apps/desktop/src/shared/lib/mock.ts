@@ -563,8 +563,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return {
         images: ['https://bimp.hdslb.com/videoshotpvhdboss/43538251892_bgvhzb-0001.jpg'],
         index: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45],
-        columns: 5,
-        rows: 2,
+        columns: 10,
+        rows: 10,
         tile_w: 480,
         tile_h: 270,
       }

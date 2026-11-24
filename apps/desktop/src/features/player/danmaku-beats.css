@@ -1,0 +1,14 @@
+.watch-beat-preview {
+  --beat-card-width: min(100%, 232px);
+  width: var(--beat-card-width);
+  left: clamp(0px, calc(var(--beat-at) - var(--beat-card-width) / 2), calc(100% - var(--beat-card-width)));
+  margin-bottom: 4px;
+}
+
+/* 让热度条与气泡之间的空隙也能接住鼠标。 */
+.watch-beat-preview::after {
+  content: '';
+  position: absolute;
+  inset: 100% -1px auto;
+  height: 5px;
+}
