@@ -177,8 +177,11 @@ pub struct FavFolder {
 }
 
 /// UP 主名片。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AuthorCard {
+    pub banner_small: Option<String>,
+    pub dress: crate::space_identity::AuthorDress,
+    pub following_count: Option<u64>,
     pub banner: Option<String>,
     pub name: String,
     pub face: String,
@@ -430,8 +433,10 @@ impl Client {
             .await?;
         let card = &v["data"]["card"];
         Ok(AuthorCard {
-            banner: v["data"]["space"]["l_img"].as_str().filter(|url| !url.is_empty())
-                .map(|url| url.replacen("http://", "https://", 1)),
+            banner: crate::space_identity::image(&v["data"]["space"]["l_img"]),
+            banner_small: crate::space_identity::image(&v["data"]["space"]["s_img"]),
+            dress: crate::space_identity::AuthorDress::from_card(card),
+            following_count: card["attention"].as_u64(),
             name: card["name"].as_str().unwrap_or_default().to_string(),
             face: card["face"]
                 .as_str()
