@@ -1846,6 +1846,7 @@ async function checkSidebarMotion(page) {
       (button.getAttribute('aria-label') || button.textContent.trim()) === '个人中心')
     const read = () => ({
       edge: nav.getBoundingClientRect().right,
+      sliding: nav.getAnimations().some(animation => animation.playState === 'running'),
       content: Math.round(main.getBoundingClientRect().left),
       width: Math.round(main.getBoundingClientRect().width),
       row: Math.round(profile.getBoundingClientRect().top),
@@ -1885,7 +1886,8 @@ async function checkSidebarMotion(page) {
     Math.min(...reversed.frames.map(f => f.edge)) > close.frames.at(-1).edge &&
     reversed.frames.at(-1).edge === open.frames.at(-1).edge)
   const expanded = open.frames.at(-1)
-  const sidebarSettled = 1 + reversed.frames.findLastIndex(f => f.edge !== expanded.edge)
+  // 最后一个亚像素可能被取整到终点，此时浏览器仍未结束侧栏动画。
+  const sidebarSettled = 1 + reversed.frames.findLastIndex(f => f.sliding || f.edge !== expanded.edge)
   const contentSettled = 1 + reversed.frames.findLastIndex(f => Math.abs(f.width - expanded.width) > 1)
   check('折返后正文最晚在侧栏停下的下一帧恢复宽度',
     reversed.turned && sidebarSettled < reversed.frames.length && contentSettled < reversed.frames.length &&
