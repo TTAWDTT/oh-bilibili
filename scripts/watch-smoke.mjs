@@ -1837,11 +1837,73 @@ async function checkDiscoveryEditor(page) {
     await page.evaluate(`document.activeElement === document.querySelector(${JSON.stringify(discoveryNav + ' [aria-haspopup="dialog"]')})`))
 }
 
+async function checkSidebarMotion(page) {
+  const sample = (reverseAt = null) => page.evaluate(`(async () => {
+    const nav = document.querySelector('nav[aria-label="主导航"]')
+    const main = document.getElementById('main-content')
+    const toggle = nav.querySelector('button[aria-expanded]')
+    const profile = Array.from(nav.querySelectorAll('button')).find(button =>
+      (button.getAttribute('aria-label') || button.textContent.trim()) === '个人中心')
+    const read = () => ({
+      edge: Math.round(nav.getBoundingClientRect().right),
+      content: Math.round(main.getBoundingClientRect().left),
+      row: Math.round(profile.getBoundingClientRect().top),
+    })
+    const frames = [read()]
+    toggle.click()
+    const start = performance.now()
+    let turned = false
+    do {
+      await new Promise(requestAnimationFrame)
+      const frame = read()
+      frames.push(frame)
+      if (${reverseAt} !== null && !turned && frame.edge <= ${reverseAt}) {
+        toggle.click()
+        turned = true
+      }
+    } while (performance.now() - start < 600)
+    return { frames, turned, expanded: toggle.getAttribute('aria-expanded') }
+  })()`)
+  const close = await sample()
+  const open = await sample()
+  for (const [name, run] of [['收起', close], ['展开', open]]) {
+    const { frames } = run
+    const first = frames[0].edge
+    const last = frames.at(-1).edge
+    const moving = frames.filter(f => f.edge > Math.min(first, last) && f.edge < Math.max(first, last))
+    const towardEnd = frames.every((f, i) => !i || (f.edge - frames[i - 1].edge) * Math.sign(last - first) >= 0)
+    check(`侧栏${name}经过中间位置，正文边缘始终与它相接`,
+      new Set(moving.map(f => f.edge)).size > 1 && towardEnd &&
+      (name === '收起' ? last < first : last > first) &&
+      frames.every(f => Math.abs(f.edge - f.content) <= 1))
+  }
+  check('开合时「我的」分组下的导航按钮留在原高度', [...close.frames, ...open.frames].every(frame =>
+    Math.abs(frame.row - close.frames[0].row) <= 1))
+  const reversed = await sample((close.frames[0].edge + close.frames.at(-1).edge) / 2)
+  check('收起途中再点一次，侧栏从中途折返到展开位置', reversed.turned && reversed.expanded === 'true' &&
+    Math.min(...reversed.frames.map(f => f.edge)) > close.frames.at(-1).edge &&
+    reversed.frames.at(-1).edge === open.frames.at(-1).edge)
+
+  await page.emulateMedia([{ name: 'prefers-reduced-motion', value: 'reduce' }])
+  try {
+    const nav = `document.querySelector('nav[aria-label="主导航"]')`
+    await page.evaluate(`${nav}.querySelector('[aria-label="展开侧边栏"]')?.click()`)
+    const reduced = await sample()
+    check('减少动态效果时直接收起侧栏', reduced.expanded === 'false' &&
+      reduced.frames.at(-1).edge === close.frames.at(-1).edge &&
+      reduced.frames.every(f => f.edge === close.frames[0].edge || f.edge === close.frames.at(-1).edge))
+    await page.evaluate(`${nav}.querySelector('[aria-label="展开侧边栏"]').click()`)
+  } finally {
+    await page.emulateMedia([])
+  }
+}
+
 /** 导航约定：歌单详情仍在曲库下，观看页返回把焦点还给进来的那张卡。 */
 async function checkNavConventions(page) {
   await page.viewport(1320, 900)
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(4000)
+  await checkSidebarMotion(page)
   await page.evaluate(`(() => {
     const hit = [...document.querySelectorAll('nav[aria-label="主导航"] button')]
       .find((button) => (button.textContent || '').trim() === '曲库')
@@ -1866,12 +1928,18 @@ async function checkNavConventions(page) {
 
   await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
   await sleep(4000)
-  const opened = await page.evaluate(`(() => {
+  const opened = await page.evaluate(`(async () => {
     const card = document.querySelector('[data-track-card]')
     const button = card?.querySelector('button[aria-label^="观看"]')
-    if (!card || !button) return null
+    if (!button) return null
     button.click()
-    return card.dataset.key ?? null
+    const deadline = performance.now() + 8000
+    do {
+      await new Promise(requestAnimationFrame)
+      const like = document.querySelector('.bili-tri-btn[aria-label="点赞"]')
+      if (like?.getClientRects().length) return { key: card.dataset.key, likeX: like.getBoundingClientRect().x }
+    } while (performance.now() < deadline)
+    return null
   })()`)
   let watching = false
   for (let i = 0; i < 20 && !watching; i += 1) {
@@ -1883,6 +1951,7 @@ async function checkNavConventions(page) {
     const hit = nav?.querySelector('[aria-current="page"]')
     return {
       nav: !!nav,
+      likeX: document.querySelector('.bili-tri-btn[aria-label="点赞"]')?.getBoundingClientRect().x,
       width: nav ? Math.round(nav.getBoundingClientRect().width) : 0,
       current: hit ? hit.getAttribute('aria-label') || hit.textContent?.trim() || 'current' : '',
       currentCount: nav ? nav.querySelectorAll('[aria-current="page"]').length : 0,
@@ -1892,6 +1961,8 @@ async function checkNavConventions(page) {
     `观看页保留可收起的左栏并高亮来源 ${JSON.stringify(watchShell)}`,
     watching && watchShell.nav && watchShell.width <= 64 && watchShell.currentCount === 1,
   )
+  check('进入观看页时点赞按钮在首帧就能点中原位置',
+    opened && Math.abs(opened.likeX - watchShell.likeX) <= 1)
   await page.evaluate(
     `document.querySelector('nav[aria-label="主导航"] button[aria-label="展开侧边栏"]')?.click()`,
   )
@@ -1902,6 +1973,7 @@ async function checkNavConventions(page) {
   })()`)
   check('观看页左栏可以展开', expanded.width >= 200)
 
+  await page.evaluate(`document.querySelector('nav[aria-label="主导航"] [aria-label="收起侧边栏"]').click()`)
   await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
   await sleep(1500)
   const back = await page.evaluate(`(() => {
@@ -1914,8 +1986,12 @@ async function checkNavConventions(page) {
   })()`)
   check(
     '从观看页返回后焦点回到进来的那张卡',
-    watching && opened !== null && back.key === opened && back.label.startsWith('观看'),
+    watching && opened !== null && back.key === opened.key && back.label.startsWith('观看'),
   )
+
+  const homeToggle = `document.querySelector('nav[aria-label="主导航"] button[aria-expanded]')`
+  check('观看页收起左栏后，返回发现仍使用原来的展开设置',
+    await page.evaluate(`${homeToggle}?.getAttribute('aria-expanded') === 'true'`))
 
   await clickDiscoveryButton(page, discoveryNav, '全部分区')
   await clickDiscoveryButton(page, discoveryDirectory, '音乐')

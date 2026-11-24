@@ -461,6 +461,15 @@
  * 全部用 transform 与 opacity，不动布局，所以不会掉帧。
  */
 
+/* 封面比例已知，屏外的图片和按钮可以跳过排版。展开的菜单要能伸出封面。 */
+.bili-card-media {
+  content-visibility: auto;
+}
+
+.bili-card-media:is(:hover, :focus-within, :has([aria-expanded='true'])) {
+  content-visibility: visible;
+}
+
 .bili-card-title button {
   transition: color 120ms var(--ease);
 }
@@ -488,11 +497,44 @@
   }
 }
 
-/* 侧边栏收起/展开不做宽度过渡。
-   宽度一变，发现页那几十张卡片每帧都要重新排版，160ms 的过渡就是十来次全量
-   reflow，点起来一顿一顿的。宽度瞬切只有一次重排，文字用透明度过一下眼。 */
+.bili-workspace {
+  --sidebar-full: 208px;
+  --sidebar-rail: 60px;
+}
+
 .bili-sidebar {
+  width: var(--sidebar-full);
   contain: layout paint;
+}
+
+.bili-sidebar[data-toggled='true'] {
+  transition: width var(--dur) ease-in-out;
+}
+
+.bili-sidebar[data-collapsed='true'] {
+  width: var(--sidebar-rail);
+}
+
+/* 正文按窄栏时的宽度滑动，外层裁掉右边多出来的部分。展开结束才收窄正文，
+   避免空间页的数百张投稿在同一次开合中来回换列。 */
+.bili-sidebar + main {
+  flex: 1 0 calc(100% - var(--sidebar-rail));
+}
+
+.bili-sidebar[data-collapsed='false'] + main {
+  flex-shrink: 1;
+}
+
+.bili-sidebar[data-toggled='true'][data-collapsed='false'] + main {
+  transition: flex-shrink 0s var(--dur);
+}
+
+/* 图标列在两种宽度下一样宽，常驻滚动条占位时也能居中。 */
+.bili-sidebar-row {
+  display: grid;
+  grid-template-columns: min(43px, 100%) minmax(0, 1fr);
+  align-items: center;
+  text-align: start;
 }
 
 .bili-nav-item[aria-current="page"]::before {
@@ -507,24 +549,31 @@
 }
 
 .bili-sidebar-label {
-  animation: bili-sidebar-label-in 120ms var(--ease);
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity var(--dur) ease-in-out;
 }
 
-@keyframes bili-sidebar-label-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.bili-sidebar-chevron {
+  transition: transform var(--dur) ease-in-out;
+}
+
+.bili-sidebar[data-collapsed='true'] .bili-sidebar-label {
+  opacity: 0;
+}
+
+.bili-sidebar[data-collapsed='true'] .bili-sidebar-chevron {
+  transform: rotate(180deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bili-sidebar-label {
-    animation: none;
+  .bili-sidebar[data-toggled='true'],
+  .bili-sidebar[data-toggled='true'][data-collapsed='false'] + main,
+  .bili-sidebar-label,
+  .bili-sidebar-chevron {
+    transition: none;
   }
 }
-
 
 /* 卡片进场：错峰淡入上移。--i 是序号，由组件传入 */
 @keyframes bili-card-in {

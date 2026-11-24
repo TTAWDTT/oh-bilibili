@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { AuthModal } from '../features/auth/AuthModal'
 import { DownloadsView } from '../features/downloads/DownloadsView'
 import { AuthorView } from '../features/library/AuthorView'
@@ -16,7 +16,7 @@ import { SettingsView } from '../features/settings/SettingsView'
 import { ProfileView } from '../features/profile/ProfileView'
 import { ToastHost } from '../shared/ui/ToastHost'
 import type { View } from './appStore'
-import { glideCards, useAppStore } from './appStore'
+import { useAppStore } from './appStore'
 import { Sidebar } from './Sidebar'
 import { MobileTabBar } from './MobileTabBar'
 import { MobileRailSheet } from './MobileRailSheet'
@@ -148,20 +148,6 @@ function CurrentView({ view }: { view: View }) {
     case 'search':
       return <SearchPanel key={view.query} query={view.query} />
   }
-}
-
-/**
- * 侧栏切换后把可见卡片从旧位置滑到新位置。
- *
- * 单独做成组件：App 本身不能订阅 sidebar，否则每次开合都会把整棵页面
- * 子树重渲染一遍，比网格重排还贵。
- */
-function SidebarGlide() {
-  const sidebar = useAppStore((state) => state.sidebar)
-  useLayoutEffect(() => {
-    glideCards()
-  }, [sidebar])
-  return null
 }
 
 /**
@@ -314,7 +300,6 @@ export default function App() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden text-[var(--text-1)]"
       style={{ background: 'var(--color-ink)' }}>
-      <SidebarGlide />
       <FocusRestore />
       {/* 键盘用户跳过导航直达内容；不聚焦时不可见 */}
       <a
@@ -326,24 +311,26 @@ export default function App() {
       {osFullscreen ? null : <TitleBar />}
 
       <div className="relative z-10 flex min-h-0 flex-1">
-        {showSidebar ? <Sidebar /> : null}
-        {/*
-         * 页面区域自己铺底：观看页不挂侧栏，主区会从 0 起画。
-         * WebKit 会把卸掉侧栏的那块合成层留到下一次重绘，透明背景下
-         * 就成了一条点不动的「幽灵侧栏」，直到窗口 resize 才消失。
-         */}
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="block min-w-0 flex-1 overflow-hidden bg-[var(--color-ink)] outline-none"
-        >
-          {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
-                父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
-          <div key={view.kind} className="bili-page flex h-full flex-col">
-            {view.kind !== 'home' && <h1 className="sr-only">{viewTitle(view)}</h1>}
-            <CurrentView view={view} />
-          </div>
-        </main>
+        <div className="bili-workspace flex min-w-0 flex-1 overflow-clip">
+          {showSidebar ? <Sidebar /> : null}
+          {/*
+           * 页面区域自己铺底：观看页不挂侧栏，主区会从 0 起画。
+           * WebKit 会把卸掉侧栏的那块合成层留到下一次重绘，透明背景下
+           * 就成了一条点不动的「幽灵侧栏」，直到窗口 resize 才消失。
+           */}
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="block min-w-0 flex-1 overflow-hidden bg-[var(--color-ink)] outline-none"
+          >
+            {/* 必须是 flex 列：多数视图根节点用 min-h-0 flex-1 overflow-y-auto，
+                  父级不是 flex 时 flex-1 不生效、高度变成 auto，页面就滚不动了。 */}
+            <div key={view.kind} className="bili-page flex h-full flex-col">
+              {view.kind !== 'home' && <h1 className="sr-only">{viewTitle(view)}</h1>}
+              <CurrentView view={view} />
+            </div>
+          </main>
+        </div>
         <div className="rail-slot hidden xl:block" data-open={railOpen} inert={!railOpen} aria-hidden={!railOpen}>
           <NowPlayingRail tab={rail ?? 'lyrics'} />
         </div>
