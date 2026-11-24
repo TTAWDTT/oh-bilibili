@@ -56,7 +56,7 @@ async function connect() {
   const chrome = spawn(
     CHROME,
     [
-      '--headless=new',
+      ...(process.argv.includes('--typography-only') && process.env.TYPOGRAPHY_HEADED === '1' ? [] : ['--headless=new']),
       '--disable-gpu',
       '--no-first-run',
       // 无头窗口会被 Chrome 当成被遮挡，WAAPI 动画会停在 0 秒；舞台过渡的检查需要它持续运行。
@@ -136,12 +136,14 @@ async function connect() {
       })
     })
   }, 1500)
-  await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: 1, mobile: false }, sid)
+  const typography = process.argv.includes('--typography-only')
+  const nativeScale = typography ? (await send('Runtime.evaluate', { expression: 'devicePixelRatio' }, sid)).result.result.value : 1
+  await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: nativeScale, mobile: false }, sid)
 
   const viewport = (width, height) =>
     send(
       'Emulation.setDeviceMetricsOverride',
-      { width, height, deviceScaleFactor: 1, mobile: false },
+      { width, height, deviceScaleFactor: nativeScale, mobile: false },
       sid,
     )
   const evaluate = async (expression) => {
@@ -205,6 +207,8 @@ async function connect() {
 
   return {
     evaluate,
+    cdp: (method, params) => send(method, params, sid),
+    nativeScale,
     errors,
     runtimeErrors: errors,
     viewport,
@@ -3665,6 +3669,10 @@ async function checkTopbarSites(page) {
       narrowMenu.ext.length === 4 &&
       narrowMenu.overflow <= 0,
   )
+  check('窄窗网站菜单的六项均显示可加载的插画', await waitFor(`(() => {
+    const items = [...document.querySelectorAll('[data-site-menu] [role="menuitem"]')]
+    return items.length === 6 && items.every((item) => item.querySelector('img')?.naturalWidth > 0)
+  })()`))
   check(
     '窄窗网站按钮与搜索框、消息入口不重叠',
     narrowLayout.triggerRight <= narrowLayout.formLeft + 1 &&
@@ -4152,6 +4160,17 @@ async function checkProfileSettings(page) {
     mineOpened && profile.account && profile.services === 6 && profile.settings && profile.heading === '我的',
   )
 
+  check('个人中心与侧栏六个同名入口复用同一张可加载的图', await waitFor(`(() => {
+    const services = [...document.querySelectorAll('[data-profile-service]')]
+    const sidebar = [...document.querySelectorAll('nav[aria-label="主导航"] button')]
+    return services.length === 6 && services.every((service) => {
+      const label = service.textContent.trim()
+      const link = sidebar.find((button) => (button.getAttribute('aria-label') || button.textContent.trim()) === label)
+      const icon = service.querySelector('img')
+      return icon?.naturalWidth > 0 && icon.currentSrc === link?.querySelector('img')?.currentSrc
+    })
+  })()`))
+
   const settingsClicked = await page.evaluate(`(() => {
     const hit = document.querySelector('[data-profile-settings]')
     hit?.click()
@@ -4351,7 +4370,7 @@ async function checkCommentPauseIntent(page) {
 
 async function main() {
   if (!existsSync(CHROME)) {
-    if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
+    if (libraryPartialOnly || process.argv.includes('--typography-only')) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
     if (DYNAMIC_RETURN) process.exitCode = 1
     return
@@ -4364,6 +4383,11 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--typography-only')) {
+      const { checkTypography } = await import('./typography-smoke.mjs')
+      await checkTypography(page, WEB, watchUiWait(page), check)
+      return
+    }
     if (process.argv.includes('--discovery-only')) {
       await checkDiscoveryFeed(page)
       await checkHeroAllocation(page)

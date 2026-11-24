@@ -10,6 +10,21 @@ const ICONS = {
   rankRosette: 'rank-rosette',
   liveCamera: 'live-camera',
   bangumiClapper: 'bangumi-clapper',
+  profileBadge: 'profile-badge',
+  historyClock: 'history-clock',
+  favoriteFolder: 'favorite-folder',
+  laterScreen: 'later-screen',
+  followingPair: 'following-pair',
+  likedThumb: 'liked-thumb',
+  libraryRecord: 'library-record',
+  downloadTray: 'download-tray',
+  settingsDial: 'settings-dial',
+  uploadCloud: 'upload-cloud',
+  shopParcel: 'shop-parcel',
+  comicBook: 'comic-book',
+  eventCup: 'event-cup',
+  creatorPen: 'creator-pen',
+  gameHandheld: 'handheld',
   /** 投币：B 站的硬币是圆形加两道横纹，投出去会翻面。 */
   coin: (
     <>

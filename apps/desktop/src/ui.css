@@ -880,11 +880,13 @@
 
 /* 带图标的按钮：悬停时让图标自己弹一下，而不是整颗按钮变大 */
 .bili-icon-btn svg,
+.bili-icon-btn > img,
 .bili-nav-item img {
   transition: transform 160ms var(--spring);
 }
 
 .bili-icon-btn:not(.bili-tri-btn):hover svg,
+.bili-icon-btn:not(.bili-tri-btn):hover > img,
 .bili-nav-item:hover img {
   transform: scale(1.12);
 }

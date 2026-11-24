@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as ipc from '../../shared/lib/ipc'
+import type { Track } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
@@ -9,7 +10,7 @@ import { WideCard } from '../tracks/WideCard'
 import { HotPageHeader } from './HotPageHeader'
 
 /** 换期记在模块里：打开作品再返回、去别的频道再回来，都还停在读过的那一期。 */
-const weeklyMemory: { number: number | null } = { number: null }
+const weeklyMemory: { number: number | null; top: number } = { number: null, top: 0 }
 
 /**
  * 每周必看。B 站自己按周出的片单：一期一个主题，一次 50 条。
@@ -28,6 +29,7 @@ export function WeeklyView() {
   const pickerRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const restoreFocus = useRef(false)
+  const restoreTop = useRef(weeklyMemory.top)
   const navigate = useAppStore((state) => state.navigate)
 
   useEffect(() => {
@@ -87,8 +89,7 @@ export function WeeklyView() {
     let cancelled = false
     setPage(null)
     setError(null)
-    // 换一期等于换一份片单，停在上一期的滚动位置会像是「切了没反应」。
-    scrollerRef.current?.scrollTo({ top: 0 })
+    restoreTop.current = weeklyMemory.top
     void ipc
       .weeklyIssue(number)
       .then((next) => {
@@ -102,18 +103,30 @@ export function WeeklyView() {
     }
   }, [number, periodNonce])
 
+  useLayoutEffect(() => {
+    if (page && scrollerRef.current) scrollerRef.current.scrollTop = restoreTop.current
+  }, [page])
+
+  function openWork(track: Track) {
+    // 键盘聚焦作品会滚动页面，点开时 scroll 事件可能还没送达。
+    weeklyMemory.top = scrollerRef.current?.scrollTop ?? 0
+    navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)
+  }
+
   const index = issues && number !== null ? issues.findIndex((i) => i.number === number) : -1
   // 列表按新到旧排：下一期是更早的那一条，上一期是更新的那一条。
   const older = index >= 0 ? (issues?.[index + 1]?.number ?? null) : null
   const newer = index > 0 ? (issues?.[index - 1]?.number ?? null) : null
   const choose = (next: number | null): void => {
     setPicking(false)
+    if (next !== number) weeklyMemory.top = 0
     weeklyMemory.number = next
     setNumber(next)
   }
 
   return (
-    <div ref={scrollerRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10">
+    <div ref={scrollerRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto pb-10"
+      onScroll={(event) => { if (page) weeklyMemory.top = event.currentTarget.scrollTop }}>
       {/* 换期组紧贴页标题，正文直接接当期作品，中间不再放跨频道入口。 */}
       <HotPageHeader active="weekly" title="每周必看">
         {issues && issues.length > 0 ? (
@@ -255,11 +268,11 @@ export function WeeklyView() {
           <div className="grid items-start gap-5 @card:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             {page.tracks.slice(0, 3).map((track, index) => (
               <div key={track.key} className={index === 0 && page.tracks.length > 1 ? '@card:row-span-2' : ''}>
-                <WideCard
+                <WideCard variant="weekly"
                   track={track}
                   lead={index === 0}
                   note={page.notes[track.key] ?? null}
-                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+                  onOpen={() => openWork(track)}
                 />
               </div>
             ))}
@@ -267,11 +280,11 @@ export function WeeklyView() {
           {page.tracks.length > 3 ? (
             <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 border-t border-[var(--line)] pt-6 @card:grid-cols-2">
               {page.tracks.slice(3).map((track) => (
-                <WideCard
+                <WideCard variant="weekly"
                   key={track.key}
                   track={track}
                   note={page.notes[track.key] ?? null}
-                  onOpen={() => navigate({ kind: 'watch', track }, undefined, `wide:${track.key}`)}
+                  onOpen={() => openWork(track)}
                 />
               ))}
             </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
+import { PERSONAL_NAV } from './personalNavigation'
 import { Icon } from '../shared/ui/Icon'
 import type { IconName } from '../shared/ui/Icon'
 import { HOT_CHANNELS } from '../shared/lib/biliChannels'
@@ -30,16 +31,14 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
   {
     title: '我的',
     items: [
-      { view: { kind: 'profile' }, label: '个人中心', icon: 'user' },
-      { view: { kind: 'history' }, label: '历史', icon: 'clock' },
-      { view: { kind: 'favs' }, label: '收藏夹', icon: 'bookmarkStar' },
-      { view: { kind: 'watchLater' }, label: '稍后再看', icon: 'watchLater' },
-      { view: { kind: 'following' }, label: '关注', icon: 'user' },
-      { view: { kind: 'liked' }, label: '赞过的视频', icon: 'heartFilled' },
-      // 曲库与下载是「我的」里的两项，不是并列于整站的第二个产品：
-      // 单开一个「音乐」分组会让每个页面都先看到听歌入口。
-      { view: { kind: 'library' }, label: '曲库', icon: 'library' },
-      { view: { kind: 'downloads' }, label: '已下载', icon: 'download' },
+      PERSONAL_NAV.profile,
+      PERSONAL_NAV.history,
+      PERSONAL_NAV.favs,
+      PERSONAL_NAV.watchLater,
+      PERSONAL_NAV.following,
+      PERSONAL_NAV.liked,
+      PERSONAL_NAV.library,
+      PERSONAL_NAV.downloads,
     ],
   },
 ]
@@ -110,7 +109,7 @@ export function Sidebar() {
       ))}
       {/* 设置与收起键钉在底部：收起之后条目变窄但数量不变，靠滚动才能碰到它们就没法展开了。 */}
       <div className="sticky bottom-0 mt-auto flex flex-col gap-0.5 bg-[var(--panel)] pt-1">
-        {item({ view: { kind: 'settings' }, label: '设置', icon: 'settings' })}
+        {item(PERSONAL_NAV.settings)}
         <button
           type="button"
           onClick={onWatch ? toggleWatchNav : toggleSidebar}
