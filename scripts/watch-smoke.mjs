@@ -5135,18 +5135,18 @@ async function main() {
       check(`${width} 宽保留画中画、音量、网页全屏、全屏`, !!fit && fit.pip && fit.volume && fit.web && fit.full)
       check(`${width} 宽截图入口按空间收起`, !!fit && !fit.shot)
 
-      const mute = await page.evaluate(`(() => {
-        const btn = document.querySelector('button[aria-label="静音"], button[aria-label="取消静音"]')
+      const speaker = `document.querySelector('[data-watch-controls] button:is([aria-label="静音"], [aria-label="取消静音"])')`
+      const speakerCenter = () => page.evaluate(`(() => {
+        const btn = ${speaker}
         if (!btn) return null
         const box = btn.getBoundingClientRect()
         return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
       })()`)
+      const mute = await speakerCenter()
       check(`${width} 宽有音量按钮`, !!mute)
       if (!mute) continue
-      const volumeWidth = () => page.evaluate(`(() => {
-        const slider = document.querySelector('[role="slider"][aria-label="音量"]')
-        return slider?.parentElement?.getBoundingClientRect().width ?? 0
-      })()`)
+      const volume = `document.querySelector('[data-watch-controls] [role="slider"][aria-label="音量"]')`
+      const volumeWidth = () => page.evaluate(`${volume}.parentElement.getBoundingClientRect().width`)
       const before = await volumeWidth()
       await page.mouseEvent({ type: 'mouseMoved', x: mute.x, y: mute.y })
       await sleep(300)
@@ -5154,6 +5154,25 @@ async function main() {
       const expanded = await controlFit(page)
       check(`${width} 宽音量滑杆真的展开`, after > before + 40)
       check(`${width} 宽音量展开后控制条仍完整`, !!expanded && expanded.overflow <= 1 && expanded.outside === 0)
+      // 展开会把按钮向左挪，原来的坐标可能已经落在滑杆上。
+      await page.mouseEvent({ type: 'mouseMoved', ...await speakerCenter() })
+      for (const [key, value] of [['Home', 0], ['End', 100]]) {
+        await page.evaluate(`${volume}.focus()`)
+        await page.keyEvent({ type: 'keyDown', key, code: key })
+        await page.keyEvent({ type: 'keyUp', key, code: key })
+        await watchUiWait(page)(`${volume}.getAttribute('aria-valuenow') === '${value}'`)
+        await page.evaluate(`${volume}.blur()`)
+        await sleep(250)
+        check(`${width} 宽悬停音量按钮时 ${value}% 圆点完整可见`, await page.evaluate(`(() => {
+          const slider = ${volume}
+          const thumb = slider.querySelector('[style*="left:"]')
+          const circle = thumb.getBoundingClientRect()
+          const bounds = slider.parentElement.getBoundingClientRect()
+          return ${speaker}.matches(':hover') && getComputedStyle(thumb).opacity === '1' && circle.width > 0 &&
+            circle.left >= bounds.left && circle.right <= bounds.right &&
+            circle.top >= bounds.top && circle.bottom <= bounds.bottom
+        })()`))
+      }
       await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
     }
 

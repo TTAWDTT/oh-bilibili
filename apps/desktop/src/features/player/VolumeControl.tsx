@@ -10,7 +10,7 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
   const shown = draft ?? volume
 
   return (
-    <div className={`group/vol flex items-center text-[var(--text-2)] ${compact ? '' : 'gap-2'}`}>
+    <div className={`group/vol flex items-center text-[var(--text-2)] ${compact ? 'group' : 'gap-2'}`}>
       <button
         type="button"
         aria-label={shown > 0 ? '静音' : '取消静音'}
@@ -34,6 +34,7 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
           label="音量"
           step={0.05}
           size="sm"
+          insetThumb={compact}
           onChange={setDraft}
           onCancel={() => setDraft(null)}
           onCommit={(value) => {

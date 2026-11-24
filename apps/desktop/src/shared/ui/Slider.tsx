@@ -17,6 +17,7 @@ type SliderProps = {
   disabled?: boolean
   buffered?: number | null
   size?: 'sm' | 'md'
+  insetThumb?: boolean
 }
 
 /** 拖拽期间只回报 onChange，松手才 onCommit；这样 seek 不会在拖动途中被反复发出。 */
@@ -32,6 +33,7 @@ export function Slider({
   disabled = false,
   buffered = null,
   size = 'md',
+  insetThumb = false,
 }: SliderProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef(false)
@@ -102,7 +104,6 @@ export function Slider({
 
   return (
     <div
-      ref={trackRef}
       role="slider"
       tabIndex={disabled ? -1 : 0}
       aria-label={label}
@@ -123,10 +124,11 @@ export function Slider({
       className={[
         'group relative flex touch-none items-center rounded-full',
         size === 'sm' ? 'h-4' : 'h-5',
+        insetThumb ? 'px-2' : '',
         disabled ? 'cursor-default opacity-45' : 'cursor-pointer',
       ].join(' ')}
     >
-      <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-[var(--line)]">
+      <div ref={trackRef} className="relative h-[3px] w-full rounded-full bg-[var(--line)]">
         {buffered === null ? null : (
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--accent)_22%,var(--line))]"
@@ -140,11 +142,11 @@ export function Slider({
             background: 'var(--accent)',
           }}
         />
+        <div
+          className="t pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--accent)] bg-white shadow-[0_0_8px_rgba(0,174,236,0.6)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100"
+          style={{ left: `${clamp(value, 0, 1) * 100}%` }}
+        />
       </div>
-      <div
-        className="t pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full border-2 border-[var(--accent)] bg-white shadow-[0_0_8px_rgba(0,174,236,0.6)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100"
-        style={{ left: `${clamp(value, 0, 1) * 100}%` }}
-      />
     </div>
   )
 }
