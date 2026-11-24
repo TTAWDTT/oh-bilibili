@@ -30,8 +30,7 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const [masterpieces, setMasterpieces] = useState<Track[] | null>(null)
   const [masterpieceFailed, setMasterpieceFailed] = useState(false)
   const [masterpieceAttempt, setMasterpieceAttempt] = useState(0)
-  const [bannerBroken, setBannerBroken] = useState(false)
-  const [smallBroken, setSmallBroken] = useState(false)
+  const [brokenBanners, setBrokenBanners] = useState<string[]>([])
   const [tracks, setTracks] = useState<Track[] | null>(null)
   const snapshot = usePlayerStore((state) => state.snapshot)
   const focusSearch = useAppStore((state) => state.focusSearch)
@@ -207,7 +206,8 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const dress = card?.dress
   const member = dress?.membership
   const plate = dress?.nameplate
-  const banner = card?.banner || card?.banner_small
+  const smallBanner = card?.banner_small && !brokenBanners.includes(card.banner_small) ? card.banner_small : null
+  const banner = card?.banner && !brokenBanners.includes(card.banner) ? card.banner : smallBanner
   const isSelf = mid != null && me?.mid === mid
   const submissionCount = tracks && !isFallback ? total : card?.videos
   const show = (next: SpaceSection) => {
@@ -234,13 +234,13 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
         data-up-mid={mid == null ? undefined : String(mid)}
         className="mb-5 rounded-[8px] border border-[var(--line)] bg-[var(--panel)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
       >
-        {banner && !bannerBroken && (
+        {banner && (
           <picture>
-            {card?.banner_small && !smallBroken && <source media="(max-width: 640px)" srcSet={card.banner_small} />}
+            {smallBanner && smallBanner !== banner && <source media="(max-width: 640px)" srcSet={smallBanner} />}
             <img data-space-banner src={banner} alt="" referrerPolicy="no-referrer"
               onError={(event) => {
-                if (!smallBroken && card?.banner_small && event.currentTarget.currentSrc === new URL(card.banner_small, document.baseURI).href && banner !== card.banner_small) setSmallBroken(true)
-                else setBannerBroken(true)
+                const failed = event.currentTarget.currentSrc === event.currentTarget.src ? banner : smallBanner
+                if (failed) setBrokenBanners((previous) => [...previous, failed])
               }}
               className="block h-[72px] w-full rounded-t-[7px] object-cover object-center md:h-[100px]" />
           </picture>
