@@ -2665,152 +2665,77 @@ async function checkRailScope(page) {
   await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
 }
 
-/** UP 主空间：页首一半是作者、一半是一件真实投稿，切排序不换图。 */
-async function checkAuthorHero(page) {
-  await page.viewport(1320, 900)
-  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?authorLong=1`)}`)
-  await sleep(4500)
-  await page.evaluate(`document.querySelector('[data-track-card] button[aria-label^="观看"]')?.click()`)
-  await sleep(2500)
-  await page.evaluate(`(() => {
-    const owner = [...document.querySelectorAll('button')]
-      .find((button) => (button.getAttribute('aria-label') || '').startsWith('看 '))
-    owner?.click()
-  })()`)
-  let ready = false
-  for (let i = 0; i < 30 && !ready; i += 1) {
-    await sleep(300)
-    ready = await page.evaluate(`!!document.querySelector('[data-author-hero]')`)
-  }
-  const wide = await page.evaluate(`(() => {
-    const header = document.querySelector('header')
-    const hero = document.querySelector('[data-author-hero]')
-    const row = document.querySelector('#scroll-main [data-track-card]')
-    const cover = hero?.querySelector('span[style*="16 / 9"]')
-    const heroKey = hero?.dataset.focusKey ?? ''
-    const heroTitle = hero?.querySelector('.line-clamp-2')?.textContent?.trim() ?? ''
-    const firstCardTitle = row?.dataset.trackTitle ?? ''
-    const upButton = row?.querySelector('button[aria-label^="UP "]')
-    return {
-      header: header ? Math.round(header.getBoundingClientRect().height) : 0,
-      title: (hero?.textContent || '').trim(),
-      heroWidth: hero ? Math.round(hero.getBoundingClientRect().width) : 0,
-      headerWidth: header ? Math.round(header.getBoundingClientRect().width) : 0,
-      heroKey,
-      heroTitle,
-      firstCardTitle,
-      name: document.querySelector('header h2')?.textContent ?? '',
-      heroMid: hero?.dataset.upMid ?? '',
-      headerMid: header?.dataset.upMid ?? '',
-      firstCardAuthor: (upButton?.textContent ?? '').trim().replace(/^UP\\s*/, ''),
-      cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
-      coverHeight: cover ? Math.round(cover.getBoundingClientRect().height) : 0,
-      firstRow: row ? Math.round(row.getBoundingClientRect().top) : null,
-      scrollable: document.getElementById('scroll-main')?.scrollHeight ?? 0,
-    }
-  })()`)
-  check(
-    `UP 主页首右侧是该作者自己的投稿，首行在桌面高度内露出来 ${JSON.stringify(wide)}`,
-    ready && wide.header > 0 && wide.header <= 420 &&
-      wide.heroWidth > 0 && wide.heroWidth <= wide.headerWidth / 2 + 8 &&
-      Math.abs(wide.cover * 9 - wide.coverHeight * 16) <= wide.cover * 2 &&
-      wide.heroKey !== '' && wide.heroTitle !== '' && wide.heroTitle === wide.firstCardTitle &&
-      wide.firstRow !== null && wide.firstRow < 900,
-  )
-  check(
-    `页首作品与作者头是同一个 UP 主 ${JSON.stringify({ heroMid: wide.heroMid, headerMid: wide.headerMid })}`,
-    wide.heroMid !== '' && wide.heroMid === wide.headerMid,
-  )
-  check(
-    `列表第一张卡属于页首作者 ${JSON.stringify({ firstCardAuthor: wide.firstCardAuthor, name: wide.name })}`,
-    wide.firstCardAuthor !== '' && wide.firstCardAuthor === wide.name.trim(),
-  )
-  const beforeSort = await page.evaluate(`document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key')`)
-  await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多播放')
-    hit?.click()
-  })()`)
-  await sleep(1500)
-  const afterSort = await page.evaluate(`(() => ({
-    heroKey: document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key') ?? '',
-    firstCardTitle: document.querySelector('#scroll-main [data-track-card]')?.dataset.trackTitle ?? '',
-  }))()`)
-  check(
-    `切「最多播放」后列表首位换人、页首作品不换 ${JSON.stringify({ before: wide.firstCardTitle, afterSort, beforeSort })}`,
-    !!beforeSort && afterSort.heroKey === beforeSort &&
-      afterSort.firstCardTitle !== '' && afterSort.firstCardTitle !== wide.firstCardTitle,
-  )
-
-  // 切排序时列表可以短暂 loading，但页首必须一直留在 DOM 里，页面也不能回顶。
-  await page.evaluate(`document.getElementById('scroll-main')?.scrollTo({ top: 380 })`)
-  await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多收藏')
-    hit?.click()
-  })()`)
-  await sleep(80)
-  const sorting = await page.evaluate(`(() => ({
-    hero: !!document.querySelector('[data-author-hero]'),
-    top: Math.round(document.getElementById('scroll-main')?.scrollTop ?? 0),
-    room: (() => {
-      const box = document.getElementById('scroll-main')
-      return box ? box.scrollHeight - box.clientHeight : 0
-    })(),
-  }))()`)
-  check(
-    `切排序时页首不消失、页面不回顶 ${JSON.stringify(sorting)}`,
-    sorting.hero && (sorting.room < 400 || sorting.top >= 300),
-  )
-
-  // 多页作者：切排序后页码要归零，翻页仍能把 125 条取回来。
+/** 未设置置顶的多页作者，检查不同排序和窗口大小下的首排投稿。 */
+async function checkAuthorSpace(page) {
+  const wait = watchUiWait(page)
+  const card = 'document.querySelector("#scroll-main [data-track-card]")'
+  const header = 'document.querySelector("header[data-up-mid]")'
+  const scroll = 'document.getElementById("scroll-main")'
+  const keys = () => page.evaluate(`Array.from(${scroll}.querySelectorAll('[data-track-card]'), card => card.dataset.key)`)
   const loadAll = async () => {
-    for (let i = 0; i < 60; i += 1) {
-      const count = await page.evaluate(`document.querySelectorAll('#scroll-main [data-track-card]').length`)
-      if (count >= 125) return count
-      await page.evaluate(`(() => {
-        const box = document.getElementById('scroll-main')
-        if (box) box.scrollTop = box.scrollHeight
-      })()`)
+    let current = []
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      current = await keys()
+      if (current.length === 125) break
+      await page.evaluate(`${scroll}.scrollTop = ${scroll}.scrollHeight`)
       await sleep(300)
     }
-    return page.evaluate(`document.querySelectorAll('#scroll-main [data-track-card]').length`)
+    return current
   }
-  const loadedAll = await loadAll()
-  await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '最多播放')
-    hit?.click()
-  })()`)
-  await sleep(1200)
-  const afterOrder = await page.evaluate(`(() => ({
-    hero: document.querySelector('[data-author-hero]')?.getAttribute('data-focus-key') ?? '',
-    total: [...document.querySelectorAll('span')].find((node) => /共 \\d+ 个投稿/.test(node.textContent || ''))?.textContent ?? '',
-  }))()`)
-  const reloadedAll = await loadAll()
-  check(
-    `多页作者切排序后总数与页码都不丢 ${JSON.stringify({ loadedAll, afterOrder, reloadedAll })}`,
-    loadedAll >= 125 && reloadedAll >= 125 && afterOrder.total.includes('125'),
-  )
+
+  await page.viewport(1320, 900)
+  const query = '?authorLong=1&spaceSlowMid=900015'
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + query)}`)
+  const discoveryCover = `document.querySelector('[data-track-card]:has(button[aria-label="UP 张学友"]) button[aria-label^=观看]')`
+  await wait(`location.search === ${JSON.stringify(query)} && ${discoveryCover}`)
+  await page.evaluate(`${discoveryCover}.click()`)
+  const owner = `document.querySelector('button[aria-label^="看 "][aria-label$="的更多视频"]')`
+  await wait(owner)
+  const ownerLabel = await page.evaluate(`${owner}.getAttribute('aria-label')`)
+  await page.evaluate(`${owner}.click()`)
+  await wait(`${header} && ${card}?.querySelector('h3')`)
+  const firstTitle = await page.evaluate(`${card}.dataset.trackTitle`)
+  check('从观看页进入投稿作者的空间，作品属于同一位作者', await page.evaluate(`(() => {
+    const name = ${header}.querySelector('h2')?.textContent.trim()
+    return ${JSON.stringify(ownerLabel)} === '看 ' + name + ' 的更多视频' &&
+      ${card}.querySelector('button[aria-label^="UP "]')?.getAttribute('aria-label') === 'UP ' + name
+  })()`))
+  check('桌面首屏能看到完整投稿封面及标题，无置顶的作者直接展示最新作品', await page.evaluate(`
+    !document.querySelector('[data-space-pinned]') &&
+    ${card}.dataset.trackTitle.endsWith('第 1 期') &&
+    ${card}.querySelector('h3').getBoundingClientRect().bottom <= ${scroll}.getBoundingClientRect().bottom`))
+
+  // 第一页 50 条刚显示时，第二页仍在路上；此刻换序也要拿全新排序的后两页。
+  await wait(`${header}.dataset.upMid === '900015' && ${scroll}.querySelectorAll('[data-track-card]').length === 50 &&
+    [...${scroll}.querySelectorAll('[role=status]')].some(node => node.textContent.includes('正在取更多投稿'))`)
+  await page.clickExactText('最多播放')
+  await wait(`${card}.dataset.trackTitle.endsWith('第 125 期')`)
+  check('最多播放首位换成播放数最高的一期', await page.evaluate(`${card}.dataset.trackTitle !== ${JSON.stringify(firstTitle)}`))
+
+  const played = await loadAll()
+  check(`第二页加载中切换排序，能继续取完新排序的 125 条（实际 ${played.length} 条）`,
+    played.length === 125 && new Set(played).size === 125)
+  await page.evaluate(`${scroll}.scrollTop = 380`)
+  await page.clickExactText('最多收藏')
+  await wait(`[...document.querySelectorAll('button[aria-pressed=true]')].some(b => b.textContent.trim() === '最多收藏')`)
+  check('切最多收藏时仍停留在原滚动位置', await page.evaluate(`${header} && ${scroll}.scrollTop >= 300`))
+
+  await wait(`!${card}.dataset.trackTitle.endsWith('第 125 期')`)
+  const collected = await loadAll()
+  check('切换排序前后，两次都能翻到完整的 125 个不同投稿和正确总数',
+    new Set(collected).size === 125 && new Set(played).size === 125 &&
+    collected.slice().sort().join() === played.slice().sort().join() &&
+    await page.evaluate(`${header}.textContent.includes('共 125 个投稿')`))
 
   await page.viewport(380, 820)
-  await sleep(600)
-  const narrow = await page.evaluate(`(() => {
-    const hero = document.querySelector('[data-author-hero]')
-    const box = document.getElementById('scroll-main')
-    const cover = hero?.querySelector('span[style*="16 / 9"]')
-    const name = document.querySelector('header h2')
-    return {
-      hero: !!hero,
-      cover: cover ? Math.round(cover.getBoundingClientRect().width) : 0,
-      nameTop: name ? Math.round(name.getBoundingClientRect().top) : null,
-      heroTop: hero ? Math.round(hero.getBoundingClientRect().top) : null,
-      overflow: box ? box.scrollWidth - box.clientWidth : null,
-    }
-  })()`)
-  check(
-    '窄窗先作者后紧凑作品，不横向溢出',
-    narrow.hero && narrow.cover > 0 && narrow.cover <= 180 &&
-      narrow.nameTop !== null && narrow.heroTop !== null && narrow.nameTop < narrow.heroTop &&
-      narrow.overflow !== null && narrow.overflow <= 0,
-  )
+  await page.evaluate(`${scroll}.scrollTop = 0`)
+  check('窄窗作者在前，首屏有作品封面和标题，内容没有横向溢出', await page.evaluate(`(() => {
+    const box = ${scroll}
+    const title = ${card}.querySelector('h3').getBoundingClientRect()
+    const cover = ${card}.querySelector('button[aria-label^=观看]').getBoundingClientRect()
+    return box.scrollWidth <= box.clientWidth && cover.width > 0 && cover.height > 0 &&
+      ${header}.getBoundingClientRect().bottom <= cover.top && title.bottom <= box.getBoundingClientRect().bottom
+  })()`))
   await page.viewport(1320, 900)
 }
 
@@ -4472,7 +4397,7 @@ async function main() {
     await checkStageMoments(page)
     await checkStageMorph(page)
     await checkHeroAllocation(page)
-    await checkAuthorHero(page)
+    await checkAuthorSpace(page)
     await checkTopbarSites(page)
     await checkLiveRooms(page)
     await checkTriple(page)

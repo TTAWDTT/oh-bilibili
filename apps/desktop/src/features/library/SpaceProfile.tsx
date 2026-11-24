@@ -5,6 +5,7 @@ import * as ipc from '../../shared/lib/ipc'
 import { MedalWall } from './MedalWall'
 import { useAuthStore } from '../auth/authStore'
 import { Icon } from '../../shared/ui/Icon'
+import './space-profile.css'
 
 function useSpaceField<T>(mid: number | null | undefined, load: (mid: number) => Promise<T>, enabled = true) {
   const [value, setValue] = useState<T>()
@@ -34,7 +35,8 @@ function open(url: string) {
   void ipc.openExternal(url).catch((cause) => toastFailure('打开 B 站', cause))
 }
 
-export function SpaceProfile({ mid, card, isSelf, profile }: {
+export function SpaceProfile({ mid, card, isSelf, profile, hidden }: {
+  hidden: boolean
   mid: number
   card: ipc.AuthorCard | null
   isSelf: boolean
@@ -51,33 +53,38 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
   const liveRoom = room.value
   const roomLabel = liveRoom?.live ? '直播中' : liveRoom?.looping ? '轮播中' : '直播间'
   return (
-    <div className="min-w-0 space-y-2 text-[12.5px] text-[var(--text-2)]">
-      {notice.value && <p data-space-notice className={`whitespace-pre-line break-words ${expanded ? '' : 'line-clamp-2'}`}>
-        <strong className="mr-2 font-medium text-[var(--text-1)]">公告</strong>{notice.value}
-      </p>}
-      {liveRoom && <button type="button" aria-label={`打开直播间：${liveRoom.title ?? liveRoom.id}`}
-        onClick={() => open(`https://live.bilibili.com/${liveRoom.id}`)}
-        className="group flex max-w-full items-center gap-2 text-left">
-        {liveRoom.cover && <img src={liveRoom.cover} alt="" referrerPolicy="no-referrer" loading="lazy"
-          className="h-8 w-[54px] shrink-0 rounded object-cover" />}
-        <span className="min-w-0"><span className="block text-[11px] text-[var(--text-3)]">{roomLabel}</span>
-          <span className="block truncate font-medium group-hover:text-[var(--accent)]">{liveRoom.title ?? `房间 ${liveRoom.id}`}</span>
-        </span><Icon name="external" size={12} />
-      </button>}
-      <button type="button" aria-expanded={expanded} onClick={() => { setExpanded(!expanded); profile.request() }}
-        className="inline-flex min-h-6 items-center gap-1 hover:text-[var(--accent)]">
-        空间资料<span className={expanded ? '-rotate-90' : 'rotate-90'}><Icon name="chevronRight" size={12} /></span>
+    <aside hidden={hidden} aria-label="作者资料栏" className="space-profile" data-expanded={expanded}>
+      <button type="button" aria-expanded={expanded}
+        onClick={() => { setExpanded(!expanded); if (!expanded) profile.request() }}
+        className="space-profile-heading w-full py-2 text-left hover:text-[var(--accent-strong)]">
+        <Icon name="profileBadge" size={20} />空间资料
+        <Icon name="chevronRight" size={14} className={`ml-auto text-[var(--text-3)] ${expanded ? '-rotate-90' : 'rotate-90'}`} />
       </button>
-      {expanded && <section aria-label="空间资料" className="space-y-2 border-t border-[var(--line)] pt-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span>UID {mid}</span>
-          {details?.sex && <span>性别 {details.sex}</span>}
-          {details?.birthday && <span>生日 {details.birthday}</span>}
-          {details?.profession && <span>{details.profession}</span>}
-          {details?.school && <span>学校 {details.school}</span>}
-        </div>
+      {notice.value && <section className="space-profile-summary">
+        <h3 className="space-profile-heading"><Icon name="creatorPen" size={20} />公告</h3>
+        <p data-space-notice className={`mt-2 whitespace-pre-line ${expanded ? '' : 'line-clamp-3'}`}>{notice.value}</p>
+      </section>}
+      {liveRoom && <section className="space-profile-summary">
+        <h3 className="space-profile-heading"><Icon name="liveCamera" size={20} />{roomLabel}</h3>
+        <button type="button" aria-label={`打开直播间：${liveRoom.title ?? liveRoom.id}`}
+          onClick={() => open(`https://live.bilibili.com/${liveRoom.id}`)}
+          className="group mt-2 flex w-full items-center gap-2 text-left hover:text-[var(--accent-strong)]">
+          {liveRoom.cover && <img src={liveRoom.cover} alt="" referrerPolicy="no-referrer" loading="lazy"
+            className="h-9 w-16 shrink-0 rounded object-cover" />}
+          <span className="line-clamp-2 min-w-0">{liveRoom.title ?? `房间 ${liveRoom.id}`}</span>
+          <Icon name="external" size={12} className="ml-auto shrink-0 text-[var(--text-3)] group-hover:text-current" />
+        </button>
+      </section>}
+      {expanded && <section aria-label="空间资料" className="space-y-3 pb-3">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt>UID</dt><dd>{mid}</dd>
+          {details?.sex && <><dt>性别</dt><dd>{details.sex}</dd></>}
+          {details?.birthday && <><dt>生日</dt><dd>{details.birthday}</dd></>}
+          {details?.profession && <><dt>职业</dt><dd>{details.profession}</dd></>}
+          {details?.school && <><dt>学校</dt><dd>{details.school}</dd></>}
+        </dl>
         {plate && <div className="flex items-center gap-2">
-          <img src={plate.image} alt="" width={38} height={38} referrerPolicy="no-referrer" />
+          <img src={plate.image} alt="" width={38} height={38} className="shrink-0" referrerPolicy="no-referrer" />
           <div><span className="font-medium">{plate.name}</span>
             {plate.condition && <p className="text-[var(--text-3)]">{plate.condition}</p>}</div>
         </div>}
@@ -94,6 +101,6 @@ export function SpaceProfile({ mid, card, isSelf, profile }: {
         {room.failed && <button type="button" className={link} onClick={room.retry}>重新加载直播间</button>}
         <div><button type="button" className={link} onClick={() => open(`https://space.bilibili.com/${mid}`)}>去 B 站空间查看勋章<Icon name="external" size={12} /></button></div>
       </section>}
-    </div>
+    </aside>
   )
 }

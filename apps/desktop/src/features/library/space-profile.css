@@ -1,0 +1,45 @@
+.space-profile {
+  min-width: 0;
+  align-self: start;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.space-profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.space-profile-summary {
+  padding-block: 10px 14px;
+}
+
+.space-profile-summary h3 { font-size: 14px; }
+
+.space-profile[data-expanded="false"] .space-profile-summary {
+  display: none;
+}
+
+.space-profile dt { color: var(--text-3); }
+
+@container author-space (min-width: 850px) {
+  .space-profile {
+    border-bottom: 0;
+    border-left: 1px solid var(--line);
+    padding-left: 18px;
+  }
+
+  .space-profile[data-expanded="false"] .space-profile-summary { display: block; }
+
+  .space-profile-summary {
+    padding-block: 14px;
+    border-top: 1px solid var(--line);
+  }
+}
