@@ -86,3 +86,57 @@
   .watch-actions > .watch-personal { grid-column: span 4; min-height: 32px; }
   .watch-tools-start { margin-inline-start: 0; }
 }
+
+.watch-inline-player [data-watch-player] {
+  max-height: max(200px, calc(100dvh - 13rem));
+  border-radius: 8px 8px 0 0;
+}
+
+/* 只裁画面圆角，弹幕设置和播放器菜单仍可伸出画框。 */
+.watch-inline-player video {
+  border-radius: inherit;
+}
+
+.watch-head-stats, .watch-actions, .watch-dm-directory {
+  font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.watch-dm-directory {
+  margin: 4px 14px;
+}
+
+.watch-dm-heading, .watch-dm-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  border-radius: 5px;
+  padding: 0 10px;
+}
+
+.watch-dm-heading {
+  min-height: 38px;
+  background: var(--ga0);
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.watch-dm-row {
+  height: 100%;
+  text-align: left;
+  font-size: 13px;
+}
+
+.watch-dm-row > .num {
+  flex: 0 0 5ch;
+  font-size: 12px;
+}
+
+.watch-dm-heading:hover, .watch-dm-row:hover {
+  background: var(--panel-hover);
+}
+
+@media (max-width: 79.999rem) {
+  .watch-dm-directory { margin-inline: 0; }
+}

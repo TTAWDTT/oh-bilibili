@@ -125,8 +125,6 @@ export function WatchView({
   const goBack = useAppStore((s) => s.goBack)
   const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
-  const osFullscreen = useAppStore((s) => s.osFullscreen)
-  const setCinema = useAppStore((s) => s.setCinema)
   const [data, setData] = useState<WatchData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
@@ -682,16 +680,6 @@ export function WatchView({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--panel)]">
-      {cinema && !osFullscreen ? (
-        <button
-          type="button"
-          onClick={() => setCinema(false)}
-          className="absolute right-4 top-4 z-50 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[12px] text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/75"
-        >
-          <Icon name="close" size={13} />
-          退出网页全屏
-        </button>
-      ) : null}
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       <Modal
         open={pickingPage && data !== null}
@@ -767,7 +755,7 @@ export function WatchView({
             />
           ) : null}
           {data ? (
-            <div className={cinema ? 'h-full' : 'overflow-hidden rounded-[8px]'}>
+            <div className={cinema ? 'h-full' : 'watch-inline-player'}>
               <WatchPlayer
                 track={track}
                 data={data}
@@ -860,7 +848,7 @@ export function WatchView({
           ) : null}
           {!cinema && danmaku.length > 0 ? (
             <div className="border-t border-hairline xl:hidden">
-              <DanmakuList items={danmaku} />
+              <DanmakuList items={danmaku} onSeek={seekTo} />
             </div>
           ) : null}
           {!cinema && data ? (
@@ -931,7 +919,7 @@ export function WatchView({
                 onFollow={toggleFollow}
               />
             ) : null}
-            <DanmakuList items={danmaku} />
+            <DanmakuList items={danmaku} onSeek={seekTo} />
             {data ? (
               <ChapterList
                 desc={data.desc}

@@ -1,0 +1,182 @@
+[data-watch-player], .watch-dm-toolbar {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.watch-overlay {
+  isolation: isolate;
+  padding: 0 clamp(8px, 1.2vw, 16px) 5px;
+}
+
+.watch-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -27px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to top, rgb(0 0 0 / 82%), rgb(0 0 0 / 58%) 54%, transparent);
+}
+
+.watch-overlay, .watch-cinema-heading { transition: opacity 140ms ease-out; }
+.watch-cinema-exit { pointer-events: auto; background: rgb(0 0 0 / 48%); }
+.watch-overlay[data-visible="false"],
+[data-controls-visible="false"] .watch-cinema-heading {
+  opacity: 0;
+  pointer-events: none;
+}
+[data-controls-visible="false"] .watch-cinema-exit { pointer-events: none; }
+[data-controls-visible="false"] video { cursor: none; }
+
+[data-watch-controls] > button,
+[data-watch-controls] > [data-watch-menu] > button,
+[data-watch-controls] button[title="静音"],
+[data-watch-controls] button[title="取消静音"] {
+  height: 32px;
+  min-width: 30px;
+}
+[data-watch-controls] > button svg,
+[data-watch-controls] button[title="静音"] svg,
+[data-watch-controls] button[title="取消静音"] svg { stroke-width: 1.85; }
+[data-watch-controls] button[title="静音"] svg,
+[data-watch-controls] button[title="取消静音"] svg { width: 21px; height: 21px; }
+[data-watch-controls] [role="slider"][aria-label="音量"] { --line: rgb(255 255 255 / 35%); }
+[data-watch-controls] button[title="静音"]:hover,
+[data-watch-controls] button[title="取消静音"]:hover { color: white; }
+[data-watch-controls] button[aria-expanded="true"] { background: rgb(255 255 255 / 17%); }
+[data-watch-controls] > [data-watch-menu] > div {
+  border-color: rgb(255 255 255 / 14%);
+  background: rgb(27 29 32 / 97%);
+  border-radius: 8px;
+}
+
+.watch-subtitle {
+  bottom: 5%;
+  font-size: clamp(15px, 1.3vw, 24px);
+  text-shadow: 0 1px 2px black;
+}
+[data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 64px); }
+@media (max-width: 1023px) {
+  [data-watch-cinema="true"][data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 100px); }
+}
+
+.watch-dm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.watch-dm-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  color: var(--text-2);
+  --dm-text: var(--text-1);
+  --dm-secondary: var(--text-2);
+  --dm-surface: var(--panel);
+  --dm-fill: var(--panel-raised);
+  --dm-line: var(--line);
+  --dm-hover: var(--ga2);
+}
+.watch-dm-tools[data-cinema="true"] {
+  color: rgb(255 255 255 / 92%);
+  --dm-text: white;
+  --dm-secondary: rgb(255 255 255 / 80%);
+  --dm-surface: #202226;
+  --dm-fill: rgb(255 255 255 / 10%);
+  --dm-line: rgb(255 255 255 / 16%);
+  --dm-hover: rgb(255 255 255 / 26%);
+}
+.watch-dm-toggle, .watch-dm-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.watch-dm-settings { width: 32px; }
+.watch-dm-toggle:hover, .watch-dm-settings:hover, .watch-dm-settings[aria-expanded="true"] {
+  background: var(--dm-fill);
+  color: var(--dm-text);
+}
+.watch-dm-indicator {
+  display: flex;
+  align-items: center;
+  width: 24px;
+  height: 14px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--ga4);
+}
+.watch-dm-indicator::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 100%;
+  background: white;
+  transition: transform 120ms ease-out;
+}
+.watch-dm-toggle[aria-pressed="true"] .watch-dm-indicator { background: var(--accent-strong); }
+.watch-dm-toggle[aria-pressed="true"] .watch-dm-indicator::after { transform: translateX(10px); }
+/* 共享弹层计算相对按钮的方向，短窗口在弹层内滚动。 */
+.watch-dm-tools [role="dialog"] {
+  max-height: min(390px, calc(100dvh - 24px));
+  color: var(--dm-text);
+  background: var(--dm-surface);
+  border-color: var(--dm-line);
+  overscroll-behavior: contain;
+}
+.watch-dm-panel {
+  display: grid;
+  gap: 7px;
+  padding: 0 12px 12px;
+}
+.watch-dm-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--dm-surface);
+  border-bottom: 1px solid var(--dm-line);
+  padding: 7px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.watch-dm-title button { display: grid; place-items: center; width: 28px; height: 28px; }
+.watch-composer {
+  border: 1px solid var(--dm-line, var(--line));
+  border-radius: 6px;
+  background: var(--panel-raised);
+  overflow: hidden;
+}
+.watch-composer:focus-within { border-color: var(--accent-strong); }
+.watch-composer input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.watch-composer button[aria-label="发送"] {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 0;
+  font-size: 12px;
+}
+.watch-composer button[aria-label="发送"]:disabled {
+  color: var(--text-3);
+  background: transparent;
+  opacity: 1;
+}
+@media (max-width: 520px) {
+  .watch-dm-toolbar { gap: 4px; padding: 5px 4px; }
+  .watch-online { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .watch-overlay, .watch-cinema-heading, .watch-dm-indicator::after { transition: none; }
+}

@@ -42,6 +42,7 @@ type Stored = Pick<
   | 'mergeSame'
 >
 
+const DEFAULT_AREA = 0.25
 const KEY = ['bilimusic', 'danmaku'].join('.')
 
 function load(): Stored {
@@ -54,7 +55,7 @@ function load(): Stored {
         opacity: v.opacity ?? 0.9,
         size: v.size ?? 13,
         speed: v.speed ?? 1,
-        area: v.area === 0.25 || v.area === 0.5 ? v.area : 1,
+        area: v.area === 0.5 || v.area === 1 ? v.area : DEFAULT_AREA,
         blockWords: Array.isArray(v.blockWords)
           ? v.blockWords.filter((w): w is string => typeof w === 'string' && w.trim().length > 0)
           : [],
@@ -78,7 +79,7 @@ function load(): Stored {
     opacity: 0.9,
     size: 13,
     speed: 1,
-    area: 1,
+    area: DEFAULT_AREA,
     blockWords: [],
     blockTypes: [],
     sendColor: 0xffffff,
