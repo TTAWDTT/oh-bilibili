@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -279,6 +279,7 @@ export function WatchPlayer({
   coins: number
 }) {
   const nextTitle = nextUp?.title ?? null
+  const frameRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
@@ -819,6 +820,10 @@ export function WatchPlayer({
 
   /** 正在拖动进度条时指针所在的百分比；null 表示没在拖。 */
   const [scrub, setScrub] = useState<number | null>(null)
+  // WebKit 卸载正被聚焦的菜单项时不会发送 blur。
+  useLayoutEffect(() => {
+    if (focusedControl && !frameRef.current?.contains(document.activeElement)) setFocusedControl(false)
+  })
   const controlsVisible = !playing || controls || overControls || focusedControl || scrub !== null ||
     (menu !== null && (cinema || menu !== 'danmaku'))
   useEffect(() => {
@@ -1051,6 +1056,7 @@ export function WatchPlayer({
   return (
     <>
     <div
+      ref={frameRef}
       onFocusCapture={(event) => setFocusedControl(event.target.matches(':focus-visible, input, textarea'))}
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocusedControl(false)
