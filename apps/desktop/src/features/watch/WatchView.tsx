@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
 import type { Track, WatchView as WatchData } from '../../shared/lib/contract'
@@ -126,7 +127,31 @@ export function WatchView({
   const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
   const osFullscreen = useAppStore((s) => s.osFullscreen)
-  const setCinema = useAppStore((s) => s.setCinema)
+  const fullscreenSynced = useRef(false)
+  useEffect(() => {
+    // 首次挂载不要把用户自己开的窗口全屏关掉。
+    if (!fullscreenSynced.current) {
+      fullscreenSynced.current = true
+      return
+    }
+    try {
+      void getCurrentWindow().setFullscreen(osFullscreen).catch(() => {})
+    } catch {
+      // 浏览器预览里没有 Tauri 窗口。
+    }
+  }, [osFullscreen])
+
+  useEffect(() => {
+    return () => {
+      useAppStore.getState().setCinema(false)
+      useAppStore.getState().setOsFullscreen(false)
+      try {
+        void getCurrentWindow().setFullscreen(false).catch(() => {})
+      } catch {
+        // 浏览器预览里没有 Tauri 窗口。
+      }
+    }
+  }, [])
   const [data, setData] = useState<WatchData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [danmaku, setDanmaku] = useState<DanmakuItem[]>([])
@@ -682,16 +707,6 @@ export function WatchView({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--panel)]">
-      {cinema && !osFullscreen ? (
-        <button
-          type="button"
-          onClick={() => setCinema(false)}
-          className="absolute right-4 top-4 z-50 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[12px] text-white ring-1 ring-white/25 backdrop-blur hover:bg-black/75"
-        >
-          <Icon name="close" size={13} />
-          退出网页全屏
-        </button>
-      ) : null}
       <FavPicker open={pickingFav} busy={favBusy} onClose={() => setPickingFav(false)} onPick={(folderId) => void favTo(folderId)} />
       <Modal
         open={pickingPage && data !== null}
@@ -767,7 +782,7 @@ export function WatchView({
             />
           ) : null}
           {data ? (
-            <div className={cinema ? 'h-full' : 'overflow-hidden rounded-[8px]'}>
+            <div className={cinema ? 'h-full' : 'watch-inline-player'}>
               <WatchPlayer
                 track={track}
                 data={data}
@@ -795,7 +810,21 @@ export function WatchView({
               />
             </div>
           ) : (
-            <div className="aspect-video w-full shrink-0 bg-black" />
+            <div className={cinema ? 'relative flex h-full items-center justify-center bg-black text-white' : 'flex aspect-video w-full shrink-0 items-center justify-center bg-black text-white'}>
+              {cinema ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    useAppStore.getState().setCinema(false)
+                    useAppStore.getState().setOsFullscreen(false)
+                  }}
+                  className="absolute right-4 top-3 rounded-md bg-white/15 px-2.5 py-1.5 text-[12px]"
+                >
+                  {osFullscreen ? '退出全屏' : '退出网页全屏'}
+                </button>
+              ) : null}
+              {!error ? <span className="text-[13px]">正在打开视频…</span> : null}
+            </div>
           )}
           {!cinema && data && hasDirectory ? (
             <div className="border-b border-hairline xl:hidden">
@@ -813,8 +842,11 @@ export function WatchView({
               </button>
             </div>
           ) : null}
-          {!cinema && error ? (
-            <div className="flex items-center gap-3 border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]">
+          {error ? (
+            <div role="alert" className={cinema
+              ? 'absolute inset-x-4 top-1/2 z-30 mx-auto flex max-w-md -translate-y-1/2 items-center gap-3 rounded-md bg-black/85 px-4 py-3 text-[13px] text-white'
+              : 'flex items-center gap-3 border-b border-hairline px-3 py-2 text-[12px] text-[var(--text-3)]'
+            }>
               <span className="min-w-0 flex-1">这条视频没打开：{error}</span>
               <button
                 type="button"
@@ -860,7 +892,7 @@ export function WatchView({
           ) : null}
           {!cinema && danmaku.length > 0 ? (
             <div className="border-t border-hairline xl:hidden">
-              <DanmakuList items={danmaku} />
+              <DanmakuList items={danmaku} onSeek={seekTo} />
             </div>
           ) : null}
           {!cinema && data ? (
@@ -931,7 +963,7 @@ export function WatchView({
                 onFollow={toggleFollow}
               />
             ) : null}
-            <DanmakuList items={danmaku} />
+            <DanmakuList items={danmaku} onSeek={seekTo} />
             {data ? (
               <ChapterList
                 desc={data.desc}

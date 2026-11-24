@@ -4439,6 +4439,96 @@ function watchUiWait(page) {
   }
 }
 
+async function checkWatchComfort(page) {
+  const waitFor = watchUiWait(page)
+  await page.viewport(1320, 900)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
+  await waitFor('document.querySelector("[data-track-card]")')
+  const saved = await page.evaluate(`localStorage.getItem('bilimusic.danmaku')`)
+  const toolbar = 'document.querySelector("[data-watch-danmaku-toolbar]")'
+  const player = 'document.querySelector("[data-watch-player]")'
+  const seek = (ms) => page.evaluate(`import('/src/shared/lib/ipc.ts').then(ipc => ipc.playerSeek(${ms}))`)
+  const clickCenter = async (element) => {
+    const point = await page.evaluate(`(() => {
+      const rect = (${element}).getBoundingClientRect()
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    })()`)
+    await page.mouseEvent({ type: 'mouseMoved', ...point })
+    await page.mouseEvent({ type: 'mousePressed', ...point, button: 'left', buttons: 1, clickCount: 1 })
+    await page.mouseEvent({ type: 'mouseReleased', ...point, button: 'left', buttons: 0, clickCount: 1 })
+    return point
+  }
+  try {
+    await page.evaluate(`localStorage.removeItem('bilimusic.danmaku'); location.href = ${JSON.stringify(`${WEB}?mergeDanmaku=1&loggedIn=1`)}`)
+    await waitFor('location.search.includes("mergeDanmaku") && window.shaka?.Player && document.querySelector("[data-track-card]")')
+    // 预览清单没有视频流；用同一张投稿的「听」起播，让真实的预览引擎提供播放时间。
+    await page.evaluate(`(() => {
+      window.shaka.Player.prototype.load = async () => {}
+      const card = document.querySelector('[data-track-card]')
+      card.querySelector('button[aria-label^="听"]').click()
+      card.querySelector('button[aria-label^="观看"]').click()
+    })()`)
+    await waitFor('window.__ohBilibiliWatch?.state().playing')
+    for (const [width, height] of [[1320, 820], [1150, 620], [380, 820]]) {
+      await page.viewport(width, height)
+      check(`${width}×${height} 可看到整幅视频，开关、设置和弹幕输入框都在画面下方`, await page.evaluate(`(() => {
+        const tool = ${toolbar}, video = ${player}.getBoundingClientRect()
+        if (!tool || video.top < 0 || video.bottom > innerHeight) return false
+        return ['button[aria-label="关闭弹幕"]','button[aria-label="弹幕设置"]','input[aria-label="发弹幕"]'].every(selector => {
+          const rect = tool.querySelector(selector)?.getBoundingClientRect()
+          return rect?.width > 0 && rect.left >= 0 && rect.right <= innerWidth && rect.top >= video.bottom - 1 && rect.bottom <= innerHeight
+        })
+      })()`))
+    }
+    await page.viewport(1320, 900)
+    await page.clickText('弹幕设置')
+    const panel = 'document.querySelector(\'[role="dialog"][aria-label="弹幕设置"]\')'
+    await waitFor(panel)
+    check('第一次观看默认只在画面上方四分之一显示弹幕', await page.evaluate(`[...${panel}.querySelectorAll('button')].some(b => b.textContent.trim() === '1/4' && b.getAttribute('aria-pressed') === 'true')`))
+    await page.evaluate(`[...${panel}.querySelectorAll('button')].find(b => b.textContent.trim() === '滚动').click()`)
+    await page.clickText('关闭弹幕设置')
+    await page.evaluate(`[...document.querySelectorAll('button')].find(b => b.getBoundingClientRect().width && b.textContent.startsWith('弹幕列表')).click()`)
+    const comment = `[...document.querySelectorAll('[aria-label="按时间排列的弹幕"] button')].find(b => b.textContent.includes('前奏一响'))`
+    await waitFor(comment)
+    await page.evaluate(`${comment}.click()`)
+    check('点 0:11 的弹幕，画面和弹幕一起跳到这一句', await waitFor(`
+      ${player}.querySelector('video').currentTime >= 11 && ${player}.querySelector('video').currentTime < 13 &&
+      ${player}.querySelector('.danmaku-pinned')?.textContent.includes('前奏一响')
+    `))
+    check('底部固定弹幕也留在选定区域内，字幕所在的下方留空', await page.evaluate(`(() => {
+      const bounds = ${player}.getBoundingClientRect(), line = ${player}.querySelector('.danmaku-pinned').getBoundingClientRect()
+      return line.height > 0 && line.top >= bounds.top && line.bottom <= bounds.top + bounds.height / 4 + 1
+    })()`))
+    await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
+    await waitFor(`${player}.dataset.controlsVisible === 'false'`)
+    check('控制条淡出后，在原播放键位置点击能直接操作画面', await page.evaluate(`(() => {
+      const rect = document.querySelector('[data-watch-controls] button').getBoundingClientRect()
+      return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.tagName === 'VIDEO'
+    })()`))
+    await page.clickText('关闭弹幕')
+    check('控制条收起时仍能一键关弹幕', await waitFor(`${toolbar}.querySelector('[aria-label="打开弹幕"]') && !${player}.querySelector('.danmaku-pinned')`))
+    await page.keyEvent({ type: 'rawKeyDown', key: 'd', code: 'KeyD', windowsVirtualKeyCode: 68 })
+    await page.keyEvent({ type: 'keyUp', key: 'd', code: 'KeyD', windowsVirtualKeyCode: 68 })
+    check('按 D 重新开启弹幕，同步更新画面外的开关', await waitFor(`${toolbar}.querySelector('[aria-label="关闭弹幕"]')?.getAttribute('aria-pressed') === 'true'`))
+    await page.clickText('字幕')
+    await clickCenter(`[...${player}.querySelectorAll('button')].find(b => b.textContent === '中文（中国）')`)
+    await seek(200)
+    await page.mouseEvent({ type: 'mouseMoved', x: 1, y: 1 })
+    await waitFor(`${player}.innerText.includes('预览字幕第一句')`)
+    check('控制条隐藏后，字幕仍随播放从第一句换成第二句', await waitFor(`${player}.dataset.controlsVisible === 'false' && ${player}.innerText.includes('预览字幕第二句')`))
+    const center = await clickCenter(`${player}.querySelector('video')`)
+    await waitFor('!window.__ohBilibiliWatch.state().playing')
+    check('暂停时画面中央仍是视频', await page.evaluate(`
+      document.elementFromPoint(${center.x}, ${center.y}) === ${player}.querySelector('video')
+    `))
+    await page.evaluate(`document.querySelector('[data-watch-controls] button[aria-label="播放"]').click()`)
+    check('暂停后可从底栏继续播放', await waitFor('window.__ohBilibiliWatch.state().playing'))
+  } finally {
+    await page.evaluate(saved === null ? "localStorage.removeItem('bilimusic.danmaku')"
+      : `localStorage.setItem('bilimusic.danmaku', ${JSON.stringify(saved)})`)
+  }
+}
+
 async function checkWatchPartHistory(page) {
   const waitFor = watchUiWait(page)
   await page.viewport(1320, 900)
@@ -4605,6 +4695,10 @@ async function main() {
       await checkCommentPauseIntent(page)
       return
     }
+    if (process.argv.includes('--watch-comfort-only')) {
+      await checkWatchComfort(page)
+      return
+    }
     if (process.argv.includes('--watch-history-only')) {
       await checkWatchPartHistory(page)
       return
@@ -4673,6 +4767,7 @@ async function main() {
     await checkFollowingDirectory(page)
     await checkDiscoveryFeed(page)
     await checkHistoryParts(page)
+    await checkWatchComfort(page)
     await checkWatchPartHistory(page)
     await checkNavConventions(page)
     await checkRanking(page)
@@ -4924,7 +5019,7 @@ async function main() {
 
     check('点「弹幕列表」', await page.clickText('弹幕列表'))
     await sleep(800)
-    check('弹幕列表展开到多行', (await page.evaluate(`document.querySelectorAll('[class*="max-h-"] li').length`)) > 3)
+    check('弹幕列表展开到多行', (await page.evaluate(`document.querySelectorAll('[aria-label="按时间排列的弹幕"] button').length`)) > 3)
 
     const layout = await page.evaluate(`(() => {
       const doc = document.scrollingElement

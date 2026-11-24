@@ -1,0 +1,15 @@
+.video-danmaku {
+  font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 500;
+}
+
+.video-danmaku .danmaku-pinned {
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-danmaku .danmaku,
+.stage-danmaku .danmaku-pinned {
+  text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 1px #fff;
+}

@@ -30,7 +30,7 @@ export function useStageDanmaku(trackKey: string | undefined, page: PageRef | nu
     let cancelled = false
     void ipc.danmakuColored(trackKey, cid)
       .then((list) => {
-        if (!cancelled) setLoaded({ trackKey, cid, items: toDanmakuItems(list) })
+        if (!cancelled) setLoaded({ trackKey, cid, items: toDanmakuItems(list, 'var(--text-1)') })
       })
       .catch(() => {})
     return () => {

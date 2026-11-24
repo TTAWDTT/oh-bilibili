@@ -1,64 +1,50 @@
-import { useState } from 'react'
-import * as ipc from '../../shared/lib/ipc'
+import { useMemo, useState } from 'react'
+import { VirtualList } from '../../shared/ui/VirtualList'
 import { formatTime } from '../../shared/lib/format'
 import { Icon } from '../../shared/ui/Icon'
 import type { DanmakuItem } from '../player/DanmakuField'
 
-/**
- * 右栏的弹幕列表，B 站网页版默认收起。
- * 点一条就跳到那个时刻——比在进度条上盲找准。
- */
-export function DanmakuList({ items }: { items: DanmakuItem[] }) {
+const ROW_HEIGHT = 30
+
+export function DanmakuList({ items, onSeek }: { items: DanmakuItem[]; onSeek: (ms: number) => void }) {
   const [open, setOpen] = useState(false)
+  const sorted = useMemo(() => open ? [...items].sort((a, b) => a.at - b.at) : [], [items, open])
   if (items.length === 0) return null
 
-  const sorted = [...items].sort((a, b) => a.at - b.at)
-
   return (
-    <div className="px-2 py-1">
-      <div className="overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className="t flex h-9 w-full items-center gap-2 rounded-[4px] px-2 text-[13px] text-[var(--text-1)] hover:text-[var(--accent)]"
+    <section className="watch-dm-directory">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="watch-dm-heading"
+      >
+        <span className="flex-1 text-left">弹幕列表</span>
+        <span className="num text-xs font-normal text-[var(--text-3)]">{items.length} 条</span>
+        <Icon name="chevronRight" size={14} className={open ? '-rotate-90' : 'rotate-90'} />
+      </button>
+      {open && (
+        <div
+          role="region"
+          aria-label="按时间排列的弹幕"
+          className="flex flex-col"
+          style={{ height: Math.min(8, sorted.length) * ROW_HEIGHT }}
         >
-          <span className="min-w-0 flex-1 text-left">弹幕列表</span>
-          <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
-          <Icon
-            name="chevronRight"
-            size={14}
-            className={`shrink-0 text-[var(--text-3)] transition-transform ${open ? 'rotate-90' : ''}`}
+          <VirtualList
+            items={sorted}
+            rowHeight={ROW_HEIGHT}
+            renderRow={(item) => (
+              <button type="button" onClick={() => onSeek(item.at)} title={item.text} className="watch-dm-row">
+                <span className="num text-[var(--text-3)]">{formatTime(item.at)}</span>
+                <span className="truncate" style={isPale(item.color) ? undefined : { color: item.color }}>
+                  {item.text}
+                </span>
+              </button>
+            )}
           />
-        </button>
-        {open ? (
-          <ul className="max-h-[240px] overflow-y-auto bg-[var(--panel)] px-1 py-1">
-            {sorted.map((item, index) => (
-              <li key={`${item.at}-${index}`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void ipc.playerSeek(item.at).catch(() => {})
-                  }}
-                  title={item.text}
-                  className="t flex w-full gap-2 rounded-[3px] px-2 py-0.5 text-left text-[12px] hover:bg-[var(--panel-hover)]"
-                >
-                  <span className="num shrink-0 text-[var(--text-3)]">{formatTime(item.at)}</span>
-                  {/* B 站列表照抄弹幕自己的颜色：一眼能看出哪些是彩蛋、哪些是白字。
-                      白字（含浅色）留在主题色上，否则会在白底列表里消失。 */}
-                  <span
-                    className="min-w-0 flex-1 truncate"
-                    style={isPale(item.color) ? undefined : { color: item.color }}
-                  >
-                    {item.text}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-    </div>
+        </div>
+      )}
+    </section>
   )
 }
 

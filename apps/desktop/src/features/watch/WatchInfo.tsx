@@ -109,10 +109,9 @@ export function WatchHead({
   const page = data.pages.find((entry) => entry.no === currentPage)
   return (
     <div className="watch-head">
-      {/* 返回键在画面左上角；这里只留标题与「听视频」。 */}
       <div className="flex items-start gap-2">
         <h1
-          className="min-w-0 flex-1 text-[20px] leading-[1.32] font-semibold md:text-[24px] text-[var(--text-1)]"
+          className="min-w-0 flex-1 text-[19px] leading-snug font-semibold md:text-[22px] text-[var(--text-1)]"
           title={track.title}
         >
           {track.title}

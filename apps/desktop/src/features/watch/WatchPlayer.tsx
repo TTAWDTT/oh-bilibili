@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -22,7 +21,8 @@ import { VolumeControl } from '../player/VolumeControl'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
-import { BiliDanmakuSetting, BiliDanmakuSwitch } from '../../shared/ui/BiliDanmakuIcons'
+import { WatchDanmakuTools } from './WatchDanmakuTools'
+import './watch-player.css'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
 
@@ -48,31 +48,7 @@ const DRIFT_LAG_SEEK_MS = 1500
 /** 追偏差时最多把画面速度改这么多，再多就看得出来变速了。 */
 const NUDGE_RATIO = 0.06
 
-/** 发弹幕可选的颜色，取 B 站播放器那排常用色。 */
-const DANMAKU_COLORS: { name: string; value: number }[] = [
-  { name: '白', value: 0xffffff },
-  { name: '红', value: 0xfe0302 },
-  { name: '橙', value: 0xff9104 },
-  { name: '黄', value: 0xffd302 },
-  { name: '绿', value: 0x00cd00 },
-  { name: '蓝', value: 0x00a1d6 },
-  { name: '紫', value: 0xa020f0 },
-  { name: '黑', value: 0x000000 },
-]
-
-/** 弹幕位置：B 站的 mode 参数。 */
-const DANMAKU_MODES: { name: string; value: number }[] = [
-  { name: '滚动', value: 1 },
-  { name: '顶部', value: 5 },
-  { name: '底部', value: 4 },
-]
-
-/** 弹幕可出现的画面高度，和 B 站播放器一样分三档。 */
-const DANMAKU_AREAS = [
-  { name: '1/4', value: 0.25 },
-  { name: '1/2', value: 0.5 },
-  { name: '全屏', value: 1 },
-] as const
+type PlayerMenu = 'danmaku' | 'subtitles' | 'pages' | 'quality' | 'speed'
 
 const cssColor = (value: number): string => `#${value.toString(16).padStart(6, '0')}`
 
@@ -190,10 +166,7 @@ function DanmakuComposer({
           tone === 'dark' ? 'text-white/60 hover:text-white' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'
         }`}
       >
-        请先
-        <span className="text-[var(--accent)]">登录</span>
-        或
-        <span className="text-[var(--accent)]">注册</span>
+        登录后发弹幕
       </button>
     )
   }
@@ -206,7 +179,7 @@ function DanmakuComposer({
         onKeyDown={(event) => {
           if (event.key === 'Enter') onSend()
         }}
-        placeholder="发个友善的弹幕见证当下"
+        placeholder="发弹幕"
         aria-label="发弹幕"
         className={`h-8 min-w-0 rounded-[4px] border px-2 text-[12px] outline-none transition-colors ${
           tone === 'dark'
@@ -221,7 +194,7 @@ function DanmakuComposer({
         aria-label="发送"
         className="t press flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-[var(--accent)] text-white disabled:opacity-40"
       >
-        <Icon name="send" size={14} />
+        发送
       </button>
     </>
   )
@@ -306,10 +279,10 @@ export function WatchPlayer({
   coins: number
 }) {
   const nextTitle = nextUp?.title ?? null
+  const frameRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<ShakaPlayer | null>(null)
   const hideTimer = useRef<number | null>(null)
-  const fullscreenSynced = useRef(false)
   /** 冒烟脚本读的最后一次落位；播放时钟在无头预览里没有真值。 */
   const lastSeek = useRef<number | null>(null)
   /** 当前生效的变体高度，降档时用它找下一档。 */
@@ -326,12 +299,13 @@ export function WatchPlayer({
   const [activeId, setActiveId] = useState<number | null>(null)
   const [qualityAuto, setQualityAuto] = useState(loadQualityAuto)
   const [controls, setControls] = useState(true)
+  const [overControls, setOverControls] = useState(false)
+  const [focusedControl, setFocusedControl] = useState(false)
+  const [menu, setMenu] = useState<PlayerMenu | null>(null)
+  const menuButton = useRef<HTMLButtonElement | null>(null)
   /** 画中画只在浏览器/WebView 支持时出现；不支持就不摆假按钮。 */
   const [pip, setPip] = useState(false)
   const pipSupported = typeof document !== 'undefined' && document.pictureInPictureEnabled
-  const [qualityOpen, setQualityOpen] = useState(false)
-  const [speedOpen, setSpeedOpen] = useState(false)
-  const [pagesOpen, setPagesOpen] = useState(false)
   const [now, setNow] = useState(0)
   /**
    * 字幕：开着哪一轨（null 表示关）。台词只在打开时取一次，
@@ -339,7 +313,6 @@ export function WatchPlayer({
    */
   const [subTrack, setSubTrack] = useState<string | null>(null)
   const [subCues, setSubCues] = useState<ipc.SubtitleCue[] | null>(null)
-  const [subMenu, setSubMenu] = useState(false)
   const [draft, setDraft] = useState('')
   /** 发弹幕的位置；颜色跨视频沿用设置里的偏好。 */
   const [draftMode, setDraftMode] = useState(1)
@@ -369,7 +342,6 @@ export function WatchPlayer({
   const setAutoplay = useAutoplay((state) => state.setEnabled)
   const loopOne = useLoopOne((state) => state.enabled)
   const setLoopOne = useLoopOne((state) => state.setEnabled)
-  /** 没登录就没有发弹幕资格：把「请先登录或注册」摆在输入框的位置上。 */
   const signedIn = useAuthStore((state) => state.auth !== null)
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
   const onNextRef = useRef(onNext)
@@ -392,16 +364,9 @@ export function WatchPlayer({
   const danmakuBlockWords = useDanmakuSettings((s) => s.blockWords)
   const danmakuBlockTypes = useDanmakuSettings((s) => s.blockTypes)
   const sendColor = useDanmakuSettings((s) => s.sendColor)
-  const setDanmakuEnabled = useDanmakuSettings((s) => s.setEnabled)
-  const patchDanmaku = useDanmakuSettings((s) => s.patch)
-  const setDanmakuBlockWords = useDanmakuSettings((s) => s.setBlockWords)
-  const toggleDanmakuBlockType = useDanmakuSettings((s) => s.toggleBlockType)
-  const setSendColor = useDanmakuSettings((s) => s.setSendColor)
   const danmakuMergeSame = useDanmakuSettings((s) => s.mergeSame)
-  const setDanmakuMergeSame = useDanmakuSettings((s) => s.setMergeSame)
-  const [danmakuPanel, setDanmakuPanel] = useState(false)
   useEffect(() => {
-    if (!danmakuPanel && !pagesOpen) return
+    if (!menu) return
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       const modalOpen = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(
@@ -410,29 +375,35 @@ export function WatchPlayer({
       if (modalOpen) return
       event.preventDefault()
       event.stopPropagation()
-      setDanmakuPanel(false)
-      setPagesOpen(false)
+      setMenu(null)
+      menuButton.current?.focus()
+    }
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.target instanceof Element && !event.target.closest('[data-watch-menu]')) setMenu(null)
     }
     document.addEventListener('keydown', onKeyDown, true)
-    return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [danmakuPanel, pagesOpen])
-  const [blockDraft, setBlockDraft] = useState('')
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [menu])
+
+  const finishMenuSelection = (): void => {
+    setMenu(null)
+    menuButton.current?.focus({ preventScroll: true })
+  }
+
+  const toggleMenu = (next: PlayerMenu, button: HTMLButtonElement): void => {
+    menuButton.current = button
+    setMenu((current) => current === next ? null : next)
+  }
 
   /** 屏蔽词和屏蔽类型只作用于画面上的弹幕，右栏列表仍保留全部。 */
   const visibleDanmaku = useMemo(
     () => filterDanmaku(danmaku, danmakuBlockWords, danmakuBlockTypes),
     [danmaku, danmakuBlockWords, danmakuBlockTypes],
   )
-
-  const addBlockWords = (): void => {
-    const words = blockDraft
-      .split(/[\s,，]+/)
-      .map((word) => word.trim().toLowerCase())
-      .filter(Boolean)
-    if (words.length === 0) return
-    setDanmakuBlockWords([...new Set([...danmakuBlockWords, ...words])])
-    setBlockDraft('')
-  }
 
   /** 引擎可能停在另一条视频上（比如这条没打开），别把别人的时间当成本条。 */
   const localPlayhead = (): number => {
@@ -510,20 +481,15 @@ export function WatchPlayer({
     }
   }, [countdown, countdownHover, ended, nextTitle, countdownCancelled])
 
-  // 位置只在控制条可见时刷新。隐藏时不跑定时器，省掉整页重渲染。
   useEffect(() => {
-    if (!controls) return
-    const timer = window.setInterval(() => setNow(Math.round(localPlayhead())), 500)
-    return () => window.clearInterval(timer)
-  }, [controls])
+    if (playing) poke()
+  }, [playing])
 
   /** 上一次单击的时间。双击时要把那次误触发的暂停收回来。 */
   const lastClickAt = useRef(0)
 
   const togglePlay = (): void => {
-    void ipc.playerToggle().catch(() => {
-      // 没加载起来时点播放不该静默失败，但也不该假装成功
-    })
+    void usePlayerStore.getState().toggle()
     poke()
   }
 
@@ -603,34 +569,10 @@ export function WatchPlayer({
    * 两者都靠隐藏应用外壳腾出空间；元素全屏在 WKWebView 里会把 MSE 画黑，不能用。
    */
   const setStageMode = (web: boolean, os: boolean): void => {
+    setMenu(null)
     setCinema(web)
     setOsFullscreen(os)
   }
-
-  useEffect(() => {
-    // 首次挂载不要把用户自己开的窗口全屏关掉。
-    if (!fullscreenSynced.current) {
-      fullscreenSynced.current = true
-      return
-    }
-    try {
-      void getCurrentWindow().setFullscreen(osFullscreen).catch(() => {})
-    } catch {
-      // 浏览器预览里没有 Tauri 窗口。
-    }
-  }, [osFullscreen])
-
-  useEffect(() => {
-    return () => {
-      useAppStore.getState().setCinema(false)
-      useAppStore.getState().setOsFullscreen(false)
-      try {
-        void getCurrentWindow().setFullscreen(false).catch(() => {})
-      } catch {
-        // 浏览器预览里没有 Tauri 窗口。
-      }
-    }
-  }, [])
 
   /** 当前这一 P 的 cid：弹幕、字幕、预览图都按它取。 */
   const cid = data.pages.find((p) => p.no === data.current_page)?.cid ?? data.pages[0]?.cid ?? 0
@@ -644,7 +586,7 @@ export function WatchPlayer({
       const cid = data.pages.find((page) => page.no === currentPage)?.cid
       await ipc.danmakuSend(track.key, text, at, draftMode, sendColor, cid)
       setDraft('')
-      onDanmakuSent({ at, text, color: cssColor(sendColor), mode: draftMode })
+      onDanmakuSent({ at, text, color: cssColor(sendColor), mode: draftMode, own: true })
       poke()
     } catch (cause) {
       // 草稿留着，但失败原因要说出来：B 站限流时静默不动，看起来就是「点了没反应」。
@@ -722,7 +664,7 @@ export function WatchPlayer({
     audioLive.current = false
     // 字幕属于上一条：换片就该关掉，别把上一部的台词挂在新画面上。
     setSubTrack(null)
-    setSubMenu(false)
+    setMenu(null)
     // 时间与续播提示也属于上一条，跟着清单一起换掉。
     setNow(0)
     setResumeNotice(null)
@@ -878,6 +820,19 @@ export function WatchPlayer({
 
   /** 正在拖动进度条时指针所在的百分比；null 表示没在拖。 */
   const [scrub, setScrub] = useState<number | null>(null)
+  // WebKit 卸载正被聚焦的菜单项时不会发送 blur。
+  useLayoutEffect(() => {
+    if (focusedControl && !frameRef.current?.contains(document.activeElement)) setFocusedControl(false)
+  })
+  const controlsVisible = !playing || controls || overControls || focusedControl || scrub !== null ||
+    (menu !== null && (cinema || menu !== 'danmaku'))
+  useEffect(() => {
+    // 字幕也使用播放时间，收起控制条时仍要继续换句。
+    if (!controlsVisible && subTrack === null) return
+    const timer = window.setInterval(() => setNow(Math.round(localPlayhead())), 250)
+    return () => window.clearInterval(timer)
+  }, [controlsVisible, subTrack])
+
   const duration = data.duration_ms || track.duration_ms || 0
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
   /** 拖动时进度条与时间跟着指针走，松手才真的落位。 */
@@ -1087,9 +1042,25 @@ export function WatchPlayer({
     }
   }
 
+  const danmakuTools = (
+    <WatchDanmakuTools
+      cinema={cinema}
+      open={menu === 'danmaku'}
+      onToggle={(button) => toggleMenu('danmaku', button)}
+      onClose={() => setMenu(null)}
+      draftMode={draftMode}
+      setDraftMode={setDraftMode}
+    />
+  )
+
   return (
     <>
     <div
+      ref={frameRef}
+      onFocusCapture={(event) => setFocusedControl(event.target.matches(':focus-visible, input, textarea'))}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusedControl(false)
+      }}
       onMouseMove={poke}
       onMouseLeave={() => setControls(false)}
       onContextMenu={(event) => {
@@ -1104,6 +1075,8 @@ export function WatchPlayer({
         poke()
       }}
       data-watch-player
+      data-controls-visible={controlsVisible}
+      data-watch-cinema={cinema}
       className={
         cinema
           ? 'relative flex h-full w-full flex-col justify-center bg-black'
@@ -1140,21 +1113,19 @@ export function WatchPlayer({
         area={danmakuArea}
         mergeSame={danmakuMergeSame}
         playbackRate={speed}
-        fade
       />
       {/* 字幕压在画面下缘、控制条之上；关掉字幕就整块不渲染。 */}
       {cue ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[9%] z-[3] flex justify-center px-10">
+        <div className="watch-subtitle pointer-events-none absolute inset-x-0 z-[15] flex justify-center px-4">
           <span
             className="max-w-[86%] rounded-[3px] bg-black/55 px-2 py-0.5 text-center leading-[1.45] text-white"
-            style={{ fontSize: `${Math.max(13, danmakuSize + 3)}px`, textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
           >
             {cue.text}
           </span>
         </div>
       ) : null}
       {cinema ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/55 to-transparent px-4 pb-12 pt-3">
+        <div className="watch-cinema-heading pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 bg-gradient-to-b from-black/65 to-transparent px-4 pb-8 pt-3 text-white">
           <div className="min-w-0 max-w-[72%]">
             <div className="truncate text-[14px] text-white/90" title={track.title}>
               {track.title}
@@ -1166,6 +1137,16 @@ export function WatchPlayer({
               </div>
             ) : null}
           </div>
+          {!osFullscreen ? (
+            <button
+              type="button"
+              onClick={() => setStageMode(false, false)}
+              className="watch-cinema-exit flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px]"
+            >
+              <Icon name="close" size={15} />
+              退出网页全屏
+            </button>
+          ) : null}
         </div>
       ) : null}
       {!ready && !error ? (
@@ -1178,19 +1159,6 @@ export function WatchPlayer({
           <span className="bili-buffer-spin h-9 w-9 rounded-full border-2 border-white/25 border-t-white" />
           <span className="text-[12px]">正在缓冲…</span>
         </div>
-      ) : null}
-      {ready && !playing && !buffering && !ended && !error ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            togglePlay()
-          }}
-          aria-label="播放"
-          className="t press absolute left-1/2 top-1/2 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/25 backdrop-blur-[2px] hover:bg-black/60"
-        >
-          <Icon name="play" size={24} />
-        </button>
       ) : null}
       {error && !forceEnded ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 px-6 text-center text-[13px] text-white">
@@ -1561,12 +1529,12 @@ export function WatchPlayer({
         </dl>
       </Modal>
 
-      {/* 控制条浮在画面上：鼠标移上来才出现，静止就淡出。
-          常驻一条控制条会把画面挤小，视频网站都不这么做。 */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-1.5 pt-10 text-white transition-opacity duration-200 ${
-          controls || !playing ? 'opacity-100' : 'opacity-0'
-        }`}
+        data-watch-overlay
+        data-visible={controlsVisible}
+        className="watch-overlay absolute inset-x-0 bottom-0 z-20 text-white"
+        onMouseEnter={() => setOverControls(true)}
+        onMouseLeave={() => setOverControls(false)}
       >
         {/* 全屏时没有画面下方那条栏，发弹幕留在控制条里。 */}
         {cinema ? (
@@ -1586,7 +1554,7 @@ export function WatchPlayer({
 
         {/* 热度条和进度条各占一层：热度在上、进度条在下，热度不能溢出进度条自己的盒，
             WebKit 不会把命中区给溢出的绝对定位子元素。 */}
-        <div className="relative mb-1.5 h-5">
+        <div className="relative mb-0.5 h-5">
           <DanmakuBeats
             items={visibleDanmaku}
             durationMs={duration}
@@ -1736,16 +1704,17 @@ export function WatchPlayer({
         </div>
         </div>
 
-        <div data-watch-controls className="flex items-center gap-1 sm:gap-2">
+        <div data-watch-controls className="flex items-center gap-0.5 sm:gap-1">
           <button
             type="button"
             onClick={togglePlay}
             aria-label={playing ? '暂停' : '播放'}
-            className="bili-icon-btn t press flex h-[22px] w-8 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15 sm:w-9"
+            title={playing ? '暂停（空格）' : '播放（空格）'}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-white/15"
           >
-            <Icon name={playing ? 'pause' : 'play'} size={15} />
+            <Icon name={playing ? 'pause' : 'play'} size={23} />
           </button>
-          <span className="num shrink-0 text-[12px] text-white/80">
+          <span className="num shrink-0 text-[12px] text-white/90">
             {formatTime(scrub === null ? now : scrub * duration)}
             <span className="hidden sm:inline"> / {formatTime(duration)}</span>
           </span>
@@ -1772,9 +1741,9 @@ export function WatchPlayer({
             onClick={captureShot}
             aria-label="截图"
             title="截图"
-            className="bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 sm:flex md:hidden xl:flex"
+            className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-white/85 hover:bg-white/15 sm:flex md:hidden xl:flex"
           >
-            <Icon name="camera" size={16} />
+            <Icon name="camera" size={21} />
           </button>
 
           {pipSupported ? (
@@ -1784,54 +1753,38 @@ export function WatchPlayer({
               aria-pressed={pip}
               aria-label={pip ? '退出画中画' : '画中画'}
               title={pip ? '退出画中画' : '画中画'}
-              className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] md:flex ${
+              className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] md:flex ${
                 pip ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
               }`}
             >
-              <Icon name="pip" size={16} />
+              <Icon name="pip" size={21} />
             </button>
           ) : null}
 
-          <button
-            type="button"
-            aria-pressed={danmakuOn}
-            aria-label={danmakuOn ? '关闭弹幕' : '打开弹幕'}
-            title={danmakuOn ? '关闭弹幕' : '打开弹幕'}
-            onClick={() => setDanmakuEnabled(!danmakuOn)}
-            className={`t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] ${
-              danmakuOn ? 'bg-white/20 text-white' : 'text-white/45 hover:bg-white/10 hover:text-white/70'
-            }`}
-          >
-            <BiliDanmakuSwitch size={18} on={danmakuOn} />
-          </button>
+          {cinema ? danmakuTools : null}
 
           {/* 字幕。没有字幕轨的条目不出现这颗按钮——B 站也是这样。 */}
           {subtitleTracks.length > 0 ? (
-            <div className="relative shrink-0">
+            <div className="relative shrink-0" data-watch-menu>
               <button
                 type="button"
-                onClick={() => {
-                  setDanmakuPanel(false)
-                  setQualityOpen(false)
-                  setSpeedOpen(false)
-                  setSubMenu((open) => !open)
-                }}
-                aria-expanded={subMenu}
+                onClick={(event) => toggleMenu('subtitles', event.currentTarget)}
+                aria-expanded={menu === 'subtitles'}
                 aria-label="字幕"
                 title="字幕"
-                className={`bili-icon-btn t press flex h-7 shrink-0 items-center justify-center rounded-[4px] px-1.5 text-[11px] font-medium tracking-wide ${
+                className={`flex h-7 shrink-0 items-center justify-center rounded-[4px] px-1.5 text-[11px] font-medium tracking-wide ${
                   subTrack ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
                 }`}
               >
                 CC
               </button>
-              {subMenu ? (
+              {menu === 'subtitles' ? (
                 <div className="absolute bottom-9 right-0 z-30 flex max-h-[260px] w-[168px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
                   <button
                     type="button"
                     onClick={() => {
                       setSubTrack(null)
-                      setSubMenu(false)
+                      finishMenuSelection()
                     }}
                     className={`t press px-3 py-1 text-left text-[12px] ${
                       subTrack === null ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -1845,7 +1798,7 @@ export function WatchPlayer({
                       type="button"
                       onClick={() => {
                         setSubTrack(t.lan)
-                        setSubMenu(false)
+                        finishMenuSelection()
                       }}
                       className={`t press px-3 py-1 text-left text-[12px] ${
                         subTrack === t.lan ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -1859,238 +1812,13 @@ export function WatchPlayer({
             </div>
           ) : null}
 
-          {/* 弹幕设置。B 站播放器在「弹」旁边就是这个齿轮：显示区域、样式、颜色、位置都在这里。 */}
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setQualityOpen(false)
-                setSpeedOpen(false)
-                setPagesOpen(false)
-                setDanmakuPanel((open) => !open)
-              }}
-              aria-expanded={danmakuPanel}
-              aria-label="弹幕设置"
-              title="弹幕设置"
-              className={`bili-icon-btn t press flex h-7 w-7 items-center justify-center rounded-[4px] ${
-                danmakuPanel ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
-              }`}
-            >
-              <BiliDanmakuSetting size={17} />
-            </button>
-            {danmakuPanel ? (
-              <div className="fixed inset-x-3 bottom-20 z-40 max-h-[60vh] w-auto overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 p-3 text-white backdrop-blur md:absolute md:inset-auto md:bottom-9 md:right-0 md:z-30 md:max-h-[70vh] md:w-[236px]">
-                <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between border-b border-white/10 bg-black/90 px-3 py-2 md:hidden">
-                  <span className="text-[12px] text-white/60">弹幕设置</span>
-                  <button
-                    type="button"
-                    onClick={() => setDanmakuPanel(false)}
-                    className="text-[12px] text-white/80 hover:text-white"
-                  >
-                    关闭
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                  <span>显示区域</span>
-                  <span>{DANMAKU_AREAS.find((option) => option.value === danmakuArea)?.name}</span>
-                </div>
-                <div className="mt-1.5 flex gap-1">
-                  {DANMAKU_AREAS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={danmakuArea === option.value}
-                      onClick={() => patchDanmaku({ area: option.value })}
-                      className={`t press flex-1 rounded-[3px] py-1 text-[11px] leading-none ${
-                        danmakuArea === option.value
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'bg-white/10 text-white/80 hover:bg-white/20'
-                      }`}
-                    >
-                      {option.name}
-                    </button>
-                  ))}
-                </div>
-                {(
-                  [
-                    { key: 'opacity', label: '不透明度', min: 0.2, max: 1, step: 0.1, value: danmakuOpacity },
-                    { key: 'size', label: '字号', min: 11, max: 20, step: 1, value: danmakuSize },
-                    { key: 'speed', label: '速度', min: 0.6, max: 2, step: 0.2, value: danmakuSpeed },
-                  ] as const
-                ).map((row) => (
-                  <label key={row.key} className="block border-t border-white/10 pt-2">
-                    <span className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                      <span>{row.label}</span>
-                      <span className="num">{row.key === 'opacity' ? `${Math.round(row.value * 100)}%` : row.value}</span>
-                    </span>
-                    <input
-                      type="range"
-                      min={row.min}
-                      max={row.max}
-                      step={row.step}
-                      value={row.value}
-                      onChange={(event) => patchDanmaku({ [row.key]: Number(event.target.value) })}
-                      className="bili-range mt-1 w-full"
-                    />
-                  </label>
-                ))}
-
-                <div className="border-t border-white/10 pt-2">
-                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                    <span>屏蔽类型</span>
-                  </div>
-                  <div className="mt-1.5 flex gap-1">
-                    {(
-                      [
-                        { value: 'roll', name: '滚动' },
-                        { value: 'top', name: '顶部' },
-                        { value: 'bottom', name: '底部' },
-                      ] as const
-                    ).map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={danmakuBlockTypes.includes(option.value)}
-                        onClick={() => toggleDanmakuBlockType(option.value)}
-                        className={`t press flex-1 rounded-[4px] py-1 text-[11px] leading-none ${
-                          danmakuBlockTypes.includes(option.value)
-                            ? 'bg-[var(--accent)] text-white'
-                            : 'bg-white/10 text-white/80 hover:bg-white/20'
-                        }`}
-                      >
-                        {option.name}
-                      </button>
-                    ))}
-                  </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={danmakuMergeSame}
-                  onClick={() => setDanmakuMergeSame(!danmakuMergeSame)}
-                  className="mt-2 flex w-full items-center justify-between border-t border-white/10 pt-2 text-[11px] leading-none text-white/70 hover:text-white"
-                >
-                  合并同句
-                  <span
-                    className={`relative flex h-4 w-7 items-center rounded-full p-0.5 transition-colors ${
-                      danmakuMergeSame ? 'bg-[var(--accent)]' : 'bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`h-3 w-3 rounded-full bg-white transition-transform ${
-                        danmakuMergeSame ? 'translate-x-3' : 'translate-x-0'
-                      }`}
-                    />
-                  </span>
-                </button>
-                </div>
-
-                <div className="border-t border-white/10 pt-2">
-                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                    <span>屏蔽词</span>
-                    {danmakuBlockWords.length > 0 ? (
-                      <span className="num">{danmakuBlockWords.length} 个</span>
-                    ) : null}
-                  </div>
-                  <div className="mt-1.5 flex gap-1">
-                    <input
-                      value={blockDraft}
-                      onChange={(event) => setBlockDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addBlockWords()
-                        }
-                      }}
-                      placeholder="输入后回车"
-                      className="h-6 min-w-0 flex-1 rounded-[3px] border border-white/15 bg-white/[0.08] px-1.5 text-[11px] text-white placeholder-white/45 outline-none focus:border-[var(--accent)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={addBlockWords}
-                      className="t press h-6 rounded-[3px] bg-white/10 px-2 text-[11px] text-white/80 hover:bg-white/20"
-                    >
-                      加
-                    </button>
-                  </div>
-                  {danmakuBlockWords.length > 0 ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {danmakuBlockWords.map((word) => (
-                        <button
-                          key={word}
-                          type="button"
-                          onClick={() =>
-                            setDanmakuBlockWords(danmakuBlockWords.filter((item) => item !== word))
-                          }
-                          className="t press rounded-[3px] bg-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:bg-white/20"
-                        >
-                          {word} ×
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="border-t border-white/10 pt-2">
-                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                    <span>弹幕颜色</span>
-                    <span>{DANMAKU_COLORS.find((color) => color.value === sendColor)?.name}</span>
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-8 gap-1.5">
-                    {DANMAKU_COLORS.map((color) => (
-                      <button
-                        key={color.value}
-                        type="button"
-                        aria-label={`弹幕颜色 ${color.name}`}
-                        aria-pressed={sendColor === color.value}
-                        onClick={() => setSendColor(color.value)}
-                        className={`h-4 w-4 rounded-full border ${
-                          sendColor === color.value ? 'border-white ring-1 ring-white' : 'border-white/40'
-                        }`}
-                        style={{ background: cssColor(color.value) }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-white/10 pt-2">
-                  <div className="flex items-center justify-between text-[11px] leading-none text-white/70">
-                    <span>位置</span>
-                    <span>{DANMAKU_MODES.find((mode) => mode.value === draftMode)?.name}</span>
-                  </div>
-                  <div className="mt-1.5 flex gap-1">
-                    {DANMAKU_MODES.map((mode) => (
-                      <button
-                        key={mode.value}
-                        type="button"
-                        aria-pressed={draftMode === mode.value}
-                        onClick={() => setDraftMode(mode.value)}
-                        className={`t press flex-1 rounded-[4px] py-1 text-[11px] leading-none ${
-                          draftMode === mode.value
-                            ? 'bg-[var(--accent)] text-white'
-                            : 'bg-white/10 text-white/80 hover:bg-white/20'
-                        }`}
-                      >
-                        {mode.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
           {/* 普通布局另有目录入口（窄窗在播放器下方，宽窗在右栏），这里只留给影院/全屏。 */}
           {data.pages.length > 1 && cinema ? (
-            <div className="relative flex shrink-0">
+            <div className="relative flex shrink-0" data-watch-menu>
               <button
                 type="button"
-                onClick={() => {
-                  setDanmakuPanel(false)
-                  setSpeedOpen(false)
-                  setQualityOpen(false)
-                  setPagesOpen((open) => !open)
-                }}
-                aria-expanded={pagesOpen}
+                onClick={(event) => toggleMenu('pages', event.currentTarget)}
+                aria-expanded={menu === 'pages'}
                 aria-label="选集"
                 title="选集"
                 className="t press flex h-7 items-center gap-1 rounded-[4px] px-1 text-[12px] hover:bg-white/15 sm:px-2"
@@ -2098,13 +1826,13 @@ export function WatchPlayer({
                 <span className="hidden sm:inline">选集</span>
                 <span className="num text-[11px] text-white/55">P{currentPage}</span>
               </button>
-              {pagesOpen ? (
+              {menu === 'pages' ? (
                 <div className="fixed inset-x-3 bottom-20 z-40 flex max-h-[60vh] w-auto flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur md:absolute md:inset-auto md:bottom-8 md:right-0 md:z-30 md:max-h-[320px] md:w-[280px]">
                   <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-black/90 px-3 py-2 md:hidden">
                     <span className="text-[12px] text-white/60">选集</span>
                     <button
                       type="button"
-                      onClick={() => setPagesOpen(false)}
+                      onClick={finishMenuSelection}
                       className="text-[12px] text-white/80 hover:text-white"
                     >
                       关闭
@@ -2119,7 +1847,7 @@ export function WatchPlayer({
                         aria-pressed={on}
                         onClick={() => {
                           onPage(page.no)
-                          setPagesOpen(false)
+                          finishMenuSelection()
                         }}
                         className={`t flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-[12px] ${
                           on
@@ -2145,27 +1873,23 @@ export function WatchPlayer({
           ) : null}
 
           {data.qualities.length > 0 ? (
-            <div className="relative shrink-0">
+            <div className="relative shrink-0" data-watch-menu>
               <button
                 type="button"
-                onClick={() => {
-                  setDanmakuPanel(false)
-                  setSpeedOpen(false)
-                  setPagesOpen(false)
-                  setQualityOpen((open) => !open)
-                }}
-                aria-expanded={qualityOpen}
+                onClick={(event) => toggleMenu('quality', event.currentTarget)}
+                title="画质"
+                aria-expanded={menu === 'quality'}
                 className="t press flex h-7 items-center rounded-[4px] px-2 text-[12px] hover:bg-white/15"
               >
                 {qualityAuto ? '自动' : (data.qualities.find((q) => q.id === activeId)?.label ?? '画质')}
               </button>
-              {qualityOpen ? (
+              {menu === 'quality' ? (
                 <div className="absolute bottom-8 right-0 z-30 flex max-h-[220px] w-[104px] flex-col overflow-y-auto rounded-[6px] border border-white/15 bg-black/90 py-1 backdrop-blur">
                   <button
                     type="button"
                     onClick={() => {
                       pickAutoQuality()
-                      setQualityOpen(false)
+                      finishMenuSelection()
                     }}
                     className={`t press px-2 py-1 text-left text-[12px] ${
                       qualityAuto ? 'text-[var(--accent)]' : 'text-white/85 hover:bg-white/10'
@@ -2179,7 +1903,7 @@ export function WatchPlayer({
                       type="button"
                       onClick={() => {
                         pickQuality(q)
-                        setQualityOpen(false)
+                        finishMenuSelection()
                       }}
                       className={`t press px-2 py-1 text-left text-[12px] ${
                         !qualityAuto && activeId === q.id
@@ -2201,32 +1925,27 @@ export function WatchPlayer({
             aria-label={loopOne ? '关闭单集循环' : '单集循环'}
             title={loopOne ? '关闭单集循环' : '单集循环'}
             onClick={() => setLoopOne(!loopOne)}
-            className={`bili-icon-btn t press hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] sm:flex ${
+            className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-[4px] sm:flex ${
               loopOne ? 'bg-white/20 text-[var(--accent)]' : 'text-white/85 hover:bg-white/15'
             }`}
           >
-            <Icon name="repeatOne" size={16} />
+            <Icon name="repeatOne" size={21} />
           </button>
 
-          <div className="relative shrink-0">
+          <div className="relative shrink-0" data-watch-menu>
             <button
               type="button"
-              onClick={() => {
-                setDanmakuPanel(false)
-                setQualityOpen(false)
-                setPagesOpen(false)
-                setSpeedOpen((open) => !open)
-              }}
-              aria-expanded={speedOpen}
+              onClick={(event) => toggleMenu('speed', event.currentTarget)}
+              aria-expanded={menu === 'speed'}
               title="播放倍速"
               aria-label={`播放倍速 ${speed}x`}
               className={`t press num flex h-7 items-center rounded-[4px] px-2 text-[12px] ${
-                speedOpen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
+                menu === 'speed' ? 'text-[var(--accent)]' : 'hover:bg-white/15'
               }`}
             >
               {speed}x
             </button>
-            {speedOpen ? (
+            {menu === 'speed' ? (
               <div className="absolute bottom-8 right-0 z-30 flex w-[84px] flex-col rounded-[6px] border border-white/15 bg-black/90 py-1 text-white backdrop-blur">
                 {[...SPEEDS].reverse().map((rate) => (
                   <button
@@ -2234,7 +1953,7 @@ export function WatchPlayer({
                     type="button"
                     onClick={() => {
                       void setSpeed(rate)
-                      setSpeedOpen(false)
+                      finishMenuSelection()
                     }}
                     className={`t press px-3 py-1 text-left text-[12px] ${
                       rate === speed
@@ -2260,46 +1979,40 @@ export function WatchPlayer({
               桌面端也保留这个层次：前者只铺满窗口，后者再进系统全屏。 */}
           <button
             type="button"
-            onClick={() => setStageMode(!cinema, false)}
+            onClick={() => setStageMode(!cinema || osFullscreen, false)}
             aria-label={cinema && !osFullscreen ? '退出网页全屏' : '网页全屏'}
             title="网页全屏（W）"
-            className={`bili-icon-btn t press hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] md:flex ${
+            className={`hidden h-[22px] w-9 shrink-0 items-center justify-center rounded-[4px] md:flex ${
               cinema && !osFullscreen ? 'text-[var(--accent)]' : 'hover:bg-white/15'
             }`}
           >
-            <Icon name="fullscreen" size={13} />
+            <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              <rect x="2.8" y="4.7" width="18.4" height="14.6" rx="1.8" />
+              <path d="M3.8 8.5h16.4" />
+            </svg>
           </button>
           <button
             type="button"
             onClick={() => (osFullscreen ? setStageMode(false, false) : setStageMode(true, true))}
             aria-label={osFullscreen ? '退出全屏' : '全屏'}
             title="全屏（F）"
-            className="bili-icon-btn t press flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] hover:bg-white/15"
           >
-            <Icon name={osFullscreen ? 'close' : 'fullscreen'} size={14} />
+            <Icon name={osFullscreen ? 'close' : 'fullscreen'} size={22} />
           </button>
         </div>
       </div>
-      {danmakuPanel || pagesOpen ? (
-        <div
-          aria-hidden
-          onClick={() => {
-            setDanmakuPanel(false)
-            setPagesOpen(false)
-          }}
-          className="fixed inset-0 z-10 bg-black/30 md:hidden"
-        />
-      ) : null}
     </div>
     {!cinema ? (
-      <div className="flex items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] px-3 py-2">
+      <div data-watch-danmaku-toolbar className="watch-dm-toolbar">
+        {danmakuTools}
         {online !== null && online > 0 ? (
-          <span className="num flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)]">
+          <span className="watch-online num flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-3)]">
             <Icon name="user" size={13} />
             {formatCount(online)} 人在看
           </span>
         ) : null}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="watch-composer flex min-w-0 flex-1 items-center gap-1">
           <DanmakuComposer
             tone="light"
             signedIn={signedIn}

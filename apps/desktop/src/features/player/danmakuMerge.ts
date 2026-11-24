@@ -11,10 +11,10 @@ const MERGE_WINDOW_MS = 2000
 export const PINNED_MS = 4000
 
 /** 先按源记录分组，再分配车道。某条未能上屏，不会改变后续同句的两秒窗口。 */
-export function scheduleDanmaku(items: DanmakuItem[], merge: boolean, lanes: number, life: number, singleLine = false): Flight[] {
+export function scheduleDanmaku(items: DanmakuItem[], merge: boolean, lanes: number, life: number): Flight[] {
   const entries: Flight[] = []
   const groups = new Map<string, Flight>()
-  const freeAt = new Array<number>(lanes).fill(-Infinity)
+  const occupants = Array<Flight | undefined>(lanes).fill(undefined)
   for (const [id, item] of [...items].sort((a, b) => a.at - b.at).entries()) {
     const key = merge && item.mode === 1 ? `${item.color}\u0000${item.text}` : null
     const group = key === null ? undefined : groups.get(key)
@@ -23,20 +23,18 @@ export function scheduleDanmaku(items: DanmakuItem[], merge: boolean, lanes: num
       continue
     }
     const pinned = item.mode === 4 || item.mode === 5
-    if (singleLine && item.own && item.at < freeAt[0]!) {
-      entries[entries.length - 1]!.until = item.at
-      freeAt[0] = item.at
+    const available = (flight: Flight | undefined) => !flight || flight.until <= item.at
+    let lane = item.mode === 4 ? occupants.findLastIndex(available) : occupants.findIndex(available)
+    if (lane < 0 && item.own) {
+      lane = item.mode === 4 ? lanes - 1 : 0
+      occupants[lane]!.until = item.at
     }
-    const lane = pinned ? -1 : freeAt.findIndex((at) => at <= item.at)
-    const flight = { ...item, id, lane, until: item.at + (pinned ? PINNED_MS : life), repeats: [] as number[] }
+    const flight: Flight = { ...item, id, lane, until: item.at + (pinned ? PINNED_MS : life), repeats: [] }
     if (key !== null) groups.set(key, flight)
-    if (singleLine) {
-      if (item.at < freeAt[0]!) continue
-      freeAt[0] = flight.until
-    } else if (lane >= 0) {
-      freeAt[lane] = item.at + life * 0.16
+    if (lane >= 0) {
+      occupants[lane] = flight
+      entries.push(flight)
     }
-    if (pinned || lane >= 0) entries.push(flight)
   }
   return entries
 }
