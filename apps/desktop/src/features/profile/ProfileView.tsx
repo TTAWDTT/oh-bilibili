@@ -6,22 +6,14 @@ import { formatCount } from '../../shared/lib/format'
 import * as ipc from '../../shared/lib/ipc'
 import { Avatar } from '../../shared/ui/Avatar'
 import { Icon } from '../../shared/ui/Icon'
-import type { IconName } from '../../shared/ui/Icon'
+import { PERSONAL_NAV } from '../../app/personalNavigation'
 import { LevelBadge } from '../../shared/ui/LevelBadge'
 import { Mascot2233 } from '../../shared/ui/Mascot2233'
 import { PageTitle } from '../../shared/ui/PageTitle'
 
-const SERVICES: readonly {
-  kind: 'history' | 'favs' | 'watchLater' | 'following' | 'liked' | 'downloads'
-  label: string
-  icon: IconName
-}[] = [
-  { kind: 'history', label: '历史', icon: 'clock' },
-  { kind: 'favs', label: '收藏夹', icon: 'bookmarkStar' },
-  { kind: 'watchLater', label: '稍后再看', icon: 'watchLater' },
-  { kind: 'following', label: '关注', icon: 'user' },
-  { kind: 'liked', label: '赞过的视频', icon: 'heart' },
-  { kind: 'downloads', label: '已下载', icon: 'download' },
+const SERVICES = [
+  PERSONAL_NAV.history, PERSONAL_NAV.favs, PERSONAL_NAV.watchLater,
+  PERSONAL_NAV.following, PERSONAL_NAV.liked, PERSONAL_NAV.downloads,
 ]
 
 /** 窄窗的「我的」：账号与个人内容集中在同一页，设置只做次级入口。 */
@@ -98,10 +90,10 @@ export function ProfileView() {
               <button
                 type="button"
                 data-profile-settings
-                onClick={() => navigate({ kind: 'settings' })}
+                onClick={() => navigate(PERSONAL_NAV.settings.view)}
                 className="t press flex h-8 items-center gap-2 rounded-[4px] border border-[var(--line)] px-4 text-[14px] text-[var(--text-1)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
               >
-                <Icon name="settings" size={14} />
+                <Icon name={PERSONAL_NAV.settings.icon} size={19} />
                 设置
               </button>
             }
@@ -159,7 +151,7 @@ export function ProfileView() {
                         onClick={() => navigate({ kind: 'author', name: user.uname, mid: user.mid })}
                         className="t press flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-[6px] bg-[var(--accent)] px-1.5 text-[12px] font-medium text-white hover:opacity-90 md:gap-2 md:px-4 md:text-[14px]"
                       >
-                        <Icon name="user" size={13} className="shrink-0" />
+                        <Icon name={PERSONAL_NAV.profile.icon} size={17} className="shrink-0" />
                         个人空间
                       </button>
                       <button
@@ -216,14 +208,14 @@ export function ProfileView() {
             <div className="mt-3 grid grid-cols-3 gap-1 md:grid-cols-6">
               {SERVICES.map((service) => (
                 <button
-                  key={service.kind}
+                  key={service.view.kind}
                   type="button"
-                  data-profile-service={service.kind}
-                  onClick={() => navigate({ kind: service.kind })}
+                  data-profile-service={service.view.kind}
+                  onClick={() => navigate(service.view)}
                   className="t press flex flex-col items-center gap-1.5 rounded-[6px] py-2 text-[12px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-                    <Icon name={service.icon} size={17} />
+                  <span className="flex h-9 w-9 items-center justify-center">
+                    <Icon name={service.icon} size={28} />
                   </span>
                   {service.label}
                 </button>

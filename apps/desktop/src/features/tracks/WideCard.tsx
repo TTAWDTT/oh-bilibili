@@ -8,14 +8,14 @@ import { PageSpine } from './PageSpine'
 export function WideCard({
   track,
   note,
-  noteAsTag = false,
+  variant,
   lead = false,
   onOpen,
 }: {
   track: Track
   note?: string | null
   lead?: boolean
-  noteAsTag?: boolean
+  variant: 'weekly' | 'popular'
   onOpen: () => void
 }) {
   return (
@@ -39,13 +39,13 @@ export function WideCard({
             {track.title}
           </span>
         </button>
-        {note && noteAsTag ? (
+        {note && variant === 'popular' ? (
           <span className="mt-1 inline-flex w-fit items-center rounded-[3px] border border-[#ffb07c] px-1.5 text-[11px] leading-[17px] text-[#ff7a45]">
             {note}
           </span>
         ) : null}
-        <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-          <TrackByline track={track} focusId={`wide-author:${track.key}`} />
+        <div className={`mt-1.5 flex items-center gap-1.5 ${variant === 'weekly' ? 'text-work-name text-[var(--text-2)]' : 'text-[12px] text-[var(--text-3)]'}`}>
+          <TrackByline track={track} focusId={`wide-author:${track.key}`} wrap={variant === 'weekly'} />
         </div>
         <span className="num mt-1 flex items-center gap-3 text-page-meta text-[var(--text-3)]">
           {track.views ? (
@@ -61,7 +61,7 @@ export function WideCard({
             </span>
           ) : null}
         </span>
-        {note && !noteAsTag ? (
+        {note && variant === 'weekly' ? (
           <span className="mt-1.5 flex items-baseline gap-1 text-reading-body text-[var(--text-2)]">
             <span aria-hidden className="shrink-0 text-[13px] leading-none">
               ❝

@@ -1,0 +1,181 @@
+.discovery-page {
+  --discovery-gutter: 16px;
+  background: var(--panel);
+  scroll-padding-block-start: 64px;
+}
+
+.discovery-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-inline: 32px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.discovery-channels {
+  container-type: inline-size;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 20px;
+}
+.discovery-directory-trigger {
+  display: inline-flex;
+  flex: none;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-alt);
+  color: var(--text-1);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.discovery-directory-trigger[aria-expanded="true"],
+.discovery-directory-trigger:hover { color: var(--accent-strong); border-color: var(--accent); }
+.discovery-directory-trigger svg { transform: rotate(90deg); }
+.discovery-directory-trigger[aria-expanded="true"] svg { transform: rotate(-90deg); }
+.discovery-shortcut-list { display: flex; align-items: center; gap: 16px; }
+.discovery-shortcut-list button {
+  position: relative;
+  flex: none;
+  height: 54px;
+  padding-inline: 2px;
+  color: var(--text-2);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.discovery-shortcut-list button[aria-pressed="true"] { color: var(--accent-strong); font-weight: 600; }
+.discovery-shortcut-list button[aria-pressed="true"]::after {
+  content: '';
+  position: absolute;
+  inset: auto 2px 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.discovery-shortcut-list button:focus-visible { outline-offset: -3px; }
+.discovery-shortcut-list button:hover,
+.discovery-shortcuts button:hover,
+.discovery-refresh:hover { color: var(--accent-strong); }
+
+@container (max-width: 690px) {
+  .discovery-shortcut-list button:nth-child(n+6):not([aria-pressed="true"]) { display: none; }
+}
+@container (max-width: 540px) {
+  .discovery-shortcut-list button:nth-child(n+4):not([aria-pressed="true"]) { display: none; }
+}
+@container (max-width: 365px) {
+  .discovery-shortcut-list { gap: 10px; }
+  .discovery-shortcut-list button:nth-child(n+3):not([aria-pressed="true"]) { display: none; }
+}
+@container (max-width: 270px) {
+  .discovery-shortcut-list:has([aria-pressed="true"]:not(:first-child)) button:not(:first-child):not([aria-pressed="true"]) { display: none; }
+}
+
+.discovery-directory { padding: 14px; }
+.discovery-directory-head, .discovery-directory-head button {
+  display: flex;
+  align-items: center;
+}
+.discovery-directory-head { justify-content: space-between; }
+.discovery-directory h2 { color: var(--text-1); font-size: 14px; font-weight: 600; }
+.discovery-directory-head button {
+  gap: 5px;
+  min-height: 28px;
+  padding-inline: 6px;
+  border-radius: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.discovery-directory-head button:hover { color: var(--accent-strong); background: var(--ga0); }
+.discovery-directory > h2 { margin-top: 16px; }
+.discovery-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.discovery-directory-grid button {
+  min-height: 34px;
+  border-radius: 5px;
+  background: var(--ga0);
+  color: var(--text-1);
+  font-size: 14px;
+}
+.discovery-directory-grid button:hover,
+.discovery-directory-grid button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+
+.discovery-shortcuts { align-items: center; gap: 14px; }
+.discovery-refresh,
+.discovery-shortcuts button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 13px;
+  min-height: 32px;
+}
+.discovery-recommend { padding-top: 20px; }
+.discovery-heading {
+  color: var(--text-1);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.discovery-lead-grid, .discovery-picks {
+  display: grid;
+  align-items: start;
+  gap: var(--discovery-gutter);
+  min-width: 0;
+}
+.discovery-lead-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.discovery-lead-grid > :first-child { grid-column: span 2; min-width: 0; }
+.discovery-picks { grid-column: span 3; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (min-width: 1280px) {
+  .discovery-lead-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .discovery-lead-grid > :first-child { grid-column: span 3; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .discovery-lead-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .discovery-lead-grid > :first-child, .discovery-picks { grid-column: auto; }
+  .discovery-picks { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .discovery-page { --discovery-gutter: 12px; scroll-padding-block-start: 54px; }
+  .discovery-bar { gap: 12px; padding-inline: 16px; }
+  .discovery-shortcuts { display: flex; flex: none; gap: 10px; }
+  .discovery-channels { gap: 12px; }
+  .discovery-shortcut-list button { height: 44px; }
+  .discovery-recommend { padding-top: 14px; }
+  .discovery-heading { font-size: 18px; line-height: 26px; }
+}
+
+@media (max-width: 639px) {
+  .discovery-lead-grid { grid-template-columns: minmax(0, 1fr); }
+  .discovery-lead-grid > :first-child, .discovery-picks { grid-column: auto; }
+  .discovery-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 519px) {
+  .discovery-bar { gap: 4px; padding-inline: 10px; }
+  .discovery-shortcuts { gap: 0; }
+  .discovery-refresh, .discovery-shortcuts button {
+    justify-content: center;
+    width: 32px;
+    height: 36px;
+  }
+  .discovery-refresh span, .discovery-shortcuts span { display: none; }
+}

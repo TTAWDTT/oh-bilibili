@@ -56,7 +56,7 @@ async function connect() {
   const chrome = spawn(
     CHROME,
     [
-      '--headless=new',
+      ...(process.argv.includes('--typography-only') && process.env.TYPOGRAPHY_HEADED === '1' ? [] : ['--headless=new']),
       '--disable-gpu',
       '--no-first-run',
       // 无头窗口会被 Chrome 当成被遮挡，WAAPI 动画会停在 0 秒；舞台过渡的检查需要它持续运行。
@@ -136,12 +136,14 @@ async function connect() {
       })
     })
   }, 1500)
-  await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: 1, mobile: false }, sid)
+  const typography = process.argv.includes('--typography-only')
+  const nativeScale = typography ? (await send('Runtime.evaluate', { expression: 'devicePixelRatio' }, sid)).result.result.value : 1
+  await send('Emulation.setDeviceMetricsOverride', { width: 1320, height: 900, deviceScaleFactor: nativeScale, mobile: false }, sid)
 
   const viewport = (width, height) =>
     send(
       'Emulation.setDeviceMetricsOverride',
-      { width, height, deviceScaleFactor: 1, mobile: false },
+      { width, height, deviceScaleFactor: nativeScale, mobile: false },
       sid,
     )
   const evaluate = async (expression) => {
@@ -205,6 +207,8 @@ async function connect() {
 
   return {
     evaluate,
+    cdp: (method, params) => send(method, params, sid),
+    nativeScale,
     errors,
     runtimeErrors: errors,
     viewport,
@@ -1579,22 +1583,10 @@ async function checkHeroAllocation(page) {
   const wide = await read()
   await page.viewport(1023, 900)
   await sleep(500)
-  const narrow = await page.evaluate(`(() => ({
-    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
-      .map((image) => image.dataset.trackTitle ?? ''),
-    grid: document.querySelector('[data-home-hero-grid]') !== null,
-    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
-  }))()`)
+  const narrow = await read()
   await page.viewport(1024, 900)
   await sleep(500)
   const restored = await read()
-  // 有可续播记录时，首屏左边就让给续播卡，轮播不再出现。
-  const hasResume = await page.evaluate(
-    `(() => {
-      const card = document.querySelector('[data-home-resume="wide"]')
-      return !!card && card.getClientRects().length > 0
-    })()`,
-  )
   const initialTitles = Array.from({ length: 16 }, (_, index) => `首页分配 ${index + 1}`)
   const placedOnce = (expected, titles) =>
     expected.every((title) => titles.filter((entry) => entry === title).length === 1) &&
@@ -1602,11 +1594,11 @@ async function checkHeroAllocation(page) {
   check(
     '首屏推荐在 1024 与 1023 两侧各有一次入口',
     ready &&
-      (hasResume ? wide.carousel.length === 0 : wide.carousel.length === 5) &&
+      wide.carousel.length === 5 &&
       wide.grid.length === 6 &&
       placedOnce(initialTitles, [...wide.carousel, ...wide.grid, ...wide.feed]) &&
-      placedOnce(initialTitles, [...narrow.carousel, ...narrow.feed]) &&
-      !narrow.grid &&
+      placedOnce(initialTitles, [...narrow.carousel, ...narrow.grid, ...narrow.feed]) &&
+      narrow.grid.length === 2 &&
       restored.grid.length === 6 &&
       placedOnce(initialTitles, [...restored.carousel, ...restored.grid, ...restored.feed]),
   )
@@ -1626,12 +1618,7 @@ async function checkHeroAllocation(page) {
   const refreshed = await read()
   await page.viewport(1023, 900)
   await sleep(500)
-  const refreshedNarrow = await page.evaluate(`(() => ({
-    carousel: [...document.querySelectorAll('[aria-label="推荐轮播"] img[data-track-title]')]
-      .map((image) => image.dataset.trackTitle ?? ''),
-    grid: document.querySelector('[data-home-hero-grid]') !== null,
-    feed: [...document.querySelectorAll('[data-home-feed] [data-track-card]')].map((card) => card.dataset.trackTitle ?? ''),
-  }))()`)
+  const refreshedNarrow = await read()
   const refreshedTitles = [
     ...Array.from({ length: 6 }, (_, index) => `换一换 ${index + 1}`),
     ...Array.from({ length: 11 }, (_, index) => `首页分配 ${index + 6}`),
@@ -1643,12 +1630,12 @@ async function checkHeroAllocation(page) {
       refreshedReady &&
       refreshed.grid.length === 6 &&
       refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) &&
-      !refreshedNarrow.grid &&
-      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed]),
+      refreshedNarrow.grid.length === 2 &&
+      refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.grid, ...refreshedNarrow.feed]),
   )
   if (
     !refreshedOnce([...refreshed.carousel, ...refreshed.grid, ...refreshed.feed]) ||
-    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.feed])
+    !refreshedOnce([...refreshedNarrow.carousel, ...refreshedNarrow.grid, ...refreshedNarrow.feed])
   ) {
     console.log(JSON.stringify({ refreshed, refreshedNarrow, refreshedTitles }))
   }
@@ -1708,150 +1695,143 @@ async function checkHistoryParts(page) {
   })()`)
 }
 
-/** 发现页续播卡：宽窗占左半屏，换一换不动它，窄窗收成一条。 */
-async function checkHomeResume(page) {
+async function checkDiscoveryFeed(page) {
+  const waitFor = watchUiWait(page)
   await page.viewport(1320, 900)
-  // 看视频的条目：位置与时长来自本地分 P 记录，卡和实际落点要一致。
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  let resumeKey = null
-  for (let i = 0; i < 40 && !resumeKey; i += 1) {
-    await sleep(250)
-    resumeKey = await page.evaluate(
-      `document.querySelector('[data-home-resume="wide"]')?.dataset.key ?? null`,
-    )
-  }
-  await page.evaluate(`(() => {
-    const key = ${JSON.stringify(resumeKey)}
-    if (!key) return
-    localStorage.setItem('oh-bilibili:watch-page:' + key, '1')
-    localStorage.setItem('oh-bilibili:watch-pos:' + key + ':1', '8000')
-    localStorage.setItem('oh-bilibili:watch-len:' + key + ':1', '26000')
-  })()`)
-  await page.evaluate(`location.reload()`)
-  let watchCard = { text: '' }
-  for (let i = 0; i < 40 && !watchCard.text.includes('继续观看'); i += 1) {
-    await sleep(250)
-    watchCard = await page.evaluate(`(() => {
-      const card = document.querySelector('[data-home-resume="wide"]')
-      return { text: (card?.textContent || '').trim() }
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + '?historyLong=1')}`)
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await page.clickExactText('历史')
+  await waitFor("document.querySelector('[data-history-row] [data-history-play]')")
+  check('有可续播的记录时仍能从历史找回', await page.evaluate(
+    `[...document.querySelectorAll('[data-history-play]')].some((button) => button.getAttribute('aria-label')?.startsWith('继续播放'))`,
+  ))
+  await page.clickExactText('发现')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  const feedOnly = `(() => {
+    const home = document.getElementById('scroll-main')
+    const tab = home?.querySelector('[aria-label="发现分区"] [aria-pressed="true"]')
+    return tab?.textContent.trim() === '全部' &&
+      !!home.querySelector('[aria-label="推荐轮播"] [data-track-title]') &&
+      !!home.querySelector('[data-home-hero-grid] [data-focus-id^="herocard:"]') &&
+      !home.querySelector('[data-home-resume], [data-home-region], .discovery-shelf') &&
+      ![...home.querySelectorAll('h2')].some((heading) =>
+        ['正在直播', '番剧', '动画', '音乐', '游戏'].includes(heading.textContent.trim()))
+  })()`
+  check('宽窗全部直接显示推荐投稿，没有续播和分区楼层', await page.evaluate(feedOnly))
+  await page.viewport(390, 820)
+  check('窄窗全部同样只显示推荐投稿', await page.evaluate(feedOnly))
+  await checkDiscoveryEditor(page)
+  await page.evaluate(`location.href = ${JSON.stringify(WEB + '?failHome=1')}`)
+  await waitFor("document.body.innerText.includes('连不上 B 站')")
+  check('推荐失败时提示重试，不用历史或分区内容填充', await page.evaluate(`(() => {
+    const home = document.getElementById('scroll-main')
+    return [...home.querySelectorAll('button')].some((button) => button.textContent.trim() === '重新取一次') &&
+      !home.querySelector('[data-home-recommend], [data-home-resume], [data-track-card], .discovery-shelf')
+  })()`))
+}
+
+const discoveryNav = 'nav[aria-label="发现分区"]'
+const discoveryDirectory = '[role="dialog"][aria-label="全部分区"]'
+const discoveryEditor = '[role="dialog"][aria-label="编辑常用"]'
+
+async function clickDiscoveryButton(page, container, name) {
+  const button = `[...document.querySelectorAll(${JSON.stringify(container + ' button')})]
+    .find((item) => (item.getAttribute('aria-label') || item.textContent.trim()) === ${JSON.stringify(name)}
+      && item.getClientRects().length)`
+  await watchUiWait(page)(button)
+  await page.evaluate(`${button}.click()`)
+}
+
+async function openDiscoveryEditor(page) {
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '编辑常用')
+}
+
+async function checkDiscoveryEditor(page) {
+  const waitFor = watchUiWait(page)
+  const edit = (name) => clickDiscoveryButton(page, discoveryEditor, name)
+  const pinned = () => page.evaluate(`[...document.querySelectorAll(${JSON.stringify(discoveryEditor + ' button[aria-label^="移除"]')})]
+    .map((button) => button.getAttribute('aria-label').slice(2))`)
+  await page.viewport(1320, 900)
+  await openDiscoveryEditor(page)
+  await edit('恢复默认')
+  const defaults = await pinned()
+  await edit('保存')
+
+  const legacy = [
+    { kind: 'region', rid: 1004, label: '跳舞' },
+    { kind: 'keyword', keyword: '动画短片', label: '短片收藏' },
+    { kind: 'region', rid: 999999, label: '过期分区' },
+    { kind: 'region', rid: 1003, label: '音乐' },
+  ]
+  await page.evaluate(`localStorage.setItem('bili.discovery.tabs', ${JSON.stringify(JSON.stringify(legacy))}); location.reload()`)
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await openDiscoveryEditor(page)
+  check('升级时保留常用顺序，恢复官方名称，清理关键词和失效分区',
+    JSON.stringify(await pinned()) === JSON.stringify(['舞蹈', '音乐']) &&
+    await page.evaluate(`!document.querySelector(${JSON.stringify(discoveryEditor)}).querySelector('input')`))
+  await edit('前移音乐')
+  const moved = await pinned()
+  await edit('移除舞蹈')
+  await edit('添加鬼畜')
+  await edit('保存')
+  await page.evaluate('location.reload()')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await openDiscoveryEditor(page)
+  check('添加、移除、移动常用分区均可保存，重开顺序正确',
+    JSON.stringify(moved) === JSON.stringify(['音乐', '舞蹈']) &&
+    JSON.stringify(await pinned()) === JSON.stringify(['音乐', '鬼畜']))
+  await edit('取消')
+
+  for (const width of [1320, 390]) {
+    await clickDiscoveryButton(page, discoveryNav, '全部')
+    await waitFor("document.querySelector('[data-home-recommend]')")
+    await page.viewport(width, 820)
+    await page.evaluate('new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))')
+    await clickDiscoveryButton(page, discoveryNav, '全部分区')
+    const layout = await page.evaluate(`(() => {
+      const panel = document.querySelector(${JSON.stringify(discoveryDirectory)})
+      const box = panel.getBoundingClientRect()
+      const buttons = [...panel.querySelectorAll('button[aria-pressed]')].filter((button) => button.getClientRects().length)
+      const names = buttons.map((button) => button.textContent.trim())
+      return names.length === 31 && new Set(names).size === names.length && names.slice(0, 2).join() === '音乐,鬼畜' &&
+        box.left >= 0 && box.right <= innerWidth + 1 && buttons.every((button) => {
+          const rect = button.getBoundingClientRect()
+          return rect.left >= box.left - 1 && rect.right <= box.right + 1
+        }) && document.documentElement.scrollWidth <= innerWidth
     })()`)
+    await clickDiscoveryButton(page, discoveryDirectory, '人工智能')
+    await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 人工智能')")
+    const active = await page.evaluate(`(() => {
+      const nav = document.querySelector(${JSON.stringify(discoveryNav)})
+      const current = [...nav.querySelectorAll('[aria-pressed="true"]')].filter((button) => button.getClientRects().length)
+      const rect = current[0]?.getBoundingClientRect()
+      return current.length === 1 && current[0].textContent.trim() === '人工智能' &&
+        [rect.left + 2, rect.right - 2].every((x) => current[0].contains(document.elementFromPoint(x, rect.top + rect.height / 2))) &&
+        !document.querySelector('[data-home-recommend], [role="dialog"]')
+    })()`)
+    check(`${width}px 目录可直接选未固定的官方分区，当前项看得见，无需横拖`, layout && active)
   }
-  const watchBar = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    const bar = card?.querySelector('[aria-hidden] > span')
-    return bar ? (bar.style.width || '') : ''
-  })()`)
-  check(
-    '有本地观看记录时按分 P 的进度显示继续观看',
-    watchCard.text.includes('继续观看') &&
-      watchCard.text.includes('已看 0:08') &&
-      watchBar.startsWith('30'),
-  )
-  await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
-  let watchReady = false
-  for (let i = 0; i < 20 && !watchReady; i += 1) {
-    await sleep(300)
-    watchReady = await page.evaluate(`!!document.querySelector('video')`)
-  }
-  await sleep(1500)
-  const watchPick = await page.evaluate(`(() => {
-    const slider = document.querySelector('[aria-label="播放进度"]')
-    return { ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null }
-  })()`)
-  // 无头预览取不到流，观看页的 seek 观察不到；卡上的分 P 进度已在上一条校验。
-  check('继续观看进入观看页', watchReady && watchPick.ratio !== null)
-  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(300)
-  // 上一次运行留下的观看记录会让这条卡变成「继续观看」，这里只清掉观看记录。
-  await page.evaluate(`(() => {
-    for (const name of Object.keys(localStorage)) {
-      if (name.startsWith('oh-bilibili:watch-')) localStorage.removeItem(name)
-    }
-  })()`)
-  await page.evaluate(`location.reload()`)
-  let ready = false
-  for (let i = 0; i < 40 && !ready; i += 1) {
-    await sleep(250)
-    ready = await page.evaluate(
-      `!!document.querySelector('[data-home-resume="wide"]') &&
-       document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length === 6`,
-    )
-  }
-  const wide = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return {
-      text: (card?.textContent || '').trim(),
-      carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-      grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
-    }
-  })()`)
-  check(
-    '有未播完的记录时首屏左半屏是续播卡',
-    ready && wide.text.includes('继续听') && wide.text.includes('已听 0:12') && !wide.carousel && wide.grid === 6,
-  )
-  await page.evaluate(`document.querySelector('[data-home-resume="wide"]')?.click()`)
-  await sleep(1200)
-  const resumed = await page.evaluate(`(() => {
-    const slider = document.querySelector('[aria-label="播放进度"]')
-    return {
-      ratio: slider ? Number(slider.getAttribute('aria-valuenow')) : null,
-      playing: !!document.querySelector('button[aria-label="暂停"]'),
-    }
-  })()`)
-  check(
-    '点续播卡接着上次的位置播放',
-    resumed.playing && resumed.ratio !== null && resumed.ratio >= 40 && resumed.ratio <= 60,
-  )
-  await page.evaluate(`document.querySelector('button[aria-label="暂停"]')?.click()`)
-  await sleep(300)
-  await page.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('button')].find((button) => (button.textContent || '').trim() === '换一换')
-    hit?.click()
-  })()`)
-  await sleep(1200)
-  const afterRefresh = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return { exists: !!card, text: (card?.textContent || '').trim() }
-  })()`)
-  check('换一换只换推荐，续播卡留在原地', afterRefresh.exists && afterRefresh.text.includes('继续听'))
-  await page.viewport(380, 820)
-  await sleep(600)
-  const narrow = await page.evaluate(`(() => {
-    const compact = document.querySelector('[data-home-resume="compact"]')
-    const wide = document.querySelector('[data-home-resume="wide"]')
-    return {
-      compact: !!compact && compact.getClientRects().length > 0,
-      wide: !!wide && wide.getClientRects().length > 0,
-      carousel: !!document.querySelector('[aria-label="推荐轮播"]'),
-    }
-  })()`)
-  check('窄窗先给一条紧凑续播卡，推荐紧接在后面', narrow.compact && !narrow.wide && narrow.carousel)
-  await page.viewport(1320, 900)
-  await sleep(300)
-  const failUrl = new URL(WEB)
-  failUrl.searchParams.set('failHome', '1')
-  await page.evaluate(`location.href = ${JSON.stringify(failUrl.href)}`)
-  let failReady = false
-  for (let i = 0; i < 20 && !failReady; i += 1) {
-    await sleep(300)
-    failReady = await page.evaluate(`document.body.innerText.includes('连不上 B 站')`)
-  }
-  const failedFeed = await page.evaluate(`(() => {
-    const card = document.querySelector('[data-home-resume="wide"]')
-    return { card: !!card, text: (card?.textContent || '').trim() }
-  })()`)
-  check(
-    '推荐单独失败时续播卡仍然可用',
-    failReady && failedFeed.card && failedFeed.text.includes('继续听'),
-  )
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(1200)
-  const recovered = await page.evaluate(`({
-    grid: document.querySelectorAll('[data-home-hero-grid] [data-focus-id^="herocard:"]').length,
-    error: document.body.innerText.includes('连不上 B 站'),
-  })`)
-  check('回到正常页面后推荐重新出现', recovered.grid > 0 && !recovered.error)
+
+  await openDiscoveryEditor(page)
+  await edit('全部移除')
+  await edit('保存')
+  await clickDiscoveryButton(page, discoveryNav, '全部')
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '舞蹈')
+  await waitFor("document.querySelector('[data-home-region] [data-track-card]')?.innerText.includes('· 舞蹈')")
+  await openDiscoveryEditor(page)
+  check('常用分区留空后仍能浏览官方分区，浏览不会自动固定', (await pinned()).length === 0)
+  await edit('恢复默认')
+  await edit('保存')
+  await page.evaluate('location.reload()')
+  await waitFor("document.querySelector('[data-home-recommend]')")
+  await openDiscoveryEditor(page)
+  check('恢复默认并重开后，常用分区与原顺序一致',
+    defaults.length === 6 && JSON.stringify(await pinned()) === JSON.stringify(defaults))
+  await edit('取消')
+  check('关闭编辑器后键盘焦点回到全部分区',
+    await page.evaluate(`document.activeElement === document.querySelector(${JSON.stringify(discoveryNav + ' [aria-haspopup="dialog"]')})`))
 }
 
 /** 导航约定：歌单详情仍在曲库下，观看页返回把焦点还给进来的那张卡。 */
@@ -1934,24 +1914,27 @@ async function checkNavConventions(page) {
     watching && opened !== null && back.key === opened && back.label.startsWith('观看'),
   )
 
-  // 分区行的入口 id 带 rid：同一曲目也在续播卡/推荐流里时，仍要回到这一行。
-  await page.evaluate(`location.href = ${JSON.stringify(WEB)}`)
-  await sleep(4500)
-  const partition = await page.evaluate(`(() => {
-    const row = document.querySelector('[data-focus-id^="partition:"]')
-    if (!row) return null
-    row.click()
-    return row.dataset.focusId
+  await clickDiscoveryButton(page, discoveryNav, '全部分区')
+  await clickDiscoveryButton(page, discoveryDirectory, '音乐')
+  const waitFor = watchUiWait(page)
+  const cardButton = '[data-home-region] [data-track-card] button[aria-label^="观看"]'
+  await waitFor(`document.querySelector(${JSON.stringify(cardButton)})`)
+  const partitionKey = await page.evaluate(`(() => {
+    const button = document.querySelector(${JSON.stringify(cardButton)})
+    const key = button.closest('[data-track-card]').dataset.key
+    button.click()
+    return key
   })()`)
-  let partitionVideo = false
-  for (let i = 0; i < 20 && !partitionVideo; i += 1) {
-    await sleep(300)
-    partitionVideo = await page.evaluate(`!!document.querySelector('video')`)
-  }
-  await page.evaluate(`document.querySelector('button[aria-label="返回"]')?.click()`)
-  await sleep(1600)
-  const partitionBack = await page.evaluate(`document.activeElement?.dataset?.focusId ?? ''`)
-  check('分区行返回后回到原分区卡', !!partition && partitionVideo && partitionBack === partition)
+  await waitFor("document.querySelector('video')")
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+  await waitFor("document.activeElement?.closest('[data-home-region] [data-track-card]')")
+  const partitionBack = await page.evaluate(`({
+    selected: document.querySelector('[aria-label="发现分区"] [aria-pressed="true"]')?.textContent.trim(),
+    key: document.activeElement.closest('[data-track-card]')?.dataset.key,
+    recommend: !!document.querySelector('[data-home-recommend]'),
+  })`)
+  check('选中音乐后打开投稿，返回仍在音乐分区并聚焦原视频',
+    partitionBack.selected === '音乐' && partitionBack.key === partitionKey && !partitionBack.recommend)
 }
 
 /** 排行榜：单列、名次独立成列，窄窗统计下移，返回同一分区与位置。 */
@@ -3686,6 +3669,10 @@ async function checkTopbarSites(page) {
       narrowMenu.ext.length === 4 &&
       narrowMenu.overflow <= 0,
   )
+  check('窄窗网站菜单的六项均显示可加载的插画', await waitFor(`(() => {
+    const items = [...document.querySelectorAll('[data-site-menu] [role="menuitem"]')]
+    return items.length === 6 && items.every((item) => item.querySelector('img')?.naturalWidth > 0)
+  })()`))
   check(
     '窄窗网站按钮与搜索框、消息入口不重叠',
     narrowLayout.triggerRight <= narrowLayout.formLeft + 1 &&
@@ -4173,6 +4160,17 @@ async function checkProfileSettings(page) {
     mineOpened && profile.account && profile.services === 6 && profile.settings && profile.heading === '我的',
   )
 
+  check('个人中心与侧栏六个同名入口复用同一张可加载的图', await waitFor(`(() => {
+    const services = [...document.querySelectorAll('[data-profile-service]')]
+    const sidebar = [...document.querySelectorAll('nav[aria-label="主导航"] button')]
+    return services.length === 6 && services.every((service) => {
+      const label = service.textContent.trim()
+      const link = sidebar.find((button) => (button.getAttribute('aria-label') || button.textContent.trim()) === label)
+      const icon = service.querySelector('img')
+      return icon?.naturalWidth > 0 && icon.currentSrc === link?.querySelector('img')?.currentSrc
+    })
+  })()`))
+
   const settingsClicked = await page.evaluate(`(() => {
     const hit = document.querySelector('[data-profile-settings]')
     hit?.click()
@@ -4372,7 +4370,7 @@ async function checkCommentPauseIntent(page) {
 
 async function main() {
   if (!existsSync(CHROME)) {
-    if (libraryPartialOnly) throw new Error(`找不到 Chrome：${CHROME}`)
+    if (libraryPartialOnly || process.argv.includes('--typography-only')) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
     if (DYNAMIC_RETURN) process.exitCode = 1
     return
@@ -4385,6 +4383,17 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--typography-only')) {
+      const { checkTypography } = await import('./typography-smoke.mjs')
+      await checkTypography(page, WEB, watchUiWait(page), check)
+      return
+    }
+    if (process.argv.includes('--discovery-only')) {
+      await checkDiscoveryFeed(page)
+      await checkHeroAllocation(page)
+      await checkNavConventions(page)
+      return
+    }
     if (process.argv.includes('--watch-link-only')) {
       await checkWatchLink(page)
       return
@@ -4455,7 +4464,7 @@ async function main() {
     await checkLiveRooms(page)
     await checkTriple(page)
     await checkFollowingDirectory(page)
-    await checkHomeResume(page)
+    await checkDiscoveryFeed(page)
     await checkHistoryParts(page)
     await checkWatchPartHistory(page)
     await checkNavConventions(page)
@@ -5215,8 +5224,11 @@ async function main() {
     check('清空草稿保留已提交的结果与阅读位置', await page.evaluate(`(() => {
       const results = document.querySelector('[data-search-results]')
       const input = document.querySelector('input[aria-label="顶栏搜索"]')
+      const query = results?.querySelector('.search-committed-query')
+      const card = results?.querySelectorAll('[data-track-card]')[2]?.querySelector('button[aria-label^="观看"]')
       return input?.value === '' && document.activeElement === input &&
-        results?.querySelector('h2')?.textContent.includes('周杰伦') &&
+        query?.getBoundingClientRect().width > 0 && query.innerText === '「周杰伦」的搜索结果' &&
+        card?.getAttribute('aria-label') === ${JSON.stringify(manyResults?.focused)} &&
         results.scrollTop === ${returnedMany.scrollTop}
     })()`))
     await page.evaluate(`[...document.querySelectorAll('[data-search-results] button')].find(b => b.textContent.trim() === '返回')?.click()`)

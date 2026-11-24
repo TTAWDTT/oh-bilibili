@@ -1,5 +1,6 @@
 import type { DownloadView, QrStatus, Track, WireError } from './contract'
 import type { HistoryEntry, PlaybackResume } from './ipc'
+import { DISCOVERY_REGIONS } from './discoveryRegions'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
 import { REAL_COVERS } from './realCovers'
 import { bool, num, sleep, str } from './mockArgs'
@@ -192,6 +193,18 @@ const popularFailOnce =
 let popularFailedOnce = false
 
 
+const typographyMode = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('typographySample') : null
+const sampleName = '云上的实验室 LongName 混合声学观测与现场录制小组'
+const sampleNote = '从一段阴天的环境录音进入正片，键盘带出旋律。第二段保留了转场时楼外的雨声，再回到没有人声的现场版本。'
+const sampleTrack: Track = {
+  ...CATALOG[0]!,
+  key: 'BV1xx411c7mD',
+  up_mid: 5000,
+  artist: sampleName,
+  title: '跨越昼夜 An Ambient Session｜Live 演出手记及工作室版本的对照 [Vol. 2]',
+  cover: typographyMode === 'missing' ? null : '/assets/illustrations/precious-editing-desk.webp',
+}
+
 function eightPartTrack(track: Track): Track {
   const result = { ...track, pages: 8 }
   registerTrack(result)
@@ -359,6 +372,19 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         index === 0 ? { ...track, title: `${track.title} · 分区 ${rid}` } : track,
       )
     }
+    case 'discovery_regions':
+      return DISCOVERY_REGIONS
+    case 'discovery_region_feed': {
+      const rid = num(args, 'rid')
+      const page = num(args, 'page')
+      const region = DISCOVERY_REGIONS.find((item) => item.rid === rid)
+      if (!region) return []
+      const start = (page - 1) * 15
+      return CATALOG.slice(start, start + 15).map((track, index) => {
+        const item = { ...track, title: `${track.title} · ${region.name}`, tname: region.name }
+        return start + index === 0 ? eightPartTrack(item) : item
+      })
+    }
     case 'region_new': {
       // 预览里分区内容也换标题，能看出范围真的切换了。
       const rid = num(args, 'rid')
@@ -469,11 +495,12 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       const tracks = CATALOG.slice(0, 12).map((track, index) =>
         index === 0 ? { ...track, title: `${track.title} · 第 ${number} 期` } : track,
       )
+      if (typographyMode !== null) tracks[0] = sampleTrack
       return {
         subject: `第 ${number} 期的主题`,
         label: `第${number}期`,
         tracks,
-        notes: Object.fromEntries(tracks.map((track) => [track.key, '预览模式的推荐语'])),
+        notes: Object.fromEntries(tracks.map((track) => [track.key, track === sampleTrack ? sampleNote : '预览模式的推荐语'])),
       }
     }
     case 'precious':
@@ -780,6 +807,10 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         comments: 12,
         likes: 45,
       }
+      if (typographyMode !== null) {
+        Object.assign(firstVideo, { author: sampleName, text: sampleNote.repeat(6), bvid: sampleTrack.key,
+          title: sampleTrack.title, cover: sampleTrack.cover ?? '' })
+      }
       const page = {
         items: [
           firstVideo,
@@ -921,6 +952,9 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         ],
         offset: '',
         has_more: false,
+      }
+      if (typographyMode !== null) {
+        for (const item of page.items) if (item.mid === sampleTrack.up_mid) item.author = sampleName
       }
       if (longBody) {
         page.items.push(...Array.from({ length: 4 }, (_, index) => ({
@@ -1400,6 +1434,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         mutual: seed.mutual,
         special: seed.special,
       }))
+      if (typographyMode !== null && users[0]) Object.assign(users[0], { name: sampleName, sign: sampleNote })
       const start = (page - 1) * 50
       return [users.slice(start, start + 50), users.length]
     }
@@ -1432,6 +1467,7 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         })
       }
       const sorted = [...owned]
+      if (typographyMode !== null && mid === sampleTrack.up_mid) sorted[0] = sampleTrack
       if (order === 'click') sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
       if (order === 'stow') sorted.sort((a, b) => (b.danmaku ?? 0) - (a.danmaku ?? 0))
       return [sorted.slice(start, start + size), sorted.length]

@@ -5,7 +5,7 @@
  */
 export type DurationKey = 0 | 1 | 2 | 3 | 4
 
-const OPTIONS: { key: DurationKey; label: string }[] = [
+export const DURATION_OPTIONS: { key: DurationKey; label: string }[] = [
   { key: 0, label: '全部时长' },
   { key: 1, label: '10 分钟以下' },
   { key: 2, label: '10~30 分钟' },
@@ -21,27 +21,23 @@ export function DurationFilter({
   onChange: (key: DurationKey) => void
 }) {
   return (
-    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
-      <span className="mr-1 shrink-0 whitespace-nowrap text-[12.5px] text-[var(--text-3)]">时长</span>
-      {OPTIONS.map((option) => {
-        const on = option.key === active
-        return (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => onChange(on ? 0 : option.key)}
-            aria-pressed={on}
-            className={[
-            't shrink-0 whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[13px]',
-              on
-                ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)] ring-1 ring-inset ring-[var(--accent)]'
-                : 'text-[var(--text-2)] hover:text-[var(--accent)]',
-            ].join(' ')}
-          >
-            {option.label}
-          </button>
-        )
-      })}
+    <div className="search-filter-row" role="group" aria-label="视频时长">
+      <span>时长</span>
+      <div>
+        {DURATION_OPTIONS.map((option) => {
+          const on = option.key === active
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(on ? 0 : option.key)}
+              aria-pressed={on}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -103,7 +103,7 @@ export function CardActions({
         onClick={onLater}
         className="bili-icon-btn flex h-6 items-center gap-1 rounded-[4px] bg-black/55 px-2 text-[11px] text-white/90 hover:bg-white/20 hover:text-white"
       >
-        <Icon name="watchLater" size={12} />稍后再看
+        <Icon name="watchLater" size={12} /><span className="hidden sm:inline">稍后再看</span>
       </button>
       <div
         ref={moreRef}

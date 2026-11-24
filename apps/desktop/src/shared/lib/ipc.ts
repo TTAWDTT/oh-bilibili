@@ -1,3 +1,4 @@
+import type { DiscoveryRegion } from './discoveryRegions'
 import { invoke } from '@tauri-apps/api/core'
 import type { CommentPage, Followed, PlayMode, WatchView,
   AuthSnapshot,
@@ -297,6 +298,19 @@ export function ranking(rid = 0): Promise<Track[]> {
 /** 分区最新投稿。发现页选中一个分区时读它，不跳去排行榜。 */
 export function regionNew(rid: number, page = 1): Promise<Track[]> {
   return call<Track[]>('region_new', { rid, page })
+}
+
+let regionCatalog: Promise<DiscoveryRegion[]> | undefined
+
+export function discoveryRegions(): Promise<DiscoveryRegion[]> {
+  return regionCatalog ??= call<DiscoveryRegion[]>('discovery_regions', {}).catch((error) => {
+    regionCatalog = undefined
+    throw error
+  })
+}
+
+export function discoveryRegionFeed(rid: number, page = 1): Promise<Track[]> {
+  return call<Track[]>('discovery_region_feed', { rid, page })
 }
 
 /** 直播推荐位的一张卡。 */

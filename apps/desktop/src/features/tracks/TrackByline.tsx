@@ -1,13 +1,13 @@
 import { useAppStore } from '../../app/appStore'
 import type { Track } from '../../shared/lib/contract'
 
-export function TrackByline({ track, focusId }: { track: Track; focusId: string }) {
+export function TrackByline({ track, focusId, wrap = false }: { track: Track; focusId: string; wrap?: boolean }) {
   const navigate = useAppStore((state) => state.navigate)
   const mid = track.up_mid
   const name = (
     <>
       <span className="shrink-0 rounded-[3px] border border-[var(--line)] px-1 text-[10px] leading-[14px]">UP</span>
-      <span className="truncate">{track.artist}</span>
+      <span className={wrap ? 'line-clamp-2 break-words text-left' : 'truncate'}>{track.artist}</span>
     </>
   )
   const style = 'inline-flex max-w-full min-w-0 items-center gap-1.5 align-top'

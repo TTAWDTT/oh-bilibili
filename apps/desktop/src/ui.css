@@ -382,15 +382,53 @@
   animation: bili-live-pulse 1.6s ease-in-out infinite;
 }
 
-/* 顶栏的小电视：每 7 秒眨一次，和图标的眼睛节奏对齐 */
-.bili-tv-mark {
-  display: inline-flex;
-  animation: bili-tv-mark-blink 7s ease-in-out infinite;
+.precious-editing-desk {
+  display: none;
 }
 
-@keyframes bili-tv-mark-blink {
-  0%, 90%, 100% { opacity: 1; }
-  94% { opacity: 0.45; }
+@media (min-width: 768px) {
+  .precious-editing-desk,
+  .messages-header-content::after {
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: right center;
+  }
+
+  .precious-editing-desk {
+    display: block;
+    width: clamp(180px, 25vw, 320px);
+    height: 52px;
+    margin-block: -9px;
+    background-image: url('/assets/illustrations/precious-editing-desk.webp');
+  }
+
+  .messages-header-content {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 1rem;
+  }
+
+  .messages-header-content nav {
+    grid-column: 1;
+  }
+
+  .messages-header-content::after {
+    content: '';
+    grid-area: 1 / 2 / 3 / 3;
+    justify-self: end;
+    width: min(100%, 320px);
+    margin-block: -10px 5px;
+    background-image: url('/assets/illustrations/messages-mail-desk.webp');
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-hot-page="weekly"] {
+    background-image: url('/assets/illustrations/weekly-projector.png');
+    background-position: right 2rem center;
+    background-repeat: no-repeat;
+    background-size: auto 38px;
+  }
 }
 
 /* 弹幕：从右向左匀速穿过，带一点描边保证在封面背景上可读 */
@@ -455,6 +493,17 @@
    reflow，点起来一顿一顿的。宽度瞬切只有一次重排，文字用透明度过一下眼。 */
 .bili-sidebar {
   contain: layout paint;
+}
+
+.bili-nav-item[aria-current="page"]::before {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-strong);
+  content: '';
 }
 
 .bili-sidebar-label {
@@ -753,7 +802,6 @@
   animation: bili-suggest-in 180ms var(--ease) both;
 }
 
-/* 加载时那只小电视：上下弹跳 + 眨眼 */
 .bili-loader {
   animation: bili-loader-bounce 900ms cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 }
@@ -764,14 +812,10 @@
   70% { transform: translateY(0) scale(1.04, 0.94); }
 }
 
-.bili-loader__eyes {
-  transform-origin: 36px 36px;
-  animation: bili-loader-blink 1.6s ease-in-out infinite;
-}
-
-@keyframes bili-loader-blink {
-  0%, 80%, 100% { transform: scaleY(1); }
-  88% { transform: scaleY(0.15); }
+@media (prefers-reduced-motion: reduce) {
+  .bili-loader {
+    animation: none;
+  }
 }
 
 /* ── 弹性动效 ─────────────────────────────────────────
@@ -835,11 +879,15 @@
 }
 
 /* 带图标的按钮：悬停时让图标自己弹一下，而不是整颗按钮变大 */
-.bili-icon-btn svg {
+.bili-icon-btn svg,
+.bili-icon-btn > img,
+.bili-nav-item img {
   transition: transform 160ms var(--spring);
 }
 
-.bili-icon-btn:not(.bili-tri-btn):hover svg {
+.bili-icon-btn:not(.bili-tri-btn):hover svg,
+.bili-icon-btn:not(.bili-tri-btn):hover > img,
+.bili-nav-item:hover img {
   transform: scale(1.12);
 }
 

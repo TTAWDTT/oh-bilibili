@@ -1,0 +1,74 @@
+.discovery-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  color: var(--text-1);
+  font-size: 14px;
+}
+.discovery-editor h3 { font-weight: 600; }
+.discovery-editor-heading,
+.discovery-editor-heading-actions,
+.discovery-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discovery-editor-heading { justify-content: space-between; flex-wrap: wrap; }
+.discovery-editor-heading-actions button {
+  min-height: 28px;
+  padding: 2px 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.discovery-editor-chosen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(172px, 100%), 1fr));
+  gap: 6px;
+  max-height: 38vh;
+  margin-top: 8px;
+  overflow: auto;
+}
+.discovery-editor-chosen li,
+.discovery-editor-available button {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 6px;
+  background: var(--ga0);
+}
+.discovery-editor-chosen li { padding: 2px 4px 2px 10px; }
+.discovery-editor-chosen li > span { flex: 1; }
+.discovery-editor-chosen button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 28px;
+  border-radius: 4px;
+  color: var(--text-2);
+}
+.discovery-editor-available {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 25vh;
+  overflow: auto;
+  margin-top: 8px;
+}
+.discovery-editor-available button { gap: 4px; padding-inline: 9px; color: var(--text-2); }
+.discovery-editor-empty { padding-block: 8px; color: var(--text-3); }
+.discovery-editor button:enabled:hover { color: var(--accent-strong); }
+.discovery-editor-chosen button:enabled:hover { background: var(--panel); }
+.discovery-editor button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.discovery-editor button:disabled { opacity: .35; cursor: default; }
+.discovery-editor-footer {
+  position: sticky;
+  bottom: -20px;
+  justify-content: flex-end;
+  margin-bottom: -20px;
+  border-top: 1px solid var(--line);
+  padding-block: 10px;
+  background: var(--panel);
+}
+.discovery-editor-footer button { min-width: 60px; min-height: 32px; border-radius: 6px; }
+.discovery-editor-footer .discovery-editor-save,
+.discovery-editor-footer .discovery-editor-save:hover { color: white; background: var(--accent-strong); }

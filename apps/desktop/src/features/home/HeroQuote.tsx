@@ -109,10 +109,10 @@ export function HeroQuoteLine({ track, quote, featured = false, onOpen }: {
       data-focus-id={`hero-quote:${track.key}`}
       aria-label={`从 ${time} 看弹幕：${quote.text}`}
       onClick={() => onOpen(track, { page: quote.page, atMs: quote.atMs })}
-      className={`group relative mt-2 grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-1.5 rounded-[5px] text-left text-[12px] text-[var(--text-2)] hover:text-[var(--accent-strong)] ${featured ? 'border-l-2 border-[var(--accent)] bg-[var(--ga0)] px-2.5 py-2' : 'px-0.5 py-1'}`}
+      className={`group mt-1 inline-flex max-w-full items-center gap-1.5 rounded py-1 text-left text-[var(--text-2)] hover:text-[var(--accent-strong)] ${featured ? 'text-[13px]' : 'text-[12px]'}`}
     >
-      <Icon name="danmaku" size={14} className="self-center text-[var(--accent-strong)]" />
-      <span className={featured ? 'line-clamp-2' : 'truncate'}>{quote.text}</span>
+      <Icon name="danmaku" size={14} className="shrink-0 text-[var(--text-3)]" />
+      <span className="truncate">{quote.text}</span>
       <span className="num inline-flex shrink-0 items-center gap-0.5 text-[var(--accent-strong)]">
         {time}<Icon name="chevronRight" size={11} />
       </span>

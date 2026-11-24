@@ -268,7 +268,7 @@ export function MessagesView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--ga0)]">
       <header className="shrink-0 border-b border-[var(--line)] bg-[var(--panel)] pt-5">
-        <div className={CONTENT}>
+        <div className={`messages-header-content ${CONTENT}`}>
           <h2 className="text-[20px] font-semibold text-[var(--text-1)]">消息中心</h2>
           <nav aria-label="消息分类" className="mt-3 flex gap-6">
             {TABS.map((tab) => (

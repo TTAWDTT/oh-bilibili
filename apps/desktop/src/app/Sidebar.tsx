@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { View } from './appStore'
 import { useAppStore } from './appStore'
+import { PERSONAL_NAV } from './personalNavigation'
 import { Icon } from '../shared/ui/Icon'
 import type { IconName } from '../shared/ui/Icon'
 import { HOT_CHANNELS } from '../shared/lib/biliChannels'
@@ -16,30 +17,28 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
     title: null,
     items: [
       { view: { kind: 'home' }, label: '发现', icon: 'biliTv' },
-      { view: { kind: 'dynamic' }, label: '动态', icon: 'dynamic' },
-      { view: { kind: 'messages' }, label: '消息', icon: 'message' },
+      { view: { kind: 'dynamic' }, label: '动态', icon: 'feedPaperplane' },
+      { view: { kind: 'messages' }, label: '消息', icon: 'msgEnvelope' },
       ...HOT_CHANNELS.map((channel) => ({
         view: { kind: channel.view } as View,
         label: channel.label,
         icon: channel.icon,
       })),
-      { view: { kind: 'live' }, label: '直播', icon: 'live' },
-      { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumi' },
+      { view: { kind: 'live' }, label: '直播', icon: 'liveCamera' },
+      { view: { kind: 'bangumi' }, label: '番剧', icon: 'bangumiClapper' },
     ],
   },
   {
     title: '我的',
     items: [
-      { view: { kind: 'profile' }, label: '个人中心', icon: 'user' },
-      { view: { kind: 'history' }, label: '历史', icon: 'clock' },
-      { view: { kind: 'favs' }, label: '收藏夹', icon: 'bookmarkStar' },
-      { view: { kind: 'watchLater' }, label: '稍后再看', icon: 'watchLater' },
-      { view: { kind: 'following' }, label: '关注', icon: 'user' },
-      { view: { kind: 'liked' }, label: '赞过的视频', icon: 'heartFilled' },
-      // 曲库与下载是「我的」里的两项，不是并列于整站的第二个产品：
-      // 单开一个「音乐」分组会让每个页面都先看到听歌入口。
-      { view: { kind: 'library' }, label: '曲库', icon: 'library' },
-      { view: { kind: 'downloads' }, label: '已下载', icon: 'download' },
+      PERSONAL_NAV.profile,
+      PERSONAL_NAV.history,
+      PERSONAL_NAV.favs,
+      PERSONAL_NAV.watchLater,
+      PERSONAL_NAV.following,
+      PERSONAL_NAV.liked,
+      PERSONAL_NAV.library,
+      PERSONAL_NAV.downloads,
     ],
   },
 ]
@@ -72,14 +71,16 @@ export function Sidebar() {
         aria-label={collapsed ? entry.label : undefined}
         title={collapsed ? entry.label : undefined}
         className={[
-          'bili-icon-btn t flex h-9 items-center gap-2.5 rounded-[6px] text-[14px]',
+          'bili-nav-item bili-icon-btn t relative flex h-9 items-center gap-2.5 rounded-lg text-[14px]',
           collapsed ? 'justify-center px-0' : 'px-2.5',
           active
-            ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+            ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent-strong)]'
             : 'text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)]',
         ].join(' ')}
       >
-        <Icon name={entry.icon} size={16} className={active ? 'bili-icon-pop' : ''} />
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center [&_img]:size-6">
+          <Icon name={entry.icon} size={18} className={active ? 'bili-icon-pop' : ''} />
+        </span>
         {collapsed ? null : <span className="bili-sidebar-label min-w-0 truncate">{entry.label}</span>}
       </button>
     )
@@ -98,7 +99,7 @@ export function Sidebar() {
       {GROUPS.map((group, index) => (
         <div key={group.title ?? `g${index}`} className="flex flex-col gap-0.5">
           {group.title && !collapsed ? (
-            <h2 className="px-2.5 pb-1 text-[12px] font-normal text-[var(--text-3)]">{group.title}</h2>
+            <h2 className="mx-2.5 mb-1 border-t border-hairline pt-3 text-[12px] font-semibold text-[var(--text-2)]">{group.title}</h2>
           ) : null}
           {group.title && collapsed && index > 0 ? (
             <span className="mx-1 mb-1 border-t border-hairline" />
@@ -108,10 +109,10 @@ export function Sidebar() {
       ))}
       {/* 设置与收起键钉在底部：收起之后条目变窄但数量不变，靠滚动才能碰到它们就没法展开了。 */}
       <div className="sticky bottom-0 mt-auto flex flex-col gap-0.5 bg-[var(--panel)] pt-1">
-        {item({ view: { kind: 'settings' }, label: '设置', icon: 'settings' })}
+        {item(PERSONAL_NAV.settings)}
         <button
           type="button"
-        onClick={onWatch ? toggleWatchNav : toggleSidebar}
+          onClick={onWatch ? toggleWatchNav : toggleSidebar}
           aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
           aria-expanded={!collapsed}
           title={collapsed ? '展开侧边栏' : '收起侧边栏'}
@@ -119,7 +120,9 @@ export function Sidebar() {
             collapsed ? 'justify-center px-0' : 'px-2.5'
           }`}
         >
-          <Icon name="chevronLeft" size={15} className={collapsed ? 'rotate-180' : ''} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+            <Icon name="chevronLeft" size={16} className={collapsed ? 'rotate-180' : ''} />
+          </span>
           {collapsed ? null : <span className="bili-sidebar-label">收起</span>}
         </button>
       </div>

@@ -8,11 +8,12 @@ import { Icon } from '../../shared/ui/Icon'
 import { useAutoplay } from './autoplay'
 
 /** 观看页右栏：相关推荐。条目全来自接口，点击进入它自己的观看页。 */
-export function RelatedAside({ items }: { items: Track[] }) {
+export function RelatedAside({ items, inline = false }: { items: Track[]; inline?: boolean }) {
   const replace = useAppStore((s) => s.replace)
   const autoplay = useAutoplay((s) => s.enabled)
   const setAutoplay = useAutoplay((s) => s.setEnabled)
   const [progress, setProgress] = useState<Record<string, number>>({})
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     const keys = items.map((item) => item.key)
@@ -33,9 +34,9 @@ export function RelatedAside({ items }: { items: Track[] }) {
   if (items.length === 0) return null
 
   return (
-    <div className="px-3 py-3">
-      <div className="mb-1.5 flex items-center gap-2">
-        <h3 className="text-[14px] font-medium text-[var(--text-1)]">接下来播放</h3>
+    <div className={`watch-related ${inline ? 'watch-related-inline' : ''}`}>
+      <div className="mb-3 flex items-center gap-2">
+        <h3 className="text-[17px] font-semibold text-[var(--text-1)]">接下来播放</h3>
         <span className="num text-[11px] text-[var(--text-3)]">{items.length} 条</span>
         {/* B 站把自动连播开关挂在相关推荐标题行右侧：不开播完不跳，不用等倒计时才关。 */}
         <button
@@ -60,19 +61,18 @@ export function RelatedAside({ items }: { items: Track[] }) {
           </span>
         </button>
       </div>
-      <div className="flex flex-col gap-y-3">
-        {items.map((item) => (
+      <div className="watch-related-list">
+        {(inline && !expanded ? items.slice(0, 3) : items).map((item) => (
           <button
             key={item.key}
             type="button"
             data-related-item={item.key}
             onClick={() => replace({ kind: 'watch', track: item })}
             title={item.title}
-            className="group flex items-start gap-2 text-left"
+            className="watch-related-entry group"
           >
             <span
-              className="relative w-[160px] shrink-0 overflow-hidden rounded-[4px]"
-              style={{ aspectRatio: '16 / 9' }}
+              className="relative aspect-video overflow-hidden rounded-[6px]"
             >
               <Cover cover={item.cover} title={item.title} width={160} className="h-full w-full" />
               {/* B 站相关推荐的封面右下角挂着时长，扫一眼就知道要花多久。 */}
@@ -97,13 +97,12 @@ export function RelatedAside({ items }: { items: Track[] }) {
                 </span>
               </span>
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 text-[13.5px] leading-[1.4] text-[var(--text-1)] group-hover:text-[var(--accent)]">
+            <span className="flex min-w-0 flex-col self-stretch">
+              <span className="line-clamp-2 text-[14px] leading-[1.35] font-medium text-[var(--text-1)] group-hover:text-[var(--accent)]">
                 {item.title}
               </span>
-              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--text-3)]">
-                <span className="truncate">{item.artist}</span>
-                {/* B 站这一行的两枚计数用「播放 / 弹幕」两条小图标，不用文字写「播放」。 */}
+              {item.artist && <span className="mt-1 block truncate text-[12px] leading-[16px] text-[var(--text-2)]">{item.artist}</span>}
+              <span className="mt-auto flex min-w-0 items-center gap-2 pt-0.5 text-[11px] leading-[14px] text-[var(--text-3)]">
                 {item.views ? (
                   <span className="num flex shrink-0 items-center gap-0.5">
                     <Icon name="play" size={10} />
@@ -121,6 +120,17 @@ export function RelatedAside({ items }: { items: Track[] }) {
           </button>
         ))}
       </div>
+      {inline && items.length > 3 ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="t mt-3 flex min-h-8 w-full items-center justify-center gap-1 rounded-[6px] bg-[var(--panel-alt)] text-[12px] text-[var(--text-2)] hover:text-[var(--accent)]"
+        >
+          {expanded ? '收起推荐' : `展开其余 ${items.length - 3} 条推荐`}
+          <Icon name="chevronRight" size={13} className={expanded ? '-rotate-90' : 'rotate-90'} />
+        </button>
+      ) : null}
     </div>
   )
 }

@@ -261,7 +261,7 @@ export function StageView() {
                     }}
                     className="t press inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--panel)]/85 px-3 text-[13px] text-[var(--text-1)] hover:text-[var(--accent-strong)]"
                   >
-                    <Icon name="biliTv" size={15} />
+                    <Icon name="play" size={15} />
                     看视频
                   </button>
                   {related.length > 0 && (

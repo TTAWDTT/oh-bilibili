@@ -460,6 +460,14 @@ impl Source {
         self.client.region_new(rid, page).await
     }
 
+    pub async fn discovery_regions(&self) -> Result<Vec<sync::DiscoveryRegion>, BiliError> {
+        self.client.discovery_regions().await
+    }
+
+    pub async fn discovery_region_feed(&self, rid: u32, page: u32) -> Result<Vec<Track>, BiliError> {
+        self.client.discovery_region_feed(rid, page).await
+    }
+
     /// 正在直播的房间。
     pub async fn live_rooms(&self, count: u32, page: u32) -> Result<Vec<sync::LiveRoom>, BiliError> {
         self.client.live_rooms(count, page).await

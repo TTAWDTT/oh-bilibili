@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useAppStore } from './appStore'
+import { PERSONAL_NAV } from './personalNavigation'
 import { useAuthStore } from '../features/auth/authStore'
 import { Avatar } from '../shared/ui/Avatar'
 import * as ipc from '../shared/lib/ipc'
@@ -9,6 +10,7 @@ import { toastFailure } from './notice'
 import { isMacOS, isTauri } from '../shared/lib/runtime'
 import { useWindowDrag } from '../shared/lib/useWindowDrag'
 import { Icon, type IconName } from '../shared/ui/Icon'
+import { BiliTvMark } from '../shared/ui/BiliTvMark'
 import { useSearchHistory } from '../shared/lib/searchHistory'
 import { AnchoredPanel } from '../shared/ui/AnchoredPanel'
 import type { Anchor } from '../shared/ui/AnchoredPanel'
@@ -19,10 +21,10 @@ import { parseWatchUrl } from '../features/watch/watchUrl'
 const overlayTitleBar = isTauri && isMacOS
 
 const EXTERNAL_SITES: { label: string; icon: IconName; url: string }[] = [
-  { label: '游戏中心', icon: 'game', url: 'https://game.bilibili.com/' },
-  { label: '会员购', icon: 'gift', url: 'https://show.bilibili.com/' },
-  { label: '漫画', icon: 'article', url: 'https://manga.bilibili.com/' },
-  { label: '赛事', icon: 'rank', url: 'https://www.bilibili.com/v/game/match/' },
+  { label: '游戏中心', icon: 'gameHandheld', url: 'https://game.bilibili.com/' },
+  { label: '会员购', icon: 'shopParcel', url: 'https://show.bilibili.com/' },
+  { label: '漫画', icon: 'comicBook', url: 'https://manga.bilibili.com/' },
+  { label: '赛事', icon: 'eventCup', url: 'https://www.bilibili.com/v/game/match/' },
 ]
 
 /**
@@ -314,7 +316,7 @@ export function TitleBar() {
       }}
       className="t flex h-10 w-full items-center gap-2.5 px-4 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
     >
-      <Icon name={icon} size={16} />
+      <Icon name={icon} size={20} />
       {label}
     </button>
   )
@@ -324,7 +326,7 @@ export function TitleBar() {
       onPointerDown={overlayTitleBar ? drag.onPointerDown : undefined}
       className={`safe-top relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-[var(--panel-alt)] pr-3 md:gap-4 ${overlayTitleBar ? 'pl-[74px] md:pl-[80px]' : 'pl-3'}`}
     >
-      <div className="flex w-16 shrink-0 items-center gap-2 sm:w-32 md:gap-4 lg:w-52">
+      <div className="flex min-w-16 shrink-0 items-center gap-2 sm:min-w-32 md:gap-4 lg:min-w-52">
         {viewing ? (
           <button
             type="button"
@@ -336,11 +338,9 @@ export function TitleBar() {
             返回
           </button>
         ) : (
-          <div className="pointer-events-none flex shrink-0 items-center gap-2">
-            <span className="bili-tv-mark text-[var(--accent)]">
-              <Icon name="biliTv" size={19} />
-            </span>
-            <span className="hidden text-[16px] font-semibold tracking-tight text-[var(--accent)] sm:inline">bilibili</span>
+          <div className="pointer-events-none flex shrink-0 items-center gap-1">
+            <BiliTvMark alt="oh-bilibili" className="sm:hidden" />
+            <span className="hidden text-[16px] font-bold tracking-tight text-[var(--accent-strong)] sm:inline">oh-bilibili</span>
           </div>
         )}
 
@@ -409,6 +409,7 @@ export function TitleBar() {
             onFocus={() => setFocused(true)}
             placeholder="搜索视频、UP 主"
             aria-label="顶栏搜索"
+            data-search-draft-changed={text.trim() !== currentQuery.trim() || undefined}
             className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
           />
           {text ? (
@@ -460,7 +461,7 @@ export function TitleBar() {
           aria-label={unread?.total ? `消息，${unread.total} 条未读` : '消息'}
           className="bili-icon-btn t press relative flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
         >
-          <Icon name="message" size={18} />
+          <Icon name="msgEnvelope" size={20} />
           {unread && unread.total > 0 ? (
             <span className="num absolute -right-1 -top-0.5 min-w-4 rounded-full bg-[var(--accent)] px-1 text-[10px] leading-4 text-white">
               {unread.total > 99 ? '99+' : unread.total}
@@ -468,20 +469,16 @@ export function TitleBar() {
           ) : null}
         </button>
         <div className="hidden items-center gap-1 md:flex">
-          {[
-            { kind: 'history' as const, label: '历史', icon: 'clock' as const },
-            { kind: 'favs' as const, label: '收藏夹', icon: 'bookmarkStar' as const },
-            { kind: 'watchLater' as const, label: '稍后再看', icon: 'watchLater' as const },
-          ].map((entry) => (
+          {[PERSONAL_NAV.history, PERSONAL_NAV.favs, PERSONAL_NAV.watchLater].map((entry) => (
             <button
-              key={entry.kind}
+              key={entry.view.kind}
               type="button"
-              onClick={() => navigate({ kind: entry.kind })}
+              onClick={() => navigate(entry.view)}
               title={entry.label}
               aria-label={entry.label}
               className="bili-icon-btn t press flex h-8 w-8 items-center justify-center rounded-[6px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--accent)]"
             >
-              <Icon name={entry.icon} size={17} />
+              <Icon name={entry.icon} size={20} />
             </button>
           ))}
         </div>
@@ -494,7 +491,7 @@ export function TitleBar() {
           aria-haspopup="dialog"
           className="bili-press hidden h-8 shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 text-[13px] text-[var(--text-2)] hover:bg-[var(--panel-raised)] hover:text-[var(--text-1)] sm:flex"
         >
-          <Icon name="plus" size={15} />
+          <Icon name="uploadCloud" size={20} />
           投稿
         </button>
         {user ? (
@@ -553,7 +550,7 @@ export function TitleBar() {
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
               >
-                <Icon name="bangumi" size={15} className="text-[var(--text-3)]" />
+                <Icon name="bangumiClapper" size={20} />
                 番剧
               </button>
               <button
@@ -566,7 +563,7 @@ export function TitleBar() {
                 }}
                 className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
               >
-                <Icon name="live" size={15} className="text-[var(--text-3)]" />
+                <Icon name="liveCamera" size={20} />
                 直播
               </button>
               <div className="my-1 h-px bg-hairline" />
@@ -584,7 +581,7 @@ export function TitleBar() {
               }}
               className="t flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
             >
-              <Icon name={site.icon} size={15} className="text-[var(--text-3)]" />
+              <Icon name={site.icon} size={20} />
               <span className="min-w-0 flex-1 truncate">{site.label}</span>
               <Icon name="external" size={12} className="text-[var(--text-3)]" />
             </button>
@@ -595,10 +592,10 @@ export function TitleBar() {
         <div className="grid grid-cols-2 gap-1 p-2">
           {(
             [
-              ['视频投稿', 'play', 'https://member.bilibili.com/platform/upload/video/frame'],
-              ['专栏投稿', 'article', 'https://member.bilibili.com/platform/upload/text/edit'],
-              ['动态投稿', 'dynamic', 'https://t.bilibili.com/'],
-              ['直播开播', 'live', 'https://link.bilibili.com/p/center/index'],
+              ['视频投稿', 'bangumiClapper', 'https://member.bilibili.com/platform/upload/video/frame'],
+              ['专栏投稿', 'creatorPen', 'https://member.bilibili.com/platform/upload/text/edit'],
+              ['动态投稿', 'feedPaperplane', 'https://t.bilibili.com/'],
+              ['直播开播', 'liveCamera', 'https://link.bilibili.com/p/center/index'],
             ] as const
           ).map(([label, icon, url]) => (
             <button
@@ -635,22 +632,22 @@ export function TitleBar() {
               </div>
             </div>
             <div className="border-t border-hairline py-1">
-              {accountItem('个人空间', 'user', () =>
+              {accountItem('个人空间', PERSONAL_NAV.profile.icon, () =>
                 navigate({ kind: 'author', name: user.uname, mid: user.mid }),
               )}
-              {accountItem('收藏夹', 'bookmarkStar', () => navigate({ kind: 'favs' }))}
-              {accountItem('观看历史', 'clock', () => navigate({ kind: 'history' }))}
-              {accountItem('投稿管理', 'article', () => {
+              {accountItem(PERSONAL_NAV.favs.label, PERSONAL_NAV.favs.icon, () => navigate(PERSONAL_NAV.favs.view))}
+              {accountItem('观看历史', PERSONAL_NAV.history.icon, () => navigate(PERSONAL_NAV.history.view))}
+              {accountItem('投稿管理', 'uploadCloud', () => {
                 void ipc
                   .openExternal('https://member.bilibili.com/platform/upload-manager/article')
                   .catch((cause) => toastFailure('打开投稿管理', cause))
               })}
-              {accountItem('创作中心', 'rank', () => {
+              {accountItem('创作中心', 'creatorPen', () => {
                 void ipc
                   .openExternal('https://member.bilibili.com/platform/home')
                   .catch((cause) => toastFailure('打开创作中心', cause))
               })}
-              {accountItem('设置', 'settings', () => navigate({ kind: 'settings' }))}
+              {accountItem(PERSONAL_NAV.settings.label, PERSONAL_NAV.settings.icon, () => navigate(PERSONAL_NAV.settings.view))}
             </div>
             <div className="border-t border-hairline py-1">
               <button
@@ -661,7 +658,7 @@ export function TitleBar() {
                 }}
                 className="t flex h-10 w-full items-center gap-2.5 px-4 text-left text-[13px] text-[var(--text-2)] hover:bg-[var(--ga0)] hover:text-[var(--accent)]"
               >
-                <Icon name="logout" size={16} />
+                <Icon name="logout" size={16} className="mx-0.5" />
                 退出登录
               </button>
             </div>

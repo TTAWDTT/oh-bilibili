@@ -57,6 +57,7 @@ export function PreciousView() {
         active="precious"
         title={data?.title ?? '入站必刷'}
         extra={data ? String(data.items.length) : undefined}
+        aside={<span aria-hidden="true" className="precious-editing-desk" />}
       />
       <div className="px-4 md:px-8">
         {data === null ? (

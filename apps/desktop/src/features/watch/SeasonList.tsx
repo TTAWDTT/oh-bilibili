@@ -44,8 +44,8 @@ export function SeasonList({ season, bare = false }: { season: SeasonView; bare?
 
   return (
     <div className={bare ? '' : 'px-2 pb-2'}>
-      <div className={bare ? '' : 'overflow-hidden rounded-[8px] border border-[var(--line)]'}>
-        <div className="flex items-baseline gap-2 border-b border-hairline px-3 py-2">
+      <div className={bare ? '' : 'overflow-hidden'}>
+        <div className="flex items-baseline gap-2 px-2 py-2">
           <h3 className="min-w-0 truncate text-[13px] font-medium text-[var(--text-1)]" title={season.title}>
             {season.title}
           </h3>
