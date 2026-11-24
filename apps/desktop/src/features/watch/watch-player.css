@@ -38,7 +38,12 @@
 [data-watch-controls] button[title="取消静音"] svg { stroke-width: 1.85; }
 [data-watch-controls] button[title="静音"] svg,
 [data-watch-controls] button[title="取消静音"] svg { width: 21px; height: 21px; }
-[data-watch-controls] [role="slider"][aria-label="音量"] { --line: rgb(255 255 255 / 35%); }
+[data-watch-controls] .volume-compact {
+  --volume-surface: #202226;
+  --volume-edge: rgb(255 255 255 / 16%);
+  --volume-rail: #73767c;
+  --volume-label: #f6f7f8;
+}
 [data-watch-controls] button[title="静音"]:hover,
 [data-watch-controls] button[title="取消静音"]:hover { color: white; }
 [data-watch-controls] button[aria-expanded="true"] { background: rgb(255 255 255 / 17%); }

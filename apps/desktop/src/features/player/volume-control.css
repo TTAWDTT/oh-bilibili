@@ -1,0 +1,56 @@
+.volume-compact [data-volume-panel] {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 4px);
+  display: grid;
+  grid-template-columns: 100px 36px;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 10px 3px 4px;
+  border: 1px solid var(--volume-edge, var(--line));
+  border-radius: 8px;
+  background: var(--volume-surface, var(--panel));
+  color: var(--volume-label, var(--text-1));
+  box-shadow: 0 3px 12px rgb(0 0 0 / 16%);
+  opacity: 0;
+  visibility: hidden;
+  /* 给鼠标留一点斜向移入滑杆的时间。 */
+  transition: opacity 100ms ease-out 180ms, visibility 0s linear 280ms;
+}
+
+/* 透明的四像素接住从喇叭移向滑杆的鼠标。 */
+.volume-compact [data-volume-panel]::after {
+  content: '';
+  position: absolute;
+  inset: 100% -1px auto;
+  height: 5px;
+}
+
+.volume-compact:is(:hover, :has(:focus-visible), [data-dragging]) [data-volume-panel] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.volume-compact [role="slider"] {
+  --line: var(--volume-rail, var(--ga4));
+  height: 26px;
+}
+
+.volume-compact [data-slider-thumb] {
+  opacity: 1;
+  border: 1px solid rgb(0 0 0 / 18%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
+}
+
+.volume-compact [data-volume-value] {
+  text-align: right;
+  font: 500 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volume-compact [data-volume-panel] { transition-duration: 0s; }
+}

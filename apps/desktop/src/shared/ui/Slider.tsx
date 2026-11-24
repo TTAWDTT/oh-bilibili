@@ -143,6 +143,7 @@ export function Slider({
           }}
         />
         <div
+          data-slider-thumb
           className="t pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--accent)] bg-white shadow-[0_0_8px_rgba(0,174,236,0.6)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100"
           style={{ left: `${clamp(value, 0, 1) * 100}%` }}
         />

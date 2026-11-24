@@ -2,15 +2,20 @@ import { useState } from 'react'
 import { Slider } from '../../shared/ui/Slider'
 import { Icon } from '../../shared/ui/Icon'
 import { usePlayerStore } from './playerStore'
+import './volume-control.css'
 
 export function VolumeControl({ compact = false }: { compact?: boolean }) {
   const volume = usePlayerStore((state) => state.snapshot?.volume ?? 0.7)
   const setVolume = usePlayerStore((state) => state.setVolume)
   const [draft, setDraft] = useState<number | null>(null)
   const shown = draft ?? volume
+  const percentage = `${Math.round(shown * 100)}%`
 
   return (
-    <div className={`group/vol flex items-center text-[var(--text-2)] ${compact ? 'group' : 'gap-2'}`}>
+    <div
+      className={`flex items-center text-[var(--text-2)] ${compact ? 'volume-compact relative' : 'gap-2'}`}
+      data-dragging={compact && draft !== null ? true : undefined}
+    >
       <button
         type="button"
         aria-label={shown > 0 ? '静音' : '取消静音'}
@@ -22,13 +27,7 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
       >
         <Icon name={shown > 0 ? 'volume' : 'mute'} size={16} />
       </button>
-      <div
-        className={
-          compact
-            ? 'w-0 overflow-hidden transition-[width] duration-150 group-hover/vol:w-[84px] group-focus-within/vol:w-[84px]'
-            : 'w-[84px]'
-        }
-      >
+      <div data-volume-panel={compact ? '' : undefined} className={compact ? undefined : 'w-[84px]'}>
         <Slider
           value={shown}
           label="音量"
@@ -41,8 +40,9 @@ export function VolumeControl({ compact = false }: { compact?: boolean }) {
             setDraft(null)
             void setVolume(value)
           }}
-          ariaValueText={`${Math.round(shown * 100)}%`}
+          ariaValueText={percentage}
         />
+        {compact && <span data-volume-value aria-hidden="true">{percentage}</span>}
       </div>
     </div>
   )
