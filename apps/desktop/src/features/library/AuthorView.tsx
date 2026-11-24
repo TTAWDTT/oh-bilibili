@@ -206,8 +206,11 @@ export function AuthorView({ view }: { view: AuthorRoute }) {
   const isSelf = mid != null && me?.mid === mid
   const submissionCount = tracks && !isFallback ? total : card?.videos
   const show = (next: SpaceSection) => {
-    if (view.shelf || view.catalogChild) goBack()
-    if (!view.shelf || next !== 'collections') replace({ kind: 'author', name, mid: mid ?? null, section: next })
+    if (view.shelf || view.catalogChild) {
+      goBack()
+      if (next === section) return
+    }
+    replace({ kind: 'author', name, mid: mid ?? null, section: next })
   }
 
   return (

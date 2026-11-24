@@ -24,6 +24,7 @@ pub enum Catalog {
     Created,
     Collected,
     Folder { id: u64 },
+    SubscribedSeason { id: u64, owner: u64 },
     Anime,
     Cinema,
     Tags,
@@ -36,6 +37,7 @@ pub enum Destination {
     Web { url: String },
     ReadingList { id: u64 },
     Folder { id: u64 },
+    SubscribedSeason { id: u64, owner: u64 },
     Video { track: Track },
     Search { keyword: String },
     Reservation { mid: u64, starts_at: Option<u64> },
@@ -107,7 +109,10 @@ impl Source {
 impl Catalog {
     fn privacy_setting(self) -> Option<&'static str> {
         match self {
-            Self::Created | Self::Collected | Self::Folder { .. } => Some("fav_video"),
+            Self::Created
+            | Self::Collected
+            | Self::Folder { .. }
+            | Self::SubscribedSeason { .. } => Some("fav_video"),
             Self::Anime | Self::Cinema => Some("bangumi"),
             Self::Coins => Some("coins_video"),
             Self::Likes => Some("likes_video"),
@@ -138,6 +143,7 @@ impl Catalog {
                 let folder = if matches!(self, Self::Created) { "created" } else { "collected" };
                 format!("/x/v3/fav/folder/{folder}/list?up_mid={mid}&pn={page}&ps={SIZE}&platform=web")
             }
+            Self::SubscribedSeason { id, owner } => format!("/x/polymer/web-space/seasons_archives_list?mid={owner}&season_id={id}&page_num={page}&page_size={SIZE}"),
             Self::Folder { id } => format!("/x/v3/fav/resource/list?media_id={id}&pn={page}&ps={SIZE}&platform=web"),
             Self::Anime | Self::Cinema => {
                 let kind = if matches!(self, Self::Anime) { 1 } else { 2 };
@@ -160,6 +166,9 @@ impl Catalog {
             Self::ReadingList { .. } => ("articles", Some(false)),
             Self::Audio => ("data", data["pageCount"].as_u64().map(|last| page < last)),
             Self::Created | Self::Collected => ("list", data["has_more"].as_bool()),
+            Self::SubscribedSeason { .. } => {
+                ("archives", more_by_total(&data["page"], "total", page))
+            }
             Self::Folder { .. } => ("medias", data["has_more"].as_bool()),
             Self::Anime | Self::Cinema => ("list", more_by_total(data, "total", page)),
             Self::Tags => ("tags", more_by_total(data, "total", page)),
@@ -272,10 +281,10 @@ impl Catalog {
                 }
                 let id = v["id"].as_u64()?;
                 let action = if matches!(self, Self::Collected) && v["type"].as_u64() == Some(21) {
-                    web(format!(
-                        "https://space.bilibili.com/{}/lists/{id}?type=season",
-                        v["upper"]["mid"].as_u64()?
-                    ))
+                    SubscribedSeason {
+                        id,
+                        owner: v["upper"]["mid"].as_u64()?,
+                    }
                 } else {
                     Folder { id }
                 };
@@ -324,7 +333,7 @@ impl Catalog {
                 let title = string(&v["tag_name"])?;
                 (title.clone(), &v["cover"], None, Search { keyword: title })
             }
-            Self::Coins | Self::Likes => {
+            Self::Coins | Self::Likes | Self::SubscribedSeason { .. } => {
                 let track = track_from_item(v)?;
                 (
                     track.title.clone(),

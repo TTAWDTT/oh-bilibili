@@ -56,6 +56,7 @@ function CatalogContent({ view, mid, order }: Props & { order: number[] }) {
   function open(item: CatalogItem, focus: string) {
     const target = item.destination
     switch (target.kind) {
+      case 'subscribed_season':
       case 'reading_list':
       case 'folder':
         navigate({ ...view, catalogChild: { ...target, title: item.title }, catalogPage: 1, catalogOffsets: [] }, undefined, focus)

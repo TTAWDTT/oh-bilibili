@@ -641,7 +641,7 @@ export function spaceVideos(
 
 export type CatalogKind = 'opus' | 'articles' | 'reading_lists' | 'audio' | 'courses' | 'reservations'
   | 'created' | 'collected' | 'anime' | 'cinema' | 'tags' | 'games' | 'coins' | 'likes'
-export type CatalogChild = { kind: 'reading_list' | 'folder'; id: number }
+export type CatalogChild = { kind: 'reading_list' | 'folder'; id: number } | { kind: 'subscribed_season'; id: number; owner: number }
 export type CatalogItem = {
   title: string; cover: string | null; detail: string | null
   destination: CatalogChild | { kind: 'web'; url: string } | { kind: 'video'; track: Track }

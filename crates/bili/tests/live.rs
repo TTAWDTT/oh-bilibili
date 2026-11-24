@@ -1036,7 +1036,8 @@ async fn live_author_catalog() {
         (946974, ReadingList { id: 89188 }), (946974, Audio), (946974, Courses),
         (43981713, Created), (43981713, Folder { id: 3927166413 }),
         (2, Anime), (2, Cinema), (2, Tags), (2, Games),
-        (10897717, Collected), (10897717, Folder { id: 2055539766 }), (8743466, Coins), (8743466, Likes),
+        (10897717, Collected), (10897717, SubscribedSeason { id: 8634190, owner: 11314362 }),
+        (10897717, Folder { id: 2055539766 }), (8743466, Coins), (8743466, Likes),
     ] {
         let CatalogPage::Public { items, more, offset } = source.space_catalog(mid, catalog, 1, None).await.unwrap()
             else { panic!("{mid} {catalog:?} 未公开") };
