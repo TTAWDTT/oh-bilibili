@@ -2810,15 +2810,17 @@ async function checkAuthorSpace(page) {
     collected.slice().sort().join() === played.slice().sort().join() &&
     await page.evaluate(`${header}.textContent.includes('共 125 个投稿')`))
 
-  check('空间翻到第 85 条投稿，收起和展开侧栏后都还能看见它', await page.evaluate(`(async () => {
+  check('空间第 85 条投稿在侧栏连续开合两次后仍回到原来的高度', await page.evaluate(`(async () => {
     const box = ${scroll}
-    const card = box.querySelectorAll('[data-track-card]')[84]
+    const cards = box.querySelectorAll('[data-track-card]')
+    const card = cards[84]
     const nav = document.querySelector('nav[aria-label="主导航"]')
     const toggle = nav.querySelector('button[aria-expanded]')
     const frame = () => new Promise(requestAnimationFrame)
-    card.scrollIntoView({ block: 'start', behavior: 'instant' })
+    cards[81].scrollIntoView({ block: 'start', behavior: 'instant' })
     await frame()
-    for (const expanded of ['false', 'true']) {
+    const originalTop = card.getBoundingClientRect().top
+    for (const expanded of ['false', 'true', 'false', 'true']) {
       toggle.click()
       await frame()
       await Promise.allSettled(nav.getAnimations().map(slide => slide.finished))
@@ -2827,7 +2829,8 @@ async function checkAuthorSpace(page) {
       const rect = card.getBoundingClientRect()
       const viewport = box.getBoundingClientRect()
       if (toggle.getAttribute('aria-expanded') !== expanded ||
-        rect.bottom <= viewport.top || rect.top >= viewport.bottom) return false
+        rect.bottom <= viewport.top || rect.top >= viewport.bottom ||
+        (expanded === 'true' && Math.abs(rect.top - originalTop) > 2)) return false
     }
     return true
   })()`))

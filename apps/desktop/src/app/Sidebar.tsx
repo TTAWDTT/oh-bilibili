@@ -56,6 +56,7 @@ export function Sidebar() {
   const mode = onWatch ? 'watch' : 'browse'
   const [toggledIn, setToggledIn] = useState<typeof mode | null>(null)
   const navRef = useRef<HTMLElement>(null)
+  const anchorRows = useRef(new WeakMap<Element, number>())
   const restoreCard = useRef<(() => void) | undefined>(undefined)
   const collapsed = (onWatch ? watchNav : preference) === 'rail'
 
@@ -73,7 +74,7 @@ export function Sidebar() {
     let current = true
     const finish = () => {
       if (!current) return
-      restoreCard.current = rememberVisibleCard()
+      restoreCard.current = rememberVisibleCard(anchorRows.current)
       setToggledIn(null)
     }
     void slide.finished.then(finish, finish)
@@ -139,7 +140,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => {
-            restoreCard.current = rememberVisibleCard()
+            restoreCard.current = rememberVisibleCard(anchorRows.current)
             if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) setToggledIn(mode)
             if (onWatch) toggleWatchNav()
             else toggleSidebar()
@@ -160,7 +161,7 @@ export function Sidebar() {
 }
 
 /** 换列时用首个可见投稿保持阅读位置。网格按行排列，只需比较几张卡的高度。 */
-function rememberVisibleCard(): (() => void) | undefined {
+function rememberVisibleCard(anchorRows: WeakMap<Element, number>): (() => void) | undefined {
   const scroller = document.getElementById('scroll-main')
   if (!scroller?.scrollTop) return
   const top = scroller.getBoundingClientRect().top
@@ -178,9 +179,17 @@ function rememberVisibleCard(): (() => void) | undefined {
       if (cards[middle]!.getBoundingClientRect().bottom <= top) start = middle + 1
       else end = middle
     }
-    const card = cards[start]
-    if (!card) continue
-    const before = card.getBoundingClientRect().top
-    return () => { scroller.scrollTop += card.getBoundingClientRect().top - before }
+    const first = cards[start]
+    if (!first) continue
+    const before = first.getBoundingClientRect().top
+    // 三列变四列后，原来第一张的左边可能多出投稿；折返时仍以原来那张为准。
+    const previous = anchorRows.get(grid)
+    const index = previous !== undefined && cards[previous]?.getBoundingClientRect().top === before
+      ? previous : start
+    anchorRows.set(grid, index)
+    const card = cards[index]!
+    return () => {
+      scroller.scrollTop += Math.round(card.getBoundingClientRect().top) - Math.round(before)
+    }
   }
 }
