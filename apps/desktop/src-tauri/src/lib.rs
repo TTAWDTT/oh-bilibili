@@ -169,6 +169,35 @@ async fn space_videos(
     engine.space_videos(mid, page, &order).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+async fn space_picks(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    kind: bilimusic_core::wire::SpacePick,
+) -> Result<Vec<Track>, WireError> {
+    engine.space_picks(mid, kind).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_collections(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    page: u32,
+) -> Result<(Vec<bilimusic_core::wire::SpaceCollection>, u64), WireError> {
+    engine.space_collections(mid, page).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_collection_works(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    kind: bilimusic_core::wire::CollectionKind,
+    id: u64,
+    page: u32,
+) -> Result<(Vec<Track>, u64), WireError> {
+    engine.space_collection_works(mid, kind, id, page).await
+}
+
 /// UP 主粉丝与关注数。
 #[tauri::command(rename_all = "snake_case")]
 async fn space_stat(
@@ -228,6 +257,41 @@ async fn messages(
     page: u32,
 ) -> Result<bilimusic_core::wire::MessagePage, WireError> {
     engine.messages(kind, cursor, page).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn direct_sessions(
+    engine: tauri::State<'_, Arc<Engine>>,
+    cursor: Option<String>,
+) -> Result<bilimusic_core::wire::DirectSessions, WireError> {
+    engine.direct_sessions(cursor).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn direct_history(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    cursor: Option<String>,
+) -> Result<bilimusic_core::wire::DirectHistory, WireError> {
+    engine.direct_history(mid, cursor).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn send_direct_text(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    text: String,
+) -> Result<bilimusic_core::wire::DirectMessage, WireError> {
+    engine.send_direct_text(mid, text).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn direct_ack(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    seqno: String,
+) -> Result<(), WireError> {
+    engine.direct_ack(mid, seqno).await
 }
 
 /// 取一页评论。评论区只读，取不到不该挡住看视频。
@@ -680,6 +744,7 @@ async fn coin_set(
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 struct AuthorCardView {
+    banner: Option<String>,
     name: String,
     face: String,
     fans: Option<u64>,
@@ -699,6 +764,7 @@ async fn author_card(
 ) -> Result<AuthorCardView, WireError> {
     let c = engine.author_card(mid).await?;
     Ok(AuthorCardView {
+        banner: c.banner,
         name: c.name,
         face: c.face,
         fans: c.fans,
@@ -1282,9 +1348,16 @@ pub fn run() {
             dynamic_feed,
             message_unread,
             messages,
+            direct_sessions,
+            direct_history,
+            send_direct_text,
+            direct_ack,
             watch_later_list,
             following,
             space_videos,
+            space_picks,
+            space_collections,
+            space_collection_works,
             space_stat,
             set_mode,
             close_watch,

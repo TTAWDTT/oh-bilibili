@@ -1,6 +1,7 @@
 //! 上线形状。命令失败与后台通知共用同一个错误形状，UI 只有一处 switch。
 
 use bilimusic_model::Track;
+pub use bilimusic_bili::space::{CollectionKind, SpaceCollection, SpacePick};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -314,6 +315,7 @@ pub struct WatchStats {
 /// 免得同一份结构写两遍、改一处漏一处。
 pub use bilimusic_bili::comments::{Comment, CommentPage};
 
+pub use bilimusic_bili::direct::{DirectHistory, DirectMessage, DirectSessions};
 pub use bilimusic_bili::messages::{MessageItem, MessageKind, MessagePage, MessageUnread, MessageUser};
 pub use bilimusic_bili::sync::{
     DiscoveryRegion, DynamicItem, DynamicPage, FavTrackPage, Followed, SubtitleCue, SubtitleTrack, SummaryPoint, SummarySection,

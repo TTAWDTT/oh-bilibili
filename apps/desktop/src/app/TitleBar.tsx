@@ -228,13 +228,17 @@ export function TitleBar() {
       return
     }
     let cancelled = false
-    void ipc.messageUnread()
-      .then((next) => {
-        if (!cancelled) setUnread(next)
-      })
-      .catch(() => {})
+    const refresh = () => {
+      if (document.hidden) return
+      void ipc.messageUnread()
+        .then((next) => { if (!cancelled) setUnread(next) })
+        .catch(() => {})
+    }
+    refresh()
+    document.addEventListener('visibilitychange', refresh)
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', refresh)
     }
   }, [auth?.logged_in, auth?.user?.mid, messaging, setUnread])
 

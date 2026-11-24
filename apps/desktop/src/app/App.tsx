@@ -100,7 +100,7 @@ function CurrentView({ view }: { view: View }) {
     case 'dynamic':
       return <DynamicView />
     case 'messages':
-      return <MessagesView />
+      return <MessagesView view={view} />
     case 'ranking':
       return <RankingView initialRid={view.rid ?? 0} />
     case 'popular':
@@ -126,7 +126,7 @@ function CurrentView({ view }: { view: View }) {
     case 'favs':
       return <FavFoldersView />
     case 'author':
-      return <AuthorView name={view.name} mid={view.mid ?? null} />
+      return <AuthorView key={view.mid ?? view.name} view={view} />
     case 'settings':
       return <SettingsView />
     case 'profile':
