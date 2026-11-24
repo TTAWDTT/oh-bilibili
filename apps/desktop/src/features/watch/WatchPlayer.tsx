@@ -22,6 +22,7 @@ import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
 import { WatchDanmakuTools } from './WatchDanmakuTools'
+import { WatchSeekPreview, type PreviewTile } from './WatchSeekPreview'
 import './watch-player.css'
 import { BiliCoin, BiliStar, BiliThumb } from '../../shared/ui/BiliTri'
 import type { ShakaGlobal, ShakaPlayer } from './shaka'
@@ -808,6 +809,9 @@ export function WatchPlayer({
     saveQualityAuto(true)
   }
 
+  /** 章节优先用 UP 主设的，没设过再看简介里有没有时间戳。 */
+  const chapters = chapterMeta.length > 0 ? chapterMeta : chaptersFrom(data.desc)
+
   /** 某个时刻落在哪一章。章节按时间升序，取最后一个不超过它的。 */
   const chapterAt = (ms: number): { at: number; title: string } | null => {
     let hit: { at: number; title: string } | null = null
@@ -837,6 +841,8 @@ export function WatchPlayer({
   const percent = Math.min(100, (now / Math.max(1, duration)) * 100)
   /** 拖动时进度条与时间跟着指针走，松手才真的落位。 */
   const shownPercent = scrub === null ? percent : scrub * 100
+  const shownTime = scrub === null ? now : scrub * duration
+  const shownChapter = chapterAt(shownTime)?.title
 
   // 冒烟脚本读的探针。无头预览取不到流，播放时钟始终是 0，seek 之后
   // 500ms 就被它覆盖回去，只能让播放器自己报出收过的落点。
@@ -894,8 +900,6 @@ export function WatchPlayer({
     // 字幕按 P 分，切 P 必须重取：语言代码通常一样，少了 cid 就会一直挂着上一集。
   }, [subTrack, track.key, cid])
 
-  /** 章节优先用 UP 主设的，没设过再看简介里有没有时间戳。 */
-  const chapters = chapterMeta.length > 0 ? chapterMeta : chaptersFrom(data.desc)
   const pageTitle = data.pages.find((page) => page.no === currentPage)?.title ?? ''
 
   /** 进度条悬停预览。整条视频的雪碧图只在第一次悬停时取，平时不发请求。 */
@@ -906,7 +910,7 @@ export function WatchPlayer({
     shotsAsked.current = false
     setShots(null)
   }, [cid])
-  const [hoverAt, setHoverAt] = useState<{ ratio: number; second: number; width: number } | null>(null)
+  const [hoverAt, setHoverAt] = useState<number | null>(null)
   /** 右键菜单的位置；null 表示没开。 */
   const [shotMenu, setShotMenu] = useState<{ x: number; y: number } | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -1018,7 +1022,7 @@ export function WatchPlayer({
   }
 
   /** 第 second 秒对应雪碧图里的哪一张、哪一格。索引是升序的，二分找最后一个不大于它的。 */
-  const shotAt = (second: number): { image: string; col: number; row: number } | null => {
+  const shotAt = (second: number): PreviewTile | null => {
     if (!shots || shots.images.length === 0 || shots.index.length === 0) return null
     const per = Math.max(1, shots.columns * shots.rows)
     const total = Math.min(shots.index.length, shots.images.length * per)
@@ -1041,6 +1045,9 @@ export function WatchPlayer({
       row: Math.floor(cell / Math.max(1, shots.columns)),
     }
   }
+
+  const previewTime = (hoverAt ?? 0) * duration
+  const previewTile = hoverAt === null ? null : shotAt(Math.floor(previewTime / 1000))
 
   const danmakuTools = (
     <WatchDanmakuTools
@@ -1536,25 +1543,10 @@ export function WatchPlayer({
         onMouseEnter={() => setOverControls(true)}
         onMouseLeave={() => setOverControls(false)}
       >
-        {/* 全屏时没有画面下方那条栏，发弹幕留在控制条里。 */}
-        {cinema ? (
-          <div className="mb-1.5 flex items-center gap-2 lg:hidden">
-            <DanmakuComposer
-              tone="dark"
-              signedIn={signedIn}
-              onLogin={() => setAuthOpen(true)}
-              value={draft}
-              onChange={setDraft}
-              onSend={() => void sendDanmaku()}
-              sending={sending}
-              inputClass="flex-1"
-            />
-          </div>
-        ) : null}
 
         {/* 热度条和进度条各占一层：热度在上、进度条在下，热度不能溢出进度条自己的盒，
             WebKit 不会把命中区给溢出的绝对定位子元素。 */}
-        <div className="relative mb-0.5 h-5">
+        <div className="watch-timeline relative">
           <DanmakuBeats
             items={visibleDanmaku}
             durationMs={duration}
@@ -1573,6 +1565,8 @@ export function WatchPlayer({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(shownPercent)}
+          aria-valuetext={`${formatTime(shownTime)} / ${formatTime(duration)}`}
+          data-scrubbing={scrub !== null}
           tabIndex={0}
           // B 站可以按住进度条拖：拖的时候填充、时间、预览图跟着指针走，
           // 松手才真的落位。只做点击的话，拖到一半松手会跳到松手那一点，
@@ -1590,18 +1584,29 @@ export function WatchPlayer({
             }
             const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
             setScrub(ratio)
-            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+            setHoverAt(ratio)
             askShots()
           }}
           onPointerUp={(event) => {
-            if (event.button !== 0 || event.clientX <= 0 || !duration) return
+            if (event.button !== 0 || scrub === null) return
             const box = event.currentTarget.getBoundingClientRect()
             const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
             setScrub(null)
             seekTo(ratio)
-            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
+            const inside = event.clientX >= box.left && event.clientX <= box.right &&
+              event.clientY >= box.top && event.clientY <= box.bottom
+            setHoverAt(inside ? ratio : null)
           }}
-          onPointerCancel={() => setScrub(null)}
+          onPointerCancel={() => {
+            setScrub(null)
+            setHoverAt(null)
+          }}
+          onLostPointerCapture={() => {
+            if (scrub !== null) {
+              setScrub(null)
+              setHoverAt(null)
+            }
+          }}
           // 标成 slider 就必须能被键盘操作：Home/End 跳到两端，
           // 方向键按 5 秒走。缺这一段，读屏和纯键盘用户完全拖不动进度。
           onKeyDown={(event) => {
@@ -1627,80 +1632,36 @@ export function WatchPlayer({
             if (!duration) return
             const box = event.currentTarget.getBoundingClientRect()
             const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
-            setHoverAt({ ratio, second: Math.round((ratio * duration) / 1000), width: box.width })
-            if (scrub !== null) setScrub(ratio)
+            setHoverAt(ratio)
+            setScrub(current => current === null ? null : ratio)
           }}
-          onMouseLeave={() => setHoverAt(null)}
-          className="bili-progress group absolute inset-x-0 bottom-0 h-3 cursor-pointer touch-none"
+          onMouseLeave={() => { if (scrub === null) setHoverAt(null) }}
+          className="bili-progress watch-seek absolute inset-x-0 bottom-0 cursor-pointer touch-none"
         >
-          {hoverAt ? (
-            (() => {
-              const shot = shotAt(hoverAt.second)
-              if (!shot) {
-                // 缩略图还没到（或这条视频没有图）时，至少把落点时间给出来。
-                return (
-                  <span
-                    className="num pointer-events-none absolute bottom-full z-30 mb-1 -translate-x-1/2 whitespace-nowrap rounded-[3px] bg-black/75 px-1.5 py-0.5 text-[11px] leading-4 text-white"
-                    style={{ left: `${Math.min(96, Math.max(4, hoverAt.ratio * 100))}%` }}
-                  >
-                    {formatTime(hoverAt.second * 1000)}
-                  </span>
-                )
-              }
-              return (
-                <span
-                  className="pointer-events-none absolute bottom-full z-30 mb-2 block h-[90px] w-[160px] -translate-x-1/2 overflow-hidden rounded-[4px] border border-white/25 bg-black shadow-[0_6px_20px_rgba(0,0,0,0.55)]"
-                  style={{
-                    left: Math.min(
-                      Math.max(hoverAt.ratio * hoverAt.width, 80),
-                      Math.max(80, hoverAt.width - 80),
-                    ),
-                  }}
-                >
-                  {/* 雪碧图用 img 而不是 background-image：图片 CDN 对 tauri://localhost
-                      这个 Referer 回 403，只有 referrerPolicy 才能把它去掉。 */}
-                  <img
-                    src={shot.image}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    className="absolute max-w-none"
-                    style={{
-                      width: 160 * (shots?.columns ?? 1),
-                      height: 90 * (shots?.rows ?? 1),
-                      left: -shot.col * 160,
-                      top: -shot.row * 90,
-                    }}
-                  />
-                  <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-0.5 text-[11px] leading-4 text-white">
-                    <span className="num text-white/70">{formatTime(hoverAt.second * 1000)} </span>
-                    <span className="line-clamp-1">{chapterAt(hoverAt.second * 1000)?.title}</span>
-                  </span>
-                </span>
-              )
-            })()
-          ) : null}
-          <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-white/25" />
+          {hoverAt !== null && (
+            <WatchSeekPreview
+              key={previewTile?.image ?? ''}
+              ratio={hoverAt}
+              time={previewTime}
+              chapter={chapterAt(previewTime)?.title}
+              tile={previewTile}
+              sheet={shots}
+            />
+          )}
+          <span className="watch-seek-rail">
+            <span className="watch-seek-fill" style={{ width: `${shownPercent}%` }} />
+          </span>
           {chapters.map((chapter) => (
             <span
               key={chapter.at}
               role="img"
               aria-label={chapter.title || formatTime(chapter.at)}
               title={chapter.title || formatTime(chapter.at)}
-              className="pointer-events-none absolute top-1/2 h-[9px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/85 shadow-[0_0_3px_rgba(0,0,0,0.6)]"
+              className="watch-seek-chapter"
               style={{ left: `${Math.min(100, (chapter.at / Math.max(1, duration)) * 100)}%` }}
             />
           ))}
-          <span
-            /* 主题只有一种强调色，进度条也用它。 */
-            className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-[var(--accent)]"
-            style={{ width: `${shownPercent}%` }}
-          />
-          <span
-            className={`pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
-              scrub === null ? 'opacity-0' : 'opacity-100'
-            }`}
-            style={{ left: `${shownPercent}%` }}
-          />
+          <span className="watch-seek-thumb" style={{ left: `${shownPercent}%` }} />
         </div>
         </div>
 
@@ -1714,15 +1675,18 @@ export function WatchPlayer({
           >
             <Icon name={playing ? 'pause' : 'play'} size={23} />
           </button>
-          <span className="num shrink-0 text-[12px] text-white/90">
-            {formatTime(scrub === null ? now : scrub * duration)}
-            <span className="hidden sm:inline"> / {formatTime(duration)}</span>
+          <span data-watch-time className="num shrink-0 whitespace-nowrap text-[12px] text-white/90">
+            {formatTime(shownTime)}
+            <span className="text-white/70"> / {formatTime(duration)}</span>
           </span>
 
-          <div className="min-w-0 flex-1" />
+          <div className="watch-chapter-space min-w-0 flex-1">
+            {shownChapter && <span title={shownChapter}>{shownChapter}</span>}
+          </div>
 
           {cinema ? (
-            <div className="hidden items-center gap-2 lg:flex">
+            <div className="watch-cinema-discussion flex items-center gap-2">
+              {danmakuTools}
               <DanmakuComposer
                 tone="dark"
                 signedIn={signedIn}
@@ -1731,7 +1695,7 @@ export function WatchPlayer({
                 onChange={setDraft}
                 onSend={() => void sendDanmaku()}
                 sending={sending}
-                inputClass="w-[150px] shrink-0"
+                inputClass="flex-1 lg:w-[150px] lg:flex-none"
               />
             </div>
           ) : null}
@@ -1760,8 +1724,6 @@ export function WatchPlayer({
               <Icon name="pip" size={21} />
             </button>
           ) : null}
-
-          {cinema ? danmakuTools : null}
 
           {/* 字幕。没有字幕轨的条目不出现这颗按钮——B 站也是这样。 */}
           {subtitleTracks.length > 0 ? (
@@ -1969,7 +1931,7 @@ export function WatchPlayer({
           </div>
 
           <span
-            className="hidden shrink-0 items-center md:flex"
+            className="flex shrink-0 items-center"
             style={{ ['--text-2' as string]: 'rgb(255 255 255 / 0.85)' }}
           >
             <VolumeControl compact />

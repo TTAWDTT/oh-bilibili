@@ -3533,6 +3533,7 @@ async function controlFit(page) {
     }
     if (!frame || !row) return null
     const frameBox = frame.getBoundingClientRect()
+    const volumePanel = row.querySelector('[data-volume-panel]')?.getBoundingClientRect()
     const buttons = [...row.querySelectorAll('button')].filter((b) => {
       if (b.parentElement !== row && b.parentElement?.parentElement !== row) return false
       const style = getComputedStyle(b)
@@ -3547,6 +3548,8 @@ async function controlFit(page) {
       outside: outside.length,
       rail: !!rail && getComputedStyle(rail).display !== 'none',
       inline: visible('[data-watch-inline]'),
+      totalTime: visible('[data-watch-controls] [data-watch-time] > span'),
+      volumeFits: volumePanel?.width > 0 && volumePanel.left >= frameBox.left && volumePanel.right <= frameBox.right,
       shot: visible('button[aria-label="截图"]'),
       pip: visible('button[aria-label="画中画"]'),
       volume: visible('button[aria-label="静音"], button[aria-label="取消静音"]'),
@@ -5074,10 +5077,19 @@ async function main() {
         buttons: 1,
         clickCount: 1,
       })
-      await page.mouseEvent({ type: 'mouseMoved', x: at(0.7), y: slider.y, buttons: 1 })
+      await page.mouseEvent({ type: 'mouseMoved', x: at(0.7), y: slider.y, button: 'left', buttons: 1 })
       await sleep(150)
       const during = await page.evaluate(`window.__ohBilibiliWatch?.state() ?? null`)
       check('拖动时进度跟手但不落位', !!during && Math.abs((during.scrub ?? -1) - 0.7) < 0.02)
+      const displayed = await page.evaluate(`(() => {
+        const slider = document.querySelector('[data-watch-player] [aria-label="播放进度"]')
+        return {
+          preview: slider.querySelector('[data-watch-seek-preview]')?.innerText,
+          spoken: slider.getAttribute('aria-valuetext'),
+        }
+      })()`)
+      const previewTime = displayed.preview?.match(/\b\d+:\d{2}\b/)?.[0]
+      check('拖动预览和读屏报出同一个落点时间', !!previewTime && displayed.spoken?.includes(previewTime))
       await page.mouseEvent({
         type: 'mouseReleased',
         x: at(0.7),
@@ -5116,6 +5128,12 @@ async function main() {
       await sleep(150)
       const seekAfter = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
       check('没有坐标的 press 不会把进度打回开头', seekBefore !== null && seekAfter === seekBefore)
+      await page.mouseEvent({ type: 'mousePressed', x: at(0.6), y: slider.y, button: 'left', buttons: 1, clickCount: 1 })
+      await page.mouseEvent({ type: 'mouseMoved', x: 0, y: slider.y, button: 'left', buttons: 1 })
+      await page.mouseEvent({ type: 'mouseReleased', x: 0, y: slider.y, button: 'left', buttons: 0, clickCount: 1 })
+      await page.mouseEvent({ type: 'mouseMoved', x: at(0.4), y: slider.y })
+      const edge = await page.evaluate(`window.__ohBilibiliWatch?.state()`)
+      check('拖到窗口最左端松手，回到开头且移回鼠标不再拖动', edge?.lastSeek === 0 && edge.scrub === null)
 
       const keyBefore = await page.evaluate(`window.__ohBilibiliWatch?.state()?.lastSeek ?? null`)
       const keySent = await page.evaluate(`(() => {
@@ -5233,7 +5251,8 @@ async function main() {
       await sleep(600)
       const fit = await controlFit(page)
       check(`${width} 宽控制条没有被裁切`, !!fit && fit.overflow <= 1 && fit.outside === 0)
-      check(`${width} 宽保留全屏`, !!fit?.full)
+      check(`${width} 宽保留总时长、音量和全屏`, fit?.totalTime && fit.volume && fit.full)
+      check(`${width} 宽音量面板在画面内`, fit?.volumeFits)
       const focused = await page.evaluate(`(() => {
         const btn = document.querySelector('button[aria-label="全屏"]')
         const frame = document.querySelector('[data-watch-player]')?.getBoundingClientRect()
@@ -5255,7 +5274,7 @@ async function main() {
     })()`)
     check('700 宽仍能改播放倍速', !!speedAt700?.visible)
     const fit700 = await controlFit(page)
-    check('700 宽保留截图入口', !!fit700?.shot)
+    check('700 宽保留总时长、音量和截图', fit700?.totalTime && fit700.volume && fit700.shot)
     if (speedAt700?.visible) {
       await page.evaluate(`document.querySelector('button[aria-label^="播放倍速"]')?.click()`)
       await sleep(200)

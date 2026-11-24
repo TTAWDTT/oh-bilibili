@@ -3,8 +3,9 @@
 }
 
 .watch-overlay {
+  --watch-gutter: clamp(8px, 1.2vw, 16px);
   isolation: isolate;
-  padding: 0 clamp(8px, 1.2vw, 16px) 5px;
+  padding: 0 var(--watch-gutter) 5px;
 }
 
 .watch-overlay::before {
@@ -44,6 +45,38 @@
   --volume-rail: #73767c;
   --volume-label: #f6f7f8;
 }
+.watch-chapter-space { container-type: inline-size; }
+.watch-chapter-space > span { display: none; }
+@container (min-width: 7rem) {
+  .watch-chapter-space > span {
+    display: block;
+    padding-inline-start: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgb(255 255 255 / 75%);
+    font-size: 12px;
+  }
+}
+@media (width < 64rem) {
+  [data-watch-cinema="true"] .watch-overlay { padding-top: 38px; }
+  .watch-cinema-discussion {
+    position: absolute;
+    top: 0;
+    inset-inline: var(--watch-gutter);
+  }
+}
+@media (width < 48rem) {
+  [data-watch-controls] .volume-compact [data-volume-panel] {
+    left: auto;
+    right: -28px;
+    transform: none;
+  }
+}
+@media (max-width: 420px) {
+  [data-watch-controls] { gap: 1px; }
+  [data-watch-controls] > [data-watch-menu] > button { padding-inline: 3px; }
+}
 [data-watch-controls] button[title="静音"]:hover,
 [data-watch-controls] button[title="取消静音"]:hover { color: white; }
 [data-watch-controls] button[aria-expanded="true"] { background: rgb(255 255 255 / 17%); }
@@ -58,9 +91,9 @@
   font-size: clamp(15px, 1.3vw, 24px);
   text-shadow: 0 1px 2px black;
 }
-[data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 64px); }
+[data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 72px); }
 @media (max-width: 1023px) {
-  [data-watch-cinema="true"][data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 100px); }
+  [data-watch-cinema="true"][data-controls-visible="true"] .watch-subtitle { bottom: max(7%, 110px); }
 }
 
 .watch-dm-toolbar {
@@ -191,4 +224,85 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .watch-overlay, .watch-cinema-heading, .watch-dm-indicator::after { transition: none; }
+}
+
+.watch-timeline {
+  height: 28px;
+}
+.watch-seek { height: 20px; }
+.watch-seek-rail, .watch-seek-thumb, .watch-seek-chapter {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+}
+.watch-seek-rail {
+  inset-inline: 0;
+  height: 3px;
+  translate: 0 -50%;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 36%);
+  transition: height 100ms ease-out;
+}
+.watch-seek:is(:hover, :focus-visible, [data-scrubbing="true"]) .watch-seek-rail { height: 5px; }
+.watch-seek-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.watch-seek-chapter {
+  width: 2px;
+  height: 7px;
+  border-radius: 2px;
+  translate: -50% -50%;
+  background: rgb(255 255 255 / 82%);
+  box-shadow: 0 0 2px rgb(0 0 0 / 50%);
+}
+.watch-seek-thumb {
+  width: 10px;
+  height: 10px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 40%);
+  opacity: 0;
+}
+.watch-seek:is(:hover, :focus-visible, [data-scrubbing="true"]) .watch-seek-thumb { opacity: 1; }
+
+.watch-seek-preview {
+  --preview-half: clamp(60px, 10vw, 82px);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: calc(2 * var(--preview-half));
+  translate: -50% 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 7px;
+  background: #202226;
+  color: white;
+  pointer-events: none;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 28%);
+}
+.watch-seek-preview[data-compact="true"] { --preview-half: 34px; }
+.watch-seek-image:not([hidden]) {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+}
+.watch-seek-image img { position: absolute; max-width: none; }
+.watch-seek-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 7px;
+  font-size: 12px;
+  line-height: 16px;
+}
+.watch-seek-caption .num { flex: none; font-weight: 600; }
+.watch-seek-caption .truncate { color: rgb(255 255 255 / 82%); }
+@media (prefers-reduced-motion: reduce) {
+  .watch-seek-rail { transition: none; }
 }
