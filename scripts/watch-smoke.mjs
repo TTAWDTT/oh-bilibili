@@ -4345,6 +4345,89 @@ async function checkProfileSettings(page) {
   await page.viewport(1320, 900)
 }
 
+async function checkFavoriteFolders(page) {
+  const waitFor = watchUiWait(page)
+  const folder = (index) => `document.querySelectorAll('[aria-label="收藏夹目录"] [data-fav-folder]')[${index - 1}]`
+  const search = `document.querySelector('input[aria-label="在已加载的收藏里搜索"]')`
+  const grid = `document.querySelector('[data-shown]')`
+  await page.viewport(1024, 820)
+  await page.evaluate(`location.href = ${JSON.stringify(`${WEB}?loggedIn=1&favThree=1`)}`)
+  const nav = `document.querySelector('nav[aria-label="主导航"] [aria-label="收藏夹"]')`
+  await waitFor(`location.search.includes('favThree') && ${nav}`)
+  await page.evaluate(`${nav}.click()`)
+  await waitFor(`${grid} && ${folder(3)}`)
+  check('宽窗收藏夹横向排列在投稿上方，默认打开第一个夹子', await page.evaluate(`(() => {
+    const first = ${folder(1)}.getBoundingClientRect()
+    const second = ${folder(2)}.getBoundingClientRect()
+    return first.top === second.top && second.left >= first.right &&
+      ${grid}.getBoundingClientRect().top >= first.bottom && ${folder(1)}.getAttribute('aria-current') === 'true'
+  })()`))
+  const emptyIcon = `${folder(3)}.querySelector('img[src$="/favorite-folder.png"]')`
+  await waitFor(`${emptyIcon}?.naturalWidth > 0`)
+  check('空收藏夹显示完整图标，四周留有空间', await page.evaluate(`(() => {
+    const icon = ${emptyIcon}.getBoundingClientRect()
+    const cover = ${emptyIcon}.parentElement.getBoundingClientRect()
+    return icon.width > 0 && Math.abs(icon.width - icon.height) < 1 && icon.height < cover.height
+  })()`))
+  const reading = `${grid}.querySelectorAll('[data-track-card]')[24]`
+  await page.evaluate(`${reading}.scrollIntoView({ block: 'start', behavior: 'instant' })`)
+  const originalY = await page.evaluate(`${reading}.getBoundingClientRect().top`)
+  const shelfInView = await page.evaluate(`${folder(2)}.getBoundingClientRect().top >= 0`)
+  await page.evaluate(`${folder(2)}.click()`)
+  await waitFor(`${folder(2)}?.getAttribute('aria-current') === 'true' && ${grid}`)
+  await page.evaluate(`${folder(1)}.click()`)
+  await waitFor(`${reading}`)
+  check('读到第 25 条时仍可切夹，切回后同一条视频留在原高度', shelfInView &&
+    await page.evaluate(`document.getElementById('scroll-main').scrollTop > 0 && Math.abs(${reading}.getBoundingClientRect().top - ${originalY}) <= 1`))
+  await page.evaluate(`${reading}.scrollIntoView({ block: 'center', behavior: 'instant' })`)
+  const watchY = await page.evaluate(`${reading}.getBoundingClientRect().top`)
+  const watchButton = `${reading}.querySelector('[data-focus-id^="card:"]')`
+  await page.evaluate(`${watchButton}.click()`)
+  await waitFor(`document.querySelector('[data-watch-player]')`)
+  await page.evaluate(`document.querySelector('button[aria-label="返回"]').click()`)
+  await waitFor(`${reading} && document.activeElement === ${watchButton}`)
+  check('收藏的视频看完返回，仍在打开它之前的位置', await page.evaluate(
+    `Math.abs(${reading}.getBoundingClientRect().top - ${watchY}) <= 1`,
+  ))
+  await page.evaluate(`${folder(1)}.focus()`)
+  for (const type of ['keyDown', 'keyUp']) {
+    await page.keyEvent({ type, key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
+  }
+  check('向右键能把焦点移到下一个收藏夹', await page.evaluate(`document.activeElement === ${folder(2)}`))
+  await page.pressSpace()
+  await waitFor(`${folder(2)}?.getAttribute('aria-current') === 'true' && ${grid}?.querySelector('[data-track-title]')`)
+  await page.evaluate(`(() => {
+    const title = ${grid}.querySelector('[data-track-title]').dataset.trackTitle
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(${search}, title)
+    ${search}.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await waitFor(`${grid}?.querySelectorAll('[data-track-card]').length === 1`)
+  const query = await page.evaluate(`${search}.value`)
+  await page.evaluate(`${folder(3)}.click()`)
+  await waitFor(`document.body.innerText.includes('这个收藏夹是空的')`)
+  await page.evaluate(`${folder(2)}.click()`)
+  check('切到空夹再回来，搜索词和筛中的投稿仍在', await waitFor(
+    `${search}?.value === ${JSON.stringify(query)} && ${grid}?.querySelector('[data-track-title]')?.dataset.trackTitle === ${JSON.stringify(query)}`,
+  ))
+
+  await page.viewport(390, 820)
+  const back = `document.querySelector('button[aria-label="返回收藏夹目录"]')`
+  await waitFor(back)
+  await page.evaluate(`${back}.click()`)
+  await waitFor(folder(3))
+  check('窄窗返回收藏夹目录后两列排布，焦点回到刚看的夹子', await page.evaluate(`(() => {
+    const [a, b, c] = [${folder(1)}, ${folder(2)}, ${folder(3)}].map(button => button.getBoundingClientRect())
+    return document.activeElement === ${folder(2)} && a.top === b.top && b.left >= a.right &&
+      c.top >= a.bottom && b.right <= innerWidth && !${grid}
+  })()`))
+  await page.evaluate(`${folder(2)}.click()`)
+  check('窄窗再次打开长标题收藏夹，筛选结果与工具留在屏内', await waitFor(`(() => {
+    const main = document.getElementById('scroll-main')
+    return ${search}?.value === ${JSON.stringify(query)} && ${grid} &&
+      main.scrollWidth <= main.clientWidth + 1 && ${search}.getBoundingClientRect().right <= innerWidth
+  })()`))
+}
+
 function watchUiWait(page) {
   return async (expression) => {
     const deadline = Date.now() + 8000
@@ -4566,6 +4649,10 @@ async function main() {
       await checkProfileSettings(page)
       return
     }
+    if (process.argv.includes('--favorites-only')) {
+      await checkFavoriteFolders(page)
+      return
+    }
     if (followingOnly) {
       await checkFollowingDirectory(page)
       return
@@ -4593,6 +4680,7 @@ async function main() {
     await checkPopularPaging(page)
     await checkLibraryEmpty(page)
     await checkProfileSettings(page)
+    await checkFavoriteFolders(page)
     await checkChannelNav(page)
     await checkRailScope(page)
     await checkShellBreakpoints(page)

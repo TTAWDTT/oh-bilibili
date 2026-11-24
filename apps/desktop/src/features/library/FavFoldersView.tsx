@@ -1,6 +1,4 @@
-import { useCardGrid } from '../../shared/ui/useCardGrid'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
 import { toastDone, toastWarn } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
 import { useAppStore, type View } from '../../app/appStore'
@@ -9,16 +7,13 @@ import { toWireError } from '../../shared/lib/errors'
 import * as ipc from '../../shared/lib/ipc'
 import type { FavFolder } from '../../shared/lib/ipc'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { thumbWide } from '../../shared/lib/thumb'
-import { PageTitle } from '../../shared/ui/PageTitle'
 import { Icon } from '../../shared/ui/Icon'
 import { BiliLoader } from '../../shared/ui/BiliLoader'
 import { ContentGrid } from '../tracks/ContentGrid'
 import { usePlayerStore } from '../player/playerStore'
 import { appendFavPage, collectFavTracks } from './favPages'
-
-/** 封面拼图按夹子缓存，来回切页不用重取。 */
-const coverCache = new Map<number, string[]>()
+import { FavoriteDirectory, FolderCover } from './FavoriteDirectory'
+import './favorite-page.css'
 
 /** 每个夹子的页数、筛选、错误与滚动位置：宽窗来回切不重新读。 */
 type FolderSnapshot = {
@@ -29,22 +24,25 @@ type FolderSnapshot = {
   error: string | null
   query: string
   top: number
+  lastRenderedIndex: number
 }
 
-const visits = new WeakMap<View, { pickedId: number | null; folders: Map<number, FolderSnapshot> }>()
+const visits = new WeakMap<View, {
+  pickedId: number | null
+  folders: Map<number, FolderSnapshot>
+  directoryTop: number
+}>()
 
 /**
  * B 站收藏夹。读的是你账号里真实存在的收藏夹，不是本地伪造的歌单。
  *
- * 宽窗是目录 + 内容双栏，目录常驻；窄窗先进目录，再进单个夹子，返回还在原处。
+ * 宽窗直接翻看夹内视频；窄窗先进目录，返回时保留原来的夹子和滚动位置。
  * 未登录时明确提示需要登录——收藏夹在 B 站那边，本机没有副本。
  */
 export function FavFoldersView() {
-  const gridRef = useCardGrid(200)
   const visit = useRef(useAppStore.getState().view).current
   const savedVisit = visits.get(visit)
   const [folders, setFolders] = useState<FavFolder[] | null>(null)
-  const [covers, setCovers] = useState<Record<number, string[]>>({})
   const [error, setError] = useState<string | null>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
   const [tracks, setTracks] = useState<Track[] | null>(null)
@@ -64,8 +62,11 @@ export function FavFoldersView() {
   const prepBusy = useRef(false)
   const prepTicket = useRef(0)
   const requestTicket = useRef(0)
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const listRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLElement>(null)
+  const directoryRef = useRef<HTMLDivElement>(null)
+  const directoryTop = useRef(savedVisit?.directoryTop ?? 0)
+  const returnFolderId = useRef<number | null>(null)
+  const backRef = useRef<HTMLButtonElement>(null)
   /** 切回某个夹子时，等列表渲染出来再落位。 */
   const restoreTop = useRef<number | null>(null)
   const memory = useRef(savedVisit?.folders ?? new Map<number, FolderSnapshot>())
@@ -98,35 +99,6 @@ export function FavFoldersView() {
     }
   }, [])
 
-  // 收藏夹列表接口不带封面，B 站网页端是逐个夹子再取前几条拼四宫格。
-  // 先出灰格子，封面到了再补，不为了等图把整页卡住。
-  useEffect(() => {
-    if (!folders) return
-    let alive = true
-    const cached: Record<number, string[]> = {}
-    for (const folder of folders) {
-      const hit = coverCache.get(folder.id)
-      if (hit) cached[folder.id] = hit
-    }
-    setCovers(cached)
-    const queue = folders.filter((f) => f.count > 0 && !coverCache.has(f.id)).map((f) => f.id)
-    const worker = async (): Promise<void> => {
-      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-        try {
-          const list = await ipc.favCovers(id, 4)
-          coverCache.set(id, list)
-          if (alive) setCovers((prev) => ({ ...prev, [id]: list }))
-        } catch {
-          // 单个夹子的封面取不到就留灰格子，不影响打开夹子
-        }
-      }
-    }
-    void Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker))
-    return () => {
-      alive = false
-    }
-  }, [folders])
-
   const snapshotOf = (): FolderSnapshot => ({
     tracks,
     page,
@@ -135,6 +107,7 @@ export function FavFoldersView() {
     error: trackError,
     query,
     top: scrollRef.current?.scrollTop ?? 0,
+    lastRenderedIndex: Number(scrollRef.current?.querySelector<HTMLElement>('[data-shown]')?.dataset.shown ?? 1) - 1,
   })
 
   /** 第一页。失败单独记，不能当成空夹。 */
@@ -178,7 +151,7 @@ export function FavFoldersView() {
       restoreTop.current = saved.top
       return
     }
-    restoreTop.current = null
+    restoreTop.current = 0
     void startFirstPage(folder.id)
   }
 
@@ -190,6 +163,7 @@ export function FavFoldersView() {
     prepTicket.current += 1
     prepBusy.current = false
     setPrep(null)
+    returnFolderId.current = pickedId
     setPickedId(null)
   }
 
@@ -207,13 +181,31 @@ export function FavFoldersView() {
   const saveVisit = useRef(() => {})
   saveVisit.current = () => {
     if (pickedId !== null) memory.current.set(pickedId, snapshotOf())
-    visits.set(visit, { pickedId, folders: memory.current })
+    visits.set(visit, { pickedId, folders: memory.current, directoryTop: directoryTop.current })
   }
-  useLayoutEffect(() => () => {
-    if (useAppStore.getState().view !== visit) saveVisit.current()
-    prepTicket.current += 1
-    requestTicket.current += 1
+  useLayoutEffect(() => {
+    // 切到观看页会收起侧栏。等卸载时再量，旧网格已经换宽，存下的位置会偏一排。
+    const unsubscribe = useAppStore.subscribe((next, previous) => {
+      if (previous.view === visit && next.view !== visit) saveVisit.current()
+    })
+    return () => {
+      unsubscribe()
+      prepTicket.current += 1
+      requestTicket.current += 1
+    }
   }, [visit])
+
+  useLayoutEffect(() => {
+    if (pickedId !== null) {
+      backRef.current?.focus({ preventScroll: true })
+    } else if (returnFolderId.current !== null && directoryRef.current) {
+      directoryRef.current.scrollTop = directoryTop.current
+      const button = directoryRef.current.querySelector<HTMLElement>(`[data-fav-folder="${returnFolderId.current}"]`)
+      button?.focus({ preventScroll: true })
+      button?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+      returnFolderId.current = null
+    }
+  }, [pickedId])
 
   useLayoutEffect(() => {
     if (restoreTop.current === null || !scrollRef.current) return
@@ -350,71 +342,57 @@ export function FavFoldersView() {
     (track) => !needle || `${track.title} ${track.artist}`.toLowerCase().includes(needle),
   )
 
+  const single = wide && folders.length === 1
   const header = picked ? (
-    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-      {!wide ? (
-        <button
-          type="button"
-          onClick={closeFolder}
-          className="flex items-center gap-1 text-[13px] text-[var(--text-3)] hover:text-[var(--accent)]"
-        >
-          <Icon name="chevronLeft" size={13} />
+    <header className="favorite-heading">
+      {!wide && (
+        <button ref={backRef} type="button" onClick={closeFolder} aria-label="返回收藏夹目录" className="favorite-back">
+          <Icon name="chevronLeft" size={15} />
           收藏夹
         </button>
-      ) : null}
-      <h2 className="min-w-0 truncate text-[18px] font-semibold text-[var(--text-1)]" title={picked.title}>
-        {picked.title}
-      </h2>
-      <span className="num shrink-0 text-[12.5px] text-[var(--text-3)]">{picked.count} 个视频</span>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
-        <label className="flex h-8 w-[180px] items-center gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--panel)] px-2 focus-within:border-[var(--accent)]">
-          <Icon name="search" size={13} className="shrink-0 text-[var(--text-3)]" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="在这夹里搜索"
-            aria-label="在已加载的收藏里搜索"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-3)]"
-          />
-        </label>
-        {prep ? (
-          <span className="flex shrink-0 items-center gap-2 text-[12px] text-[var(--text-3)]">
-            <span className="num">
-              已读 {prep.loaded} · 第 {prep.page} 页
+      )}
+      <div className="favorite-heading-row">
+        <div className="favorite-heading-title">
+          {single && <span className="favorite-single-cover"><FolderCover folder={picked} /></span>}
+          <h2>{picked.title}</h2>
+          <span className="favorite-video-count num">{picked.count} 个视频</span>
+        </div>
+        <div className="favorite-tools">
+          <label className="favorite-search">
+            <Icon name="search" size={15} />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索已加载的视频"
+              aria-label="在已加载的收藏里搜索"
+              className="min-w-0 flex-1 bg-transparent outline-none"
+            />
+          </label>
+          {prep ? (
+            <span className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--text-3)]">
+              <span className="num">
+                已读 {prep.loaded} · 第 {prep.page} 页
+              </span>
+              <button type="button" onClick={cancelPrep} className="t text-[var(--accent)] hover:underline">
+                取消
+              </button>
             </span>
-            <button type="button" onClick={cancelPrep} className="t text-[var(--accent)] hover:underline">
-              取消
+          ) : tracks && (tracks.length > 0 || !exhausted) ? (
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => void playAll()}
+              className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent-strong)] px-3 text-[12.5px] text-white"
+            >
+              <Icon name="play" size={12} />
+              播放全部
             </button>
-          </span>
-        ) : tracks && (tracks.length > 0 || !exhausted) ? (
-          <button
-            type="button"
-            disabled={loadingMore}
-            onClick={() => void playAll()}
-            className="t press flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] bg-[var(--accent)] px-3 text-[12.5px] text-white"
-          >
-            <Icon name="play" size={12} />
-            播放全部
-          </button>
-        ) : null}
+          ) : null}
+        </div>
       </div>
-    </div>
+    </header>
   ) : null
-
-  /** 目录里用上下键换夹子，和关注页的名单一致。 */
-  const onFolderKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-    event.preventDefault()
-    const rows = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('[data-fav-folder]') ?? [])]
-    const next =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? rows.length - 1
-          : index + (event.key === 'ArrowDown' ? 1 : -1)
-    rows[Math.max(0, Math.min(rows.length - 1, next))]?.focus()
-  }
 
   const content = picked ? (
     <>
@@ -454,6 +432,8 @@ export function FavFoldersView() {
       ) : (
         <>
           <ContentGrid
+            key={picked.id}
+            initialIndex={memory.current.get(picked.id)?.lastRenderedIndex ?? 0}
             tracks={visible}
             activeKey={snapshot?.track?.key ?? null}
             playing={snapshot?.phase === 'playing'}
@@ -495,118 +475,26 @@ export function FavFoldersView() {
         </>
       )}
     </>
-  ) : (
-    <p className="py-10 text-center text-[13px] text-[var(--text-3)]">选择一个收藏夹。</p>
-  )
-
-  if (wide) {
-    return (
-      <div className="flex min-h-0 flex-1">
-        <aside aria-label="收藏夹目录" className="flex w-[216px] shrink-0 flex-col border-r border-hairline">
-          <div className="px-4 pb-2 pt-5">
-            <h2 className="text-[20px] font-semibold leading-[28px] text-[var(--text-1)]">收藏夹</h2>
-            <p className="num mt-0.5 text-[12.5px] text-[var(--text-3)]">{folders.length} 个</p>
-          </div>
-          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
-            {folders.map((folder, index) => {
-              const on = folder.id === pickedId
-              return (
-                <button
-                  key={folder.id}
-                  type="button"
-                  onClick={() => openFolder(folder)}
-                  onKeyDown={(event) => onFolderKeyDown(event, index)}
-                  data-fav-folder
-                  aria-current={on ? 'true' : undefined}
-                  className={[
-                    't press mb-0.5 block w-full rounded-[6px] px-2.5 py-2 text-left',
-                    on
-                      ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                      : 'text-[var(--text-1)] hover:bg-[var(--panel-alt)]',
-                  ].join(' ')}
-                >
-                  <span className="line-clamp-2 text-[13.5px] leading-[19px]">{folder.title}</span>
-                  <span className="num mt-0.5 block text-[11.5px] text-[var(--text-3)]">
-                    {folder.count} 个视频
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </aside>
-        <section ref={scrollRef} id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          {content}
-        </section>
-      </div>
-    )
-  }
-
-  if (picked) {
-    return (
-      <div
-        ref={scrollRef}
-        id="scroll-main"
-        className="bili-canvas min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8"
-      >
-        {content}
-      </div>
-    )
-  }
+  ) : null
 
   return (
-    <div id="scroll-main" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-6 md:px-8">
-      <PageTitle extra={`${folders.length} 个`}>收藏夹</PageTitle>
-      <section ref={gridRef} className="mt-6 grid grid-cols-(--card-tracks) gap-4">
-        {folders.map((folder) => {
-          const shots = covers[folder.id]
-          const single = shots?.[0] ?? folder.cover
-          return (
-            <button
-              key={folder.id}
-              type="button"
-              onClick={() => openFolder(folder)}
-              className="bili-card bili-card-enter bili-press overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--panel)] text-left"
-            >
-              {/* 列表接口自带一张封面，先铺上；四张拼图到了再换成 2×2。 */}
-              <span className="relative grid aspect-[16/10] w-full grid-cols-2 grid-rows-2 gap-px overflow-hidden bg-[var(--ga2)]">
-                {shots && shots.length >= 4 ? (
-                  shots.slice(0, 4).map((src, i) => (
-                    <span key={i} className="relative block overflow-hidden bg-[var(--ga1)]">
-                      <img
-                        src={thumbWide(src, 400) ?? src}
-                        alt=""
-                        aria-hidden
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    </span>
-                  ))
-                ) : single ? (
-                  <img
-                    src={thumbWide(single, 800) ?? single}
-                    alt=""
-                    aria-hidden
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    className="col-span-2 row-span-2 h-full w-full object-cover"
-                  />
-                ) : (
-                  Array.from({ length: 4 }, (_, i) => <span key={i} className="block bg-[var(--ga1)]" />)
-                )}
-              </span>
-              <span className="block px-3 py-2">
-                <span className="line-clamp-1 text-[14px] font-medium text-[var(--text-1)]" title={folder.title}>
-                  {folder.title}
-                </span>
-                <span className="num mt-0.5 block text-[12px] text-[var(--text-3)]">
-                  {folder.count} 个视频
-                </span>
-              </span>
-            </button>
-          )
-        })}
-      </section>
+    <div className="favorite-page flex min-h-0 flex-1 flex-col">
+      {!single && (
+        <div ref={directoryRef} hidden={!wide && !!picked} id={!wide && !picked ? 'scroll-main' : undefined}
+          className="favorite-directory-pane">
+          <div className="favorite-page-inner">
+            <FavoriteDirectory folders={folders} pickedId={pickedId} compact={wide} onPick={(folder) => {
+              if (!wide) directoryTop.current = directoryRef.current?.scrollTop ?? 0
+              openFolder(folder)
+            }} />
+          </div>
+        </div>
+      )}
+      {picked && (
+        <section ref={scrollRef} id="scroll-main" aria-label="夹内视频" className="favorite-videos min-h-0 flex-1 overflow-y-auto">
+          <div className="favorite-page-inner">{content}</div>
+        </section>
+      )}
     </div>
   )
 }
