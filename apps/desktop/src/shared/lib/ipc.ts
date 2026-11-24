@@ -226,6 +226,14 @@ export function lyricsGet(key: string): Promise<LyricDoc> {
 
 export type AuthorCard = {
   banner?: string | null
+  banner_small?: string | null
+  following_count?: number | null
+  dress?: {
+    pendant: string | null
+    pendant_name: string | null
+    nameplate: { name: string; image: string; small: string | null; condition: string | null } | null
+    membership: { label: string | null; image: string | null; animated: string | null; nickname_color: string | null } | null
+  }
   name: string
   face: string
   fans: number | null
@@ -243,6 +251,25 @@ export type AuthorCard = {
 /** UP 主名片：粉丝数、签名、认证。 */
 export function authorCard(mid: number): Promise<AuthorCard> {
   return call<AuthorCard>('author_card', { mid })
+}
+
+export type SpaceRoom = { id: number; title: string | null; cover: string | null; live: boolean; looping: boolean }
+export type SpaceProfile = {
+  official_icon: string | null
+  fans_medal: { name: string; level: number; background: string | null; color: string | null } | null
+  charging: { url: string; icon: string | null; count: number | null } | null
+  sex: string | null
+  birthday: string | null
+  school: string | null
+}
+export function spaceNotice(mid: number): Promise<string | null> {
+  return call<string | null>('space_notice', { mid })
+}
+export function spaceRoom(mid: number): Promise<SpaceRoom | null> {
+  return call<SpaceRoom | null>('space_room', { mid })
+}
+export function spaceProfile(mid: number): Promise<SpaceProfile> {
+  return call<SpaceProfile>('space_profile', { mid })
 }
 
 export type FavFolder = { id: number; title: string; count: number; cover: string | null }

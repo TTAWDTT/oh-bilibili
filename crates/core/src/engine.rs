@@ -3389,6 +3389,18 @@ impl Engine {
         Ok(self.source.author_card(mid).await?)
     }
 
+    pub async fn space_notice(&self, mid: u64) -> Result<Option<String>, WireError> {
+        Ok(self.source.space_notice(mid).await?)
+    }
+
+    pub async fn space_room(&self, mid: u64) -> Result<Option<crate::wire::SpaceRoom>, WireError> {
+        Ok(self.source.space_room(mid).await?)
+    }
+
+    pub async fn space_profile(&self, mid: u64) -> Result<crate::wire::SpaceProfile, WireError> {
+        Ok(self.source.space_profile(mid).await?)
+    }
+
     /// 从某个收藏夹移出一条。
     pub async fn unfav_from(&self, key: &TrackKey, folder: i64) -> Result<(), WireError> {
         self.source.unfav_from(key, folder).await?;
