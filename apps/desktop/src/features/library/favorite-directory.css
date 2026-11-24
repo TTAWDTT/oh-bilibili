@@ -1,0 +1,115 @@
+.favorite-directory { min-width: 0; }
+
+.favorite-folder-list {
+  display: grid;
+  align-items: start;
+  gap: 20px 16px;
+}
+
+.favorite-folder-strip {
+  grid-auto-flow: column;
+  grid-auto-columns: 148px;
+  justify-content: start;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* 给首尾两张封面的键盘焦点框留出空间。 */
+  padding: 4px;
+  margin: -4px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .favorite-folder-strip { scroll-behavior: smooth; }
+}
+
+.favorite-folder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 36rem) {
+  .favorite-folder-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 60rem) {
+  .favorite-folder-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.favorite-folder {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.favorite-folder-cover {
+  display: block;
+  position: relative;
+  padding-top: 6px;
+}
+
+.favorite-folder-cover::before,
+.favorite-folder-cover::after {
+  position: absolute;
+  content: '';
+  border-radius: 5px 5px 0 0;
+  height: 8px;
+}
+
+.favorite-folder-cover::before { inset: 0 11px auto; background: var(--ga2); }
+.favorite-folder-cover::after { inset: 3px 5px auto; background: var(--ga3); }
+
+.favorite-folder-picture {
+  display: grid;
+  position: relative;
+  z-index: 1;
+  place-items: center;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  background: var(--panel-alt);
+}
+
+.favorite-folder-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.favorite-folder[aria-current='true'] .favorite-folder-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--accent-strong);
+  pointer-events: none;
+}
+
+.favorite-folder-name {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-1);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.favorite-folder[aria-current='true'] .favorite-folder-name,
+.favorite-folder:hover .favorite-folder-name { color: var(--accent-strong); }
+
+.favorite-folder-count {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.favorite-page-arrow {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--text-2);
+}
+
+.favorite-page-arrow:enabled:hover { color: var(--accent-strong); border-color: currentColor; }
+.favorite-page-arrow:disabled { opacity: .45; }
