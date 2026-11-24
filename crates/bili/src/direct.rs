@@ -1,5 +1,8 @@
 //! B 站消息中心的一对一私信。
 
+mod cards;
+pub use cards::DirectCard;
+
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -32,6 +35,10 @@ pub struct DirectMessage {
     pub sender_mid: u64,
     pub text: String,
     pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cards: Vec<DirectCard>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub emotes: Vec<(String, String)>,
     pub at: u64,
 }
 
@@ -127,6 +134,76 @@ impl Source {
         text: String,
         device: &str,
     ) -> Result<DirectMessage, BiliError> {
+        self.send_direct(owner, mid, 1, json!({"content": text}), device)
+            .await
+    }
+
+    pub async fn send_direct_image(
+        &self,
+        owner: u64,
+        mid: u64,
+        mime: &str,
+        encoded: &str,
+        device: &str,
+    ) -> Result<DirectMessage, BiliError> {
+        use base64::Engine as _;
+        let image_type = match mime {
+            "image/png" => "png",
+            "image/jpeg" => "jpeg",
+            "image/gif" => "gif",
+            "image/webp" => "webp",
+            _ => {
+                return Err(BiliError::Parse(
+                    "请选择 PNG、JPEG、GIF 或 WebP 图片".into(),
+                ))
+            }
+        };
+        let limit = if image_type == "gif" {
+            1024 * 1024
+        } else {
+            20 * 1024 * 1024
+        };
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|_| BiliError::Parse("无法读取所选图片".into()))?;
+        if bytes.is_empty() || bytes.len() > limit {
+            return Err(BiliError::Parse(
+                "图片为空或超过大小限制（GIF 1 MB，其他图片 20 MB）".into(),
+            ));
+        }
+        let csrf = self.direct_csrf()?;
+        let file = reqwest::multipart::Part::bytes(bytes)
+            .file_name(format!("image.{image_type}"))
+            .mime_str(mime)
+            .map_err(|_| BiliError::Parse("图片格式有误".into()))?;
+        let form = reqwest::multipart::Form::new()
+            .part("file_up", file)
+            .text("biz", "im")
+            .text("csrf", csrf);
+        let response = self
+            .client
+            .post_session(&format!("{API}/x/dynamic/feed/draw/upload_bfs"), |req| {
+                req.multipart(form)
+            })
+            .await
+            .map_err(direct_error)?;
+        let image = direct_image_content(&response["data"], image_type)?;
+        if self.nav().mid != Some(owner) {
+            return Err(BiliError::NeedsLogin(
+                "登录账号已更换，请重新选择联系人".into(),
+            ));
+        }
+        self.send_direct(owner, mid, 2, image, device).await
+    }
+
+    async fn send_direct(
+        &self,
+        owner: u64,
+        mid: u64,
+        kind: u64,
+        content: Value,
+        device: &str,
+    ) -> Result<DirectMessage, BiliError> {
         let csrf = self.direct_csrf()?;
         let url = self
             .client
@@ -144,7 +221,7 @@ impl Source {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        let form = text_form(owner, mid, &text, device, at, csrf);
+        let form = message_form(owner, mid, kind, &content, device, at, csrf);
         let receipt = self
             .client
             .post_form(&url, form)
@@ -155,7 +232,10 @@ impl Source {
                 }
                 other => other,
             })?;
-        sent_message(&receipt["data"], owner, text, at)
+        let (text, image) = message_content(&json!({"msg_type": kind, "content": content}));
+        let mut message = sent_message(&receipt["data"], owner, text, at)?;
+        message.image = image;
+        Ok(message)
     }
 
     pub async fn direct_ack(&self, mid: u64, seqno: u64) -> Result<(), BiliError> {
@@ -267,6 +347,19 @@ fn history_from(
     cursor: Option<u64>,
 ) -> Result<DirectHistory, BiliError> {
     let rows = page_rows(data, "messages")?;
+    let emotes: Vec<_> = data["e_infos"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry["text"].as_str()?.trim();
+            if !name.starts_with('[') || !name.ends_with(']') {
+                return None;
+            }
+            let image = media_url(&entry["gif_url"]).or_else(|| media_url(&entry["url"]))?;
+            Some((name, image))
+        })
+        .collect();
     let mut withdrawals = Vec::new();
     let mut latest = None;
     let mut first = None;
@@ -295,14 +388,20 @@ fn history_from(
             let id = number(&msg["msg_key"])?.to_string();
             latest = latest.max(Some((seqno, at)));
             first = Some(first.map_or(seqno, |n: u64| n.min(seqno)));
-            let (text, image) = message_content(msg);
+            let (text, image, cards) = received_content(msg, sender_mid);
             Some((
                 seqno,
                 DirectMessage {
                     id,
                     sender_mid,
+                    emotes: emotes
+                        .iter()
+                        .filter(|(name, _)| text.contains(name))
+                        .map(|(name, url)| ((*name).to_owned(), url.clone()))
+                        .collect(),
                     text,
                     image,
+                    cards,
                     at,
                 },
             ))
@@ -320,15 +419,46 @@ fn history_from(
     })
 }
 
-fn message_content(msg: &Value) -> (String, Option<String>) {
-    let kind = number(&msg["msg_type"]).unwrap_or(0);
-    if number(&msg["msg_status"]) == Some(1) || matches!(kind, 5 | 8) {
-        return ("消息已撤回".into(), None);
-    }
-    let content: Value = match &msg["content"] {
-        Value::String(raw) => serde_json::from_str(raw).unwrap_or(Value::Null),
-        value => value.clone(),
+fn received_content(msg: &Value, sender: u64) -> (String, Option<String>, Vec<DirectCard>) {
+    let Some((kind, content)) = message_payload(msg) else {
+        return ("消息已撤回".into(), None, Vec::new());
     };
+    let cards = cards::received_cards(kind, &content, sender);
+    let (text, image) = if cards.is_empty() || kind == 16 {
+        describe_message(kind, &content)
+    } else {
+        let attached = if matches!(kind, 11 | 12) {
+            content["attach_msg"]["content"]
+                .as_str()
+                .unwrap_or_default()
+        } else {
+            ""
+        };
+        (attached.to_owned(), None)
+    };
+    (text, image, cards)
+}
+
+fn message_content(msg: &Value) -> (String, Option<String>) {
+    match message_payload(msg) {
+        Some((kind, content)) => describe_message(kind, &content),
+        None => ("消息已撤回".into(), None),
+    }
+}
+
+fn message_payload(msg: &Value) -> Option<(u64, std::borrow::Cow<'_, Value>)> {
+    let kind = number(&msg["msg_type"]).unwrap_or_default();
+    if number(&msg["msg_status"]) == Some(1) || matches!(kind, 5 | 8) {
+        return None;
+    }
+    let content = match &msg["content"] {
+        Value::String(s) => std::borrow::Cow::Owned(serde_json::from_str(s).unwrap_or(Value::Null)),
+        v => std::borrow::Cow::Borrowed(v),
+    };
+    Some((kind, content))
+}
+
+fn describe_message(kind: u64, content: &Value) -> (String, Option<String>) {
     let title = content["title"].as_str().unwrap_or_default();
     let label = match kind {
         1 => content["content"]
@@ -339,9 +469,9 @@ fn message_content(msg: &Value) -> (String, Option<String>) {
             let label = if kind == 2 { "[图片]" } else { "[表情]" };
             return (label.into(), media_url(&content["url"]));
         }
-        3 => "[语音]".into(),
+        3 => "[语音] 请在哔哩哔哩手机端收听".into(),
         4 | 7 | 14 | 15 => format!("[分享]{title}"),
-        9 => "[小程序]".into(),
+        9 => "[小程序] 请在哔哩哔哩手机端查看".into(),
         10 | 13 if !title.is_empty() => title.to_owned(),
         11 | 17 => format!("[视频]{title}"),
         12 => format!("[文章]{title}"),
@@ -368,10 +498,28 @@ fn media_url(value: &Value) -> Option<String> {
     Some(url.into())
 }
 
-fn text_form(
+fn direct_image_content(data: &Value, image_type: &str) -> Result<Value, BiliError> {
+    let url = media_url(&data["image_url"]);
+    match (
+        url,
+        number(&data["image_width"]),
+        number(&data["image_height"]),
+        data["img_size"].as_f64(),
+    ) {
+        (Some(url), Some(width), Some(height), Some(size)) if width > 0 && height > 0 => {
+            Ok(json!({
+                "url":url, "width":width, "height":height, "size":size, "imageType":image_type, "original":1
+            }))
+        }
+        _ => Err(BiliError::Parse("图片上传后没有收到完整回执".into())),
+    }
+}
+
+fn message_form(
     owner: u64,
     mid: u64,
-    text: &str,
+    kind: u64,
+    content: &Value,
     device: &str,
     at: u64,
     csrf: String,
@@ -380,9 +528,9 @@ fn text_form(
         ("msg[sender_uid]", owner.to_string()),
         ("msg[receiver_type]", "1".into()),
         ("msg[receiver_id]", mid.to_string()),
-        ("msg[msg_type]", "1".into()),
+        ("msg[msg_type]", kind.to_string()),
         ("msg[msg_status]", "0".into()),
-        ("msg[content]", json!({ "content": text }).to_string()),
+        ("msg[content]", content.to_string()),
         ("msg[new_face_version]", "0".into()),
         ("msg[dev_id]", device.into()),
         ("msg[timestamp]", at.to_string()),
@@ -420,6 +568,8 @@ fn sent_message(
         sender_mid: owner,
         text,
         image: None,
+        cards: Vec::new(),
+        emotes: Vec::new(),
         at,
     })
 }
@@ -428,6 +578,26 @@ fn sent_message(
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn 图片上传回执生成私信图像消息且缺失回执不发信() {
+        let content = direct_image_content(&json!({"image_url":"//i0.hdslb.com/test.png","image_width":120,"image_height":80,"img_size":1.5}), "png").unwrap();
+        assert_eq!(content["original"], 1);
+        assert_eq!(content["size"], 1.5);
+        assert_eq!(content["imageType"], "png");
+        let form: HashMap<_, _> = message_form(7, 9, 2, &content, "desktop", 44, "test".into())
+            .into_iter()
+            .collect();
+        assert_eq!(form["msg[msg_type]"], "2");
+        assert_eq!(
+            serde_json::from_str::<Value>(&form["msg[content]"]).unwrap()["url"],
+            "https://i0.hdslb.com/test.png"
+        );
+        assert!(
+            direct_image_content(&json!({"image_url":"//i0.hdslb.com/missing.png"}), "png")
+                .is_err()
+        );
+    }
 
     #[test]
     fn 私信列表仅收一对一且沿原始页末翻页() {
@@ -499,6 +669,8 @@ mod tests {
                 sender_mid: 4,
                 text: "[图片]".into(),
                 image: Some("https://i0.hdslb.com/test.jpg".into()),
+                cards: Vec::new(),
+                emotes: Vec::new(),
                 at: 5
             }
         );
@@ -531,9 +703,17 @@ mod tests {
     #[test]
     fn 发信保留文字与收件人且需服务端消息编号() {
         let text = "空格 & = \"引号\"\n[doge] ".to_owned();
-        let form: HashMap<_, _> = text_form(7, 9, &text, "desktop", 44, "test-csrf".into())
-            .into_iter()
-            .collect();
+        let form: HashMap<_, _> = message_form(
+            7,
+            9,
+            1,
+            &json!({"content":text}),
+            "desktop",
+            44,
+            "test-csrf".into(),
+        )
+        .into_iter()
+        .collect();
         assert_eq!(form["msg[sender_uid]"], "7");
         assert_eq!(form["msg[receiver_id]"], "9");
         assert_eq!(form["msg[receiver_type]"], "1");
@@ -559,6 +739,8 @@ mod tests {
                 sender_mid: 7,
                 text,
                 image: None,
+                cards: Vec::new(),
+                emotes: Vec::new(),
                 at: 44
             }
         );

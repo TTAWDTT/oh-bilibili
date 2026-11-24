@@ -2200,6 +2200,20 @@ impl Engine {
             .await?)
     }
 
+    pub async fn send_direct_image(
+        &self,
+        mid: u64,
+        mime: String,
+        encoded: String,
+    ) -> Result<crate::wire::DirectMessage, WireError> {
+        let owner = self.direct_participant(mid)?;
+        let device = self.direct_device(owner)?;
+        Ok(self
+            .source
+            .send_direct_image(owner, mid, &mime, &encoded, &device)
+            .await?)
+    }
+
     pub async fn direct_ack(&self, mid: u64, seqno: String) -> Result<(), WireError> {
         self.direct_participant(mid)?;
         Ok(self.source.direct_ack(mid, direct_seqno(&seqno)?).await?)

@@ -56,3 +56,10 @@
   .dm-back { display: inline-grid; }
   .dm-messages { padding-inline: 12px; }
 }
+.dm-compose-actions { position: relative; }
+.dm-attachment { display: flex; gap: 8px; align-items: center; color: var(--text-2); font-size: 13px; }
+.dm-attachment img { max-height: 60px; max-width: 90px; object-fit: contain; }
+.dm-emotes { position: absolute; bottom: 100%; left: 0; display: grid; grid-template-columns: repeat(7, 32px); max-height: 180px; overflow: auto; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; z-index: 2; }
+.dm-emotes button { padding: 4px; }
+.dm-emotes img { width: 24px; height: 24px; object-fit: contain; }
+.dm-emotes p { grid-column: 1 / -1; padding: 6px; color: var(--text-2); font-size: 13px; }

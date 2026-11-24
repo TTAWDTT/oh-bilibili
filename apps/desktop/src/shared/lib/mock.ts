@@ -765,6 +765,8 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
       return mockDirectHistory(num(args, 'mid'), args.cursor)
     case 'direct_ack':
       return mockDirectAck(num(args, 'mid'), str(args, 'seqno'))
+    case 'send_direct_image':
+      return mockSendDirect(num(args, 'mid'), '[图片]', `data:${str(args, 'mime')};base64,${str(args, 'encoded')}`)
     case 'send_direct_text':
       return mockSendDirect(num(args, 'mid'), str(args, 'text'))
     case 'message_unread': {

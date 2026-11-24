@@ -1,3 +1,4 @@
+import { quoteNodes } from './quoteNodes'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore, type View } from '../../app/appStore'
 import { DirectInbox } from './DirectInbox'
@@ -106,69 +107,7 @@ function MessageCard({ item, emotes }: { item: ipc.MessageItem; emotes: Map<stri
   )
 }
 
-function quoteNodes(text: string, mentions: ipc.MessageMention[], emotes: Map<string, string>, onMention: (mention: ipc.MessageMention) => void): React.ReactNode[] {
-  if (mentions.length === 0 && emotes.size === 0) return [text]
-  const users = [...mentions].sort((a, b) => b.name.length - a.name.length)
-  const nodes: React.ReactNode[] = []
-  let buffer = ''
-  let index = 0
-  const nextClose = new Int32Array(text.length).fill(-1)
-  let close = -1
-  for (let cursor = text.length - 1; cursor >= 0; cursor -= 1) {
-    if (text[cursor] === ']') close = cursor
-    nextClose[cursor] = close
-  }
-  const flush = (): void => {
-    if (!buffer) return
-    nodes.push(buffer)
-    buffer = ''
-  }
 
-  while (index < text.length) {
-    if (text[index] === '[') {
-      const end = nextClose[index] ?? -1
-      const code = end > index ? text.slice(index, end + 1) : ''
-      const url = code ? emotes.get(code) : undefined
-      if (url) {
-        flush()
-        nodes.push(
-          <img
-            key={index}
-            src={url}
-            alt={code}
-            title={code}
-            referrerPolicy="no-referrer"
-            className="mx-[1px] inline-block h-[20px] w-auto align-[-4px]"
-          />,
-        )
-        index = end + 1
-        continue
-      }
-    }
-    if (text[index] === '@') {
-      const mention = users.find((user) => text.startsWith(user.name, index + 1))
-      if (mention) {
-        flush()
-        nodes.push(
-          <button
-            key={index}
-            type="button"
-            onClick={() => onMention(mention)}
-            className="t text-left text-[var(--accent)] hover:underline"
-          >
-            @{mention.name}
-          </button>,
-        )
-        index += mention.name.length + 1
-        continue
-      }
-    }
-    buffer += text[index]
-    index += 1
-  }
-  flush()
-  return nodes
-}
 
 function MessageList({ kind, emotes }: { kind: ipc.MessageKind; emotes: Map<string, string> }) {
   const [items, setItems] = useState<ipc.MessageItem[]>([])
@@ -265,8 +204,11 @@ export function MessagesView({ view }: { view: Extract<View, { kind: 'messages' 
   const setAuthOpen = useAppStore((state) => state.setAuthOpen)
 
   useEffect(() => {
-    void ipc.commentEmotes().then(setEmotePairs).catch(() => setEmotePairs([]))
-  }, [])
+    let active = true
+    setEmotePairs([])
+    void ipc.commentEmotes().then((pairs) => { if (active) setEmotePairs(pairs) }).catch(() => {})
+    return () => { active = false }
+  }, [accountMid])
 
   useEffect(() => {
     if (auth && !auth.logged_in) setAuthOpen(true)
@@ -310,7 +252,7 @@ export function MessagesView({ view }: { view: Extract<View, { kind: 'messages' 
       </header>
       {!auth ? <BiliLoader label="正在确认登录…" /> : auth.logged_in ? (
         kind === 'direct' && accountMid
-          ? <DirectInbox key={accountMid} me={accountMid} selected={sameOwner ? view.peer : undefined}
+          ? <DirectInbox key={accountMid} me={accountMid} emotes={emotes} selected={sameOwner ? view.peer : undefined}
               onSelect={(peer) => replace(peer ? { kind: 'messages', tab: 'direct', peer, accountMid } : { kind: 'messages', tab: 'direct' })} />
           : kind !== 'direct' && <MessageList key={`${kind}:${auth.user?.mid}`} kind={kind} emotes={emotes} />
       ) : (

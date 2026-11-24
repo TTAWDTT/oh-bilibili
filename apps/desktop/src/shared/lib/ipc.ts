@@ -717,7 +717,8 @@ export type MessageKind = 'reply' | 'at' | 'like'
 
 export type DirectPeer = { mid: number; name: string; avatar: string }
 export type DirectSession = DirectPeer & { preview: string; at: number; unread: number }
-export type DirectMessage = { id: string; sender_mid: number; text: string; image: string | null; at: number }
+export type DirectCard = { title: string; cover: string | null; url: string | null; description: string | null; author: string | null }
+export type DirectMessage = { id: string; sender_mid: number; text: string; image: string | null; cards?: DirectCard[]; emotes?: [string, string][]; at: number }
 export type DirectPage<T> = { items: T[]; next_cursor: string | null }
 
 export type DirectSessionPage = DirectPage<DirectSession>
@@ -741,6 +742,16 @@ export function directAck(mid: number, seqno: string): Promise<void> {
 
 export function sendDirectText(mid: number, text: string): Promise<DirectMessage> {
   return call<DirectMessage>('send_direct_text', { mid, text })
+}
+
+export async function sendDirectImage(mid: number, file: File): Promise<DirectMessage> {
+  const encoded = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('无法读取图片'))
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.readAsDataURL(file)
+  })
+  return call<DirectMessage>('send_direct_image', { mid, mime: file.type, encoded })
 }
 
 export type MessageUser = {

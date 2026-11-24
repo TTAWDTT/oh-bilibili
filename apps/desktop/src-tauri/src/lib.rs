@@ -286,6 +286,16 @@ async fn send_direct_text(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+async fn send_direct_image(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    mime: String,
+    encoded: String,
+) -> Result<bilimusic_core::wire::DirectMessage, WireError> {
+    engine.send_direct_image(mid, mime, encoded).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 async fn direct_ack(
     engine: tauri::State<'_, Arc<Engine>>,
     mid: u64,
@@ -1351,6 +1361,7 @@ pub fn run() {
             direct_sessions,
             direct_history,
             send_direct_text,
+            send_direct_image,
             direct_ack,
             watch_later_list,
             following,
