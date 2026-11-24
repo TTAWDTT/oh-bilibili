@@ -1,6 +1,7 @@
 //! 上线形状。命令失败与后台通知共用同一个错误形状，UI 只有一处 switch。
 
 use bilimusic_model::Track;
+pub use bilimusic_bili::space_catalog::{Catalog, CatalogPage};
 pub use bilimusic_bili::space::{CollectionKind, SpaceCollection, SpacePick};
 pub use bilimusic_bili::space_identity::{SpaceProfile, SpaceRoom};
 pub use bilimusic_bili::sync::AuthorCard;

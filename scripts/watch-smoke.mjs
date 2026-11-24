@@ -4370,7 +4370,7 @@ async function checkCommentPauseIntent(page) {
 
 async function main() {
   if (!existsSync(CHROME)) {
-    if (libraryPartialOnly || process.argv.includes('--typography-only') || process.argv.includes('--social-only')) throw new Error(`找不到 Chrome：${CHROME}`)
+    if (libraryPartialOnly || process.argv.includes('--typography-only') || process.argv.includes('--social-only') || process.argv.includes('--space-catalog-only')) throw new Error(`找不到 Chrome：${CHROME}`)
     console.log('没装 Chrome，跳过')
     if (DYNAMIC_RETURN) process.exitCode = 1
     return
@@ -4383,6 +4383,11 @@ async function main() {
 
   const page = await connect()
   try {
+    if (process.argv.includes('--space-catalog-only')) {
+      const { checkSpaceCatalog } = await import('./space-catalog-smoke.mjs')
+      await checkSpaceCatalog(page, WEB, watchUiWait(page), check)
+      return
+    }
     if (process.argv.includes('--social-only')) {
       const { checkSocialPages } = await import('./social-smoke.mjs')
       await checkSocialPages(page, WEB, watchUiWait(page), check)

@@ -165,8 +165,25 @@ async fn space_videos(
     mid: u64,
     page: u32,
     order: String,
+    keyword: Option<String>,
 ) -> Result<(Vec<Track>, u32), WireError> {
-    engine.space_videos(mid, page, &order).await
+    engine.space_videos(mid, page, &order, keyword.as_deref().unwrap_or_default()).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_catalog_order(engine: tauri::State<'_, Arc<Engine>>, mid: u64) -> Result<Vec<u64>, WireError> {
+    engine.space_catalog_order(mid).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn space_catalog(
+    engine: tauri::State<'_, Arc<Engine>>,
+    mid: u64,
+    catalog: bilimusic_core::wire::Catalog,
+    page: u32,
+    offset: Option<String>,
+) -> Result<bilimusic_core::wire::CatalogPage, WireError> {
+    engine.space_catalog(mid, catalog, page, offset.as_deref()).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -1350,6 +1367,8 @@ pub fn run() {
             watch_later_list,
             following,
             space_videos,
+            space_catalog,
+            space_catalog_order,
             space_picks,
             space_collections,
             space_collection_works,
