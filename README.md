@@ -4,12 +4,10 @@
 
 | 平台 | 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS · Apple 芯片 | [下载 v0.1.0（ZIP）][mac-download] | 解压后将 `oh-bilibili.app` 拖到「应用程序」。首次打开若提示无法验证开发者，可查看 [Apple 的打开说明](https://support.apple.com/zh-cn/102445)。 |
+| macOS · Apple 芯片 | [下载 v0.1.2（ZIP）][mac-download] | 解压后将 `oh-bilibili.app` 拖到「应用程序」。首次打开若提示无法验证开发者，可查看 [Apple 的打开说明](https://support.apple.com/zh-cn/102445)。 |
 | Windows · x64 | [下载 v0.1.2（EXE）][win-download] | 双击安装到当前用户。若缺少 WebView2，安装程序会联网获取。 |
 
-两个安装包均未签名，发布页提供 SHA-256 校验文件。[Mac 发布说明][mac-release] · [Windows 发布说明][win-release]
-
-Windows v0.1.2 已包含下文介绍的新版时间轴、窄窗音量和私信。macOS v0.1.0 发布较早，在 Apple 芯片设备上体验这些功能可以[从源码运行](#从源码运行)。
+v0.1.2 的两个平台版本都包含新版时间轴、窄窗音量和文字私信。Mac 应用采用本地签名，未经过 Apple 公证。Windows 安装程序未签名。两个安装包的 SHA-256 校验值见[发布说明][release]。
 
 ![Mac 版发现页，左侧是频道导航，右侧是推荐视频的封面](docs/assets/readme-home.jpg)
 
@@ -59,7 +57,6 @@ npm ci
 
 侧栏的小电视、纸飞机和信封来自这套项目自制的贴纸图标，也可以单独下载使用。[咔嗒 · Kada Icons](https://github.com/TTAWDTT/kada-icons)
 
-[mac-download]: https://github.com/TTAWDTT/oh-bilibili/releases/download/v0.1.0/oh-bilibili-0.1.0-macos-arm64.zip
+[mac-download]: https://github.com/TTAWDTT/oh-bilibili/releases/download/v0.1.2/oh-bilibili-0.1.2-macos-arm64.zip
 [win-download]: https://github.com/TTAWDTT/oh-bilibili/releases/download/v0.1.2/oh-bilibili-0.1.2-windows-x64-setup.exe
-[mac-release]: https://github.com/TTAWDTT/oh-bilibili/releases/tag/v0.1.0
-[win-release]: https://github.com/TTAWDTT/oh-bilibili/releases/tag/v0.1.2
+[release]: https://github.com/TTAWDTT/oh-bilibili/releases/tag/v0.1.2
