@@ -519,13 +519,25 @@ async function checkStageMoments(page) {
     return false
   }
   await waitFor(`location.search.includes('multiP') && !!document.querySelector('main h2')`)
-  await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
-    .then(([app, catalog]) => app.useAppStore.getState().navigate({
-      kind: 'watch', track: catalog.trackByTitle('漠河舞厅'), page: 2,
-    }))`)
-  const canListen = await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === '听视频')`)
-  if (canListen) await page.clickExactText('听视频')
-  await waitFor(`!!document.querySelector('[aria-label="打开播放舞台"]')`)
+  const nextUrl = await page.evaluate(`Promise.all([import('/src/app/appStore.ts'), import('/src/shared/lib/mockCatalog.ts')])
+    .then(([app, catalog]) => {
+      app.useAppStore.getState().navigate({ kind: 'watch', track: catalog.trackByTitle('孤勇者') })
+      return 'https://www.bilibili.com/video/' + catalog.trackByTitle('漠河舞厅').key + '?p=2'
+    })`)
+  await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === '听视频')`)
+  await page.evaluate(`document.querySelector('input[aria-label="顶栏搜索"]').focus()`)
+  await page.cdp('Input.insertText', { text: nextUrl })
+  await page.evaluate(`document.querySelector('input[aria-label="顶栏搜索"]').form.querySelector('button[type="submit"]').click()`)
+  const view = `import('/src/app/appStore.ts').then(app => app.useAppStore.getState().view)`
+  const secondReady = await waitFor(`document.querySelector('main')?.textContent.includes('观看：漠河舞厅') && ${view}.then(v => v.track?.title === '漠河舞厅' && v.page === 2)`)
+  check('在观看页粘贴另一条视频链接后打开指定分 P', secondReady)
+  if (!secondReady) return
+  await page.clickExactText('听视频')
+  check('听视频回到发现，前一条观看页不会抢走当前音轨', await waitFor(`
+    !!document.querySelector('[aria-label="打开播放舞台"]') && Promise.all([${view}, import('/src/shared/lib/mockEngine.ts')]).then(([v, engine]) => {
+      const p = engine.snapshot()
+      return v.kind === 'home' && p.mode === 'listen' && p.phase === 'playing' && p.track?.title === '漠河舞厅' && p.page?.no === 2
+    })`))
   await page.evaluate(`document.querySelector('[aria-label="打开播放舞台"]')?.click()`)
   const moment = `document.querySelector('.stage button[aria-label="跳到 0:19，尾奏适合循环"]')`
   const correctPart = await waitFor(`!!${moment}`)
