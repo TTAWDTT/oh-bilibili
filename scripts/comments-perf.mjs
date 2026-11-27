@@ -3,10 +3,12 @@
 //
 // 用法：先 npm run web（1420），再 node scripts/comments-perf.mjs。
 import { spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { browserPath } from './smoke-browser.mjs'
 
 const WEB = 'http://127.0.0.1:1420/?manyComments=1'
 const PORT = 9237
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const LAYOUT_LIMIT = 2000
 const HEAP_LIMIT = 100 * 1024 * 1024
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -27,14 +29,14 @@ async function main() {
   }
 
   const chrome = spawn(
-    CHROME,
+    browserPath,
     [
       '--headless=new',
       '--disable-gpu',
       '--no-first-run',
       '--no-default-browser-check',
       `--remote-debugging-port=${PORT}`,
-      '--user-data-dir=/tmp/oh-bilibili-comments-perf',
+      `--user-data-dir=${join(tmpdir(), 'oh-bilibili-comments-perf')}`,
       'about:blank',
     ],
     { stdio: 'ignore' },

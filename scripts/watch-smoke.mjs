@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { browserPath as CHROME } from './smoke-browser.mjs'
 
 const WEB = process.env.SMOKE_WEB || 'http://127.0.0.1:1420/'
 const DYNAMIC_RETURN = process.argv.includes('--dynamic-return')
@@ -21,9 +22,6 @@ const libraryEmptyOnly = process.argv.includes('--library-empty-only')
 const profileOnly = process.argv.includes('--profile-only')
 const followingOnly = process.argv.includes('--following-only')
 const PORT = Number(process.env.SMOKE_CDP_PORT || (DYNAMIC_RETURN ? 9324 : 9224))
-const CHROME = process.env.CHROME_PATH || (process.platform === 'win32'
-  ? join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe')
-  : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
