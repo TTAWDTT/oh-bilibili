@@ -3,7 +3,7 @@
 //! 这是「音频层不认识 B 站」那条边界的实现处：Referer 和 cookie 都在这里加上，
 //! seek 靠重新发 Range 请求完成。
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -17,11 +17,33 @@ pub struct RemoteMedia {
     headers: Vec<(String, String)>,
     pos: u64,
     total: Option<u64>,
-    response: Mutex<Option<reqwest::blocking::Response>>,
+    response: Mutex<Option<RangeResponse>>,
+}
+
+struct RangeResponse {
+    body: reqwest::blocking::Response,
+    end: Option<u64>,
+}
+
+fn content_range(response: &reqwest::blocking::Response) -> Option<(u64, u64, Option<u64>)> {
+    let value = response
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)?
+        .to_str()
+        .ok()?;
+    let (range, total) = value.strip_prefix("bytes ")?.split_once('/')?;
+    let (start, end) = range.split_once('-')?;
+    let start = start.parse::<u64>().ok()?;
+    let end = end.parse::<u64>().ok()?.checked_add(1)?;
+    let total = total.parse::<u64>().ok();
+    (start < end && total.map_or(true, |total| end <= total)).then_some((start, end, total))
 }
 
 impl RemoteMedia {
-    pub fn open(url: impl Into<String>, headers: Vec<(String, String)>) -> Result<RemoteMedia, String> {
+    pub fn open(
+        url: impl Into<String>,
+        headers: Vec<(String, String)>,
+    ) -> Result<RemoteMedia, String> {
         let url: String = url.into();
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(8))
@@ -37,12 +59,7 @@ impl RemoteMedia {
             .header("Range", "bytes=0-0")
             .send()
             .map_err(|e| e.to_string())?;
-        let total = head
-            .headers()
-            .get("content-range")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.rsplit('/').next())
-            .and_then(|s| s.parse::<u64>().ok());
+        let total = content_range(&head).and_then(|(_, _, total)| total);
 
         Ok(RemoteMedia {
             client,
@@ -54,21 +71,7 @@ impl RemoteMedia {
         })
     }
 
-    /// 丢掉当前连接，下次 read 会按 self.pos 重发 Range。
-    fn drop_response(&self) {
-        if let Ok(mut guard) = self.response.lock() {
-            *guard = None;
-        }
-    }
-
-    fn ensure_response(&self) -> std::io::Result<()> {
-        let mut guard = self
-            .response
-            .lock()
-            .map_err(|_| std::io::Error::other("音频流锁被毒化"))?;
-        if guard.is_some() {
-            return Ok(());
-        }
+    fn open_response(&mut self) -> io::Result<RangeResponse> {
         let mut req = self.client.get(self.url.clone());
         for (k, v) in &self.headers {
             req = req.header(k.as_str(), v.as_str());
@@ -77,22 +80,62 @@ impl RemoteMedia {
             Some(total) if self.pos < total => (self.pos + CHUNK_SIZE - 1).min(total - 1),
             _ => self.pos + CHUNK_SIZE - 1,
         };
-        let resp = req
+        let body = req
             .header("Range", format!("bytes={}-{}", self.pos, end))
             .send()
-            .map_err(std::io::Error::other)?;
-        let status = resp.status();
-        if !(status.is_success() || status.as_u16() == 206) {
-            return Err(std::io::Error::other(format!("音频源返回 {status}")));
+            .map_err(io::Error::other)?;
+        let response_end = match body.status() {
+            reqwest::StatusCode::PARTIAL_CONTENT => {
+                let (_, response_end, total) = content_range(&body)
+                    .filter(|(start, response_end, _)| {
+                        *start == self.pos && *response_end <= end + 1
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "音频源返回了错误的 Content-Range",
+                        )
+                    })?;
+                self.total = total.or(self.total);
+                Some(response_end)
+            }
+            reqwest::StatusCode::OK if self.pos == 0 => {
+                self.total = body.content_length().or(self.total);
+                self.total
+            }
+            status => return Err(io::Error::other(format!("音频源返回 {status}"))),
+        };
+        Ok(RangeResponse {
+            body,
+            end: response_end,
+        })
+    }
+
+    fn read_range(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.response.get_mut().unwrap().is_none() {
+            let response = self.open_response()?;
+            *self.response.get_mut().unwrap() = Some(response);
         }
-        *guard = Some(resp);
-        Ok(())
+        let slot = self.response.get_mut().unwrap();
+        let response = slot.as_mut().unwrap();
+        let count = response.body.read(buf)?;
+        if count == 0 && response.end.is_some_and(|end| self.pos < end) {
+            return Err(io::Error::new(
+                io::ErrorKind::ConnectionAborted,
+                "音频流在到达末尾前断开",
+            ));
+        }
+        self.pos += count as u64;
+        if response.end == Some(self.pos) {
+            *slot = None;
+        }
+        Ok(count)
     }
 }
 
 impl Read for RemoteMedia {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.total.is_some_and(|total| self.pos >= total) {
+        if buf.is_empty() || self.total.is_some_and(|total| self.pos >= total) {
             return Ok(0);
         }
         // B 站 CDN 的长连接会中途断掉。早先这里直接往上抛错，而解码线程遇到
@@ -100,57 +143,20 @@ impl Read for RemoteMedia {
         // 进度冻结、按钮回到播放态。
         //
         // 现在在这里自己接住：只要还没读到末尾，就按当前偏移重发一次 Range 续上。
-        for attempt in 0..3 {
-            if let Err(e) = self.ensure_response() {
-                if attempt == 2 {
-                    return Err(e);
-                }
-                self.drop_response();
-                std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
-                continue;
-            }
-            let mut guard = match self.response.lock() {
-                Ok(g) => g,
-                Err(_) => return Err(std::io::Error::other("音频流锁被毒化")),
-            };
-            let Some(resp) = guard.as_mut() else {
-                return Ok(0);
-            };
-            match resp.read(buf) {
-                Ok(0) => {
-                    // 0 是 EOF。只有真的到末尾才算播完；否则当作连接断了重连。
-                    let at_end = self.total.is_some_and(|t| self.pos >= t);
-                    drop(guard);
-                    if at_end {
-                        return Ok(0);
-                    }
-                    self.drop_response();
-                    if attempt == 2 {
-                        // 到这里还没读到文件末尾，不能把 0 交给解码器：
-                        // Symphonia 会把它当成自然 EOF，引擎就弹出结束卡并切下一集。
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::ConnectionAborted,
-                            "音频流在到达末尾前断开",
-                        ));
-                    }
-                    std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
-                }
-                Ok(n) => {
-                    self.pos += n as u64;
-                    return Ok(n);
-                }
+        let mut attempts = 0;
+        loop {
+            match self.read_range(buf) {
+                Ok(n) => return Ok(n),
                 Err(e) => {
-                    drop(guard);
-                    if attempt == 2 {
+                    *self.response.get_mut().unwrap() = None;
+                    attempts += 1;
+                    if attempts == 3 {
                         return Err(e);
                     }
-                    // 丢掉断掉的连接，下一轮按 self.pos 重新 Range
-                    self.drop_response();
-                    std::thread::sleep(Duration::from_millis(120 * (attempt as u64 + 1)));
+                    std::thread::sleep(Duration::from_millis(120 * attempts));
                 }
             }
         }
-        Ok(0)
     }
 }
 
@@ -169,9 +175,7 @@ impl Seek for RemoteMedia {
         if next != self.pos {
             self.pos = next;
             // 换位置就丢掉旧连接，下次 read 会重新发 Range。
-            if let Ok(mut guard) = self.response.lock() {
-                *guard = None;
-            }
+            *self.response.get_mut().unwrap() = None;
         }
         Ok(self.pos)
     }

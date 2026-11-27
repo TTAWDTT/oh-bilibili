@@ -4,6 +4,7 @@
 //! 位置由回调按帧数推进，是全应用唯一的时间真值。
 
 use std::borrow::Cow;
+use std::io::SeekFrom;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -14,12 +15,13 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
 use ringbuf::HeapRb;
 use symphonia::core::codecs::DecoderOptions;
-use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
-use symphonia::core::io::MediaSourceStream;
+use symphonia::core::formats::{FormatOptions, FormatReader, Packet, SeekMode, SeekTo, SeekedTo};
+use symphonia::core::io::{MediaSource, MediaSourceStream};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::units::{Time, TimeBase};
 
+use crate::indexed_mp4::{IndexedMp4, SegmentIndex};
 use crate::AudioError;
 use crate::{Clock, Media, SharedClock};
 
@@ -35,7 +37,7 @@ enum Cmd {
     },
     Play,
     Pause,
-    Seek(u64, Option<Sender<()>>),
+    Seek(u64, Option<Sender<Result<(), AudioError>>>),
     /// 播放倍速，0.5..=2.0。
     SetSpeed(f64),
     Stop,
@@ -279,7 +281,7 @@ impl Player {
     pub fn seek(&self, position_ms: u64) {
         let _ = self.tx.send(Cmd::Seek(position_ms, None));
     }
-    pub fn seek_with_receipt(&self, position_ms: u64) -> Receiver<()> {
+    pub fn seek_with_receipt(&self, position_ms: u64) -> Receiver<Result<(), AudioError>> {
         let (done, finished) = channel();
         let _ = self.tx.send(Cmd::Seek(position_ms, Some(done)));
         finished
@@ -309,26 +311,110 @@ struct Session {
     decoder: Box<dyn symphonia::core::codecs::Decoder>,
     track_id: u32,
     sample_rate: u32,
+    time_base: TimeBase,
     duration_ms: u64,
+    index: Option<IndexedMp4>,
+    timestamp_offset: u64,
+}
+
+impl Session {
+    fn next_packet(&mut self) -> symphonia::core::errors::Result<Packet> {
+        let mut packet = self.format.next_packet()?;
+        packet.ts += self.timestamp_offset;
+        Ok(packet)
+    }
+
+    fn seek(&mut self, ms: u64) -> Result<SeekedTo, AudioError> {
+        let time = Time::from(ms as f64 / 1000.0);
+        let mut replacement = None;
+        let (target, offset) = if let Some(index) = &self.index {
+            let ts = self.time_base.calc_timestamp(time);
+            let (segment, offset) = index.segment_at(ts);
+            if offset != self.timestamp_offset {
+                replacement = Some(index.open_at(segment)?);
+            }
+            (
+                SeekTo::TimeStamp {
+                    ts: ts - offset,
+                    track_id: self.track_id,
+                },
+                offset,
+            )
+        } else {
+            (
+                SeekTo::Time {
+                    time,
+                    track_id: Some(self.track_id),
+                },
+                0,
+            )
+        };
+        let mut seeked = replacement
+            .as_mut()
+            .unwrap_or(&mut self.format)
+            .seek(SeekMode::Accurate, target)
+            .map_err(|e| AudioError::Decode(e.to_string()))?;
+        if let Some(format) = replacement {
+            self.format = format;
+        }
+        self.timestamp_offset = offset;
+        self.decoder.reset();
+        seeked.required_ts += offset;
+        seeked.actual_ts += offset;
+        Ok(seeked)
+    }
 }
 
 pub fn probe_audio(media: Media) -> Result<(), AudioError> {
     open_decoder(media, false).map(|_| ())
 }
 
-fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioError> {
-    let mss = MediaSourceStream::new(media.into_inner(), Default::default());
+pub(super) fn probe_format(
+    source: Box<dyn MediaSource>,
+) -> Result<Box<dyn FormatReader>, AudioError> {
+    let mss = MediaSourceStream::new(source, Default::default());
     let mut hint = Hint::new();
     hint.with_extension("m4a");
-    let probed = symphonia::default::get_probe()
+    symphonia::default::get_probe()
         .format(
             &hint,
             mss,
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| AudioError::Open(e.to_string()))?;
-    let mut format = probed.format;
+        .map(|probed| probed.format)
+        .map_err(|e| AudioError::Open(e.to_string()))
+}
+
+fn open_format(
+    mut source: Box<dyn MediaSource>,
+    measure_duration: bool,
+) -> Result<(Box<dyn FormatReader>, Option<IndexedMp4>), AudioError> {
+    if !measure_duration && source.is_seekable() {
+        if let Some(index) = SegmentIndex::read(source.as_mut()) {
+            let indexed = IndexedMp4::new(source, index);
+            if let Ok(format) = indexed.open_at(0) {
+                if let [track] = format.tracks() {
+                    if track
+                        .codec_params
+                        .time_base
+                        .is_some_and(|base| indexed.matches(base))
+                    {
+                        return Ok((format, Some(indexed)));
+                    }
+                }
+            }
+            source = indexed.into_source();
+        }
+        source
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| AudioError::Open(e.to_string()))?;
+    }
+    Ok((probe_format(source)?, None))
+}
+
+fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioError> {
+    let (mut format, index) = open_format(media.into_inner(), measure_duration)?;
     let track = format
         .tracks()
         .iter()
@@ -354,10 +440,12 @@ fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioEr
         }
     }
     let time = time_base.calc_time(frames);
-    let duration_ms = time.seconds * 1000 + (time.frac * 1000.0).round() as u64;
+    let duration_ms = index
+        .as_ref()
+        .map(|index| index.duration_ms())
+        .unwrap_or_else(|| time.seconds * 1000 + (time.frac * 1000.0).round() as u64);
 
-    // fMP4 把 moov 放在文件末尾，探针读完头已经在 EOF 附近，
-    // 不回卷的话第一次 next_packet 直接 EOF，听起来像「点了播放没反应」。
+    // 没有前置 moov 的媒体会读到文件尾来初始化。回卷后才能取首包。
     let rewind = format.seek(
         SeekMode::Accurate,
         SeekTo::Time {
@@ -374,7 +462,10 @@ fn open_decoder(media: Media, measure_duration: bool) -> Result<Session, AudioEr
         decoder,
         track_id,
         sample_rate,
+        time_base,
         duration_ms,
+        index,
+        timestamp_offset: 0,
     })
 }
 
@@ -524,28 +615,23 @@ fn run_engine(
                     clock.set_playing(false);
                 }
                 Cmd::Seek(ms, done) => {
-                    if let Some(d) = decoder.as_mut() {
-                        at_eof = false;
-                        lifecycle.clear_eof();
+                    let result = decoder.as_mut().ok_or(AudioError::NoTrack).and_then(|d| {
                         resampler.pending.clear();
                         request_flush(&flush_requested, &flush_done);
-                        let target = SeekTo::Time {
-                            time: Time::from(ms as f64 / 1000.0),
-                            track_id: Some(d.track_id),
-                        };
-                        match d.format.seek(SeekMode::Accurate, target) {
-                            Ok(_) => {
-                                clock.seek_to_ms(ms);
-                                resampler.set_source_rate(base_rate * speed);
-                                if !lifecycle.is_paused() {
-                                    clock.set_playing(true);
-                                }
-                            }
-                            Err(e) => eprintln!("seek 失败: {e}"),
+                        d.seek(ms)?;
+                        at_eof = false;
+                        lifecycle.clear_eof();
+                        clock.seek_to_ms(ms);
+                        resampler.set_source_rate(base_rate * speed);
+                        if !lifecycle.is_paused() {
+                            clock.set_playing(true);
                         }
-                    }
+                        Ok(())
+                    });
                     if let Some(done) = done {
-                        let _ = done.send(());
+                        let _ = done.send(result);
+                    } else if let Err(error) = result {
+                        eprintln!("seek 失败: {error}");
                     }
                 }
                 Cmd::Stop => {
@@ -583,7 +669,7 @@ fn run_engine(
             continue;
         }
 
-        let packet = match d.format.next_packet() {
+        let packet = match d.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(ref e))
                 if e.kind() == std::io::ErrorKind::UnexpectedEof =>

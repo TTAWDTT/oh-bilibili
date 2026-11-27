@@ -281,6 +281,12 @@ pub struct HistoryResume {
     pub position_ms: u64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WatchContinuation {
+    pub following: Option<Vec<Track>>,
+    pub autoplay: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueueView {
     pub items: Vec<Track>,

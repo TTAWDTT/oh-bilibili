@@ -10,6 +10,21 @@ use bilimusic_model::{EntryId, Millis, Quality, Track, TrackKey};
 pub struct QueueEntry {
     pub id: EntryId,
     pub track: Track,
+    /// 观看转入的条目还要接着播分 P，关闭自动连播仍可手动切 P。
+    pub watch_autoplay: Option<WatchAutoplay>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchAutoplay {
+    Off,
+    RemainingParts,
+    Next,
+}
+
+impl WatchAutoplay {
+    pub fn permits(self, has_next_part: bool) -> bool {
+        self == Self::Next || (self == Self::RemainingParts && has_next_part)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,7 +99,8 @@ impl Queue {
         let id = EntryId(self.next_id);
         self.entries.push(QueueEntry {
             id,
-            track: track.clone(),
+            track,
+            watch_autoplay: None,
         });
         if let Some(PlayOrder::Shuffle { perm, .. }) = self.order.as_mut() {
             perm.push(id);
@@ -104,7 +120,8 @@ impl Queue {
             at,
             QueueEntry {
                 id,
-                track: track.clone(),
+                track,
+                watch_autoplay: None,
             },
         );
         if let Some(PlayOrder::Shuffle { perm, .. }) = self.order.as_mut() {
@@ -112,6 +129,37 @@ impl Queue {
         }
         self.bump();
         id
+    }
+
+    pub fn continue_watching(&mut self, following: Option<&[Track]>, autoplay: bool) {
+        let Some(index) = self.index() else { return };
+        let current = self.entries[index].id;
+        let mut policy = match (autoplay, following.is_some()) {
+            (false, _) => WatchAutoplay::Off,
+            (true, true) => WatchAutoplay::RemainingParts,
+            (true, false) => WatchAutoplay::Next,
+        };
+        for track in following.unwrap_or_default().iter().rev() {
+            let id = self.entry_id_of(track.key.as_opaque())
+                .unwrap_or_else(|| self.push_back(track.clone()));
+            if id == current {
+                continue;
+            }
+            let from = self.position_of(id).unwrap();
+            let mut entry = self.entries.remove(from);
+            entry.watch_autoplay = Some(policy);
+            if autoplay { policy = WatchAutoplay::Next; }
+            let after_current = self.index().unwrap() + 1;
+            self.entries.insert(after_current, entry);
+            if let Some(PlayOrder::Shuffle { perm, at }) = &mut self.order {
+                perm.retain(|other| *other != id);
+                *at = perm.iter().position(|other| *other == current).unwrap();
+                perm.insert(*at + 1, id);
+            }
+        }
+        let index = self.index().unwrap();
+        self.entries[index].watch_autoplay = Some(policy);
+        self.bump();
     }
 
     pub fn remove(&mut self, id: EntryId) -> bool {
@@ -335,6 +383,11 @@ pub enum PlayerState {
         prepared: Prepared,
     },
     Ended {
+        token: LoadToken,
+        track: TrackKey,
+        prepared: Prepared,
+    },
+    Stopped {
         track: TrackKey,
     },
     Faulted {
@@ -351,7 +404,7 @@ impl PlayerState {
             PlayerState::Ready { .. } => "ready",
             PlayerState::Playing { .. } => "playing",
             PlayerState::Paused { .. } => "paused",
-            PlayerState::Ended { .. } => "ended",
+            PlayerState::Ended { .. } | PlayerState::Stopped { .. } => "ended",
             PlayerState::Faulted { .. } => "faulted",
         }
     }
@@ -361,7 +414,8 @@ impl PlayerState {
             PlayerState::Loading { token, .. }
             | PlayerState::Ready { token, .. }
             | PlayerState::Playing { token, .. }
-            | PlayerState::Paused { token, .. } => Some(*token),
+            | PlayerState::Paused { token, .. }
+            | PlayerState::Ended { token, .. } => Some(*token),
             _ => None,
         }
     }
@@ -373,7 +427,8 @@ impl PlayerState {
             | PlayerState::Ready { track, .. }
             | PlayerState::Playing { track, .. }
             | PlayerState::Paused { track, .. }
-            | PlayerState::Ended { track }
+            | PlayerState::Ended { track, .. }
+            | PlayerState::Stopped { track }
             | PlayerState::Faulted { track, .. } => Some(track),
         }
     }
@@ -387,7 +442,8 @@ impl PlayerState {
         match self {
             PlayerState::Ready { prepared, .. }
             | PlayerState::Playing { prepared, .. }
-            | PlayerState::Paused { prepared, .. } => Some(prepared),
+            | PlayerState::Paused { prepared, .. }
+            | PlayerState::Ended { prepared, .. } => Some(prepared),
             _ => None,
         }
     }
@@ -436,21 +492,9 @@ impl PlayerState {
 
     pub fn play(self) -> PlayerState {
         match self {
-            PlayerState::Paused {
-                token,
-                track,
-                prepared,
-            } => PlayerState::Playing {
-                token,
-                track,
-                prepared,
-                prefetched: None,
-            },
-            PlayerState::Ready {
-                token,
-                track,
-                prepared,
-            } => PlayerState::Playing {
+            PlayerState::Paused { token, track, prepared }
+            | PlayerState::Ready { token, track, prepared }
+            | PlayerState::Ended { token, track, prepared } => PlayerState::Playing {
                 token,
                 track,
                 prepared,
@@ -477,8 +521,18 @@ impl PlayerState {
     }
 
     pub fn ended(self) -> PlayerState {
+        match self {
+            PlayerState::Playing { token, track, prepared, .. }
+            | PlayerState::Paused { token, track, prepared }
+            | PlayerState::Ready { token, track, prepared }
+            | PlayerState::Ended { token, track, prepared } => PlayerState::Ended { token, track, prepared },
+            other => other.stopped(),
+        }
+    }
+
+    pub fn stopped(self) -> PlayerState {
         match self.track().cloned() {
-            Some(track) => PlayerState::Ended { track },
+            Some(track) => PlayerState::Stopped { track },
             None => PlayerState::Idle,
         }
     }

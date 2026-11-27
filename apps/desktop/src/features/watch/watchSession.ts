@@ -1,4 +1,4 @@
-import type { Track } from '../../shared/lib/contract'
+import type { SeasonEpisodeView, Track } from '../../shared/lib/contract'
 
 /**
  * 一次「连续观看」的片单上下文。
@@ -35,6 +35,17 @@ export function peekWatchSessionNext(key: string): Track | null {
   const from = session.items.findIndex((item) => item.key === key)
   if (from < 0) return null
   return nextAfter(from)
+}
+
+export function followingWatchTracks(key: string, episodes: SeasonEpisodeView[], owner: string): Track[] | null {
+  const current = currentWatchSession(key)
+  if (current) return current.items.slice(current.index + 1).filter((item) => !current.skipped.has(item.key))
+  const index = episodes.findIndex((entry) => entry.key === key)
+  if (index < 0) return null
+  return episodes.slice(index + 1).map((entry) => ({
+    key: entry.key, title: entry.title, artist: owner, cover: entry.cover,
+    duration_ms: entry.duration_ms || null, views: entry.views,
+  }))
 }
 
 /** 走到下一条并把它记为当前条目。 */

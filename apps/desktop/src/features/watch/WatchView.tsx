@@ -15,9 +15,12 @@ import {
   advanceWatchSession,
   currentWatchSession,
   endWatchSession,
+  followingWatchTracks,
   peekWatchSessionNext,
   skipWatchSession,
 } from './watchSession'
+import { useAutoplay } from './autoplay'
+import { reportActionError } from '../../shared/lib/actionError'
 import { ChapterList } from './ChapterList'
 import { DanmakuList } from './DanmakuList'
 import { OwnerCard } from './OwnerCard'
@@ -777,7 +780,13 @@ export function WatchView({
               data={data}
               currentPage={currentPageNo}
               onListen={(at) => {
-                void ipc.setMode('listen', at, track.key).then(() => goBack()).catch(() => {})
+                const following = followingWatchTracks(track.key, seasonEpisodes, data.owner)
+                void ipc.setMode('listen', at, track.key, {
+                  following, autoplay: useAutoplay.getState().enabled,
+                }).then(() => {
+                  void usePlayerStore.getState().refreshQueue()
+                  goBack()
+                }).catch((cause) => reportActionError('听视频', cause))
               }}
             />
           ) : null}
@@ -797,7 +806,7 @@ export function WatchView({
                 onCoin={() => coin(1, true)}
                 coins={coins}
                 onReplay={() => {
-                  void ipc.playerReplay().catch(() => {})
+                  void usePlayerStore.getState().replay()
                 }}
                 nextUp={nextUp}
                 onNext={playNext}

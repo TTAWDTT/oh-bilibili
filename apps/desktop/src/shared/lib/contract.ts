@@ -34,7 +34,9 @@ export type PlayerSnapshot = {
   mode: PlayMode
 }
 
-export type PlayMode = 'listen' | 'watch' 
+export type PlayMode = 'listen' | 'watch'
+
+export type WatchContinuation = { following: Track[] | null; autoplay: boolean }
 
 export type Followed = {
   mid: number

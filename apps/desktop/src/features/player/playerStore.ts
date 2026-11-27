@@ -20,9 +20,10 @@ type PlayerStore = {
   play: (key: string) => Promise<void>
   playContext: (keys: string[], index: number, resume?: ipc.PlaybackResume) => Promise<void>
   toggle: () => Promise<void>
+  replay: () => Promise<boolean>
   next: () => Promise<void>
   prev: () => Promise<void>
-  seek: (positionMs: number) => Promise<void>
+  seek: (positionMs: number) => Promise<boolean>
   setVolume: (volume: number) => Promise<void>
   setSpeed: (speed: number) => Promise<void>
   cycleRepeat: () => Promise<void>
@@ -146,9 +147,8 @@ export const usePlayerStore = create<PlayerStore>()((set, get) => {
       await run('上一首', () => ipc.playerPrev())
       await refreshQueue()
     },
-    seek: async (positionMs) => {
-      await run('调整进度', () => ipc.playerSeek(positionMs))
-    },
+    seek: (positionMs) => run('调整进度', () => ipc.playerSeek(positionMs)),
+    replay: () => run('重新播放', ipc.playerReplay),
     setSpeed: async (speed) => {
       try {
         apply(await ipc.playerSetSpeed(speed))

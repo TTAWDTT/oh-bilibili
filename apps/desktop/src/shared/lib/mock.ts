@@ -1,4 +1,4 @@
-import type { DownloadView, QrStatus, Track, WireError } from './contract'
+import type { DownloadView, QrStatus, Track, WatchContinuation, WireError } from './contract'
 import type { HistoryEntry, PlaybackResume } from './ipc'
 import { DISCOVERY_REGIONS } from './discoveryRegions'
 import { CATALOG, avatarArt, buildLyrics, findTrack, registerTrack } from './mockCatalog'
@@ -731,6 +731,20 @@ export async function mockInvoke(command: string, args: Record<string, unknown>)
         if (track) {
           if (!state.keys.includes(key)) state.keys.push(key)
           state.index = state.keys.indexOf(key)
+          const context = args.continuation as WatchContinuation | undefined
+          if (context) {
+            const following = (context.following ?? []).filter((item) => item.key !== key)
+            for (const item of following) registerTrack(item)
+            const keys = [...new Set(following.map((item) => item.key))]
+            const inserted = new Set(keys)
+            state.keys = state.keys.filter((item) => !inserted.has(item))
+            state.index = state.keys.indexOf(key)
+            state.keys.splice(state.index + 1, 0, ...keys)
+            const tail = context.following === null ? null : keys.at(-1) ?? key
+            for (const item of [key, ...keys]) {
+              state.watchAutoplay.set(item, !context.autoplay ? 'off' : item === tail ? 'parts' : 'next')
+            }
+          }
           state.localKey = null
           state.duration = state.watchPage?.key === key ? state.watchPage.page.duration_ms : track.duration_ms ?? 30_000
           state.position = Number.isFinite(at) ? at : 0

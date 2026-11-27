@@ -5,6 +5,7 @@
 
 use std::io::{Read, Seek, SeekFrom};
 
+mod indexed_mp4;
 pub mod player;
 pub use player::{probe_audio, Player};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};

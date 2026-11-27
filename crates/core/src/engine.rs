@@ -220,6 +220,7 @@ mod download_restore_tests {
     #[ignore = "需要声卡输出"]
     async fn 在线音轨播完后能重播并从拖动位置继续() {
         use crate::state::Prepared;
+        use crate::wire::AppEvent;
         use bilimusic_audio::Media;
         use bilimusic_model::{Millis, Quality};
 
@@ -227,7 +228,7 @@ mod download_restore_tests {
         let engine = Engine::open(&dir.join("library.sqlite")).unwrap();
         engine.set_volume(0.0);
         let mut song = track("online-fixture");
-        song.duration = Some(Millis(4_992));
+        song.duration = Some(Millis(30_000));
         engine.remember(&song);
         engine.select_listen_track(&song);
         let token = engine.begin_load(&song, false);
@@ -243,6 +244,12 @@ mod download_restore_tests {
             wait_for(|| engine.reached_track_end()).await;
             engine.finish_track().await;
             assert_eq!(engine.snapshot().phase, "ended");
+            engine.next().await.unwrap();
+            assert!(matches!(*lock(&engine.state), crate::state::PlayerState::Ended { .. }));
+            let rejected = engine.seek_async(25_000).await;
+            assert!(rejected.is_err(), "实际音轨只有约 5 秒，不能声称跳到了 25 秒");
+            assert_eq!(engine.snapshot().phase, "ended");
+            assert!(!lock(&engine.player).clock().is_playing());
             let resumed = if restart_by_dragging {
                 engine.seek(2_000)
             } else {
@@ -254,8 +261,15 @@ mod download_restore_tests {
             wait_for(|| engine.snapshot().position_ms > target + 300).await;
         }
         engine.pause();
-        let paused = engine.seek(1_000);
+        let mut events = engine.subscribe();
+        let (first, last) = tokio::join!(engine.seek_async(1_800), engine.seek_async(1_000));
+        first.unwrap();
+        let paused = last.unwrap();
         assert_eq!((paused.phase.as_str(), paused.position_ms), ("paused", 1_000));
+        assert_eq!(engine.snapshot().position_ms, 1_000);
+        while let Ok(event) = events.try_recv() {
+            assert!(!matches!(event, AppEvent::State { .. }), "旧的跳转不能广播到界面");
+        }
         drop(engine);
         std::fs::remove_dir_all(dir).unwrap();
     }
@@ -1354,9 +1368,29 @@ fn watch_start(
     (current, at)
 }
 
+fn next_video_part(track: &Track, page: Option<&PageRef>) -> Option<u32> {
+    let no = page?.no;
+    (no < track.pages.unwrap_or(1)).then(|| no + 1)
+}
+
 struct QueueBookmark {
     current: Option<(TrackKey, u64)>,
     page: Option<(TrackKey, PageRef)>,
+}
+
+struct DecoderSeek {
+    receipt: std::sync::mpsc::Receiver<Result<(), AudioError>>,
+    token: LoadToken,
+    restart: bool,
+}
+
+impl DecoderSeek {
+    fn wait(self) -> Result<(LoadToken, bool), WireError> {
+        self.receipt.recv()
+            .map_err(|error| WireError::internal(error.to_string()))?
+            .map_err(|error| WireError::internal(error.to_string()))?;
+        Ok((self.token, self.restart))
+    }
 }
 
 pub struct Engine {
@@ -2061,7 +2095,7 @@ impl Engine {
             *lock(&self.mode) = crate::wire::PlayMode::Listen;
         } else {
             let mut st = lock(&self.state);
-            *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
+            *st = std::mem::replace(&mut *st, PlayerState::Idle).stopped();
         }
         self.emit_state();
         self.snapshot()
@@ -2073,8 +2107,18 @@ impl Engine {
         at_ms: Option<u64>,
         key: Option<&TrackKey>,
     ) -> Result<PlayerSnapshot, WireError> {
-        *lock(&self.mode) = mode;
+        self.set_mode_with_continuation(mode, at_ms, key, None).await
+    }
+
+    pub async fn set_mode_with_continuation(
+        self: &Arc<Self>,
+        mode: crate::wire::PlayMode,
+        at_ms: Option<u64>,
+        key: Option<&TrackKey>,
+        continuation: Option<crate::wire::WatchContinuation>,
+    ) -> Result<PlayerSnapshot, WireError> {
         if mode == crate::wire::PlayMode::Watch {
+            *lock(&self.mode) = mode;
             let snapshot = self.snapshot();
             // 模式本身也是快照的一部分。同一条已经加载好时不会走 play_key，
             // 没有这条事件，界面就会一直以为还在看。
@@ -2082,10 +2126,20 @@ impl Engine {
             return Ok(snapshot);
         }
 
+        let watch_handoff = continuation.is_some();
         if let Some(key) = key {
             self.select_listen_track(&self.track_of(key)?);
             *lock(&self.listen_bookmark) = None;
+            if let Some(context) = continuation {
+                let following = context.following.as_deref();
+                for track in following.unwrap_or_default() {
+                    self.remember_persisted(track);
+                }
+                lock(&self.queue).continue_watching(following, context.autoplay);
+                self.persist_queue();
+            }
         }
+        *lock(&self.mode) = mode;
 
         // 要听哪一条：调用方给了就用它，否则用队列当前项。
         // 只看「有没有在放」不够——正在放 A 却要看 B 的时候，
@@ -2106,13 +2160,15 @@ impl Engine {
             };
             let snapshot = self.play_key(&t).await?;
             if let Some(at) = at_ms.filter(|v| *v > 0) {
-                self.seek(at);
+                self.seek_async(at).await?;
             }
             self.emit_state();
             return Ok(snapshot);
         }
-        if let Some(at) = at_ms.filter(|v| *v > 0) {
-            self.seek(at);
+        if !watch_handoff {
+            if let Some(at) = at_ms.filter(|v| *v > 0) {
+                self.seek_async(at).await?;
+            }
         }
         let snapshot = self.snapshot();
         self.emit_state();
@@ -2530,9 +2586,8 @@ impl Engine {
     /// 队列是从快照恢复的，音频从未加载过；这种状态下 `player.play()` 是空操作，
     /// 用户点了播放键会觉得「点了没反应」。
     pub async fn toggle_or_load(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
-        let local = lock(&self.local_track).clone();
-        if let Some(key) = local.filter(|_| lock(&self.state).phase() == "ended") {
-            return self.play_local(&key);
+        if lock(&self.state).phase() == "ended" {
+            return self.replay().await;
         }
         // 先取出 key 再 await：MutexGuard 不能跨 await 存活。
         let idle_key = {
@@ -2552,6 +2607,9 @@ impl Engine {
     }
 
     pub fn toggle(&self) -> PlayerSnapshot {
+        if matches!(*lock(&self.state), PlayerState::Ended { .. }) {
+            return self.seek(0);
+        }
         let is_playing = lock(&self.player).clock().is_playing();
         {
             let player = lock(&self.player);
@@ -2593,12 +2651,27 @@ impl Engine {
         self.snapshot()
     }
 
+    fn watch_autoplay_for(&self, key: &TrackKey) -> Option<crate::state::WatchAutoplay> {
+        lock(&self.queue).current()
+            .filter(|entry| &entry.track.key == key)
+            .and_then(|entry| entry.watch_autoplay)
+    }
+
     pub async fn next(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
         // 单曲循环：播完重放同一首，而不是走到下一首。
         if *lock(&self.repeat) == "one" && lock(&self.local_track).is_none() {
             let current = lock(&self.queue).current().map(|e| e.track.key.clone());
             if let Some(key) = current {
                 return self.play_key(&key).await;
+            }
+        }
+        let snapshot = self.snapshot();
+        if let Some(track) = snapshot.track {
+            if !snapshot.local && self.watch_autoplay_for(&track.key).is_some() {
+                if let Some(page) = next_video_part(&track, snapshot.page.as_ref()) {
+                    let next_part = HistoryResume { page, position_ms: 0 };
+                    return self.play_queue_track(&track.key, Some(next_part)).await;
+                }
             }
         }
         let wrapped = *lock(&self.repeat) == "all";
@@ -2637,17 +2710,54 @@ impl Engine {
     }
 
     pub fn seek(&self, position_ms: u64) -> PlayerSnapshot {
+        match self.request_seek(position_ms).and_then(|request| request.map(DecoderSeek::wait).transpose()) {
+            Ok(Some((token, restart))) => self.confirm_seek(token, restart),
+            Err(error) => self.emit(AppEvent::Notice { error, op: "调整进度".into() }),
+            Ok(None) => {}
+        }
+        self.snapshot()
+    }
+
+    pub async fn seek_async(&self, position_ms: u64) -> Result<PlayerSnapshot, WireError> {
+        if let Some(request) = self.request_seek(position_ms)? {
+            let (token, restart) = tokio::task::spawn_blocking(move || request.wait())
+                .await
+                .map_err(|error| WireError::internal(error.to_string()))??;
+            self.confirm_seek(token, restart);
+        }
+        Ok(self.snapshot())
+    }
+
+    fn confirm_seek(&self, token: LoadToken, restart: bool) {
+        let mut current = lock(&self.state);
+        if current.token() != Some(token) {
+            return;
+        }
+        if restart && matches!(*current, PlayerState::Ended { .. }) {
+            lock(&self.player).play();
+            *current = std::mem::replace(&mut *current, PlayerState::Idle).play();
+        }
+        if lock(&self.local_track).is_none() {
+            let mut pending = lock(&self.pending_resume);
+            if pending.as_ref().is_some_and(|(key, _)| current.track() == Some(key)) {
+                *pending = None;
+                drop(pending);
+                drop(current);
+                self.persist_queue();
+            }
+        }
+    }
+
+    fn request_seek(&self, position_ms: u64) -> Result<Option<DecoderSeek>, WireError> {
         let state = lock(&self.state).clone();
-        if state.phase() == "ended" {
-            return self.snapshot();
+        if matches!(state, PlayerState::Stopped { .. } | PlayerState::Faulted { .. }) {
+            return Err(WireError::internal("音轨没有打开"));
         }
         *lock(&self.last_transport_at) = std::time::Instant::now();
-        // 正好落在曲目时长上的 seek 会被解码器拒掉（实测按 End 之后位置不动、
-        // 也不报错），拖到最右就是这种情况。停在末尾前一秒，让解码器自然读到 EOF，
-        // 播完该切歌仍由 reached_track_end 负责。
         let track = self.snapshot_track(&state);
         let local = lock(&self.local_track).is_some();
         let duration = self.playback_duration(track.as_ref(), local);
+        // 分片标记的总时长可能比最后一帧稍晚，右端保留一秒交给解码器自然播完。
         let target = if local && duration > 0 {
             position_ms.min(duration - 1)
         } else if duration > 1000 && position_ms >= duration - 1000 {
@@ -2655,33 +2765,26 @@ impl Engine {
         } else {
             position_ms
         };
-        let updated_resume = {
-            let mut pending = lock(&self.pending_resume);
-            match pending.as_mut() {
-                Some((key, at))
-                    if !local && track.as_ref().is_some_and(|track| &track.key == key) =>
-                {
-                    *at = target;
-                    true
-                }
-                _ => false,
+        if !local && matches!(state, PlayerState::Idle | PlayerState::Loading { .. }) {
+            if let Some(track) = track {
+                *lock(&self.pending_resume) = Some((track.key, target));
+                lock(&self.player).seek(target);
+                self.persist_queue();
             }
-        };
-        if local || state.phase() == "paused" {
-            let finished = lock(&self.player).seek_with_receipt(target);
-            let _ = finished.recv();
-        } else {
-            lock(&self.player).seek(target);
+            return Ok(None);
         }
-        if updated_resume {
-            self.persist_queue();
-        }
-        self.snapshot()
+        let token = state.token().ok_or_else(|| WireError::internal("音轨没有打开"))?;
+        Ok(Some(DecoderSeek {
+            receipt: lock(&self.player).seek_with_receipt(target),
+            token,
+            restart: matches!(state, PlayerState::Ended { .. }),
+        }))
     }
 
-    /// 从头重播当前视频。结束态的 PlayerState 不保留解码准备信息，
-    /// 单靠 seek(0) 回不到 playing，所以重新走一次 play_key。
     pub async fn replay(self: &Arc<Self>) -> Result<PlayerSnapshot, WireError> {
+        if matches!(*lock(&self.state), PlayerState::Ended { .. }) {
+            return self.seek_async(0).await;
+        }
         let local = lock(&self.local_track).clone();
         if let Some(key) = local {
             return self.start_local(&key);
@@ -2964,7 +3067,13 @@ impl Engine {
                 return;
             }
         }
-        if local.is_some() || *lock(&self.mode) == crate::wire::PlayMode::Watch {
+        let snapshot = self.snapshot();
+        let stop_after_part = snapshot.track.as_ref().is_some_and(|track| {
+            self.watch_autoplay_for(&track.key).is_some_and(|policy| {
+                !policy.permits(next_video_part(track, snapshot.page.as_ref()).is_some())
+            })
+        });
+        if local.is_some() || *lock(&self.mode) == crate::wire::PlayMode::Watch || (stop_after_part && !repeat_one) {
             lock(&self.player).pause();
             let mut st = lock(&self.state);
             *st = std::mem::replace(&mut *st, PlayerState::Idle).ended();
