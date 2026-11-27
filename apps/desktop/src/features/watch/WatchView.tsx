@@ -126,7 +126,7 @@ export function WatchView({
   /** 同一次跳转还要落到这条弹幕的时刻。 */
   atMs?: number
 }) {
-  const goBack = useAppStore((s) => s.goBack)
+  const returnAfterListening = useAppStore((s) => s.returnAfterListening)
   const replace = useAppStore((s) => s.replace)
   const cinema = useAppStore((s) => s.cinema)
   const osFullscreen = useAppStore((s) => s.osFullscreen)
@@ -785,7 +785,7 @@ export function WatchView({
                   following, autoplay: useAutoplay.getState().enabled,
                 }).then(() => {
                   void usePlayerStore.getState().refreshQueue()
-                  goBack()
+                  returnAfterListening()
                 }).catch((cause) => reportActionError('听视频', cause))
               }}
             />

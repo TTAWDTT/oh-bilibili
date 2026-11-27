@@ -125,6 +125,7 @@ type AppStore = SearchFilters & {
   replace: (view: View) => void
   /** 回上一层；没有历史就回发现页。 */
   goBack: () => void
+  returnAfterListening: () => void
   setRail: (tab: RailTab | null) => void
   toggleRail: (tab: RailTab) => void
   closeRail: () => void
@@ -196,29 +197,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       cinema: false,
       osFullscreen: false,
     }),
-  goBack: () =>
+  goBack: () => set((state) => restoreHistory(state, state.history.length - 1)),
+  returnAfterListening: () =>
     set((state) => {
-      const prev = state.history.at(-1)
-      if (!prev) {
-        return {
-          dynamicReturn: undefined,
-          view: { kind: 'home' } as View,
-          cinema: false,
-          osFullscreen: false,
-        }
-      }
-      return {
-        view: prev.view,
-        currentQuery: prev.view.kind === 'search' ? prev.view.query : state.currentQuery,
-        dynamicReturn: prev.dynamicReturn,
-        returnFocus:
-          prev.focusId
-            ? { kind: prev.view.kind, id: prev.focusId }
-            : null,
-        cinema: false,
-        osFullscreen: false,
-        history: state.history.slice(0, -1),
-      }
+      let index = state.history.length - 1
+      // 再打开旧的观看页会自动起播，抢走刚切到后台的声音。
+      while (state.history[index]?.view.kind === 'watch') index -= 1
+      return restoreHistory(state, index)
     }),
   setRail: (tab) => set({ rail: tab }),
   toggleRail: (tab) => set({ rail: get().rail === tab ? null : tab }),
@@ -242,3 +227,17 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   },
   dismissToast: (id) => set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) })),
 }))
+
+function restoreHistory(state: AppStore, index: number): Partial<AppStore> {
+  const entry = state.history[index]
+  const view: View = entry?.view ?? { kind: 'home' }
+  return {
+    view,
+    currentQuery: view.kind === 'search' ? view.query : state.currentQuery,
+    dynamicReturn: entry?.dynamicReturn,
+    returnFocus: entry?.focusId ? { kind: view.kind, id: entry.focusId } : null,
+    history: entry ? state.history.slice(0, index) : [],
+    cinema: false,
+    osFullscreen: false,
+  }
+}
