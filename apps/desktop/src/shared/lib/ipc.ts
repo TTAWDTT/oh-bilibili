@@ -1,6 +1,6 @@
 import type { DiscoveryRegion } from './discoveryRegions'
 import { invoke } from '@tauri-apps/api/core'
-import type { CommentPage, Followed, PlayMode, WatchView,
+import type { CommentPage, Followed, PlayMode, WatchContinuation, WatchView,
   AuthSnapshot,
   DownloadView,
   LyricDoc,
@@ -100,7 +100,6 @@ export function playerSeek(positionMs: number): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_seek', { position_ms: Math.max(0, Math.round(positionMs)) })
 }
 
-/** 从头重播当前视频。结束态只 seek 回不到 playing，要重新挂载一次。 */
 export function playerReplay(): Promise<PlayerSnapshot> {
   return call<PlayerSnapshot>('player_replay', {})
 }
@@ -653,8 +652,8 @@ export function mvSource(key: string): Promise<string> {
 
 
 /** 切换看/听。从看到听时传画面当前位置。 */
-export function setMode(mode: PlayMode, atMs?: number, key?: string): Promise<PlayerSnapshot> {
-  return call<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null })
+export function setMode(mode: PlayMode, atMs?: number, key?: string, continuation?: WatchContinuation): Promise<PlayerSnapshot> {
+  return call<PlayerSnapshot>('set_mode', { mode, at_ms: atMs ?? null, key: key ?? null, continuation })
 }
 
 /** 离开观看页，停掉这条视频的声音。带上 key，换片时旧页面的清理不会掐掉新视频。 */

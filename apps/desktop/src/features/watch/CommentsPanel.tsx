@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
 import * as ipc from '../../shared/lib/ipc'
+import { usePlayerStore } from '../player/playerStore'
 import type { Comment, CommentMedal, CommentPage } from '../../shared/lib/contract'
 import { toWireError } from '../../shared/lib/errors'
 import { findCommentTimes } from './commentTime'
@@ -1269,7 +1270,7 @@ export function CommentsPanel({
       onSeek(ms, page)
       return
     }
-    void ipc.playerSeek(ms).catch(() => {})
+    void usePlayerStore.getState().seek(ms)
   }, [onSeek])
 
   const timeSource = useMemo(() => ({ trackKey, pages }), [trackKey, pages])

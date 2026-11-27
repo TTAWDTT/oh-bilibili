@@ -16,7 +16,7 @@
     "fetch:yt-dlp:windows": "node scripts/fetch-yt-dlp-windows.mjs",
     "verify": "cargo test --workspace --locked --quiet && npm run typecheck && npm run ui:audit && node scripts/ipc-audit.mjs",
     "test:sources": "node scripts/sources-test.mjs",
-    "test:watch-session": "node scripts/watch-session-test.mjs",
+    "test:watch-session": "node scripts/watch-session-test.mjs && node scripts/watch-listen-order-test.mjs && node scripts/watch-listen-return-test.mjs",
     "test:comment-time": "node scripts/comment-time-test.mjs",
     "test:fav-pages": "node scripts/fav-pages-test.mjs",
     "test:danmaku-merge": "node scripts/danmaku-merge-test.mjs",

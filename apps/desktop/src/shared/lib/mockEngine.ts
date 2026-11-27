@@ -6,6 +6,7 @@ import { clamp } from './format'
 export type MockPlaylist = { id: number; name: string; keys: string[] }
 
 export type MockState = {
+  watchAutoplay: Map<string, 'off' | 'parts' | 'next'>
   watchPage: { key: string; page: PageRef } | null
   keys: string[]
   index: number | null
@@ -63,6 +64,7 @@ const loggedIn =
 const reactedKeys = CATALOG.slice(0, 1).map((track) => track.key)
 
 export const state: MockState = {
+  watchAutoplay: new Map(),
   watchPage: null,
   keys: [],
   index: null,
@@ -193,13 +195,14 @@ export function playIndex(index: number, resume?: PlaybackResume): void {
   }
   state.index = index
   state.localKey = null
-  const pages = resume ? previewPages(track) : []
+  const pages = resume || state.watchAutoplay.has(track.key) ? previewPages(track) : []
   const page = pages.find((part) => part.no === resume?.page) ?? pages[0]
-  if (page) state.watchPage = { key: track.key, page }
+  state.watchPage = page ? { key: track.key, page } : null
   state.duration = page?.duration_ms ?? track.duration_ms ?? 30_000
   state.position = resume && page?.no === resume.page ? clamp(resume.position_ms, 0, state.duration) : 0
   state.phase = 'playing'
   emit({ type: 'now_playing', track, index })
+  emit({ type: 'state', snapshot: snapshot() })
   emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0 })
 }
 
@@ -214,6 +217,15 @@ export function step(direction: 1 | -1, announce = false): void {
   const total = state.keys.length
   const current = state.index
   if (total === 0 || current === null) return
+  const track = currentTrack()
+  if (direction === 1 && track && state.watchAutoplay.has(track.key)) {
+    const page = state.watchPage?.key === track.key ? state.watchPage.page.no : 1
+    const following = previewPages(track).find((item) => item.no === page + 1)
+    if (following) {
+      playIndex(current, { page: following.no, position_ms: 0 })
+      return
+    }
+  }
   let target = current
   if (state.shuffle && total > 1) {
     do {
@@ -256,8 +268,11 @@ function tick(): void {
     state.position = Math.min(state.position + delta, state.duration)
     emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
     if (state.position >= state.duration) {
+      const track = currentTrack()
+      const policy = state.watchAutoplay.get(track?.key ?? '')
+      const lastPart = track && (state.watchPage?.page.no ?? 1) >= previewPages(track).length
       if (state.repeat === 'one') state.position = 0
-      else if (state.localKey) endPlayback()
+      else if (state.mode === 'watch' || state.localKey || policy === 'off' || (policy === 'parts' && lastPart)) endPlayback()
       else step(1)
     }
   }
@@ -290,7 +305,7 @@ export function ensureClock(): void {
 
 export function setPosition(position: number): void {
   state.position = clamp(position, 0, state.duration)
-  emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
+  if (state.phase === 'playing') emit({ type: 'progress', position_ms: state.position, duration_ms: state.duration, level: 0.35 })
 }
 
 /** 预览里没有真实音频：观看页打开时把这条视频的时长交给播放器状态。 */

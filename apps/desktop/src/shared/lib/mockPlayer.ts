@@ -54,6 +54,7 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       if (keys.length === 0) throw fail('input', '播放队列是空的')
       const index = clamp(Math.trunc(num(args, 'index')), 0, keys.length - 1)
       trackOf(keys[index] ?? '')
+      state.watchAutoplay.clear()
       state.keys = [...keys]
       state.mode = 'listen'
       playIndex(index, args.resume as PlaybackResume | undefined)
@@ -93,6 +94,7 @@ export function playerCommand(command: string, args: Record<string, unknown>): P
       else step(-1)
       return snapshot()
     case 'player_seek':
+      if (state.phase === 'ended' && !state.localKey) state.phase = 'playing'
       setPosition(num(args, 'position_ms'))
       return snapshot()
     case 'player_replay':

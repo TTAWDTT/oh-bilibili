@@ -255,7 +255,7 @@ export function StageView() {
                         kind: 'watch',
                         track,
                         page: snapshot?.page?.no ?? 1,
-                        atMs: Math.round(readPlayhead()),
+                        atMs: snapshot?.phase === 'ended' ? 0 : Math.round(readPlayhead()),
                         audioPaused: snapshot?.phase === 'paused',
                       }, undefined, 'player-stage')
                     }}

@@ -6,7 +6,7 @@ export type ShakaPlayer = {
   destroy: () => Promise<void>
   getVariantTracks: () => ShakaVariant[]
   selectVariantTrack: (track: ShakaVariant, clearBuffer: boolean) => void
-  addEventListener: (type: string, handler: (event: { detail?: unknown }) => void) => void
+  addEventListener: (type: string, handler: (event: { detail?: unknown; buffering?: boolean }) => void) => void
   configure?: (config: Record<string, unknown>) => void
 }
 

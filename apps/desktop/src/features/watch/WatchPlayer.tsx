@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../app/appStore'
 import { toastDone, toastFailure } from '../../app/notice'
 import { reportActionError } from '../../shared/lib/actionError'
@@ -286,6 +286,7 @@ export function WatchPlayer({
   const hideTimer = useRef<number | null>(null)
   /** 冒烟脚本读的最后一次落位；播放时钟在无头预览里没有真值。 */
   const lastSeek = useRef<number | null>(null)
+  const pendingSeek = useRef<Promise<boolean> | null>(null)
   /** 当前生效的变体高度，降档时用它找下一档。 */
   const currentHeight = useRef<number>(0)
   /** 出错后想降到的目标高度；为 0 表示按 shaka 的默认选择。 */
@@ -323,6 +324,7 @@ export function WatchPlayer({
   const osFullscreen = useAppStore((state) => state.osFullscreen)
   const setOsFullscreen = useAppStore((state) => state.setOsFullscreen)
   const [playing, setPlaying] = useState(false)
+  const audioLoading = usePlayerStore((state) => state.snapshot?.track?.key === track.key && state.snapshot.phase === 'loading')
   /** 播到结尾就掀开三连面板。 */
   const [finished, setFinished] = useState(false)
   /** 仅开发页：`?forceEnded=1` 直接把结束卡拉起来，用来验自动连播与取消。 */
@@ -417,11 +419,24 @@ export function WatchPlayer({
     if (hideTimer.current) window.clearTimeout(hideTimer.current)
     hideTimer.current = window.setTimeout(() => setControls(false), 2500)
   }
+  const seekAudio = useCallback(async (at: number): Promise<boolean> => {
+    const request = usePlayerStore.getState().seek(at)
+    pendingSeek.current = request
+    setNow(at)
+    const applied = await request
+    if (pendingSeek.current !== request) return false
+    pendingSeek.current = null
+    if (!applied && usePlayerStore.getState().snapshot?.track?.key === track.key) {
+      const head = readPlayhead()
+      setNow(head)
+      if (videoRef.current) videoRef.current.currentTime = head / 1000
+    }
+    return applied
+  }, [track.key])
+
   useEffect(() => {
-    if (!seekSignal) return
-    setNow(seekSignal.at)
-    void ipc.playerSeek(seekSignal.at).catch(() => {})
-  }, [seekSignal])
+    if (seekSignal) void seekAudio(seekSignal.at)
+  }, [seekAudio, seekSignal])
 
   const appliedVideoSeek = useRef<typeof seekSignal>(null)
   useEffect(() => {
@@ -520,16 +535,15 @@ export function WatchPlayer({
     }
   }, [])
 
-  const seekTo = (ratio: number): void => {
+  const seekTo = async (ratio: number): Promise<boolean> => {
     const duration = data.duration_ms || track.duration_ms || 0
-    if (!duration) return
+    if (!duration) return false
     const at = Math.round(Math.min(Math.max(ratio, 0), 1) * duration)
     lastSeek.current = at
-    void ipc.playerSeek(at).catch(() => {})
     const v = videoRef.current
     if (v) v.currentTime = at / 1000
-    setNow(at)
     poke()
+    return seekAudio(at)
   }
 
   /** 已经为哪条清单续过播。同一份清单（含降档重载）只续一次。 */
@@ -610,7 +624,7 @@ export function WatchPlayer({
       const enginePlaying = sameTrack && snap?.phase === 'playing'
       setPlaying(enginePlaying)
       setFinished(sameTrack && snap?.phase === 'ended')
-      if (!sameTrack || !enginePlaying) {
+      if (!sameTrack || !enginePlaying || pendingSeek.current !== null) {
         if (!v.paused) v.pause()
         return
       }
@@ -682,6 +696,7 @@ export function WatchPlayer({
       return
     }
     let cancelled = false
+    setBuffering(false)
     void (async () => {
       try {
         await releasingPlayer.current
@@ -689,9 +704,8 @@ export function WatchPlayer({
         shaka.polyfill?.installAll?.()
         const player = new shaka.Player(video)
         playerRef.current = player
-        player.addEventListener('buffering', (event: { detail?: unknown }) => {
-          const detail = event.detail as { buffering?: boolean } | undefined
-          if (!cancelled) setBuffering(Boolean(detail?.buffering))
+        player.addEventListener('buffering', (event) => {
+          if (!cancelled) setBuffering(Boolean(event.buffering))
         })
         player.addEventListener('error', (event: { detail?: unknown }) => {
           // shaka 的可恢复错误它自己会重试（例如某个分片 404 之后换 CDN）。
@@ -760,7 +774,6 @@ export function WatchPlayer({
             )[0]
           if (match) setActiveId(match.id)
         }
-        setBuffering(false)
         setLoadedData(data)
       } catch (e) {
         if (!cancelled) setError(describePlaybackError(e))
@@ -833,7 +846,9 @@ export function WatchPlayer({
   useEffect(() => {
     // 字幕也使用播放时间，收起控制条时仍要继续换句。
     if (!controlsVisible && subTrack === null) return
-    const timer = window.setInterval(() => setNow(Math.round(localPlayhead())), 250)
+    const timer = window.setInterval(() => {
+      if (pendingSeek.current === null) setNow(Math.round(localPlayhead()))
+    }, 250)
     return () => window.clearInterval(timer)
   }, [controlsVisible, subTrack])
 
@@ -1161,7 +1176,7 @@ export function WatchPlayer({
           <BiliLoader label="正在取流…" />
         </div>
       ) : null}
-      {ready && buffering && !ended && !error ? (
+      {ready && (buffering || audioLoading) && !ended && !error ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-white/85">
           <span className="bili-buffer-spin h-9 w-9 rounded-full border-2 border-white/25 border-t-white" />
           <span className="text-[12px]">正在缓冲…</span>
@@ -1554,9 +1569,10 @@ export function WatchPlayer({
             resetKey={data.current_page}
             onSeek={(ms) => {
               if (!duration) return
-              seekTo(ms / duration)
-              // 暂停时按按钮就直接从这一刻播，别只把画面停在新位置。
-              if (!playing) togglePlay()
+              const paused = usePlayerStore.getState().snapshot?.phase === 'paused'
+              void seekTo(ms / duration).then((applied) => {
+                if (applied && paused && usePlayerStore.getState().snapshot?.phase === 'paused') togglePlay()
+              })
             }}
           />
         <div

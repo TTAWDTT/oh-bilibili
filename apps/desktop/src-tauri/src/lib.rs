@@ -143,9 +143,10 @@ async fn set_mode(
     mode: bilimusic_core::wire::PlayMode,
     at_ms: Option<u64>,
     key: Option<String>,
+    continuation: Option<bilimusic_core::wire::WatchContinuation>,
 ) -> Result<PlayerSnapshot, WireError> {
     let target = key.map(TrackKey::from_provider);
-    engine.set_mode(mode, at_ms, target.as_ref()).await
+    engine.set_mode_with_continuation(mode, at_ms, target.as_ref(), continuation).await
 }
 
 /// 离开观看页。看模式下必须停掉声音，否则退出后视频还在后台放。
@@ -592,10 +593,7 @@ async fn player_seek(
     engine: tauri::State<'_, Arc<Engine>>,
     position_ms: u64,
 ) -> Result<PlayerSnapshot, WireError> {
-    let engine = engine.inner().clone();
-    tokio::task::spawn_blocking(move || engine.seek(position_ms))
-        .await
-        .map_err(|error| WireError::internal(error.to_string()))
+    engine.seek_async(position_ms).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
