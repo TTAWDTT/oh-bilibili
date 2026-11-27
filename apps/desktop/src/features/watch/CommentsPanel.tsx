@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, memo, useCallback, useMemo, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { useAppStore } from '../../app/appStore'
@@ -155,14 +155,13 @@ function CommentRichText({
   emotes: [string, string][]
   mentions: [string, number][]
 }) {
-  const navigate = useAppStore((state) => state.navigate)
   if (emotes.length === 0 && mentions.length === 0) {
     return (
       <>
         {mentionNodes(
           text,
           mentions,
-          (name, mid) => navigate({ kind: 'author', name, mid }),
+          (name, mid) => useAppStore.getState().navigate({ kind: 'author', name, mid }),
           0,
         )}
       </>
@@ -178,7 +177,7 @@ function CommentRichText({
       ...mentionNodes(
         buffer,
         mentions,
-        (name, mid) => navigate({ kind: 'author', name, mid }),
+        (name, mid) => useAppStore.getState().navigate({ kind: 'author', name, mid }),
         chunk,
       ),
     )
@@ -223,7 +222,10 @@ function CommentText({
 }) {
   const { trackKey, pages } = useContext(TimeSource)
   const times = anchors ?? findCommentTimes(text, pages, trackKey)
-  if (!onSeek || times.length === 0) return <CommentRichText text={text} emotes={emotes} mentions={mentions} />
+  if (!onSeek || times.length === 0) {
+    if (!emotes.length && !mentions.length && !/https?:\/\//.test(text)) return text
+    return <CommentRichText text={text} emotes={emotes} mentions={mentions} />
+  }
   const nodes: ReactNode[] = []
   let last = 0
   for (const anchor of times) {
@@ -271,7 +273,7 @@ function CommentMedalBadge({ medal }: { medal: CommentMedal }) {
 }
 
 /** 一条评论，含楼中楼预览。一级评论可以回复。 */
-function CommentRow({
+const CommentRow = memo(function CommentRow({
   c,
   depth = 0,
   trackKey,
@@ -310,7 +312,6 @@ function CommentRow({
   const { pages } = useContext(TimeSource)
   const anchors = findCommentTimes(c.text, pages, trackKey)
   const validTimes = anchors.filter((anchor) => !anchor.invalid).length
-  const navigate = useAppStore((state) => state.navigate)
   const [repliesOpen, setRepliesOpen] = useState(false)
   const [loadedReplies, setLoadedReplies] = useState<Comment[]>([])
   const [repliesCursor, setRepliesCursor] = useState<string | null>(null)
@@ -457,7 +458,7 @@ function CommentRow({
             {c.mid > 0 ? (
               <button
                 type="button"
-                onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+                onClick={() => useAppStore.getState().navigate({ kind: 'author', name: c.author, mid: c.mid })}
                 onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
                 onMouseLeave={onAuthorHide}
                 onFocus={(event) => onAuthorHover?.(c, event.currentTarget)}
@@ -699,7 +700,7 @@ function CommentRow({
       ) : null}
     </li>
   )
-}
+})
 
 /**
  * 评论区。
@@ -723,7 +724,6 @@ function DialogRow({
   onAuthorHover?: ((c: Comment, el: HTMLElement) => void) | undefined
   onAuthorHide?: (() => void) | undefined
 }) {
-  const navigate = useAppStore((state) => state.navigate)
   return (
     <li className="flex items-start gap-2">
       <span className="mt-0.5 shrink-0">
@@ -735,7 +735,7 @@ function DialogRow({
           {c.mid > 0 ? (
             <button
               type="button"
-              onClick={() => navigate({ kind: 'author', name: c.author, mid: c.mid })}
+              onClick={() => useAppStore.getState().navigate({ kind: 'author', name: c.author, mid: c.mid })}
               onMouseEnter={(event) => onAuthorHover?.(c, event.currentTarget)}
               onMouseLeave={onAuthorHide}
               onFocus={(event) => onAuthorHover?.(c, event.currentTarget)}
@@ -1005,13 +1005,14 @@ export function CommentsPanel({
   const visible = onlyUp && ownerMid !== null ? items.filter((c) => c.mid === ownerMid) : items
   const recentShown =
     recent && recent.mid === (me?.mid ?? 0) && !recentBroken ? recent : null
-  const showAuthorCard = (c: Comment, el: HTMLElement): void => {
+  const { show: showAuthor, hide: hideAuthor } = authorHover
+  const showAuthorCard = useCallback((c: Comment, el: HTMLElement): void => {
     if (c.mid <= 0) return
-    authorHover.show(
+    showAuthor(
       { mid: c.mid, name: c.author, face: c.avatar, sign: '', official: null, vip: false },
       el,
     )
-  }
+  }, [showAuthor])
 
   useEffect(() => {
     if (replyTo) inputRef.current?.focus()
@@ -1263,13 +1264,24 @@ export function CommentsPanel({
     }
   }
 
-  const seekToTime = (ms: number, page?: number): void => {
+  const seekToTime = useCallback((ms: number, page?: number): void => {
     if (onSeek) {
       onSeek(ms, page)
       return
     }
     void ipc.playerSeek(ms).catch(() => {})
-  }
+  }, [onSeek])
+
+  const timeSource = useMemo(() => ({ trackKey, pages }), [trackKey, pages])
+  const openReply = useCallback((target: Comment) => {
+    setReplyTo({ id: target.id, root: target.root ? String(target.root) : target.id, author: target.author })
+  }, [])
+  const openPhoto = useCallback((pictures: string[], index: number) => setPhoto({ pictures, index }), [])
+  const openDialog = useCallback((target: Comment) => {
+    if ((target.root ?? 0) > 0 && (target.dialog ?? 0) > 0) {
+      setDialog({ root: String(target.root), anchor: String(target.dialog) })
+    }
+  }, [])
 
   const composer = (reply: { id: string; author: string } | null): ReactNode => (
     <div>
@@ -1396,7 +1408,7 @@ export function CommentsPanel({
   )
 
   return (
-    <TimeSource.Provider value={{ trackKey, pages }}>
+    <TimeSource.Provider value={timeSource}>
     <div id="watch-comments" className={flow ? 'flex flex-col' : 'flex min-h-0 flex-col'}>
       <div className={`flex items-baseline gap-2 py-3 ${flow ? '' : 'px-3'}`}>
         <h3 className="text-[14px] font-medium">评论</h3>
@@ -1499,29 +1511,19 @@ export function CommentsPanel({
               c={c}
               trackKey={trackKey}
               ownerMid={ownerMid}
-              onReply={(target) =>
-                setReplyTo({
-                  id: target.id,
-                  root: target.root ? String(target.root) : target.id,
-                  author: target.author,
-                })
-              }
+              onReply={openReply}
               onDelete={mine.has(c.id) ? remove : undefined}
-              deleteFor={(target) => (mine.has(target.id) ? remove : undefined)}
-              onPhoto={(pictures, index) => setPhoto({ pictures, index })}
+              deleteFor={mine.size ? (target) => (mine.has(target.id) ? remove : undefined) : undefined}
+              onPhoto={openPhoto}
               onSeek={seekToTime}
               onReadNote={onNote}
               onAuthorHover={showAuthorCard}
-              onAuthorHide={authorHover.hide}
+              onAuthorHide={hideAuthor}
               replyComposer={replyTo?.id === c.id ? composer(replyTo) : undefined}
-              replyComposerFor={(target) =>
-                replyTo?.id === target.id ? composer(replyTo) : undefined
-              }
-              onDialog={(target) => {
-                if ((target.root ?? 0) > 0 && (target.dialog ?? 0) > 0) {
-                  setDialog({ root: String(target.root), anchor: String(target.dialog) })
-                }
-              }}
+              replyComposerFor={replyTo
+                ? (target) => (replyTo.id === target.id ? composer(replyTo) : undefined)
+                : undefined}
+              onDialog={openDialog}
             />
           ))}
           {onlyUp && !loading && !error && items.length > 0 && visible.length === 0 ? (
@@ -1554,10 +1556,10 @@ export function CommentsPanel({
         root={dialog?.root ?? ''}
         anchor={dialog?.anchor ?? ''}
         onClose={() => setDialog(null)}
-        onPhoto={(pictures, index) => setPhoto({ pictures, index })}
+        onPhoto={openPhoto}
         onSeek={seekToTime}
         onAuthorHover={showAuthorCard}
-        onAuthorHide={authorHover.hide}
+        onAuthorHide={hideAuthor}
       />
       <AuthorHoverCard
         hover={authorHover.hover}

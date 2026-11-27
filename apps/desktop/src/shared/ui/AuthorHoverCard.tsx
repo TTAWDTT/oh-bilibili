@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Followed } from '../lib/contract'
 import { formatCount } from '../lib/format'
@@ -75,22 +75,22 @@ export function useAuthorHover(): {
     }
   }, [])
 
-  const show = (user: Followed, el: HTMLElement): void => {
+  const show = useCallback((user: Followed, el: HTMLElement): void => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     // 鼠标扫过整列时会一路触发，留一帧的延迟避免名片疯狂闪
     timerRef.current = window.setTimeout(() => {
       setHover({ user, trigger: el })
     }, document.activeElement === el ? 0 : 40)
-  }
+  }, [])
 
-  const hide = (): void => {
+  const hide = useCallback((): void => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     // 指针从头像移进名片要经过一小段空隙，立刻卸载会让名片永远点不到。
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
       setHover(null)
     }, 120)
-  }
+  }, [])
 
   const keep = (): void => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
