@@ -731,6 +731,10 @@ impl LinearResampler {
 }
 
 #[cfg(test)]
+#[path = "indexed_playback_tests.rs"]
+mod indexed_playback_tests;
+
+#[cfg(test)]
 mod duration_tests {
     use super::{open_decoder, Media};
 

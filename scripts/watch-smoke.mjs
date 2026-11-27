@@ -4485,12 +4485,19 @@ async function checkWatchComfort(page) {
     await waitFor('location.search.includes("mergeDanmaku") && window.shaka?.Player && document.querySelector("[data-track-card]")')
     // 预览清单没有视频流；用同一张投稿的「听」起播，让真实的预览引擎提供播放时间。
     await page.evaluate(`(() => {
-      window.shaka.Player.prototype.load = async () => {}
+      window.shaka.Player.prototype.load = async function () { window.comfortPlayer = this }
       const card = document.querySelector('[data-track-card]')
       card.querySelector('button[aria-label^="听"]').click()
       card.querySelector('button[aria-label^="观看"]').click()
     })()`)
     await waitFor('window.__ohBilibiliWatch?.state().playing')
+    for (const buffering of [true, false]) {
+      await page.evaluate(`window.comfortPlayer.dispatchEvent(
+        new window.shaka.util.FakeEvent('buffering', new Map([['buffering', ${buffering}]]))
+      )`)
+      check(buffering ? '视频缓冲时出现提示' : '缓冲结束后提示消失',
+        await waitFor(`Boolean(${player}.querySelector('.bili-buffer-spin')) === ${buffering}`))
+    }
     for (const [width, height] of [[1320, 820], [1150, 620], [380, 820]]) {
       await page.viewport(width, height)
       check(`${width}×${height} 可看到整幅视频，开关、设置和弹幕输入框都在画面下方`, await page.evaluate(`(() => {
@@ -4543,6 +4550,16 @@ async function checkWatchComfort(page) {
     check('暂停时画面中央仍是视频', await page.evaluate(`
       document.elementFromPoint(${center.x}, ${center.y}) === ${player}.querySelector('video')
     `))
+    const timeline = `${player}.querySelector('[role="slider"][aria-label="播放进度"]')`
+    await clickCenter(timeline)
+    // 暂停时引擎不再发进度通知。等页面刷新两次，确认落点仍然有效。
+    await sleep(600)
+    check('暂停时点时间条中间，画面和时间条都停在中点', await page.evaluate(`(() => {
+      const duration = window.__ohBilibiliWatch.state().duration
+      const frame = ${player}.querySelector('video').currentTime * 1000
+      return !window.__ohBilibiliWatch.state().playing &&
+        Number(${timeline}.getAttribute('aria-valuenow')) === 50 && Math.abs(frame - duration / 2) < 150
+    })()`))
     await page.evaluate(`document.querySelector('[data-watch-controls] button[aria-label="播放"]').click()`)
     check('暂停后可从底栏继续播放', await waitFor('window.__ohBilibiliWatch.state().playing'))
   } finally {

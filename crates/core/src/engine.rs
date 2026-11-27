@@ -216,6 +216,50 @@ mod download_restore_tests {
         }
     }
 
+    #[tokio::test]
+    #[ignore = "需要声卡输出"]
+    async fn 在线音轨播完后能重播并从拖动位置继续() {
+        use crate::state::Prepared;
+        use bilimusic_audio::Media;
+        use bilimusic_model::{Millis, Quality};
+
+        let dir = temp_dir("online-replay");
+        let engine = Engine::open(&dir.join("library.sqlite")).unwrap();
+        engine.set_volume(0.0);
+        let mut song = track("online-fixture");
+        song.duration = Some(Millis(4_992));
+        engine.remember(&song);
+        engine.select_listen_track(&song);
+        let token = engine.begin_load(&song, false);
+        engine.load_media(Media::new(std::io::Cursor::new(audio_fixture())), false).unwrap();
+        *lock(&engine.pending_prepared) = Some((token, Prepared {
+            duration: song.duration.unwrap(),
+            quality: Quality::BEST,
+        }));
+        wait_for(|| engine.promote_loading()).await;
+
+        for restart_by_dragging in [false, true] {
+            engine.seek(4_000);
+            wait_for(|| engine.reached_track_end()).await;
+            engine.finish_track().await;
+            assert_eq!(engine.snapshot().phase, "ended");
+            let resumed = if restart_by_dragging {
+                engine.seek(2_000)
+            } else {
+                engine.toggle_or_load().await.unwrap()
+            };
+            let target = if restart_by_dragging { 2_000 } else { 0 };
+            assert_eq!(resumed.phase, "playing");
+            assert!((target..target + 300).contains(&resumed.position_ms));
+            wait_for(|| engine.snapshot().position_ms > target + 300).await;
+        }
+        engine.pause();
+        let paused = engine.seek(1_000);
+        assert_eq!((paused.phase.as_str(), paused.position_ms), ("paused", 1_000));
+        drop(engine);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[cfg(unix)]
     fn download_helper(dir: &std::path::Path) -> std::path::PathBuf {
         use std::os::unix::fs::PermissionsExt;

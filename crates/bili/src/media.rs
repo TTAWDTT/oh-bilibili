@@ -205,6 +205,59 @@ mod reconnect_tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
 
+    #[test]
+    fn 正常的_range_边界不退避() {
+        use std::io::BufRead;
+        use std::time::Instant;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let fixture = include_bytes!("../../audio/tests/fixtures/fragmented.m4s").repeat(15);
+        let server_fixture = fixture.clone();
+        let server = std::thread::spawn(move || {
+            let mut starts = Vec::new();
+            loop {
+                let (mut stream, _) = listener.accept().unwrap();
+                let range = std::io::BufReader::new(&stream)
+                    .lines()
+                    .map_while(Result::ok)
+                    .take_while(|line| !line.is_empty())
+                    .find_map(|line| line.strip_prefix("range: bytes=").map(str::to_owned))
+                    .unwrap();
+                let (start, end) = range.split_once('-').unwrap();
+                let start: usize = start.parse().unwrap();
+                let end = end.parse::<usize>().unwrap().min(server_fixture.len() - 1);
+                let bytes = &server_fixture[start..=end];
+                write!(
+                    stream,
+                    "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{end}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    server_fixture.len(),
+                    bytes.len()
+                )
+                .unwrap();
+                stream.write_all(bytes).unwrap();
+                starts.push(start);
+                if end == server_fixture.len() - 1 {
+                    return starts;
+                }
+            }
+        });
+
+        let mut media = RemoteMedia::open(format!("http://{addr}/audio"), Vec::new()).unwrap();
+        let start = Instant::now();
+        let mut got = Vec::new();
+        media.read_to_end(&mut got).unwrap();
+        let elapsed = start.elapsed();
+        let starts = server.join().unwrap();
+        let expected = std::iter::once(0)
+            .chain((0..fixture.len()).step_by(CHUNK_SIZE as usize))
+            .collect::<Vec<_>>();
+        println!("{} bytes, {} ranges, {elapsed:?}", got.len(), starts.len());
+        assert_eq!(got, fixture);
+        assert_eq!(starts, expected);
+        assert!(elapsed < Duration::from_millis(360), "{elapsed:?}");
+    }
+
     /// 前两次连接都在发了一小段后强行断开，第三次才把剩余字节发完。
     ///
     /// 这是 B 站 CDN 的真实行为：长连接会中途断。早先 read() 直接把错往上抛，
